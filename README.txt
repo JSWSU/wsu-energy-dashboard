@@ -60,6 +60,46 @@ README.txt                              --        This file
 docs/                                   --        Full documentation suite (see below)
 
 
+REQUIREMENTS (WHAT YOU NEED BEFORE YOU START)
+-----------------------------------------------
+
+For monthly data updates (the routine task):
+
+  [ ] Microsoft Excel 2016 or later (or Microsoft 365) with macros enabled
+      - The workbook uses VBA macros; Excel must allow them to run
+      - Go to File > Options > Trust Center > Trust Center Settings > Macro Settings
+      - Select "Disable VBA macros with notification" then click "Enable Content"
+        when prompted upon opening the workbook
+      - See docs/TROUBLESHOOTING.txt if macros are blocked by IT policy
+
+  [ ] Access to the R: drive (\\fais007\ENERGY GROUP)
+      - If you don't have it, submit an access request through WSU IT
+      - You need read/write access to the 1A. Cost Projection Report folder
+
+  [ ] A GitHub account with push access to the repository
+      - Create a free account at https://github.com if you don't have one
+      - Ask a repo admin to add you as a collaborator at:
+        https://github.com/JSWSU/wsu-energy-dashboard/settings/access
+      - OR use the GitHub web editor (no special software needed -- just a browser)
+
+  [ ] A web browser (Chrome, Edge, or Firefox)
+      - For viewing the live dashboard and uploading data.json via GitHub web
+
+For code changes (FY rollover, bug fixes, new features):
+
+  [ ] Everything above, plus:
+  [ ] A plain-text editor (Notepad works; VS Code is better)
+      - For editing index.html, ExportDataJSON.bas, or documentation files
+  [ ] (Optional) Git for Windows -- https://gitforwindows.org
+      - Only needed if you prefer command-line git over the GitHub web editor
+      - After installing, open Git Bash and run:
+          git clone https://github.com/JSWSU/wsu-energy-dashboard.git
+        This creates a local copy you can edit, commit, and push from
+
+No web servers, databases, programming languages, or build tools are required.
+Everything runs from Excel + a web browser + GitHub.
+
+
 QUICK START: MONTHLY DATA UPDATE
 ----------------------------------
 
