@@ -26,6 +26,15 @@ GitHub repository (version-controlled source):
 Live dashboard:
   https://jswsu.github.io/wsu-energy-dashboard/  (password: Energy@WSU)
 
+Why are there two copies (shared drive + GitHub)?
+  The shared drive holds the Excel workbook and a backup of all project files.
+  GitHub hosts the live website and tracks version history.
+  The shared drive is NOT a Git repository -- Git does not work reliably on
+  network file shares (SMB file locking causes corruption). To make code
+  changes, either edit directly on github.com (web editor) or clone the repo
+  to a local PC, edit there, push, and copy updated files back to the shared
+  drive. See docs/ARCHITECTURE.txt for full details.
+
 
 WHAT THIS PROJECT DOES
 -----------------------

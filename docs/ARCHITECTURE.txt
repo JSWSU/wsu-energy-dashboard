@@ -40,6 +40,36 @@ source of truth for code changes. The shared drive copy is the operational/archi
 ensures project continuity if the primary maintainer is unavailable.
 
 
+WHY THE SHARED DRIVE IS NOT A GIT REPOSITORY
+---------------------------------------------
+
+The shared drive (R:) is a Windows SMB/CIFS file share. Git repositories on network shares are
+unreliable: SMB file locking conflicts with Git's internal file operations, leading to corrupted
+indexes, broken histories, and silent data loss. This is a well-known limitation of Git on
+network-attached storage.
+
+Instead, the workflow uses three separate locations:
+
+Location                     Purpose                            Git?
+--------                     -------                            ----
+Local machine (any PC)       Edit files + run git commands       Yes (clone of the GitHub repo)
+GitHub (cloud)               Version control + hosts live site   Yes (the canonical repository)
+Shared drive (R:)            Operational backup + Excel home     No (plain file copy)
+
+For code changes (index.html, docs, ExportDataJSON.bas):
+1. Clone the GitHub repo to any local PC: git clone https://github.com/JSWSU/wsu-energy-dashboard.git
+2. Edit files locally, commit, and push to GitHub
+3. Copy updated files to the shared drive so both locations stay in sync
+   (Or skip the local clone entirely and edit directly on github.com using the web editor)
+
+For monthly data updates (data.json only):
+1. Run the Excel export macro (writes data.json to the shared drive)
+2. Upload data.json to GitHub (via web upload or git push from a local clone)
+
+The local clone is NOT required -- all editing can be done through the GitHub web interface.
+The local clone is a convenience for users who prefer a desktop text editor and command-line Git.
+
+
 FILE-BY-FILE BREAKDOWN
 -----------------------
 
