@@ -89,5 +89,6 @@ CONTACT & OWNERSHIP
 --------------------
 
 Department:                   WSU Facilities Services
+POC:			      John Slagboom (john.slagboom@wsu.edu / energy.1@wsu.edu)
 Campus:                       Pullman
 Documentation last reviewed:  February 2026
