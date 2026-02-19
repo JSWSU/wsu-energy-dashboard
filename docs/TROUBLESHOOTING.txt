@@ -161,6 +161,19 @@ Solution:
 7. Save the workbook as .xlsm
 
 
+INDEX.HTML SHOWS BLANK PAGE WHEN OPENED FROM SHARED DRIVE
+-----------------------------------------------------------
+
+Cause: Opening index.html directly from the R: drive (or any local folder) uses the file:// protocol. Most browsers block fetch('data.json') over file:// due to security restrictions (CORS policy).
+
+This is NOT a bug -- it is expected browser behavior.
+
+Solution: The live dashboard is hosted on GitHub Pages, not the shared drive. Always access it at:
+  https://jswsu.github.io/wsu-energy-dashboard/
+
+The copy of index.html on the shared drive is there as a code backup/reference, not for direct viewing. If you ever need to view it locally (e.g., GitHub is down), use Firefox which is more permissive with file:// access, or run a local web server from the folder.
+
+
 DASHBOARD SHOWS STALE DATA AFTER REFRESH
 ------------------------------------------
 

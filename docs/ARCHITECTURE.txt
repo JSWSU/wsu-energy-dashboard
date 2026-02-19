@@ -7,24 +7,37 @@ Technical deep dive for the developer who will maintain or extend the WSU Energy
 SYSTEM ARCHITECTURE
 -------------------
 
-Excel Workbook (4 sheets)
+Excel Workbook (4 sheets)                               <-- on shared drive (R:\...\1A. Cost Projection Report\)
       |
       | VBA Macro (ExportDataJSON.bas)
       v
-data.json (local file)
+data.json (written to same folder as workbook)           <-- on shared drive (R:\...\1A. Cost Projection Report\)
       |
-      | git push / GitHub web upload
+      | git push / GitHub web upload (manual step)
       v
-GitHub Repository (main branch)
+GitHub Repository (main branch)                          <-- https://github.com/JSWSU/wsu-energy-dashboard
       |
       | GitHub Pages (automatic deployment)
       v
-index.html (fetches data.json via Fetch API)
+index.html (fetches data.json via Fetch API)             <-- https://jswsu.github.io/wsu-energy-dashboard/
       |
       v
 Browser (Chart.js renders charts, JS builds tables/KPIs)
 
 No build step. No Node.js, no bundler, no package.json. The repository is deployed as-is by GitHub Pages.
+
+
+FILE LOCATIONS
+--------------
+
+All operational files live in one folder on the shared drive:
+
+  R:\Energy Services Admin\Energy Files\Annual Elect & Steam Use\1A. Cost Projection Report\
+  (UNC: \\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Annual Elect & Steam Use\1A. Cost Projection Report)
+
+The GitHub repository at https://github.com/JSWSU/wsu-energy-dashboard is the version-controlled
+source of truth for code changes. The shared drive copy is the operational/archival copy that
+ensures project continuity if the primary maintainer is unavailable.
 
 
 FILE-BY-FILE BREAKDOWN
