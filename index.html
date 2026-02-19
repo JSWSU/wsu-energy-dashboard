@@ -124,66 +124,67 @@
   #printSummary { display: none; }
   /* --- Print Media --- */
   @media print {
-    @page { size: letter; margin: 0.4in 0.5in; }
+    @page { size: letter portrait; margin: 0.3in 0.4in 0.3in 0.4in; }
     * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
-    body { background: #fff !important; color: #2d2d2d !important; font-size: 11px; }
+    body { background: #fff !important; color: #2d2d2d !important; font-size: 10px; margin: 0; padding: 0; }
     /* Force light mode */
     html.dark { --bg:#f5f5f5; --card-bg:#fff; --text:#2d2d2d; --text-light:#6b7280; --border:#e5e7eb; --secondary:#5f6b6d; --green:#059669; --red:#dc2626; --forecast-blue:#3b82f6; --table-head-bg:#f9fafb; --total-row-bg:#f0f4ff; }
     /* Hide all screen content */
     header, .container, footer, #authGate, #loading, #error { display: none !important; }
     /* Show print summary */
-    #printSummary { display: block !important; }
+    #printSummary { display: block !important; overflow: hidden; }
     .ps-header {
       background: linear-gradient(135deg, #981e32, #7a1828); color: #fff;
-      padding: 0.35in 0.1in; text-align: center; margin: -0.4in -0.5in 0; width: calc(100% + 1in);
+      padding: 0.2in 0.1in; text-align: center; margin: -0.3in -0.4in 0; width: calc(100% + 0.8in);
     }
-    .ps-header h1 { font-size: 16pt; font-weight: 700; margin: 0; letter-spacing: 0.02em; }
-    .ps-header p { font-size: 8.5pt; opacity: 0.9; margin: 2px 0 0; }
-    .ps-header .verified { background: rgba(255,255,255,0.2); color: #fff; font-size: 7pt; padding: 1px 6px; border-radius: 3px; }
+    .ps-header h1 { font-size: 14pt; font-weight: 700; margin: 0; letter-spacing: 0.02em; }
+    .ps-header p { font-size: 7.5pt; opacity: 0.9; margin: 1px 0 0; }
+    .ps-header .verified { background: rgba(255,255,255,0.2); color: #fff; font-size: 6.5pt; padding: 1px 5px; border-radius: 3px; }
     .ps-budget-print {
-      padding: 5px 10px; border-radius: 4px; font-size: 8pt; font-weight: 500;
-      margin: 10px 0 8px; display: flex; align-items: center; gap: 6px;
+      padding: 3px 8px; border-radius: 3px; font-size: 7pt; font-weight: 500;
+      margin: 6px 0 4px; display: flex; align-items: center; gap: 4px;
     }
     .ps-budget-print.on-track { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
     .ps-budget-print.watch { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
     .ps-budget-print.over-budget { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
     .ps-kpi-grid {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-      margin: 8px 0;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+      margin: 5px 0;
     }
     .ps-kpi {
-      border: 1px solid #e5e7eb; border-radius: 5px; padding: 6px 8px;
+      border: 1px solid #e5e7eb; border-radius: 4px; padding: 3px 6px;
       border-left: 3px solid #981e32; background: #fff;
     }
     .ps-kpi.forecast { border-left-color: #3b82f6; }
     .ps-kpi.delta { border-left-color: #c69214; }
     .ps-kpi.energy { border-left-color: #059669; }
-    .ps-kpi-label { font-size: 6.5pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
-    .ps-kpi-value { font-size: 13pt; font-weight: 700; margin: 1px 0; line-height: 1.2; }
+    .ps-kpi-label { font-size: 5.5pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+    .ps-kpi-value { font-size: 11pt; font-weight: 700; margin: 0; line-height: 1.2; }
     .ps-kpi-value.blue { color: #3b82f6; }
     .ps-kpi-value.green { color: #059669; }
     .ps-kpi-value.red { color: #dc2626; }
-    .ps-kpi-sub { font-size: 6pt; color: #6b7280; }
-    .ps-table-section { margin: 8px 0 6px; }
-    .ps-table-section h3 { font-size: 9pt; font-weight: 600; color: #981e32; margin-bottom: 4px; }
-    .ps-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+    .ps-kpi-sub { font-size: 5.5pt; color: #6b7280; }
+    .ps-table-section { margin: 5px 0 3px; }
+    .ps-table-section h3 { font-size: 8pt; font-weight: 600; color: #981e32; margin-bottom: 2px; }
+    .ps-table { width: 100%; border-collapse: collapse; font-size: 7pt; }
     .ps-table thead th {
-      background: #f9fafb; padding: 3px 5px; text-align: right; font-weight: 600;
-      color: #5f6b6d; border-bottom: 1.5px solid #e5e7eb; font-size: 7pt;
+      background: #f9fafb; padding: 2px 4px; text-align: right; font-weight: 600;
+      color: #5f6b6d; border-bottom: 1.5px solid #e5e7eb; font-size: 6.5pt;
     }
     .ps-table thead th:first-child { text-align: left; }
-    .ps-table tbody td { padding: 2.5px 5px; text-align: right; border-bottom: 0.5px solid #f3f4f6; }
+    .ps-table tbody td { padding: 1.5px 4px; text-align: right; border-bottom: 0.5px solid #f3f4f6; }
     .ps-table tbody td:first-child { text-align: left; font-weight: 500; }
     .ps-table tbody tr.forecast-row { color: #3b82f6; font-style: italic; }
     .ps-table tbody tr.total-row { font-weight: 700; background: #f0f4ff; border-top: 1.5px solid #981e32; }
     .ps-table .positive { color: #059669; }
     .ps-table .negative { color: #dc2626; }
-    .ps-chart-section { margin: 8px 0 4px; }
-    .ps-chart-section h3 { font-size: 9pt; font-weight: 600; color: #981e32; margin-bottom: 4px; }
-    .ps-chart-section canvas { width: 100% !important; height: 160px !important; }
+    .ps-chart-section { margin: 5px 0 2px; }
+    .ps-chart-section h3 { font-size: 8pt; font-weight: 600; color: #981e32; margin-bottom: 2px; }
+    .ps-chart-wrap { position: relative; width: 100%; height: 140px; }
+    .ps-chart-wrap canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
     .ps-footer {
-      text-align: center; font-size: 7pt; color: #6b7280;
-      border-top: 1px solid #e5e7eb; padding-top: 4px; margin-top: 6px;
+      text-align: center; font-size: 6.5pt; color: #6b7280;
+      border-top: 1px solid #e5e7eb; padding-top: 3px; margin-top: 4px;
     }
   }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -632,7 +633,7 @@
   </div>
   <div class="ps-chart-section">
     <h3>Cumulative Cost Trend &mdash; Actual vs Forecast</h3>
-    <canvas id="chartPrintCumulative"></canvas>
+    <div class="ps-chart-wrap"><canvas id="chartPrintCumulative"></canvas></div>
   </div>
   <div class="ps-footer">
     WSU Facilities Services &bull; Energy Cost Projection FY2026 &bull; Confidential
@@ -1140,7 +1141,12 @@ function initDashboard(D) {
       '<td>' + fmtNum(totalMMBTU) + '</td>';
     psBody.appendChild(trT);
 
-    // Cumulative chart for print (rendered off-screen, visible in print)
+    // Cumulative chart for print — briefly show container so Chart.js can measure
+    const psSummary = document.getElementById('printSummary');
+    psSummary.style.display = 'block';
+    psSummary.style.position = 'absolute';
+    psSummary.style.left = '-9999px';
+    psSummary.style.width = '7.7in'; // letter minus margins
     const psCanvas = document.getElementById('chartPrintCumulative');
     new Chart(psCanvas, {
       type: 'line',
@@ -1155,12 +1161,19 @@ function initDashboard(D) {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
-        plugins: { legend: { position: 'bottom', labels: { font: { size: 8 }, padding: 8, usePointStyle: true, color: '#6b7280' } } },
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 8 }, padding: 6, usePointStyle: true, color: '#6b7280' } } },
         scales: {
-          y: { ticks: { callback: v => '$' + (v / 1e6).toFixed(0) + 'M', font: { size: 8 }, color: '#6b7280' }, grid: { color: 'rgba(0,0,0,0.06)' } },
-          x: { ticks: { font: { size: 8 }, color: '#6b7280' }, grid: { display: false } }
+          y: { ticks: { callback: v => '$' + (v / 1e6).toFixed(0) + 'M', font: { size: 7 }, color: '#6b7280' }, grid: { color: 'rgba(0,0,0,0.06)' } },
+          x: { ticks: { font: { size: 7 }, color: '#6b7280' }, grid: { display: false } }
         }
       }
+    });
+    // Re-hide after chart renders
+    requestAnimationFrame(() => {
+      psSummary.style.display = '';
+      psSummary.style.position = '';
+      psSummary.style.left = '';
+      psSummary.style.width = '';
     });
   })();
 }
