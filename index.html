@@ -380,8 +380,11 @@ function initDashboard(D) {
   const totalElec = sum(fy26.elecActual), totalGas = sum(fy26.gasActual);
   const totalMMBTU = sum(energyUse.totalActual);
   const totalElecMMBTU = sum(energyUse.elecActual), totalGasMMBTU = sum(energyUse.gasActual);
-  const delta = totalFcast - totalAct;
-  const deltaPct = totalAct > 0 ? (delta / totalAct) * 100 : 0;
+  // Use the authoritative delta from the cumulative summary (last month = full-year projection)
+  // This correctly accounts for actual months replacing forecasts
+  const last = cumul.delta.length - 1;
+  const delta = cumul.delta[last];
+  const deltaPct = cumul.deltaPct[last];
 
   // Compute rates from cost/MMBTU (since cumul no longer has elecRate/gasRate)
   const elecRateAct = totalElecMMBTU > 0 ? totalElec / totalElecMMBTU : 0;
@@ -391,8 +394,9 @@ function initDashboard(D) {
 
   document.getElementById('kpiActualYTD').textContent = fmtDollarM(totalAct);
   document.getElementById('kpiForecast').textContent = fmtDollarM(totalFcast);
-  document.getElementById('kpiDelta').textContent = '+' + fmtDollarM(delta);
-  document.getElementById('kpiDeltaPct').textContent = fmtPct(deltaPct) + ' over actuals';
+  const deltaSign = delta >= 0 ? '+' : '-';
+  document.getElementById('kpiDelta').textContent = deltaSign + fmtDollarM(Math.abs(delta));
+  document.getElementById('kpiDeltaPct').textContent = fmtPct(deltaPct) + (delta >= 0 ? ' over actuals' : ' under actuals');
   document.getElementById('kpiMMBTU').textContent = fmtNum(totalMMBTU);
   document.getElementById('kpiMMBTUSub').textContent = 'MMBTU (Elec: ' + fmtNum(totalElecMMBTU) + ' | Gas: ' + fmtNum(totalGasMMBTU) + ')';
   document.getElementById('kpiElecCost').textContent = fmtDollarM(totalElec);
