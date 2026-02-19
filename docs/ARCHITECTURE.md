@@ -1,0 +1,263 @@
+# Architecture Reference
+
+Technical deep dive for the developer who will maintain or extend the WSU Energy Dashboard.
+
+---
+
+## System Architecture
+
+```
+Excel Workbook (4 sheets)
+      |
+      | VBA Macro (ExportDataJSON.bas)
+      v
+data.json (local file)
+      |
+      | git push / GitHub web upload
+      v
+GitHub Repository (main branch)
+      |
+      | GitHub Pages (automatic deployment)
+      v
+index.html (fetches data.json via Fetch API)
+      |
+      v
+Browser (Chart.js renders charts, JS builds tables/KPIs)
+```
+
+**No build step.** No Node.js, no bundler, no package.json. The repository is deployed as-is by GitHub Pages.
+
+---
+
+## File-by-File Breakdown
+
+### `index.html` (~58 KB, single-file SPA)
+
+The entire web application lives in one file. Structure:
+
+| Section | Contents |
+|---------|----------|
+| `<style>` block | CSS variables, layout, components, dark mode, print styles |
+| `<body>` HTML | Auth gate, loading spinner, header, 9 tab sections, print summary, footer |
+| `<script>` block | Constants, formatters, auth gate, dark mode, tab nav, `initDashboard()`, data fetch |
+
+**CSS Architecture:**
+- CSS custom properties (variables) defined in `:root` (light theme) and `html.dark` (dark theme override)
+- All colors reference variables: `var(--bg)`, `var(--text)`, `var(--primary)`, etc.
+- Component classes: `.kpi-card`, `.card`, `.nav-tab`, `.budget-banner`, etc.
+- Print styles in `@media print` block: hides screen content, shows `#printSummary`
+
+**JavaScript Architecture:**
+- `initDashboard(D)` is the main function -- receives the parsed JSON data object
+- All charts, tables, KPIs, and dynamic content built inside this single function
+- Helper functions: `fmtDollar`, `fmtDollarM`, `fmtNum`, `fmtPct`, `fmtRate`, `fmtRateKwh`, `sum`
+- No modules, no classes, no framework -- vanilla JS throughout
+
+### `data.json` (~6 KB)
+
+The data payload. 10 top-level keys, all arrays are 12 elements (fiscal year months). See [Data Dictionary](DATA-DICTIONARY.md) for complete field reference.
+
+### `ExportDataJSON.bas` (~24 KB)
+
+VBA macro for Excel. See [VBA Reference](VBA-REFERENCE.md) for complete documentation.
+
+---
+
+## Authentication Model
+
+| Property | Value |
+|----------|-------|
+| Type | Client-side password gate |
+| Password | `Energy@WSU` (hardcoded in JS) |
+| Storage | `sessionStorage` key: `wsuEnergyAuth` |
+| Persistence | Cleared when browser tab closes |
+| Security level | **Deterrent only** -- anyone who views page source can see the password |
+
+**How it works:**
+1. On page load, checks `sessionStorage.getItem('wsuEnergyAuth')`
+2. If `'ok'`, hides the auth gate immediately
+3. If not, shows full-screen overlay with password input
+4. On submit, compares input to `'Energy@WSU'` (case-sensitive)
+5. If match: sets `sessionStorage`, hides gate
+6. If no match: shows error message
+
+**To change the password:** Edit the string comparison in the `tryAuth()` function inside the auth gate IIFE.
+
+**Recommendation:** If true access control is needed, consider moving to a private GitHub repo with organization access, or adding server-side authentication.
+
+---
+
+## Tab System
+
+9 tabs managed by click handlers:
+
+| Tab ID | Tab Name | Content |
+|--------|----------|---------|
+| `dashboard` | Dashboard | KPI cards, 4 charts, budget banner |
+| `monthly` | Monthly Detail | FY2026 actuals vs forecasts table |
+| `gas` | Gas Analysis | FY2025 gas table + chart, Kintec chart |
+| `energy-use` | Energy Use | MMBTU table + chart |
+| `yoy` | Year-over-Year | FY25 vs FY26 MMBTU comparison |
+| `cumulative` | Cumulative Summary | Running totals table + chart |
+| `variance` | Price vs Volume | Variance analysis table + 2 charts |
+| `hdd` | HDD / Weather | Heating degree days table + chart |
+| `sources` | Data Sources | Account list, methodology notes |
+
+**Implementation:** Show/hide via `.section { display: none; }` and `.section.active { display: block; }`. Click handler toggles `.active` class.
+
+---
+
+## KPI Card System
+
+8 interactive cards on the Dashboard tab, each with:
+
+| Feature | Implementation |
+|---------|---------------|
+| Hover tooltip | CSS-only: `.kpi-tooltip` visibility/opacity transition |
+| Click to expand | JS toggles `.expanded` class; CSS `max-height` transition from 0 to 500px |
+| Mini-table | Built by `buildKpiMiniTable(config)` using `kpiExpandConfig` object |
+| Expand icon | `<span class="kpi-expand-icon">` rotates 180 degrees when expanded |
+
+**Configuration object** `kpiExpandConfig` maps each card's `data-kpi` attribute to:
+- `headers` -- column headers for the mini-table
+- `rows(i)` -- function returning cell values for month `i`
+- `totalLabel` -- label for the total row
+- `totals()` -- function returning total row values
+
+**Card types by `data-kpi` attribute:**
+
+| Key | Card Label | Expand Shows |
+|-----|-----------|-------------|
+| `actualYTD` | FY2026 Actual + Forecast | Month, Total Cost |
+| `forecast` | FY2026 Forecast | Month, Total Forecast |
+| `delta` | Forecast vs Actual | Month, Cumul. Actual, Cumul. Forecast, Delta |
+| `mmbtu` | Total Energy Use (YTD) | Month, Total MMBTU |
+| `elecCost` | Electric Cost (YTD) | Month, Electric Cost, Elec MMBTU |
+| `gasCost` | Gas Cost (YTD) | Month, Gas Cost, Gas MMBTU, Kintec, Avista |
+| `elecRate` | Avg Elec Rate | Month, Elec $, kWh, $/kWh |
+| `gasRate` | Avg Gas Rate | Month, Gas $, MMBTU, $/MMBTU |
+
+---
+
+## Budget Status Banner
+
+Dynamically generated based on cumulative delta at the last actual month.
+
+| Condition | CSS Class | Icon | Label |
+|-----------|-----------|------|-------|
+| `delta > 0` and `deltaPct > 3%` | `on-track` | Green check | Under Budget |
+| `delta > 0` and `deltaPct <= 3%` | `watch` | Warning | Watch |
+| `delta <= 0` | `over-budget` | Stop sign | Over Budget |
+
+**Actual vs forecast detection:** A month is "actual" if `fy26.totalActual[i] !== fy26.totalFcast[i]`. This is stored in the `isActual[]` boolean array and also drives forecast row shading in tables.
+
+---
+
+## Chart.js Configuration
+
+**Version:** 4.4.7, loaded from CDN: `https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js`
+
+**11 chart instances:**
+
+| Chart ID | Type | Tab | Description |
+|----------|------|-----|-------------|
+| `chartMonthly` | Bar | Dashboard | Monthly actual vs forecast cost |
+| `chartBreakdown` | Stacked bar | Dashboard | Electric + gas actual vs forecast |
+| `chartMMBTU` | Stacked bar | Dashboard | Electric + gas MMBTU |
+| `chartPie` | Doughnut | Dashboard | Cost distribution (Electric, Kintec, Avista) |
+| `chartGas25` | Bar + line (dual axis) | Gas Analysis | FY2025 gas cost + MMBTU |
+| `chartKintec` | Bar + line (dual axis) | Gas Analysis | Kintec Dth + cost history |
+| `chartEnergyUse` | Stacked bar + line | Energy Use | MMBTU actual vs forecast |
+| `chartYoY` | Line | Year-over-Year | FY25 vs FY26 MMBTU trends |
+| `chartCumulative` | Filled line | Cumulative | Running actual vs forecast |
+| `chartVarianceCost` | Bar | Variance | FY25 vs FY26 cost comparison |
+| `chartVarianceMmbtu` | Bar + line | Variance | FY25 vs FY26 MMBTU + normal HDD |
+| `chartHDD` | Bar + line | HDD | FY25 vs FY26 HDD + 30-year normal |
+
+**Color palette** (defined in the `C` object):
+
+| Variable | Hex | Usage |
+|----------|-----|-------|
+| `primary` | `#981e32` | WSU Crimson -- actuals, primary bars |
+| `blue` | `#3b82f6` | Forecasts, overlays |
+| `green` | `#059669` | Positive indicators |
+| `accent` | `#c69214` | Gold -- gas data |
+| `gray` | `#6b7280` | Normals, reference lines |
+| `purple` | `#7c3aed` | (Reserved) |
+| `orange` | `#ea580c` | Avista in pie chart |
+
+**Dark mode limitation:** Chart.js text/grid colors are set once at page load. If the user toggles dark mode after charts are rendered, the chart text won't update until a page refresh.
+
+---
+
+## Dark Mode
+
+| Property | Value |
+|----------|-------|
+| Toggle | Slider button in header |
+| Storage | `localStorage` key: `wsuDarkMode` (values: `'on'` / `'off'`) |
+| Persistence | Persists across sessions and page refreshes |
+| Implementation | Toggles `html.dark` class on `<html>` element |
+
+CSS variables under `html.dark` override all colors (background, text, borders, table headers, forecast shading, etc.).
+
+---
+
+## Print Optimization
+
+**Print button** in header triggers `window.print()`.
+
+**`#printSummary`** -- A hidden section (`display:none` on screen) that becomes visible only in `@media print`:
+
+| Component | Description |
+|-----------|-------------|
+| `.ps-header` | WSU crimson banner with title, date, verified badge |
+| `#psBudget` | Budget status banner (mirrors main banner) |
+| `#psKpiGrid` | 4x2 grid of 8 KPI boxes |
+| `.ps-table` | Compact monthly cost summary table (12 rows + total) |
+| `.ps-footer` | "Confidential" footer line |
+
+**Layout:** Designed for 8.5x11 letter paper with 0.75in margins (wide).
+
+**Dark mode in print:** CSS forces all dark mode variables back to light values.
+
+---
+
+## Data Fetching
+
+```javascript
+fetch('data.json')  // Relative URL -- served by GitHub Pages
+  .then(r => r.json())
+  .then(data => initDashboard(data))
+  .catch(err => /* show error */ );
+```
+
+- No caching headers, no service worker, no offline support
+- Error message instructs user to run the Excel export macro
+
+---
+
+## External Dependencies
+
+| Dependency | Version | Source | Purpose |
+|-----------|---------|--------|---------|
+| Chart.js | 4.4.7 | `cdn.jsdelivr.net` | All charts and visualizations |
+| GitHub Pages | -- | `github.com` | Static site hosting |
+
+**No other dependencies.** No CSS framework, no JS framework, no build tools.
+
+---
+
+## Known Limitations & Technical Debt
+
+| Issue | Impact | Mitigation |
+|-------|--------|------------|
+| All code in one 58KB HTML file | Hard to navigate for large changes | Consider splitting CSS/JS into separate files |
+| Password is client-side plaintext | Anyone can read the page source | Move to private repo or server-side auth if needed |
+| FY year hardcoded in multiple places | Must update ~8 locations for FY rollover | See [Operations Runbook](OPERATIONS-RUNBOOK.md#fiscal-year-rollover-procedure) |
+| Chart.js colors don't respond to dark mode toggle | Charts look wrong if toggled after load | Refresh after toggling (or toggle before load) |
+| No automated tests | Changes could break silently | Manual testing required |
+| No linting or formatting tools | Inconsistent code style | Consider adding ESLint/Prettier |
+| VBA row/column offsets are hardcoded | Fragile if Excel layout changes | Keep Excel layout stable; update VBA if it changes |
+| Chart.js loaded from CDN | Requires internet; CDN outage breaks charts | Download and host locally as fallback |
+| `sessionStorage` auth clears on every new tab | User re-enters password per tab | Expected behavior for simple gate |
