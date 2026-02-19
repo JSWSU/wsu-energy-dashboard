@@ -90,6 +90,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   #loading { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; }
   #error { position: fixed; inset: 0; background: var(--bg); align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; padding: 2rem; text-align: center; }
+  .verified { display: inline-flex; align-items: center; gap: 0.3rem; background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -106,7 +107,7 @@
 
 <header>
   <h1>WSU Energy Cost Projection Workbook &amp; Report</h1>
-  <p>FY2026 (July 2025 &ndash; June 2026) &bull; Last Updated: <span id="lastUpdated">...</span></p>
+  <p>FY2026 (July 2025 &ndash; June 2026) &bull; Last Updated: <span id="lastUpdated">...</span> <span id="verifiedBadge"></span></p>
 </header>
 <div class="container">
   <div class="nav-tabs">
@@ -116,6 +117,7 @@
     <button class="nav-tab" data-tab="energy-use">Energy Use</button>
     <button class="nav-tab" data-tab="yoy">Year-over-Year</button>
     <button class="nav-tab" data-tab="cumulative">Cumulative Summary</button>
+    <button class="nav-tab" data-tab="variance">Price vs Volume</button>
     <button class="nav-tab" data-tab="hdd">HDD / Weather</button>
     <button class="nav-tab" data-tab="sources">Data Sources</button>
   </div>
@@ -234,10 +236,10 @@
 
   <!-- YEAR OVER YEAR -->
   <div id="yoy" class="section">
-    <div class="card"><h2>Fiscal Year MMBTU Comparison</h2><div class="chart-container"><canvas id="chartYoY"></canvas></div></div>
+    <div class="card"><h2>Fiscal Year MMBTU Comparison (FY2025 vs FY2026)</h2><div class="chart-container"><canvas id="chartYoY"></canvas></div></div>
     <div class="card"><div class="table-wrap">
       <table id="tableYoY"><thead><tr>
-        <th>Month</th><th>FY24 Total</th><th>FY24 Elec</th><th>FY24 Gas</th>
+        <th>Month</th>
         <th>FY25 Total</th><th>FY25 Elec</th><th>FY25 Gas</th>
         <th>FY26 Total</th><th>FY26 Elec</th><th>FY26 Gas</th>
       </tr></thead><tbody></tbody></table>
@@ -252,7 +254,22 @@
     <div class="card"><div class="table-wrap">
       <table id="tableCumulative"><thead><tr>
         <th>Month</th><th>Cumul. Actual ($)</th><th>Cumul. Forecast ($)</th><th>Delta ($)</th><th>Delta %</th>
-        <th>Cumul. MMBTU (Actual)</th><th>Elec $/MMBTU (Actual)</th><th>Gas $/MMBTU (Actual)</th>
+        <th>Cumul. MMBTU (Actual)</th><th>Cumul. MMBTU (Fcast)</th><th>MMBTU Delta</th><th>MMBTU Delta %</th>
+      </tr></thead><tbody></tbody></table>
+    </div></div>
+  </div>
+
+  <!-- PRICE vs VOLUME VARIANCE -->
+  <div id="variance" class="section">
+    <div class="chart-row">
+      <div class="card"><h2>FY25 vs FY26 Cost Comparison</h2><div class="chart-container"><canvas id="chartVarianceCost"></canvas></div></div>
+      <div class="card"><h2>FY25 vs FY26 MMBTU Comparison</h2><div class="chart-container"><canvas id="chartVarianceMmbtu"></canvas></div></div>
+    </div>
+    <div class="card"><h2>Price vs Volume Variance Analysis</h2><div class="table-wrap">
+      <table id="tableVariance"><thead><tr>
+        <th>Month</th><th>FY25 Cost</th><th>FY26 Cost</th><th>$ Variance</th>
+        <th>FY25 MMBTU</th><th>FY26 MMBTU</th><th>MMBTU Var.</th><th>MMBTU %</th>
+        <th>FY25 HDD</th><th>FY26 HDD</th><th>HDD %</th><th>30-Yr Normal</th>
       </tr></thead><tbody></tbody></table>
     </div></div>
   </div>
@@ -303,10 +320,8 @@
         <li>Actuals shown in bold black; Forecasts in blue italic</li>
         <li>Forecasts calculated using CY2024&ndash;CY2025 annual growth trend applied to CY2025 same-month values</li>
         <li>All data dynamically sourced from Consolidated Data table (Avista, Inland Power, Kintec Gas)</li>
+        <li>Data read from &ldquo;Executive Summary (Print)&rdquo; sheet, cross-checked against Consolidated Data</li>
         <li>FY2026 = July 2025 through June 2026; FY2025 = July 2024 through June 2025</li>
-        <li>Elec rate (~$27&ndash;$30/MMBTU) equates to ~$0.09&ndash;$0.10/kWh (Avista commercial/industrial tariffs)</li>
-        <li>Gas rate (~$5.70&ndash;$5.85/MMBTU) reflects delivered cost (commodity + distribution)</li>
-        <li>Electric-to-gas ratio of ~5:1 on $/MMBTU is typical (electricity 3&ndash;5x more costly per unit energy)</li>
         <li>Price hedge / contingency applied to all forecast months</li>
       </ul></div>
     </div>
@@ -357,7 +372,8 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 // ==================== LOAD DATA & BUILD ====================
 function initDashboard(D) {
   const fy26 = D.fy26, fy25gas = D.fy25gas, energyUse = D.energyUse,
-        yoy = D.yoy, cumul = D.cumul, hdd = D.hdd, kintec = D.kintec;
+        yoy = D.yoy, cumul = D.cumul, hdd = D.hdd, kintec = D.kintec,
+        variance = D.variance;
 
   // --- KPI Cards ---
   const totalAct = sum(fy26.totalActual), totalFcast = sum(fy26.totalFcast);
@@ -366,9 +382,12 @@ function initDashboard(D) {
   const totalElecMMBTU = sum(energyUse.elecActual), totalGasMMBTU = sum(energyUse.gasActual);
   const delta = totalFcast - totalAct;
   const deltaPct = totalAct > 0 ? (delta / totalAct) * 100 : 0;
-  const last = cumul.elecRate.length - 1;
-  const elecRateFcast = sum(fy26.elecFcast) / sum(energyUse.elecActual);
-  const gasRateFcast = sum(fy26.gasFcast) / sum(energyUse.gasActual);
+
+  // Compute rates from cost/MMBTU (since cumul no longer has elecRate/gasRate)
+  const elecRateAct = totalElecMMBTU > 0 ? totalElec / totalElecMMBTU : 0;
+  const gasRateAct = totalGasMMBTU > 0 ? totalGas / totalGasMMBTU : 0;
+  const elecRateFcast = sum(energyUse.elecActual) > 0 ? sum(fy26.elecFcast) / sum(energyUse.elecActual) : 0;
+  const gasRateFcast = sum(energyUse.gasActual) > 0 ? sum(fy26.gasFcast) / sum(energyUse.gasActual) : 0;
 
   document.getElementById('kpiActualYTD').textContent = fmtDollarM(totalAct);
   document.getElementById('kpiForecast').textContent = fmtDollarM(totalFcast);
@@ -380,12 +399,17 @@ function initDashboard(D) {
   document.getElementById('kpiElecPct').textContent = (totalElec / totalAct * 100).toFixed(1) + '% of total';
   document.getElementById('kpiGasCost').textContent = fmtDollarM(totalGas);
   document.getElementById('kpiGasPct').textContent = (totalGas / totalAct * 100).toFixed(1) + '% of total (Kintec + Avista)';
-  document.getElementById('kpiElecRate').textContent = fmtRate(cumul.elecRate[last]);
+  document.getElementById('kpiElecRate').textContent = fmtRate(elecRateAct);
   document.getElementById('kpiElecRateSub').textContent = '$/MMBTU actual | ' + fmtRate(elecRateFcast) + ' forecast';
-  document.getElementById('kpiGasRate').textContent = fmtRate(cumul.gasRate[last]);
+  document.getElementById('kpiGasRate').textContent = fmtRate(gasRateAct);
   document.getElementById('kpiGasRateSub').textContent = '$/MMBTU actual | ' + fmtRate(gasRateFcast) + ' forecast';
   document.getElementById('lastUpdated').textContent = D.lastUpdated;
   document.getElementById('footerDate').textContent = D.lastUpdated;
+
+  // Verification badge
+  if (D.verification) {
+    document.getElementById('verifiedBadge').innerHTML = '<span class="verified">Verified vs Consolidated Data</span>';
+  }
 
   // --- Dashboard Charts ---
   new Chart(document.getElementById('chartMonthly'), {
@@ -480,13 +504,13 @@ function initDashboard(D) {
     {label:'Total Forecast',data:energyUse.totalFcast,type:'line',borderColor:C.blue,borderDash:[5,5],pointRadius:4,tension:0.3,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}});
 
-  // --- YoY Table ---
+  // --- YoY Table (2 years: FY25 vs FY26) ---
   const tb4=document.querySelector('#tableYoY tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtNum(yoy.fy24total[i])}</td><td>${fmtNum(yoy.fy24elec[i])}</td><td>${fmtNum(yoy.fy24gas[i])}</td><td>${fmtNum(yoy.fy25total[i])}</td><td>${fmtNum(yoy.fy25elec[i])}</td><td>${fmtNum(yoy.fy25gas[i])}</td><td>${fmtNum(yoy.fy26total[i])}</td><td>${fmtNum(yoy.fy26elec[i])}</td><td>${fmtNum(yoy.fy26gas[i])}</td>`;
+    tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtNum(yoy.fy25total[i])}</td><td>${fmtNum(yoy.fy25elec[i])}</td><td>${fmtNum(yoy.fy25gas[i])}</td><td>${fmtNum(yoy.fy26total[i])}</td><td>${fmtNum(yoy.fy26elec[i])}</td><td>${fmtNum(yoy.fy26gas[i])}</td>`;
     tb4.appendChild(tr);}
   const tr4=document.createElement('tr');tr4.className='total-row';
-  tr4.innerHTML=`<td>FY TOTAL</td><td>${fmtNum(sum(yoy.fy24total))}</td><td>${fmtNum(sum(yoy.fy24elec))}</td><td>${fmtNum(sum(yoy.fy24gas))}</td><td>${fmtNum(sum(yoy.fy25total))}</td><td>${fmtNum(sum(yoy.fy25elec))}</td><td>${fmtNum(sum(yoy.fy25gas))}</td><td>${fmtNum(sum(yoy.fy26total))}</td><td>${fmtNum(sum(yoy.fy26elec))}</td><td>${fmtNum(sum(yoy.fy26gas))}</td>`;
+  tr4.innerHTML=`<td>FY TOTAL</td><td>${fmtNum(sum(yoy.fy25total))}</td><td>${fmtNum(sum(yoy.fy25elec))}</td><td>${fmtNum(sum(yoy.fy25gas))}</td><td>${fmtNum(sum(yoy.fy26total))}</td><td>${fmtNum(sum(yoy.fy26elec))}</td><td>${fmtNum(sum(yoy.fy26gas))}</td>`;
   tb4.appendChild(tr4);
 
   // YoY notes
@@ -495,9 +519,8 @@ function initDashboard(D) {
   const yoyPctGas=((sum(yoy.fy26gas)-sum(yoy.fy25gas))/sum(yoy.fy25gas)*100).toFixed(1);
   document.getElementById('yoyNotes').innerHTML=`<li>FY26 vs FY25: ${yoyPctTotal}% total, ${yoyPctElec}% electric, ${yoyPctGas}% gas</li>`;
 
-  // --- YoY Chart ---
+  // --- YoY Chart (2 years) ---
   new Chart(document.getElementById('chartYoY'),{type:'line',data:{labels:MONTHS,datasets:[
-    {label:'FY2024',data:yoy.fy24total,borderColor:C.gray,backgroundColor:C.grayLight,pointRadius:3,tension:0.3},
     {label:'FY2025',data:yoy.fy25total,borderColor:C.blue,backgroundColor:C.blueLight,pointRadius:3,tension:0.3},
     {label:'FY2026',data:yoy.fy26total,borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,borderWidth:2.5,tension:0.3}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}},
@@ -505,12 +528,14 @@ function initDashboard(D) {
 
   // --- Cumulative Table ---
   const mShort=['Jul 2025','Aug 2025','Sep 2025','Oct 2025','Nov 2025','Dec 2025','Jan 2026','Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026'];
+  const last=cumul.actual.length-1;
   const tb5=document.querySelector('#tableCumulative tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${mShort[i]}</td><td>${fmtDollar(cumul.actual[i])}</td><td class="forecast">${fmtDollar(cumul.forecast[i])}</td><td class="negative">+${fmtDollar(cumul.delta[i])}</td><td class="negative">${fmtPct(cumul.deltaPct[i])}</td><td>${fmtNum(cumul.mmbtuAct[i])}</td><td>${fmtRate(cumul.elecRate[i])}</td><td>${fmtRate(cumul.gasRate[i])}</td>`;
+    const dCls = cumul.delta[i]>0?'negative':'positive';
+    tr.innerHTML=`<td>${mShort[i]}</td><td>${fmtDollar(cumul.actual[i])}</td><td class="forecast">${fmtDollar(cumul.forecast[i])}</td><td class="${dCls}">${fmtDollar(cumul.delta[i])}</td><td class="${dCls}">${fmtPct(cumul.deltaPct[i])}</td><td>${fmtNum(cumul.mmbtuAct[i])}</td><td class="forecast">${fmtNum(cumul.mmbtuFcast[i])}</td><td>${fmtNum(cumul.mmbtuDelta[i])}</td><td>${fmtPct(cumul.mmbtuDeltaPct[i])}</td>`;
     tb5.appendChild(tr);}
   const tr5=document.createElement('tr');tr5.className='total-row';
-  tr5.innerHTML=`<td>FY TOTAL</td><td>${fmtDollar(cumul.actual[last])}</td><td class="forecast">${fmtDollar(cumul.forecast[last])}</td><td class="negative">+${fmtDollar(cumul.delta[last])}</td><td class="negative">${fmtPct(cumul.deltaPct[last])}</td><td>${fmtNum(cumul.mmbtuAct[last])}</td><td>${fmtRate(cumul.elecRate[last])}</td><td>${fmtRate(cumul.gasRate[last])}</td>`;
+  tr5.innerHTML=`<td>FY TOTAL</td><td>${fmtDollar(cumul.actual[last])}</td><td class="forecast">${fmtDollar(cumul.forecast[last])}</td><td class="negative">${fmtDollar(cumul.delta[last])}</td><td class="negative">${fmtPct(cumul.deltaPct[last])}</td><td>${fmtNum(cumul.mmbtuAct[last])}</td><td class="forecast">${fmtNum(cumul.mmbtuFcast[last])}</td><td>${fmtNum(cumul.mmbtuDelta[last])}</td><td>${fmtPct(cumul.mmbtuDeltaPct[last])}</td>`;
   tb5.appendChild(tr5);
 
   // --- Cumulative Chart ---
@@ -519,6 +544,30 @@ function initDashboard(D) {
     {label:'Forecast (Cumulative)',data:cumul.forecast,borderColor:C.blue,backgroundColor:C.blueLight,fill:true,pointRadius:4,borderDash:[6,3],tension:0.3}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(0)+'M'}}},
     plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollarM(ctx.raw)}}}}});
+
+  // --- Variance Table ---
+  if(variance){
+    const tb7=document.querySelector('#tableVariance tbody');
+    for(let i=0;i<12;i++){const tr=document.createElement('tr');
+      const costCls=variance.costDelta[i]>0?'negative':'positive';
+      tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtDollar(variance.fy25cost[i])}</td><td>${fmtDollar(variance.fy26cost[i])}</td><td class="${costCls}">${fmtDollar(variance.costDelta[i])}</td><td>${fmtNum(variance.fy25mmbtu[i])}</td><td>${fmtNum(variance.fy26mmbtu[i])}</td><td>${fmtNum(variance.mmbtuDelta[i])}</td><td>${fmtPct(variance.mmbtuDeltaPct[i])}</td><td>${fmtNum(variance.fy25hdd[i])}</td><td>${fmtNum(variance.fy26hdd[i])}</td><td>${variance.hddDeltaPct[i]}%</td><td>${fmtNum(variance.normalHdd[i])}</td>`;
+      tb7.appendChild(tr);}
+    const tr7=document.createElement('tr');tr7.className='total-row';
+    tr7.innerHTML=`<td>FY Total</td><td>${fmtDollar(sum(variance.fy25cost))}</td><td>${fmtDollar(sum(variance.fy26cost))}</td><td class="${sum(variance.costDelta)>0?'negative':'positive'}">${fmtDollar(sum(variance.costDelta))}</td><td>${fmtNum(sum(variance.fy25mmbtu))}</td><td>${fmtNum(sum(variance.fy26mmbtu))}</td><td>${fmtNum(sum(variance.mmbtuDelta))}</td><td>${fmtPct(sum(variance.mmbtuDelta)/sum(variance.fy25mmbtu)*100)}</td><td>${fmtNum(sum(variance.fy25hdd))}</td><td>${fmtNum(sum(variance.fy26hdd))}</td><td>--</td><td>${fmtNum(sum(variance.normalHdd))}</td>`;
+    tb7.appendChild(tr7);
+
+    // Variance charts
+    new Chart(document.getElementById('chartVarianceCost'),{type:'bar',data:{labels:MONTHS,datasets:[
+      {label:'FY2025',data:variance.fy25cost,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
+      {label:'FY2026',data:variance.fy26cost,backgroundColor:C.primary,borderRadius:3}
+    ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}});
+
+    new Chart(document.getElementById('chartVarianceMmbtu'),{type:'bar',data:{labels:MONTHS,datasets:[
+      {label:'FY2025 MMBTU',data:variance.fy25mmbtu,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
+      {label:'FY2026 MMBTU',data:variance.fy26mmbtu,backgroundColor:C.primary,borderRadius:3},
+      {label:'30-Yr Normal HDD',data:variance.normalHdd,type:'line',borderColor:C.gray,borderDash:[5,5],pointRadius:3,tension:0.3,fill:false}
+    ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}}}});
+  }
 
   // --- HDD Table ---
   const tb6=document.querySelector('#tableHDD tbody');
