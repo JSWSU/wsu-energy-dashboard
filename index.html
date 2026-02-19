@@ -37,47 +37,19 @@
   header h1 { font-size: 1.6rem; font-weight: 700; }
   header p { opacity: 0.85; font-size: 0.9rem; margin-top: 0.25rem; }
   .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
-
-  /* Navigation */
   .nav-tabs {
-    display: flex;
-    gap: 0.25rem;
-    background: var(--card-bg);
-    border-radius: 8px;
-    padding: 0.25rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    overflow-x: auto;
+    display: flex; gap: 0.25rem; background: var(--card-bg); border-radius: 8px;
+    padding: 0.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto;
   }
   .nav-tab {
-    padding: 0.6rem 1.2rem;
-    border: none;
-    background: transparent;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text-light);
-    white-space: nowrap;
-    transition: all 0.2s;
+    padding: 0.6rem 1.2rem; border: none; background: transparent; border-radius: 6px;
+    cursor: pointer; font-size: 0.85rem; font-weight: 500; color: var(--text-light);
+    white-space: nowrap; transition: all 0.2s;
   }
   .nav-tab:hover { background: #f3f4f6; color: var(--text); }
   .nav-tab.active { background: var(--primary); color: #fff; }
-
-  /* KPI Cards */
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-  .kpi-card {
-    background: var(--card-bg);
-    border-radius: 10px;
-    padding: 1.25rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    border-left: 4px solid var(--primary);
-  }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card { background: var(--card-bg); border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary); }
   .kpi-card.forecast { border-left-color: var(--forecast-blue); }
   .kpi-card.delta { border-left-color: var(--accent); }
   .kpi-card.energy { border-left-color: var(--green); }
@@ -87,66 +59,17 @@
   .kpi-value.blue { color: var(--forecast-blue); }
   .kpi-value.green { color: var(--green); }
   .kpi-value.red { color: var(--red); }
-
-  /* Cards */
-  .card {
-    background: var(--card-bg);
-    border-radius: 10px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    margin-bottom: 1.5rem;
-  }
-  .card h2 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .card h3 {
-    font-size: 0.95rem;
-    font-weight: 600;
-    margin: 1rem 0 0.75rem;
-    color: var(--secondary);
-  }
-  .chart-container {
-    position: relative;
-    height: 350px;
-    width: 100%;
-  }
-  .chart-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-  }
-  @media (max-width: 900px) {
-    .chart-row { grid-template-columns: 1fr; }
-  }
-
-  /* Tables */
+  .card { background: var(--card-bg); border-radius: 10px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
+  .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--primary); display: flex; align-items: center; gap: 0.5rem; }
+  .card h3 { font-size: 0.95rem; font-weight: 600; margin: 1rem 0 0.75rem; color: var(--secondary); }
+  .chart-container { position: relative; height: 350px; width: 100%; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
   .table-wrap { overflow-x: auto; }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.82rem;
-  }
-  thead th {
-    background: #f9fafb;
-    padding: 0.6rem 0.75rem;
-    text-align: right;
-    font-weight: 600;
-    color: var(--secondary);
-    border-bottom: 2px solid var(--border);
-    white-space: nowrap;
-  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th { background: #f9fafb; padding: 0.6rem 0.75rem; text-align: right; font-weight: 600; color: var(--secondary); border-bottom: 2px solid var(--border); white-space: nowrap; }
   thead th:first-child { text-align: left; }
-  tbody td {
-    padding: 0.5rem 0.75rem;
-    text-align: right;
-    border-bottom: 1px solid var(--border);
-  }
+  tbody td { padding: 0.5rem 0.75rem; text-align: right; border-bottom: 1px solid var(--border); }
   tbody td:first-child { text-align: left; font-weight: 500; }
   tbody tr:hover { background: #f9fafb; }
   tbody tr.total-row { font-weight: 700; background: #f0f4ff; border-top: 2px solid var(--primary); }
@@ -154,62 +77,36 @@
   td.forecast { color: var(--forecast-blue); font-style: italic; }
   td.positive { color: var(--green); }
   td.negative { color: var(--red); }
-
-  /* Section visibility */
   .section { display: none; }
   .section.active { display: block; }
-
-  /* Notes */
-  .notes {
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    font-size: 0.82rem;
-    color: #92400e;
-    margin-top: 1rem;
-  }
+  .notes { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 1rem 1.25rem; font-size: 0.82rem; color: #92400e; margin-top: 1rem; }
   .notes ul { margin: 0.5rem 0 0 1.25rem; }
   .notes li { margin-bottom: 0.25rem; }
-
-  /* Legend */
-  .legend {
-    display: flex;
-    gap: 1.5rem;
-    margin-bottom: 0.75rem;
-    font-size: 0.8rem;
-    flex-wrap: wrap;
-  }
+  .legend { display: flex; gap: 1.5rem; margin-bottom: 0.75rem; font-size: 0.8rem; flex-wrap: wrap; }
   .legend-item { display: flex; align-items: center; gap: 0.35rem; }
-  .legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-
-  /* Footer */
-  footer {
-    text-align: center;
-    padding: 1.5rem;
-    color: var(--text-light);
-    font-size: 0.78rem;
-    border-top: 1px solid var(--border);
-    margin-top: 2rem;
-  }
-
-  /* Print */
-  @media print {
-    header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .nav-tabs { display: none; }
-    .section { display: block !important; page-break-inside: avoid; }
-  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  footer { text-align: center; padding: 1.5rem; color: var(--text-light); font-size: 0.78rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+  @media print { header { print-color-adjust: exact; -webkit-print-color-adjust: exact; } .nav-tabs { display: none; } .section { display: block !important; page-break-inside: avoid; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; }
+  #error { position: fixed; inset: 0; background: var(--bg); align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; padding: 2rem; text-align: center; }
 </style>
 </head>
 <body>
+
+<div id="loading">
+  <div style="width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#981e32;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+  <p style="color:#6b7280;">Loading energy data...</p>
+</div>
+<div id="error" style="display:none;">
+  <div style="font-size:2rem;">&#9888;&#65039;</div>
+  <h2 style="color:#981e32;">Could not load data</h2>
+  <p style="color:#6b7280;max-width:500px;" id="errorMsg"></p>
+</div>
+
 <header>
   <h1>WSU Energy Cost Projection Workbook &amp; Report</h1>
-  <p>FY2026 (July 2025 &ndash; June 2026) &bull; Last Updated: February 17, 2026</p>
+  <p>FY2026 (July 2025 &ndash; June 2026) &bull; Last Updated: <span id="lastUpdated">...</span></p>
 </header>
 <div class="container">
   <div class="nav-tabs">
@@ -223,53 +120,52 @@
     <button class="nav-tab" data-tab="sources">Data Sources</button>
   </div>
 
-  <!-- ============ DASHBOARD ============ -->
+  <!-- DASHBOARD -->
   <div id="dashboard" class="section active">
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="kpi-label">FY2026 Actual (YTD)</div>
-        <div class="kpi-value">$21.57M</div>
+        <div class="kpi-value"><span id="kpiActualYTD">--</span></div>
         <div class="kpi-sub">Total energy cost to date</div>
       </div>
       <div class="kpi-card forecast">
         <div class="kpi-label">FY2026 Forecast</div>
-        <div class="kpi-value blue">$23.84M</div>
+        <div class="kpi-value blue"><span id="kpiForecast">--</span></div>
         <div class="kpi-sub">Projected full-year cost</div>
       </div>
       <div class="kpi-card delta">
         <div class="kpi-label">Forecast vs Actual</div>
-        <div class="kpi-value red">+$2.27M</div>
-        <div class="kpi-sub">10.5% over actuals</div>
+        <div class="kpi-value red"><span id="kpiDelta">--</span></div>
+        <div class="kpi-sub"><span id="kpiDeltaPct">--</span></div>
       </div>
       <div class="kpi-card energy">
         <div class="kpi-label">Total Energy Use (YTD)</div>
-        <div class="kpi-value">1,549,488</div>
-        <div class="kpi-sub">MMBTU (Elec: 566,788 | Gas: 982,700)</div>
+        <div class="kpi-value"><span id="kpiMMBTU">--</span></div>
+        <div class="kpi-sub"><span id="kpiMMBTUSub">--</span></div>
       </div>
     </div>
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="kpi-label">Electric Cost (YTD)</div>
-        <div class="kpi-value">$15.94M</div>
-        <div class="kpi-sub">73.9% of total</div>
+        <div class="kpi-value"><span id="kpiElecCost">--</span></div>
+        <div class="kpi-sub"><span id="kpiElecPct">--</span></div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Gas Cost (YTD)</div>
-        <div class="kpi-value">$5.68M</div>
-        <div class="kpi-sub">26.1% of total (Kintec + Avista)</div>
+        <div class="kpi-value"><span id="kpiGasCost">--</span></div>
+        <div class="kpi-sub"><span id="kpiGasPct">--</span></div>
       </div>
       <div class="kpi-card forecast">
         <div class="kpi-label">Avg Elec Rate</div>
-        <div class="kpi-value blue">$28.12</div>
-        <div class="kpi-sub">$/MMBTU actual | $31.17 forecast</div>
+        <div class="kpi-value blue"><span id="kpiElecRate">--</span></div>
+        <div class="kpi-sub"><span id="kpiElecRateSub">--</span></div>
       </div>
       <div class="kpi-card forecast">
         <div class="kpi-label">Avg Gas Rate</div>
-        <div class="kpi-value blue">$5.78</div>
-        <div class="kpi-sub">$/MMBTU actual | $6.38 forecast</div>
+        <div class="kpi-value blue"><span id="kpiGasRate">--</span></div>
+        <div class="kpi-sub"><span id="kpiGasRateSub">--</span></div>
       </div>
     </div>
-
     <div class="chart-row">
       <div class="card">
         <h2>Monthly Total Energy Cost</h2>
@@ -284,7 +180,6 @@
         <div class="chart-container"><canvas id="chartBreakdown"></canvas></div>
       </div>
     </div>
-
     <div class="chart-row">
       <div class="card">
         <h2>Energy Use by Fuel Type (MMBTU)</h2>
@@ -297,7 +192,7 @@
     </div>
   </div>
 
-  <!-- ============ MONTHLY DETAIL ============ -->
+  <!-- MONTHLY DETAIL -->
   <div id="monthly" class="section">
     <div class="card">
       <h2>FY2026 Actuals vs Forecasts</h2>
@@ -306,203 +201,97 @@
         <span class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span> Forecast (blue italic)</span>
       </div>
       <div class="table-wrap">
-        <table id="tableMonthly">
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Total Cost (Actual)</th>
-              <th>Electric (Actual)</th>
-              <th>Gas (Actual)</th>
-              <th>Total Cost (Forecast)</th>
-              <th>Electric (Forecast)</th>
-              <th>Gas (Forecast)</th>
-              <th>Kintec Gas</th>
-              <th>Avista Gas</th>
-              <th>Hedge %</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <table id="tableMonthly"><thead><tr>
+          <th>Month</th><th>Total Cost (Actual)</th><th>Electric (Actual)</th><th>Gas (Actual)</th>
+          <th>Total Cost (Forecast)</th><th>Electric (Forecast)</th><th>Gas (Forecast)</th>
+          <th>Kintec Gas</th><th>Avista Gas</th><th>Hedge %</th>
+        </tr></thead><tbody></tbody></table>
       </div>
     </div>
   </div>
 
-  <!-- ============ GAS ANALYSIS ============ -->
+  <!-- GAS ANALYSIS -->
   <div id="gas" class="section">
-    <div class="card">
-      <h2>FY2025 Gas MMBTU / Cost</h2>
-      <div class="chart-container"><canvas id="chartGas25"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="table-wrap">
-        <table id="tableGas25">
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Gas Cost (Actual)</th>
-              <th>Gas MMBTU</th>
-              <th>Gas $/MMBTU</th>
-              <th>Kintec $</th>
-              <th>Avista $</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Kintec Gas Delivery (All Months)</h2>
-      <div class="chart-container"><canvas id="chartKintec"></canvas></div>
-    </div>
+    <div class="card"><h2>FY2025 Gas MMBTU / Cost</h2><div class="chart-container"><canvas id="chartGas25"></canvas></div></div>
+    <div class="card"><div class="table-wrap">
+      <table id="tableGas25"><thead><tr>
+        <th>Month</th><th>Gas Cost (Actual)</th><th>Gas MMBTU</th><th>Gas $/MMBTU</th><th>Kintec $</th><th>Avista $</th>
+      </tr></thead><tbody></tbody></table>
+    </div></div>
+    <div class="card"><h2>Kintec Gas Delivery (All Months)</h2><div class="chart-container"><canvas id="chartKintec"></canvas></div></div>
   </div>
 
-  <!-- ============ ENERGY USE ============ -->
+  <!-- ENERGY USE -->
   <div id="energy-use" class="section">
-    <div class="card">
-      <h2>FY2026 Energy Use: Actual vs Forecast</h2>
-      <div class="chart-container"><canvas id="chartEnergyUse"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="table-wrap">
-        <table id="tableEnergyUse">
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Total MMBTU (Actual)</th>
-              <th>Elec MMBTU (Actual)</th>
-              <th>Gas MMBTU (Actual)</th>
-              <th>Total MMBTU (Forecast)</th>
-              <th>Total kWh</th>
-              <th>kWh $/Unit</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="card"><h2>FY2026 Energy Use: Actual vs Forecast</h2><div class="chart-container"><canvas id="chartEnergyUse"></canvas></div></div>
+    <div class="card"><div class="table-wrap">
+      <table id="tableEnergyUse"><thead><tr>
+        <th>Month</th><th>Total MMBTU (Actual)</th><th>Elec MMBTU (Actual)</th><th>Gas MMBTU (Actual)</th>
+        <th>Total MMBTU (Forecast)</th><th>Total kWh</th><th>kWh $/Unit</th>
+      </tr></thead><tbody></tbody></table>
+    </div></div>
   </div>
 
-  <!-- ============ YEAR OVER YEAR ============ -->
+  <!-- YEAR OVER YEAR -->
   <div id="yoy" class="section">
-    <div class="card">
-      <h2>Fiscal Year MMBTU Comparison</h2>
-      <div class="chart-container"><canvas id="chartYoY"></canvas></div>
+    <div class="card"><h2>Fiscal Year MMBTU Comparison</h2><div class="chart-container"><canvas id="chartYoY"></canvas></div></div>
+    <div class="card"><div class="table-wrap">
+      <table id="tableYoY"><thead><tr>
+        <th>Month</th><th>FY24 Total</th><th>FY24 Elec</th><th>FY24 Gas</th>
+        <th>FY25 Total</th><th>FY25 Elec</th><th>FY25 Gas</th>
+        <th>FY26 Total</th><th>FY26 Elec</th><th>FY26 Gas</th>
+      </tr></thead><tbody></tbody></table>
     </div>
-    <div class="card">
-      <div class="table-wrap">
-        <table id="tableYoY">
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>FY24 Total</th>
-              <th>FY24 Elec</th>
-              <th>FY24 Gas</th>
-              <th>FY25 Total</th>
-              <th>FY25 Elec</th>
-              <th>FY25 Gas</th>
-              <th>FY26 Total</th>
-              <th>FY26 Elec</th>
-              <th>FY26 Gas</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div class="notes">
-        <strong>Year-over-Year Change:</strong>
-        <ul>
-          <li>FY25 vs FY24: +20.2% total, +98.9% electric (first full year of electric metering), -0.9% gas</li>
-          <li>FY26 vs FY25: -4.5% total, -0.3% electric, -6.7% gas</li>
-        </ul>
-      </div>
+    <div class="notes"><strong>Year-over-Year Change:</strong><ul id="yoyNotes"></ul></div>
     </div>
   </div>
 
-  <!-- ============ CUMULATIVE SUMMARY ============ -->
+  <!-- CUMULATIVE SUMMARY -->
   <div id="cumulative" class="section">
-    <div class="card">
-      <h2>FY2026 Cumulative Cost: Actual vs Forecast</h2>
-      <div class="chart-container"><canvas id="chartCumulative"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="table-wrap">
-        <table id="tableCumulative">
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Cumul. Actual ($)</th>
-              <th>Cumul. Forecast ($)</th>
-              <th>Delta ($)</th>
-              <th>Delta %</th>
-              <th>Cumul. MMBTU (Actual)</th>
-              <th>Elec $/MMBTU (Actual)</th>
-              <th>Gas $/MMBTU (Actual)</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="card"><h2>FY2026 Cumulative Cost: Actual vs Forecast</h2><div class="chart-container"><canvas id="chartCumulative"></canvas></div></div>
+    <div class="card"><div class="table-wrap">
+      <table id="tableCumulative"><thead><tr>
+        <th>Month</th><th>Cumul. Actual ($)</th><th>Cumul. Forecast ($)</th><th>Delta ($)</th><th>Delta %</th>
+        <th>Cumul. MMBTU (Actual)</th><th>Elec $/MMBTU (Actual)</th><th>Gas $/MMBTU (Actual)</th>
+      </tr></thead><tbody></tbody></table>
+    </div></div>
   </div>
 
-  <!-- ============ HDD / WEATHER ============ -->
+  <!-- HDD / WEATHER -->
   <div id="hdd" class="section">
-    <div class="card">
-      <h2>Heating Degree Days - Pullman-Moscow Airport (KPUW)</h2>
-      <div class="chart-container"><canvas id="chartHDD"></canvas></div>
+    <div class="card"><h2>Heating Degree Days - Pullman-Moscow Airport (KPUW)</h2><div class="chart-container"><canvas id="chartHDD"></canvas></div></div>
+    <div class="card"><div class="table-wrap">
+      <table id="tableHDD"><thead><tr>
+        <th>Month</th><th>FY2025 HDD</th><th>FY2026 HDD</th><th>30-Yr Normal</th>
+      </tr></thead><tbody></tbody></table>
     </div>
-    <div class="card">
-      <div class="table-wrap">
-        <table id="tableHDD">
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>FY2025 HDD</th>
-              <th>FY2026 HDD</th>
-              <th>30-Yr Normal</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div class="notes">
-        <strong>Notes:</strong>
-        <ul>
-          <li>Source: NWS Spokane (KOTX) CLM/CLI Reports for KPUW via NOAA ACIS API</li>
-          <li>HDD measures cold relative to 65&deg;F. Higher HDD = more heating energy consumed</li>
-          <li>Forecast months use 30-year normals (1991&ndash;2020) until actual data is published</li>
-          <li>FY2025 Total: 6,092 HDD | FY2026 Total: 5,972 HDD | 30-Yr Normal: 6,844 HDD</li>
-        </ul>
-      </div>
-    </div>
+    <div class="notes"><strong>Notes:</strong><ul>
+      <li>Source: NWS Spokane (KOTX) CLM/CLI Reports for KPUW via NOAA ACIS API</li>
+      <li>HDD measures cold relative to 65&deg;F. Higher HDD = more heating energy consumed</li>
+      <li>Forecast months use 30-year normals (1991&ndash;2020) until actual data is published</li>
+      <li><span id="hddTotals">--</span></li>
+    </ul></div></div>
   </div>
 
-  <!-- ============ DATA SOURCES ============ -->
+  <!-- DATA SOURCES -->
   <div id="sources" class="section">
     <div class="card">
       <h2>Data Sources &amp; Accounts</h2>
       <h3>Avista Utilities</h3>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Account Name</th><th>Account #</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>WSU FACILITIES SERVICES</td><td>4265620000</td><td>Small account - Gas &amp; Electric</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>1747670000</td><td>Small account - Gas &amp; Electric</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>3236650000</td><td>Small / Large account</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>5037100000</td><td>Large account</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>6037100000</td><td>Large account</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>6100220000</td><td>Large account</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>6365350762</td><td>Large account</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>6595550000</td><td>Small account - Gas &amp; Electric</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>7037100000</td><td>Small account - Gas only</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>7979840000</td><td>Small account - Gas only</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>9447033237</td><td>Small account - Electric only</td></tr>
-            <tr><td>WSU FACILITIES SERVICES</td><td>3731710000</td><td>Large account</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table><thead><tr><th>Account Name</th><th>Account #</th><th>Description</th></tr></thead><tbody>
+        <tr><td>WSU FACILITIES SERVICES</td><td>4265620000</td><td>Small account - Gas &amp; Electric</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>1747670000</td><td>Small account - Gas &amp; Electric</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>3236650000</td><td>Small / Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>5037100000</td><td>Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>6037100000</td><td>Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>6100220000</td><td>Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>6365350762</td><td>Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>6595550000</td><td>Small account - Gas &amp; Electric</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>7037100000</td><td>Small account - Gas only</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>7979840000</td><td>Small account - Gas only</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>9447033237</td><td>Small account - Electric only</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>3731710000</td><td>Large account</td></tr>
+      </tbody></table></div>
       <h3>Inland Power</h3>
       <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.5rem;">Electric service for outlying WSU facilities. Data sourced from Inland Power bills.</p>
       <h3>Kintec (Gas Supplier)</h3>
@@ -510,138 +299,52 @@
     </div>
     <div class="card">
       <h2>Methodology Notes</h2>
-      <div class="notes" style="background:#f0f9ff;border-color:#bae6fd;color:#0c4a6e;">
-        <ul>
-          <li>Actuals shown in bold black; Forecasts in blue italic</li>
-          <li>Forecasts calculated using CY2024&ndash;CY2025 annual growth trend applied to CY2025 same-month values</li>
-          <li>All data dynamically sourced from Consolidated Data table (Avista, Inland Power, Kintec Gas)</li>
-          <li>FY2026 = July 2025 through June 2026; FY2025 = July 2024 through June 2025</li>
-          <li>Elec rate (~$27&ndash;$30/MMBTU) equates to ~$0.09&ndash;$0.10/kWh (Avista commercial/industrial tariffs)</li>
-          <li>Gas rate (~$5.70&ndash;$5.85/MMBTU) reflects delivered cost (commodity + distribution)</li>
-          <li>Electric-to-gas ratio of ~5:1 on $/MMBTU is typical (electricity 3&ndash;5x more costly per unit energy)</li>
-          <li>Price hedge / contingency: 10.0% applied to all forecast months</li>
-        </ul>
-      </div>
+      <div class="notes" style="background:#f0f9ff;border-color:#bae6fd;color:#0c4a6e;"><ul>
+        <li>Actuals shown in bold black; Forecasts in blue italic</li>
+        <li>Forecasts calculated using CY2024&ndash;CY2025 annual growth trend applied to CY2025 same-month values</li>
+        <li>All data dynamically sourced from Consolidated Data table (Avista, Inland Power, Kintec Gas)</li>
+        <li>FY2026 = July 2025 through June 2026; FY2025 = July 2024 through June 2025</li>
+        <li>Elec rate (~$27&ndash;$30/MMBTU) equates to ~$0.09&ndash;$0.10/kWh (Avista commercial/industrial tariffs)</li>
+        <li>Gas rate (~$5.70&ndash;$5.85/MMBTU) reflects delivered cost (commodity + distribution)</li>
+        <li>Electric-to-gas ratio of ~5:1 on $/MMBTU is typical (electricity 3&ndash;5x more costly per unit energy)</li>
+        <li>Price hedge / contingency applied to all forecast months</li>
+      </ul></div>
     </div>
   </div>
 </div>
 
 <footer>
-  WSU Facilities Services &bull; Energy Cost Projection Workbook &amp; Report FY2026 &bull; Data as of 02/17/2026
+  WSU Facilities Services &bull; Energy Cost Projection Workbook &amp; Report FY2026 &bull; Data as of <span id="footerDate">--</span>
 </footer>
 
 <script>
-// ==================== DATA ====================
 const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
 const MONTH_FULL = ['July 2025','August 2025','September 2025','October 2025','November 2025','December 2025',
   'January 2026','February 2026','March 2026','April 2026','May 2026','June 2026'];
 
-// FY2026 Monthly actuals/forecasts
-const fy26 = {
-  totalActual: [1629889,1733057,1687008,1642922,1779167,1984496,2170762,2042321,1874647,1743558,1657715,1621218],
-  elecActual:  [1406834,1522107,1440834,1259479,1175379,1233998,1370991,1296099,1289832,1282450,1300545,1359075],
-  gasActual:   [235097,223189,256112,393302,612997,751029,799771,746221,584816,461108,357169,262143],
-  totalFcast:  [1771034,1828578,1804883,1879435,2058873,2273767,2387838,2246553,2062112,1917914,1823486,1783339],
-  elecFcast:   [1538429,1573172,1493840,1396377,1372194,1417411,1508091,1425709,1418815,1410695,1430600,1494982],
-  gasFcast:    [232605,255406,311042,483059,686679,856355,879748,820844,643297,507219,392886,288357],
-  kintecFcast: [207212,239864,288663,450994,635108,793609,807568,743816,582511,459113,358868,262889],
-  avistaFcast: [26182,15004,22118,31353,51240,62156,72451,78383,61896,49001,34342,25763],
-  hedge: 10.0
-};
+const fmtDollar = v => '$' + v.toLocaleString('en-US');
+const fmtDollarM = v => '$' + (v/1e6).toFixed(2) + 'M';
+const fmtNum = v => v.toLocaleString('en-US');
+const fmtPct = v => v.toFixed(1) + '%';
+const fmtRate = v => '$' + v.toFixed(2);
+const fmtRateKwh = v => '$' + v.toFixed(4);
+const sum = arr => arr.reduce((a, b) => a + b, 0);
 
-// FY2025 Gas
-const fy25gas = {
-  cost:    [251010,275615,335654,521282,741014,924116,949359,885794,694199,547354,423974,311174],
-  mmbtu:   [39158,45248,52410,81021,115129,132529,145137,131544,105534,87923,68320,49727],
-  perUnit: [6.41,6.09,6.40,6.43,6.44,6.97,6.54,6.73,6.58,6.23,6.21,6.26],
-  kintec:  [225435,260959,314049,490656,690962,863402,878589,809230,633739,499489,390428,286009],
-  avista:  [25575,14656,21605,30626,50052,60714,70771,76564,60460,47864,33546,25165]
-};
-
-// FY2026 Energy Use
-const energyUse = {
-  totalActual: [93445,96273,97327,129201,139913,164875,185538,168921,144606,127541,108926,92922],
-  elecActual:  [52304,55447,51337,46091,43599,45681,48312,44547,44824,44410,44330,45905],
-  gasActual:   [41141,40826,45990,83110,96314,119194,137226,124374,99782,83131,64596,47017],
-  totalFcast:  [89445,94892,98252,122455,152653,170959,185538,168921,144606,127541,108926,92922],
-  kwhActual:   [15363898,15272536,14272674,13437790,12836875,13380564,14159336,13056094,13137202,13015958,12992314,13453945],
-  kwhRate:     [0.0916,0.0997,0.1010,0.0937,0.0916,0.0922,0.0968,0.0993,0.0982,0.0985,0.1001,0.1010]
-};
-
-// Year-over-Year MMBTU
-const yoy = {
-  fy24total: [42284,43247,56147,85826,107239,121029,184614,165128,162373,140494,138550,102554],
-  fy24elec:  [0,0,0,0,0,3,48442,44576,46025,44014,57858,45030],
-  fy24gas:   [42284,43247,56147,85826,107239,121026,136172,120551,116347,96480,80692,57523],
-  fy25total: [92307,98081,101784,127507,159536,178817,194119,176709,150980,132950,113265,96269],
-  fy25elec:  [53149,52833,49374,46486,44407,46288,48982,45165,45446,45027,44945,46542],
-  fy25gas:   [39158,45248,52410,81021,115129,132529,145137,131544,105534,87923,68320,49727],
-  fy26total: [93445,96273,97327,129201,139913,164875,185538,168921,144606,127541,108926,92922],
-  fy26elec:  [52304,55447,51337,46091,43599,45681,48312,44547,44824,44410,44330,45905],
-  fy26gas:   [41141,40826,45990,83110,96314,119194,137226,124374,99782,83131,64596,47017]
-};
-
-// Cumulative summary
-const cumul = {
-  actual:   [1629889,3362946,5049955,6692876,8472044,10456539,12627301,14669622,16544269,18287828,19945542,21566760],
-  forecast: [1771034,3599612,5404494,7283930,9342803,11616569,14004408,16250961,18313072,20230986,22054472,23837812],
-  delta:    [141144,236665,354540,591053,870759,1160030,1377106,1581338,1768803,1943159,2108930,2271052],
-  deltaPct: [8.7,7.0,7.0,8.8,10.3,11.1,10.9,10.8,10.7,10.6,10.6,10.5],
-  mmbtuAct: [93445,189718,287045,416247,556160,721035,906573,1075494,1220099,1347641,1456566,1549488],
-  elecRate: [26.90,27.18,27.47,27.44,27.35,27.30,27.45,27.64,27.76,27.86,27.99,28.12],
-  gasRate:  [5.71,5.59,5.58,5.25,5.60,5.79,5.80,5.84,5.84,5.81,5.79,5.78]
-};
-
-// HDD data
-const hdd = {
-  fy25: [4,12,84,520,808,1100,1170,728,683,593,280,110],
-  fy26: [18,18,5,575,762,518,1240,966,843,570,316,141],
-  normal: [31,34,168,539,849,1147,1240,966,843,570,316,141]
-};
-
-// Kintec monthly data
-const kintec = {
-  months: ['Jan-23','Feb-23','Mar-23','Apr-23','May-23','Jun-23','Jul-23','Aug-23','Sep-23','Oct-23','Nov-23','Dec-23',
-    'Jan-24','Feb-24','Mar-24','Apr-24','May-24','Jun-24','Jul-24','Aug-24','Sep-24','Oct-24','Nov-24','Dec-24',
-    'Jan-25','Feb-25','Mar-25','Apr-25','May-25','Jun-25','Jul-25','Aug-25','Sep-25','Oct-25','Nov-25','Dec-25'],
-  dths: [5028,123510,123412,98240,56475,49286,42284,43247,56147,85826,107239,120998,
-    129802,115569,111707,92469,77360,55179,37408,44321,51009,78956,111481,127643,
-    139531,125490,100594,83998,65612,47790,39668,39544,44717,81100,92664,114498],
-  cost: [230311,1141095,851649,605760,403252,293607,259737,291068,403647,615277,779746,902942,
-    940220,882635,798822,588242,475377,328304,221179,255956,308324,481913,678706,849400,
-    863303,795461,622659,490202,383126,280632,210167,199921,232189,357398,558719,683277]
-};
-
-// ==================== FORMATTERS ====================
-const fmtDollar = (v) => '$' + v.toLocaleString('en-US');
-const fmtDollarM = (v) => '$' + (v/1e6).toFixed(2) + 'M';
-const fmtNum = (v) => v.toLocaleString('en-US');
-const fmtPct = (v) => v.toFixed(1) + '%';
-const fmtRate = (v) => '$' + v.toFixed(2);
-const fmtRateKwh = (v) => '$' + v.toFixed(4);
-
-// ==================== CHART DEFAULTS ====================
 Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 Chart.defaults.font.size = 12;
 Chart.defaults.plugins.legend.labels.usePointStyle = true;
 Chart.defaults.plugins.legend.labels.padding = 16;
 
-const COLORS = {
-  primary: '#981e32',
-  primaryLight: 'rgba(152,30,50,0.15)',
-  blue: '#3b82f6',
-  blueLight: 'rgba(59,130,246,0.15)',
-  green: '#059669',
-  greenLight: 'rgba(5,150,105,0.15)',
-  accent: '#c69214',
-  accentLight: 'rgba(198,146,20,0.15)',
-  gray: '#6b7280',
-  grayLight: 'rgba(107,114,128,0.15)',
-  purple: '#7c3aed',
-  orange: '#ea580c'
+const C = {
+  primary:'#981e32', primaryLight:'rgba(152,30,50,0.15)',
+  blue:'#3b82f6', blueLight:'rgba(59,130,246,0.15)',
+  green:'#059669', greenLight:'rgba(5,150,105,0.15)',
+  accent:'#c69214', accentLight:'rgba(198,146,20,0.15)',
+  gray:'#6b7280', grayLight:'rgba(107,114,128,0.15)',
+  purple:'#7c3aed', orange:'#ea580c'
 };
 
-// ==================== TAB NAVIGATION ====================
+// Tab navigation
 document.querySelectorAll('.nav-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -651,350 +354,206 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
   });
 });
 
-// ==================== DASHBOARD CHARTS ====================
+// ==================== LOAD DATA & BUILD ====================
+function initDashboard(D) {
+  const fy26 = D.fy26, fy25gas = D.fy25gas, energyUse = D.energyUse,
+        yoy = D.yoy, cumul = D.cumul, hdd = D.hdd, kintec = D.kintec;
 
-// Monthly cost chart
-new Chart(document.getElementById('chartMonthly'), {
-  type: 'bar',
-  data: {
-    labels: MONTHS,
-    datasets: [
-      { label: 'Actual', data: fy26.totalActual, backgroundColor: COLORS.primary, borderRadius: 3 },
-      { label: 'Forecast', data: fy26.totalFcast, backgroundColor: COLORS.blueLight, borderColor: COLORS.blue, borderWidth: 1.5, borderRadius: 3 }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtDollar(ctx.raw) } } },
-    scales: { y: { ticks: { callback: v => '$' + (v/1e6).toFixed(1) + 'M' } } }
-  }
-});
+  // --- KPI Cards ---
+  const totalAct = sum(fy26.totalActual), totalFcast = sum(fy26.totalFcast);
+  const totalElec = sum(fy26.elecActual), totalGas = sum(fy26.gasActual);
+  const totalMMBTU = sum(energyUse.totalActual);
+  const totalElecMMBTU = sum(energyUse.elecActual), totalGasMMBTU = sum(energyUse.gasActual);
+  const delta = totalFcast - totalAct;
+  const deltaPct = totalAct > 0 ? (delta / totalAct) * 100 : 0;
+  const last = cumul.elecRate.length - 1;
+  const elecRateFcast = sum(fy26.elecFcast) / sum(energyUse.elecActual);
+  const gasRateFcast = sum(fy26.gasFcast) / sum(energyUse.gasActual);
 
-// Cost breakdown
-new Chart(document.getElementById('chartBreakdown'), {
-  type: 'bar',
-  data: {
-    labels: MONTHS,
-    datasets: [
-      { label: 'Electric (Actual)', data: fy26.elecActual, backgroundColor: COLORS.primary, stack: 'actual', borderRadius: 2 },
-      { label: 'Gas (Actual)', data: fy26.gasActual, backgroundColor: COLORS.accent, stack: 'actual', borderRadius: 2 },
-      { label: 'Electric (Forecast)', data: fy26.elecFcast, backgroundColor: COLORS.blueLight, borderColor: COLORS.blue, borderWidth: 1, stack: 'forecast', borderRadius: 2 },
-      { label: 'Gas (Forecast)', data: fy26.gasFcast, backgroundColor: 'rgba(198,146,20,0.2)', borderColor: COLORS.accent, borderWidth: 1, stack: 'forecast', borderRadius: 2 }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtDollar(ctx.raw) } } },
-    scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => '$' + (v/1e6).toFixed(1) + 'M' } } }
-  }
-});
+  document.getElementById('kpiActualYTD').textContent = fmtDollarM(totalAct);
+  document.getElementById('kpiForecast').textContent = fmtDollarM(totalFcast);
+  document.getElementById('kpiDelta').textContent = '+' + fmtDollarM(delta);
+  document.getElementById('kpiDeltaPct').textContent = fmtPct(deltaPct) + ' over actuals';
+  document.getElementById('kpiMMBTU').textContent = fmtNum(totalMMBTU);
+  document.getElementById('kpiMMBTUSub').textContent = 'MMBTU (Elec: ' + fmtNum(totalElecMMBTU) + ' | Gas: ' + fmtNum(totalGasMMBTU) + ')';
+  document.getElementById('kpiElecCost').textContent = fmtDollarM(totalElec);
+  document.getElementById('kpiElecPct').textContent = (totalElec / totalAct * 100).toFixed(1) + '% of total';
+  document.getElementById('kpiGasCost').textContent = fmtDollarM(totalGas);
+  document.getElementById('kpiGasPct').textContent = (totalGas / totalAct * 100).toFixed(1) + '% of total (Kintec + Avista)';
+  document.getElementById('kpiElecRate').textContent = fmtRate(cumul.elecRate[last]);
+  document.getElementById('kpiElecRateSub').textContent = '$/MMBTU actual | ' + fmtRate(elecRateFcast) + ' forecast';
+  document.getElementById('kpiGasRate').textContent = fmtRate(cumul.gasRate[last]);
+  document.getElementById('kpiGasRateSub').textContent = '$/MMBTU actual | ' + fmtRate(gasRateFcast) + ' forecast';
+  document.getElementById('lastUpdated').textContent = D.lastUpdated;
+  document.getElementById('footerDate').textContent = D.lastUpdated;
 
-// MMBTU chart
-new Chart(document.getElementById('chartMMBTU'), {
-  type: 'bar',
-  data: {
-    labels: MONTHS,
-    datasets: [
-      { label: 'Electric MMBTU', data: energyUse.elecActual, backgroundColor: COLORS.primary, stack: 's1', borderRadius: 2 },
-      { label: 'Gas MMBTU', data: energyUse.gasActual, backgroundColor: COLORS.accent, stack: 's1', borderRadius: 2 }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw) } } },
-    scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fmtNum(v) } } }
-  }
-});
+  // --- Dashboard Charts ---
+  new Chart(document.getElementById('chartMonthly'), {
+    type:'bar', data:{ labels:MONTHS, datasets:[
+      {label:'Actual',data:fy26.totalActual,backgroundColor:C.primary,borderRadius:3},
+      {label:'Forecast',data:fy26.totalFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1.5,borderRadius:3}
+    ]}, options:{responsive:true,maintainAspectRatio:false,
+      plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollar(ctx.raw)}}},
+      scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}
+  });
 
-// Pie chart
-new Chart(document.getElementById('chartPie'), {
-  type: 'doughnut',
-  data: {
-    labels: ['Electric (Actual)', 'Gas - Kintec', 'Gas - Avista'],
-    datasets: [{
-      data: [15937624, 5830214, 529889],
-      backgroundColor: [COLORS.primary, COLORS.accent, COLORS.orange],
-      borderWidth: 2
-    }]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: {
-      tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmtDollarM(ctx.raw) + ' (' + ((ctx.raw / 22297727) * 100).toFixed(1) + '%)' } },
-      legend: { position: 'bottom' }
-    }
-  }
-});
+  new Chart(document.getElementById('chartBreakdown'), {
+    type:'bar', data:{ labels:MONTHS, datasets:[
+      {label:'Electric (Actual)',data:fy26.elecActual,backgroundColor:C.primary,stack:'actual',borderRadius:2},
+      {label:'Gas (Actual)',data:fy26.gasActual,backgroundColor:C.accent,stack:'actual',borderRadius:2},
+      {label:'Electric (Forecast)',data:fy26.elecFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,stack:'forecast',borderRadius:2},
+      {label:'Gas (Forecast)',data:fy26.gasFcast,backgroundColor:'rgba(198,146,20,0.2)',borderColor:C.accent,borderWidth:1,stack:'forecast',borderRadius:2}
+    ]}, options:{responsive:true,maintainAspectRatio:false,
+      plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollar(ctx.raw)}}},
+      scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}
+  });
 
-// ==================== POPULATE TABLES ====================
+  new Chart(document.getElementById('chartMMBTU'), {
+    type:'bar', data:{ labels:MONTHS, datasets:[
+      {label:'Electric MMBTU',data:energyUse.elecActual,backgroundColor:C.primary,stack:'s1',borderRadius:2},
+      {label:'Gas MMBTU',data:energyUse.gasActual,backgroundColor:C.accent,stack:'s1',borderRadius:2}
+    ]}, options:{responsive:true,maintainAspectRatio:false,
+      plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)}}},
+      scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}
+  });
 
-// Monthly detail
-(function() {
-  const tb = document.querySelector('#tableMonthly tbody');
-  for (let i = 0; i < 12; i++) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${MONTH_FULL[i]}</td>
-      <td>${fmtDollar(fy26.totalActual[i])}</td>
-      <td>${fmtDollar(fy26.elecActual[i])}</td>
-      <td>${fmtDollar(fy26.gasActual[i])}</td>
-      <td class="forecast">${fmtDollar(fy26.totalFcast[i])}</td>
-      <td class="forecast">${fmtDollar(fy26.elecFcast[i])}</td>
-      <td class="forecast">${fmtDollar(fy26.gasFcast[i])}</td>
-      <td class="forecast">${fmtDollar(fy26.kintecFcast[i])}</td>
-      <td class="forecast">${fmtDollar(fy26.avistaFcast[i])}</td>
-      <td>${fy26.hedge}%</td>`;
-    tb.appendChild(tr);
-  }
-  // Totals row
-  const sum = arr => arr.reduce((a, b) => a + b, 0);
-  const tr = document.createElement('tr');
-  tr.className = 'total-row';
-  tr.innerHTML = `<td>YTD TOTAL</td>
-    <td>${fmtDollar(sum(fy26.totalActual))}</td>
-    <td>${fmtDollar(sum(fy26.elecActual))}</td>
-    <td>${fmtDollar(sum(fy26.gasActual))}</td>
-    <td class="forecast">${fmtDollar(sum(fy26.totalFcast))}</td>
-    <td class="forecast">${fmtDollar(sum(fy26.elecFcast))}</td>
-    <td class="forecast">${fmtDollar(sum(fy26.gasFcast))}</td>
-    <td class="forecast">${fmtDollar(sum(fy26.kintecFcast))}</td>
-    <td class="forecast">${fmtDollar(sum(fy26.avistaFcast))}</td>
-    <td>${fy26.hedge}%</td>`;
-  tb.appendChild(tr);
-})();
+  const pieElec = sum(fy26.elecActual), pieKintec = sum(fy26.kintecFcast), pieAvista = sum(fy26.avistaFcast);
+  const pieTotal = pieElec + pieKintec + pieAvista;
+  new Chart(document.getElementById('chartPie'), {
+    type:'doughnut', data:{
+      labels:['Electric (Actual)','Gas - Kintec','Gas - Avista'],
+      datasets:[{data:[pieElec,pieKintec,pieAvista],backgroundColor:[C.primary,C.accent,C.orange],borderWidth:2}]
+    }, options:{responsive:true,maintainAspectRatio:false,
+      plugins:{tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmtDollarM(ctx.raw)+' ('+(ctx.raw/pieTotal*100).toFixed(1)+'%)'}},legend:{position:'bottom'}}}
+  });
 
-// Gas FY25
-(function() {
-  const tb = document.querySelector('#tableGas25 tbody');
-  const monthsFy25 = ['July 2024','August 2024','September 2024','October 2024','November 2024','December 2024',
-    'January 2025','February 2025','March 2025','April 2025','May 2025','June 2025'];
-  for (let i = 0; i < 12; i++) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${monthsFy25[i]}</td>
-      <td>${fmtDollar(fy25gas.cost[i])}</td>
-      <td>${fmtNum(fy25gas.mmbtu[i])}</td>
-      <td>${fmtRate(fy25gas.perUnit[i])}</td>
-      <td>${fmtDollar(fy25gas.kintec[i])}</td>
-      <td>${fmtDollar(fy25gas.avista[i])}</td>`;
-    tb.appendChild(tr);
-  }
-  const sum = arr => arr.reduce((a, b) => a + b, 0);
-  const tr = document.createElement('tr');
-  tr.className = 'total-row';
-  tr.innerHTML = `<td>YTD TOTAL</td>
-    <td>${fmtDollar(sum(fy25gas.cost))}</td>
-    <td>${fmtNum(sum(fy25gas.mmbtu))}</td>
-    <td>${fmtRate(sum(fy25gas.cost) / sum(fy25gas.mmbtu))}</td>
-    <td>${fmtDollar(sum(fy25gas.kintec))}</td>
-    <td>${fmtDollar(sum(fy25gas.avista))}</td>`;
-  tb.appendChild(tr);
-})();
+  // --- Monthly Detail Table ---
+  const tb1 = document.querySelector('#tableMonthly tbody');
+  for(let i=0;i<12;i++){const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${MONTH_FULL[i]}</td><td>${fmtDollar(fy26.totalActual[i])}</td><td>${fmtDollar(fy26.elecActual[i])}</td><td>${fmtDollar(fy26.gasActual[i])}</td><td class="forecast">${fmtDollar(fy26.totalFcast[i])}</td><td class="forecast">${fmtDollar(fy26.elecFcast[i])}</td><td class="forecast">${fmtDollar(fy26.gasFcast[i])}</td><td class="forecast">${fmtDollar(fy26.kintecFcast[i])}</td><td class="forecast">${fmtDollar(fy26.avistaFcast[i])}</td><td>${fy26.hedge}%</td>`;
+    tb1.appendChild(tr);}
+  const tr1=document.createElement('tr');tr1.className='total-row';
+  tr1.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(totalAct)}</td><td>${fmtDollar(totalElec)}</td><td>${fmtDollar(totalGas)}</td><td class="forecast">${fmtDollar(totalFcast)}</td><td class="forecast">${fmtDollar(sum(fy26.elecFcast))}</td><td class="forecast">${fmtDollar(sum(fy26.gasFcast))}</td><td class="forecast">${fmtDollar(sum(fy26.kintecFcast))}</td><td class="forecast">${fmtDollar(sum(fy26.avistaFcast))}</td><td>${fy26.hedge}%</td>`;
+  tb1.appendChild(tr1);
 
-// Gas FY25 chart
-new Chart(document.getElementById('chartGas25'), {
-  type: 'bar',
-  data: {
-    labels: MONTHS,
-    datasets: [
-      { label: 'Gas Cost ($)', data: fy25gas.cost, backgroundColor: COLORS.accent, borderRadius: 3, yAxisID: 'y' },
-      { label: 'Gas MMBTU', data: fy25gas.mmbtu, type: 'line', borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight, pointRadius: 4, tension: 0.3, yAxisID: 'y1' }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    scales: {
-      y: { position: 'left', ticks: { callback: v => '$' + (v/1e3).toFixed(0) + 'K' } },
-      y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => fmtNum(v) } }
-    }
-  }
-});
+  // --- Gas FY25 Table ---
+  const mfy25=['July 2024','August 2024','September 2024','October 2024','November 2024','December 2024','January 2025','February 2025','March 2025','April 2025','May 2025','June 2025'];
+  const tb2=document.querySelector('#tableGas25 tbody');
+  for(let i=0;i<12;i++){const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${mfy25[i]}</td><td>${fmtDollar(fy25gas.cost[i])}</td><td>${fmtNum(fy25gas.mmbtu[i])}</td><td>${fmtRate(fy25gas.perUnit[i])}</td><td>${fmtDollar(fy25gas.kintec[i])}</td><td>${fmtDollar(fy25gas.avista[i])}</td>`;
+    tb2.appendChild(tr);}
+  const tr2=document.createElement('tr');tr2.className='total-row';
+  tr2.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(sum(fy25gas.cost))}</td><td>${fmtNum(sum(fy25gas.mmbtu))}</td><td>${fmtRate(sum(fy25gas.cost)/sum(fy25gas.mmbtu))}</td><td>${fmtDollar(sum(fy25gas.kintec))}</td><td>${fmtDollar(sum(fy25gas.avista))}</td>`;
+  tb2.appendChild(tr2);
 
-// Kintec chart
-new Chart(document.getElementById('chartKintec'), {
-  type: 'bar',
-  data: {
-    labels: kintec.months,
-    datasets: [
-      { label: 'Dekatherms', data: kintec.dths, backgroundColor: COLORS.accent, borderRadius: 2, yAxisID: 'y' },
-      { label: 'Cost ($)', data: kintec.cost, type: 'line', borderColor: COLORS.primary, pointRadius: 2, tension: 0.3, yAxisID: 'y1' }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    scales: {
-      x: { ticks: { maxRotation: 45, font: { size: 10 } } },
-      y: { position: 'left', ticks: { callback: v => fmtNum(v) } },
-      y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => '$' + (v/1e3).toFixed(0) + 'K' } }
-    }
-  }
-});
+  // --- Gas FY25 Chart ---
+  new Chart(document.getElementById('chartGas25'),{type:'bar',data:{labels:MONTHS,datasets:[
+    {label:'Gas Cost ($)',data:fy25gas.cost,backgroundColor:C.accent,borderRadius:3,yAxisID:'y'},
+    {label:'Gas MMBTU',data:fy25gas.mmbtu,type:'line',borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,tension:0.3,yAxisID:'y1'}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{
+    y:{position:'left',ticks:{callback:v=>'$'+(v/1e3).toFixed(0)+'K'}},
+    y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fmtNum(v)}}}}});
 
-// Energy use table
-(function() {
-  const tb = document.querySelector('#tableEnergyUse tbody');
-  for (let i = 0; i < 12; i++) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${MONTH_FULL[i]}</td>
-      <td>${fmtNum(energyUse.totalActual[i])}</td>
-      <td>${fmtNum(energyUse.elecActual[i])}</td>
-      <td>${fmtNum(energyUse.gasActual[i])}</td>
-      <td class="forecast">${fmtNum(energyUse.totalFcast[i])}</td>
-      <td>${fmtNum(energyUse.kwhActual[i])}</td>
-      <td>${fmtRateKwh(energyUse.kwhRate[i])}</td>`;
-    tb.appendChild(tr);
-  }
-  const sum = arr => arr.reduce((a, b) => a + b, 0);
-  const tr = document.createElement('tr');
-  tr.className = 'total-row';
-  tr.innerHTML = `<td>YTD TOTAL</td>
-    <td>${fmtNum(sum(energyUse.totalActual))}</td>
-    <td>${fmtNum(sum(energyUse.elecActual))}</td>
-    <td>${fmtNum(sum(energyUse.gasActual))}</td>
-    <td class="forecast">${fmtNum(sum(energyUse.totalFcast))}</td>
-    <td>${fmtNum(sum(energyUse.kwhActual))}</td>
-    <td>${fmtRateKwh(sum(energyUse.kwhActual) > 0 ? sum(fy26.elecActual) / sum(energyUse.kwhActual) : 0)}</td>`;
-  tb.appendChild(tr);
-})();
+  // --- Kintec Chart ---
+  new Chart(document.getElementById('chartKintec'),{type:'bar',data:{labels:kintec.months,datasets:[
+    {label:'Dekatherms',data:kintec.dths,backgroundColor:C.accent,borderRadius:2,yAxisID:'y'},
+    {label:'Cost ($)',data:kintec.cost,type:'line',borderColor:C.primary,pointRadius:2,tension:0.3,yAxisID:'y1'}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{
+    x:{ticks:{maxRotation:45,font:{size:10}}},
+    y:{position:'left',ticks:{callback:v=>fmtNum(v)}},
+    y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>'$'+(v/1e3).toFixed(0)+'K'}}}}});
 
-// Energy use chart
-new Chart(document.getElementById('chartEnergyUse'), {
-  type: 'bar',
-  data: {
-    labels: MONTHS,
-    datasets: [
-      { label: 'Electric MMBTU', data: energyUse.elecActual, backgroundColor: COLORS.primary, stack: 's1', borderRadius: 2 },
-      { label: 'Gas MMBTU', data: energyUse.gasActual, backgroundColor: COLORS.accent, stack: 's1', borderRadius: 2 },
-      { label: 'Total Forecast', data: energyUse.totalFcast, type: 'line', borderColor: COLORS.blue, borderDash: [5,5], pointRadius: 4, tension: 0.3, fill: false }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => fmtNum(v) } } }
-  }
-});
+  // --- Energy Use Table ---
+  const tb3=document.querySelector('#tableEnergyUse tbody');
+  for(let i=0;i<12;i++){const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${MONTH_FULL[i]}</td><td>${fmtNum(energyUse.totalActual[i])}</td><td>${fmtNum(energyUse.elecActual[i])}</td><td>${fmtNum(energyUse.gasActual[i])}</td><td class="forecast">${fmtNum(energyUse.totalFcast[i])}</td><td>${fmtNum(energyUse.kwhActual[i])}</td><td>${fmtRateKwh(energyUse.kwhRate[i])}</td>`;
+    tb3.appendChild(tr);}
+  const tr3=document.createElement('tr');tr3.className='total-row';
+  const avgKwh=sum(energyUse.kwhActual)>0?sum(fy26.elecActual)/sum(energyUse.kwhActual):0;
+  tr3.innerHTML=`<td>YTD TOTAL</td><td>${fmtNum(sum(energyUse.totalActual))}</td><td>${fmtNum(sum(energyUse.elecActual))}</td><td>${fmtNum(sum(energyUse.gasActual))}</td><td class="forecast">${fmtNum(sum(energyUse.totalFcast))}</td><td>${fmtNum(sum(energyUse.kwhActual))}</td><td>${fmtRateKwh(avgKwh)}</td>`;
+  tb3.appendChild(tr3);
 
-// YoY table
-(function() {
-  const tb = document.querySelector('#tableYoY tbody');
-  for (let i = 0; i < 12; i++) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${MONTHS[i]}</td>
-      <td>${fmtNum(yoy.fy24total[i])}</td><td>${fmtNum(yoy.fy24elec[i])}</td><td>${fmtNum(yoy.fy24gas[i])}</td>
-      <td>${fmtNum(yoy.fy25total[i])}</td><td>${fmtNum(yoy.fy25elec[i])}</td><td>${fmtNum(yoy.fy25gas[i])}</td>
-      <td>${fmtNum(yoy.fy26total[i])}</td><td>${fmtNum(yoy.fy26elec[i])}</td><td>${fmtNum(yoy.fy26gas[i])}</td>`;
-    tb.appendChild(tr);
-  }
-  const sum = arr => arr.reduce((a, b) => a + b, 0);
-  const tr = document.createElement('tr');
-  tr.className = 'total-row';
-  tr.innerHTML = `<td>FY TOTAL</td>
-    <td>${fmtNum(sum(yoy.fy24total))}</td><td>${fmtNum(sum(yoy.fy24elec))}</td><td>${fmtNum(sum(yoy.fy24gas))}</td>
-    <td>${fmtNum(sum(yoy.fy25total))}</td><td>${fmtNum(sum(yoy.fy25elec))}</td><td>${fmtNum(sum(yoy.fy25gas))}</td>
-    <td>${fmtNum(sum(yoy.fy26total))}</td><td>${fmtNum(sum(yoy.fy26elec))}</td><td>${fmtNum(sum(yoy.fy26gas))}</td>`;
-  tb.appendChild(tr);
-})();
+  // --- Energy Use Chart ---
+  new Chart(document.getElementById('chartEnergyUse'),{type:'bar',data:{labels:MONTHS,datasets:[
+    {label:'Electric MMBTU',data:energyUse.elecActual,backgroundColor:C.primary,stack:'s1',borderRadius:2},
+    {label:'Gas MMBTU',data:energyUse.gasActual,backgroundColor:C.accent,stack:'s1',borderRadius:2},
+    {label:'Total Forecast',data:energyUse.totalFcast,type:'line',borderColor:C.blue,borderDash:[5,5],pointRadius:4,tension:0.3,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}});
 
-// YoY chart
-new Chart(document.getElementById('chartYoY'), {
-  type: 'line',
-  data: {
-    labels: MONTHS,
-    datasets: [
-      { label: 'FY2024', data: yoy.fy24total, borderColor: COLORS.gray, backgroundColor: COLORS.grayLight, pointRadius: 3, tension: 0.3 },
-      { label: 'FY2025', data: yoy.fy25total, borderColor: COLORS.blue, backgroundColor: COLORS.blueLight, pointRadius: 3, tension: 0.3 },
-      { label: 'FY2026', data: yoy.fy26total, borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight, pointRadius: 4, borderWidth: 2.5, tension: 0.3 }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    scales: { y: { ticks: { callback: v => fmtNum(v) } } },
-    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw) + ' MMBTU' } } }
-  }
-});
+  // --- YoY Table ---
+  const tb4=document.querySelector('#tableYoY tbody');
+  for(let i=0;i<12;i++){const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtNum(yoy.fy24total[i])}</td><td>${fmtNum(yoy.fy24elec[i])}</td><td>${fmtNum(yoy.fy24gas[i])}</td><td>${fmtNum(yoy.fy25total[i])}</td><td>${fmtNum(yoy.fy25elec[i])}</td><td>${fmtNum(yoy.fy25gas[i])}</td><td>${fmtNum(yoy.fy26total[i])}</td><td>${fmtNum(yoy.fy26elec[i])}</td><td>${fmtNum(yoy.fy26gas[i])}</td>`;
+    tb4.appendChild(tr);}
+  const tr4=document.createElement('tr');tr4.className='total-row';
+  tr4.innerHTML=`<td>FY TOTAL</td><td>${fmtNum(sum(yoy.fy24total))}</td><td>${fmtNum(sum(yoy.fy24elec))}</td><td>${fmtNum(sum(yoy.fy24gas))}</td><td>${fmtNum(sum(yoy.fy25total))}</td><td>${fmtNum(sum(yoy.fy25elec))}</td><td>${fmtNum(sum(yoy.fy25gas))}</td><td>${fmtNum(sum(yoy.fy26total))}</td><td>${fmtNum(sum(yoy.fy26elec))}</td><td>${fmtNum(sum(yoy.fy26gas))}</td>`;
+  tb4.appendChild(tr4);
 
-// Cumulative table
-(function() {
-  const tb = document.querySelector('#tableCumulative tbody');
-  const monthsShort = ['Jul 2025','Aug 2025','Sep 2025','Oct 2025','Nov 2025','Dec 2025',
-    'Jan 2026','Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026'];
-  for (let i = 0; i < 12; i++) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${monthsShort[i]}</td>
-      <td>${fmtDollar(cumul.actual[i])}</td>
-      <td class="forecast">${fmtDollar(cumul.forecast[i])}</td>
-      <td class="negative">+${fmtDollar(cumul.delta[i])}</td>
-      <td class="negative">${fmtPct(cumul.deltaPct[i])}</td>
-      <td>${fmtNum(cumul.mmbtuAct[i])}</td>
-      <td>${fmtRate(cumul.elecRate[i])}</td>
-      <td>${fmtRate(cumul.gasRate[i])}</td>`;
-    tb.appendChild(tr);
-  }
-  const tr = document.createElement('tr');
-  tr.className = 'total-row';
-  tr.innerHTML = `<td>FY TOTAL</td>
-    <td>${fmtDollar(21566760)}</td>
-    <td class="forecast">${fmtDollar(23837812)}</td>
-    <td class="negative">+${fmtDollar(2271052)}</td>
-    <td class="negative">10.5%</td>
-    <td>${fmtNum(1549488)}</td>
-    <td>${fmtRate(28.12)}</td>
-    <td>${fmtRate(5.78)}</td>`;
-  tb.appendChild(tr);
-})();
+  // YoY notes
+  const yoyPctTotal=((sum(yoy.fy26total)-sum(yoy.fy25total))/sum(yoy.fy25total)*100).toFixed(1);
+  const yoyPctElec=sum(yoy.fy25elec)>0?((sum(yoy.fy26elec)-sum(yoy.fy25elec))/sum(yoy.fy25elec)*100).toFixed(1):'N/A';
+  const yoyPctGas=((sum(yoy.fy26gas)-sum(yoy.fy25gas))/sum(yoy.fy25gas)*100).toFixed(1);
+  document.getElementById('yoyNotes').innerHTML=`<li>FY26 vs FY25: ${yoyPctTotal}% total, ${yoyPctElec}% electric, ${yoyPctGas}% gas</li>`;
 
-// Cumulative chart
-new Chart(document.getElementById('chartCumulative'), {
-  type: 'line',
-  data: {
-    labels: MONTHS,
-    datasets: [
-      { label: 'Actual (Cumulative)', data: cumul.actual, borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight, fill: true, pointRadius: 4, tension: 0.3, borderWidth: 2.5 },
-      { label: 'Forecast (Cumulative)', data: cumul.forecast, borderColor: COLORS.blue, backgroundColor: COLORS.blueLight, fill: true, pointRadius: 4, borderDash: [6,3], tension: 0.3 }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    scales: { y: { ticks: { callback: v => '$' + (v/1e6).toFixed(0) + 'M' } } },
-    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtDollarM(ctx.raw) } } }
-  }
-});
+  // --- YoY Chart ---
+  new Chart(document.getElementById('chartYoY'),{type:'line',data:{labels:MONTHS,datasets:[
+    {label:'FY2024',data:yoy.fy24total,borderColor:C.gray,backgroundColor:C.grayLight,pointRadius:3,tension:0.3},
+    {label:'FY2025',data:yoy.fy25total,borderColor:C.blue,backgroundColor:C.blueLight,pointRadius:3,tension:0.3},
+    {label:'FY2026',data:yoy.fy26total,borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,borderWidth:2.5,tension:0.3}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}},
+    plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)+' MMBTU'}}}}});
 
-// HDD table
-(function() {
-  const tb = document.querySelector('#tableHDD tbody');
-  for (let i = 0; i < 12; i++) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${MONTHS[i]}</td>
-      <td>${fmtNum(hdd.fy25[i])}</td>
-      <td>${fmtNum(hdd.fy26[i])}</td>
-      <td>${fmtNum(hdd.normal[i])}</td>`;
-    tb.appendChild(tr);
-  }
-  const sum = arr => arr.reduce((a, b) => a + b, 0);
-  const tr = document.createElement('tr');
-  tr.className = 'total-row';
-  tr.innerHTML = `<td>FY Total</td>
-    <td>${fmtNum(sum(hdd.fy25))}</td>
-    <td>${fmtNum(sum(hdd.fy26))}</td>
-    <td>${fmtNum(sum(hdd.normal))}</td>`;
-  tb.appendChild(tr);
-})();
+  // --- Cumulative Table ---
+  const mShort=['Jul 2025','Aug 2025','Sep 2025','Oct 2025','Nov 2025','Dec 2025','Jan 2026','Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026'];
+  const tb5=document.querySelector('#tableCumulative tbody');
+  for(let i=0;i<12;i++){const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${mShort[i]}</td><td>${fmtDollar(cumul.actual[i])}</td><td class="forecast">${fmtDollar(cumul.forecast[i])}</td><td class="negative">+${fmtDollar(cumul.delta[i])}</td><td class="negative">${fmtPct(cumul.deltaPct[i])}</td><td>${fmtNum(cumul.mmbtuAct[i])}</td><td>${fmtRate(cumul.elecRate[i])}</td><td>${fmtRate(cumul.gasRate[i])}</td>`;
+    tb5.appendChild(tr);}
+  const tr5=document.createElement('tr');tr5.className='total-row';
+  tr5.innerHTML=`<td>FY TOTAL</td><td>${fmtDollar(cumul.actual[last])}</td><td class="forecast">${fmtDollar(cumul.forecast[last])}</td><td class="negative">+${fmtDollar(cumul.delta[last])}</td><td class="negative">${fmtPct(cumul.deltaPct[last])}</td><td>${fmtNum(cumul.mmbtuAct[last])}</td><td>${fmtRate(cumul.elecRate[last])}</td><td>${fmtRate(cumul.gasRate[last])}</td>`;
+  tb5.appendChild(tr5);
 
-// HDD chart
-new Chart(document.getElementById('chartHDD'), {
-  type: 'bar',
-  data: {
-    labels: MONTHS,
-    datasets: [
-      { label: 'FY2025 HDD', data: hdd.fy25, backgroundColor: COLORS.blueLight, borderColor: COLORS.blue, borderWidth: 1, borderRadius: 3 },
-      { label: 'FY2026 HDD', data: hdd.fy26, backgroundColor: COLORS.primary, borderRadius: 3 },
-      { label: '30-Yr Normal', data: hdd.normal, type: 'line', borderColor: COLORS.gray, borderDash: [5,5], pointRadius: 3, tension: 0.3, fill: false }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    scales: { y: { ticks: { callback: v => fmtNum(v) } } }
-  }
-});
+  // --- Cumulative Chart ---
+  new Chart(document.getElementById('chartCumulative'),{type:'line',data:{labels:MONTHS,datasets:[
+    {label:'Actual (Cumulative)',data:cumul.actual,borderColor:C.primary,backgroundColor:C.primaryLight,fill:true,pointRadius:4,tension:0.3,borderWidth:2.5},
+    {label:'Forecast (Cumulative)',data:cumul.forecast,borderColor:C.blue,backgroundColor:C.blueLight,fill:true,pointRadius:4,borderDash:[6,3],tension:0.3}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(0)+'M'}}},
+    plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollarM(ctx.raw)}}}}});
+
+  // --- HDD Table ---
+  const tb6=document.querySelector('#tableHDD tbody');
+  for(let i=0;i<12;i++){const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtNum(hdd.fy25[i])}</td><td>${fmtNum(hdd.fy26[i])}</td><td>${fmtNum(hdd.normal[i])}</td>`;
+    tb6.appendChild(tr);}
+  const tr6=document.createElement('tr');tr6.className='total-row';
+  tr6.innerHTML=`<td>FY Total</td><td>${fmtNum(sum(hdd.fy25))}</td><td>${fmtNum(sum(hdd.fy26))}</td><td>${fmtNum(sum(hdd.normal))}</td>`;
+  tb6.appendChild(tr6);
+  document.getElementById('hddTotals').textContent='FY2025 Total: '+fmtNum(sum(hdd.fy25))+' HDD | FY2026 Total: '+fmtNum(sum(hdd.fy26))+' HDD | 30-Yr Normal: '+fmtNum(sum(hdd.normal))+' HDD';
+
+  // --- HDD Chart ---
+  new Chart(document.getElementById('chartHDD'),{type:'bar',data:{labels:MONTHS,datasets:[
+    {label:'FY2025 HDD',data:hdd.fy25,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
+    {label:'FY2026 HDD',data:hdd.fy26,backgroundColor:C.primary,borderRadius:3},
+    {label:'30-Yr Normal',data:hdd.normal,type:'line',borderColor:C.gray,borderDash:[5,5],pointRadius:3,tension:0.3,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}}}});
+}
+
+// ==================== FETCH & GO ====================
+fetch('data.json')
+  .then(r => {
+    if(!r.ok) throw new Error('data.json not found. Click the "Export Data" button in your Excel workbook first, then upload data.json to this folder.');
+    return r.json();
+  })
+  .then(data => {
+    document.getElementById('loading').style.display = 'none';
+    initDashboard(data);
+  })
+  .catch(err => {
+    document.getElementById('loading').style.display = 'none';
+    const el = document.getElementById('error');
+    el.style.display = 'flex';
+    document.getElementById('errorMsg').textContent = err.message;
+  });
 </script>
 </body>
 </html>
