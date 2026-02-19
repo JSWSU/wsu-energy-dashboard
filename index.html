@@ -574,33 +574,32 @@ function initDashboard(D) {
       totals: () => [fmtDollar(cumul.actual[last]), fmtDollar(cumul.forecast[last]), fmtDollar(cumul.delta[last])]
     },
     mmbtu: {
-      headers: ['Month', 'Total MMBTU', 'Elec MMBTU', 'Gas MMBTU'],
-      rows: (i) => [MONTHS[i], fmtNum(energyUse.totalActual[i]), fmtNum(energyUse.elecActual[i]), fmtNum(energyUse.gasActual[i])],
+      headers: ['Month', 'Total MMBTU'],
+      rows: (i) => [MONTHS[i], fmtNum(energyUse.totalActual[i])],
       totalLabel: 'YTD Total',
-      totals: () => [fmtNum(totalMMBTU), fmtNum(totalElecMMBTU), fmtNum(totalGasMMBTU)]
+      totals: () => [fmtNum(totalMMBTU)]
     },
     elecCost: {
-      headers: ['Month', 'Electric Cost'],
-      rows: (i) => [MONTHS[i], fmtDollar(fy26.elecActual[i])],
+      headers: ['Month', 'Electric Cost', 'Elec MMBTU'],
+      rows: (i) => [MONTHS[i], fmtDollar(fy26.elecActual[i]), fmtNum(energyUse.elecActual[i])],
       totalLabel: 'YTD Total',
-      totals: () => [fmtDollar(totalElec)]
+      totals: () => [fmtDollar(totalElec), fmtNum(totalElecMMBTU)]
     },
     gasCost: {
-      headers: ['Month', 'Gas Cost', 'Kintec', 'Avista'],
-      rows: (i) => [MONTHS[i], fmtDollar(fy26.gasActual[i]), fmtDollar(fy26.kintecFcast[i]), fmtDollar(fy26.avistaFcast[i])],
+      headers: ['Month', 'Gas Cost', 'Gas MMBTU', 'Kintec', 'Avista'],
+      rows: (i) => [MONTHS[i], fmtDollar(fy26.gasActual[i]), fmtNum(energyUse.gasActual[i]), fmtDollar(fy26.kintecFcast[i]), fmtDollar(fy26.avistaFcast[i])],
       totalLabel: 'YTD Total',
-      totals: () => [fmtDollar(totalGas), fmtDollar(sum(fy26.kintecFcast)), fmtDollar(sum(fy26.avistaFcast))]
+      totals: () => [fmtDollar(totalGas), fmtNum(totalGasMMBTU), fmtDollar(sum(fy26.kintecFcast)), fmtDollar(sum(fy26.avistaFcast))]
     },
     elecRate: {
-      headers: ['Month', 'Elec $', 'MMBTU', '$/MMBTU', 'kWh', '$/kWh'],
+      headers: ['Month', 'Elec $', 'kWh', '$/kWh'],
       rows: (i) => {
-        const m = energyUse.elecActual[i], c = fy26.elecActual[i];
-        return [MONTHS[i], fmtDollar(c), fmtNum(m), fmtRate(m > 0 ? c/m : 0), fmtNum(energyUse.kwhActual[i]), fmtRateKwh(energyUse.kwhRate[i])];
+        return [MONTHS[i], fmtDollar(fy26.elecActual[i]), fmtNum(energyUse.kwhActual[i]), fmtRateKwh(energyUse.kwhRate[i])];
       },
       totalLabel: 'Avg / Total',
       totals: () => {
         const tkwh = sum(energyUse.kwhActual);
-        return [fmtDollar(totalElec), fmtNum(totalElecMMBTU), fmtRate(elecRateAct), fmtNum(tkwh), fmtRateKwh(tkwh > 0 ? totalElec/tkwh : 0)];
+        return [fmtDollar(totalElec), fmtNum(tkwh), fmtRateKwh(tkwh > 0 ? totalElec/tkwh : 0)];
       }
     },
     gasRate: {
