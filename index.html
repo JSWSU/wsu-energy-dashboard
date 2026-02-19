@@ -296,18 +296,18 @@
       <h2>Data Sources &amp; Accounts</h2>
       <h3>Avista Utilities</h3>
       <div class="table-wrap"><table><thead><tr><th>Account Name</th><th>Account #</th><th>Description</th></tr></thead><tbody>
-        <tr><td>WSU FACILITIES SERVICES</td><td>4265620000</td><td>Small account - Gas &amp; Electric</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>1747670000</td><td>Small account - Gas &amp; Electric</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>3236650000</td><td>Small / Large account</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>5037100000</td><td>Large account</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>6037100000</td><td>Large account</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>6100220000</td><td>Large account</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>6365350762</td><td>Large account</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>6595550000</td><td>Small account - Gas &amp; Electric</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>7037100000</td><td>Small account - Gas only</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>7979840000</td><td>Small account - Gas only</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>9447033237</td><td>Small account - Electric only</td></tr>
-        <tr><td>WSU FACILITIES SERVICES</td><td>3731710000</td><td>Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***620000</td><td>Small account - Gas &amp; Electric</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***670000</td><td>Small account - Gas &amp; Electric</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***650000</td><td>Small / Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***100000</td><td>Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***100000</td><td>Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***220000</td><td>Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***350762</td><td>Large account</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***550000</td><td>Small account - Gas &amp; Electric</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***100000</td><td>Small account - Gas only</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***840000</td><td>Small account - Gas only</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***033237</td><td>Small account - Electric only</td></tr>
+        <tr><td>WSU FACILITIES SERVICES</td><td>***710000</td><td>Large account</td></tr>
       </tbody></table></div>
       <h3>Inland Power</h3>
       <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.5rem;">Electric service for outlying WSU facilities. Data sourced from Inland Power bills.</p>
@@ -532,7 +532,7 @@ function initDashboard(D) {
 
   // --- Cumulative Table ---
   const mShort=['Jul 2025','Aug 2025','Sep 2025','Oct 2025','Nov 2025','Dec 2025','Jan 2026','Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026'];
-  const last=cumul.actual.length-1;
+  // 'last' already declared above for delta KPI
   const tb5=document.querySelector('#tableCumulative tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
     const dCls = cumul.delta[i]>0?'negative':'positive';
