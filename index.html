@@ -86,14 +86,104 @@
   .legend-item { display: flex; align-items: center; gap: 0.35rem; }
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   footer { text-align: center; padding: 1.5rem; color: var(--text-light); font-size: 0.78rem; border-top: 1px solid var(--border); margin-top: 2rem; }
-  @media print { header { print-color-adjust: exact; -webkit-print-color-adjust: exact; } .nav-tabs { display: none; } .section { display: block !important; page-break-inside: avoid; } }
+  @media print { header { print-color-adjust: exact; -webkit-print-color-adjust: exact; } .nav-tabs { display: none; } .section { display: block !important; page-break-inside: avoid; } #authGate { display: none !important; } .kpi-tooltip { display: none !important; } .kpi-expand { max-height: none !important; opacity: 1 !important; } .kpi-expand-icon { display: none !important; } }
   @keyframes spin { to { transform: rotate(360deg); } }
   #loading { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; }
   #error { position: fixed; inset: 0; background: var(--bg); align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; padding: 2rem; text-align: center; }
   .verified { display: inline-flex; align-items: center; gap: 0.3rem; background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+  /* --- Auth Gate --- */
+  #authGate {
+    position: fixed; inset: 0; z-index: 99999; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+  }
+  #authGate .auth-header {
+    position: absolute; top: 0; left: 0; right: 0;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; padding: 1.5rem 2rem; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  #authGate .auth-header h1 { font-size: 1.4rem; font-weight: 700; }
+  #authGate .auth-header p { opacity: 0.85; font-size: 0.85rem; margin-top: 0.25rem; }
+  #authGate .auth-card {
+    background: var(--card-bg); border-radius: 12px; padding: 2.5rem 2rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1); text-align: center;
+    width: 100%; max-width: 380px; margin-top: 60px;
+  }
+  #authGate .auth-card h2 { font-size: 1.1rem; color: var(--text); margin-bottom: 0.5rem; }
+  #authGate .auth-card p { font-size: 0.82rem; color: var(--text-light); margin-bottom: 1.5rem; }
+  #authGate .auth-input {
+    width: 100%; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+  }
+  #authGate .auth-input:focus { border-color: var(--primary); }
+  #authGate .auth-btn {
+    width: 100%; padding: 0.75rem; margin-top: 1rem; border: none; border-radius: 8px;
+    background: var(--primary); color: #fff; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  #authGate .auth-btn:hover { background: var(--primary-dark); }
+  #authGate .auth-error {
+    color: var(--red); font-size: 0.8rem; margin-top: 0.75rem; min-height: 1.2rem;
+  }
+  /* --- Interactive KPI Cards --- */
+  .kpi-card {
+    cursor: pointer; transition: box-shadow 0.2s ease, transform 0.15s ease; position: relative;
+  }
+  .kpi-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-2px);
+  }
+  .kpi-tooltip {
+    visibility: hidden; opacity: 0; position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); background: #1f2937; color: #fff; font-size: 0.75rem;
+    line-height: 1.4; padding: 0.5rem 0.75rem; border-radius: 6px; white-space: normal;
+    width: max-content; max-width: 260px; z-index: 100; pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .kpi-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #1f2937;
+  }
+  .kpi-card:hover .kpi-tooltip { visibility: visible; opacity: 1; }
+  .kpi-expand {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.35s ease, margin-top 0.35s ease, opacity 0.25s ease;
+    opacity: 0; margin-top: 0;
+  }
+  .kpi-card.expanded .kpi-expand { max-height: 500px; opacity: 1; margin-top: 0.75rem; }
+  .kpi-card.expanded { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+  .kpi-expand-icon {
+    position: absolute; top: 0.75rem; right: 0.75rem; font-size: 0.7rem;
+    color: var(--text-light); transition: transform 0.3s ease;
+  }
+  .kpi-card.expanded .kpi-expand-icon { transform: rotate(180deg); }
+  .kpi-mini-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+  .kpi-mini-table th {
+    text-align: left; font-weight: 600; color: var(--secondary); padding: 0.3rem 0.5rem;
+    border-bottom: 2px solid var(--border); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .kpi-mini-table th:not(:first-child) { text-align: right; }
+  .kpi-mini-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid #f3f4f6; }
+  .kpi-mini-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+  .kpi-mini-table tr:last-child { font-weight: 700; border-top: 2px solid var(--primary); }
+  .kpi-mini-table tr:last-child td { border-bottom: none; padding-top: 0.4rem; }
+  @media (max-width: 600px) { .kpi-tooltip { max-width: 200px; font-size: 0.7rem; } }
 </style>
 </head>
 <body>
+
+<div id="authGate">
+  <div class="auth-header">
+    <h1>WSU Energy Cost Projection</h1>
+    <p>FY2026 Dashboard &bull; WSU Facilities Services</p>
+  </div>
+  <div class="auth-card">
+    <h2>Authorized Access Only</h2>
+    <p>Enter the password to view the energy dashboard.</p>
+    <input type="password" class="auth-input" id="authInput" placeholder="Password" autocomplete="off">
+    <button class="auth-btn" id="authBtn">Sign In</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
 
 <div id="loading">
   <div style="width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#981e32;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
@@ -125,47 +215,71 @@
   <!-- DASHBOARD -->
   <div id="dashboard" class="section active">
     <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">FY2026 Actual (YTD)</div>
+      <div class="kpi-card" data-kpi="actualYTD">
+        <span class="kpi-expand-icon">&#9660;</span>
+        <span class="kpi-tooltip">Sum of actual energy costs paid to date plus forecasted costs for remaining months, across all WSU Pullman Facility Services utility accounts (see Data Sources tab for full list).</span>
+        <div class="kpi-label">FY2026 Actual + Forecast</div>
         <div class="kpi-value"><span id="kpiActualYTD">--</span></div>
-        <div class="kpi-sub">Total energy cost to date</div>
+        <div class="kpi-sub">Actuals to date plus forecast for remaining months</div>
+        <div class="kpi-expand"></div>
       </div>
-      <div class="kpi-card forecast">
+      <div class="kpi-card forecast" data-kpi="forecast">
+        <span class="kpi-expand-icon">&#9660;</span>
+        <span class="kpi-tooltip">Projected total energy cost for the full fiscal year, using CY2024&ndash;2025 growth trends with a price hedge adjustment.</span>
         <div class="kpi-label">FY2026 Forecast</div>
         <div class="kpi-value blue"><span id="kpiForecast">--</span></div>
         <div class="kpi-sub">Projected full-year cost</div>
+        <div class="kpi-expand"></div>
       </div>
-      <div class="kpi-card delta">
+      <div class="kpi-card delta" data-kpi="delta">
+        <span class="kpi-expand-icon">&#9660;</span>
+        <span class="kpi-tooltip">Cumulative difference between forecast and actual costs. Positive = under budget; negative = over budget.</span>
         <div class="kpi-label">Forecast vs Actual</div>
         <div class="kpi-value red"><span id="kpiDelta">--</span></div>
         <div class="kpi-sub"><span id="kpiDeltaPct">--</span></div>
+        <div class="kpi-expand"></div>
       </div>
-      <div class="kpi-card energy">
+      <div class="kpi-card energy" data-kpi="mmbtu">
+        <span class="kpi-expand-icon">&#9660;</span>
+        <span class="kpi-tooltip">Total energy consumed in MMBTU (Million BTU), combining electricity and natural gas across all campus facilities.</span>
         <div class="kpi-label">Total Energy Use (YTD)</div>
         <div class="kpi-value"><span id="kpiMMBTU">--</span></div>
         <div class="kpi-sub"><span id="kpiMMBTUSub">--</span></div>
+        <div class="kpi-expand"></div>
       </div>
     </div>
     <div class="kpi-grid">
-      <div class="kpi-card">
+      <div class="kpi-card" data-kpi="elecCost">
+        <span class="kpi-expand-icon">&#9660;</span>
+        <span class="kpi-tooltip">Electricity cost year-to-date for WSU Pullman Facility Services accounts including Avista and Inland Power. See Data Sources tab for the full account list.</span>
         <div class="kpi-label">Electric Cost (YTD)</div>
         <div class="kpi-value"><span id="kpiElecCost">--</span></div>
         <div class="kpi-sub"><span id="kpiElecPct">--</span></div>
+        <div class="kpi-expand"></div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card" data-kpi="gasCost">
+        <span class="kpi-expand-icon">&#9660;</span>
+        <span class="kpi-tooltip">Natural gas cost year-to-date for WSU Pullman Facility Services accounts, combining Kintec commodity delivery and Avista distribution charges. See Data Sources tab for the full account list.</span>
         <div class="kpi-label">Gas Cost (YTD)</div>
         <div class="kpi-value"><span id="kpiGasCost">--</span></div>
         <div class="kpi-sub"><span id="kpiGasPct">--</span></div>
+        <div class="kpi-expand"></div>
       </div>
-      <div class="kpi-card forecast">
+      <div class="kpi-card forecast" data-kpi="elecRate">
+        <span class="kpi-expand-icon">&#9660;</span>
+        <span class="kpi-tooltip">Average $/MMBTU for electricity. Expand to see per-kWh rates each month.</span>
         <div class="kpi-label">Avg Elec Rate</div>
         <div class="kpi-value blue"><span id="kpiElecRate">--</span></div>
         <div class="kpi-sub"><span id="kpiElecRateSub">--</span></div>
+        <div class="kpi-expand"></div>
       </div>
-      <div class="kpi-card forecast">
+      <div class="kpi-card forecast" data-kpi="gasRate">
+        <span class="kpi-expand-icon">&#9660;</span>
+        <span class="kpi-tooltip">Average $/MMBTU for natural gas. Reflects blended Kintec commodity and Avista distribution pricing.</span>
         <div class="kpi-label">Avg Gas Rate</div>
         <div class="kpi-value blue"><span id="kpiGasRate">--</span></div>
         <div class="kpi-sub"><span id="kpiGasRateSub">--</span></div>
+        <div class="kpi-expand"></div>
       </div>
     </div>
     <div class="chart-row">
@@ -359,6 +473,30 @@ const C = {
   purple:'#7c3aed', orange:'#ea580c'
 };
 
+// ==================== AUTH GATE ====================
+(function() {
+  const gate = document.getElementById('authGate');
+  const input = document.getElementById('authInput');
+  const btn = document.getElementById('authBtn');
+  const err = document.getElementById('authError');
+  if (sessionStorage.getItem('wsuEnergyAuth') === 'ok') {
+    gate.style.display = 'none';
+  }
+  function tryAuth() {
+    if (input.value === 'Energy@WSU') {
+      sessionStorage.setItem('wsuEnergyAuth', 'ok');
+      gate.style.display = 'none';
+      err.textContent = '';
+    } else {
+      err.textContent = 'Incorrect password. Please try again.';
+      input.value = '';
+      input.focus();
+    }
+  }
+  btn.addEventListener('click', tryAuth);
+  input.addEventListener('keydown', function(e) { if (e.key === 'Enter') tryAuth(); });
+})();
+
 // Tab navigation
 document.querySelectorAll('.nav-tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -414,6 +552,95 @@ function initDashboard(D) {
   if (D.verification) {
     document.getElementById('verifiedBadge').innerHTML = '<span class="verified">Verified vs Consolidated Data</span>';
   }
+
+  // --- KPI Expand Content Config ---
+  const kpiExpandConfig = {
+    actualYTD: {
+      headers: ['Month', 'Total Cost'],
+      rows: (i) => [MONTHS[i], fmtDollar(fy26.totalActual[i])],
+      totalLabel: 'FY Total',
+      totals: () => [fmtDollar(totalAct)]
+    },
+    forecast: {
+      headers: ['Month', 'Total Forecast'],
+      rows: (i) => [MONTHS[i], fmtDollar(fy26.totalFcast[i])],
+      totalLabel: 'FY Total',
+      totals: () => [fmtDollar(totalFcast)]
+    },
+    delta: {
+      headers: ['Month', 'Cumul. Actual', 'Cumul. Forecast', 'Delta'],
+      rows: (i) => [MONTHS[i], fmtDollar(cumul.actual[i]), fmtDollar(cumul.forecast[i]), fmtDollar(cumul.delta[i])],
+      totalLabel: 'Final',
+      totals: () => [fmtDollar(cumul.actual[last]), fmtDollar(cumul.forecast[last]), fmtDollar(cumul.delta[last])]
+    },
+    mmbtu: {
+      headers: ['Month', 'Total MMBTU', 'Elec MMBTU', 'Gas MMBTU'],
+      rows: (i) => [MONTHS[i], fmtNum(energyUse.totalActual[i]), fmtNum(energyUse.elecActual[i]), fmtNum(energyUse.gasActual[i])],
+      totalLabel: 'YTD Total',
+      totals: () => [fmtNum(totalMMBTU), fmtNum(totalElecMMBTU), fmtNum(totalGasMMBTU)]
+    },
+    elecCost: {
+      headers: ['Month', 'Electric Cost'],
+      rows: (i) => [MONTHS[i], fmtDollar(fy26.elecActual[i])],
+      totalLabel: 'YTD Total',
+      totals: () => [fmtDollar(totalElec)]
+    },
+    gasCost: {
+      headers: ['Month', 'Gas Cost', 'Kintec', 'Avista'],
+      rows: (i) => [MONTHS[i], fmtDollar(fy26.gasActual[i]), fmtDollar(fy26.kintecFcast[i]), fmtDollar(fy26.avistaFcast[i])],
+      totalLabel: 'YTD Total',
+      totals: () => [fmtDollar(totalGas), fmtDollar(sum(fy26.kintecFcast)), fmtDollar(sum(fy26.avistaFcast))]
+    },
+    elecRate: {
+      headers: ['Month', 'Elec $', 'MMBTU', '$/MMBTU', 'kWh', '$/kWh'],
+      rows: (i) => {
+        const m = energyUse.elecActual[i], c = fy26.elecActual[i];
+        return [MONTHS[i], fmtDollar(c), fmtNum(m), fmtRate(m > 0 ? c/m : 0), fmtNum(energyUse.kwhActual[i]), fmtRateKwh(energyUse.kwhRate[i])];
+      },
+      totalLabel: 'Avg / Total',
+      totals: () => {
+        const tkwh = sum(energyUse.kwhActual);
+        return [fmtDollar(totalElec), fmtNum(totalElecMMBTU), fmtRate(elecRateAct), fmtNum(tkwh), fmtRateKwh(tkwh > 0 ? totalElec/tkwh : 0)];
+      }
+    },
+    gasRate: {
+      headers: ['Month', 'Gas $', 'MMBTU', '$/MMBTU'],
+      rows: (i) => {
+        const m = energyUse.gasActual[i], c = fy26.gasActual[i];
+        return [MONTHS[i], fmtDollar(c), fmtNum(m), fmtRate(m > 0 ? c/m : 0)];
+      },
+      totalLabel: 'Avg / Total',
+      totals: () => [fmtDollar(totalGas), fmtNum(totalGasMMBTU), fmtRate(gasRateAct)]
+    }
+  };
+
+  function buildKpiMiniTable(config) {
+    let html = '<table class="kpi-mini-table"><thead><tr>';
+    config.headers.forEach(h => { html += '<th>' + h + '</th>'; });
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < 12; i++) {
+      const cells = config.rows(i);
+      html += '<tr>';
+      cells.forEach(c => { html += '<td>' + c + '</td>'; });
+      html += '</tr>';
+    }
+    html += '<tr><td>' + config.totalLabel + '</td>';
+    config.totals().forEach(t => { html += '<td>' + t + '</td>'; });
+    html += '</tr></tbody></table>';
+    return html;
+  }
+
+  document.querySelectorAll('.kpi-card[data-kpi]').forEach(card => {
+    const key = card.dataset.kpi;
+    const config = kpiExpandConfig[key];
+    if (!config) return;
+    const expandDiv = card.querySelector('.kpi-expand');
+    expandDiv.innerHTML = buildKpiMiniTable(config);
+    card.addEventListener('click', function(e) {
+      e.preventDefault();
+      this.classList.toggle('expanded');
+    });
+  });
 
   // --- Dashboard Charts ---
   new Chart(document.getElementById('chartMonthly'), {
