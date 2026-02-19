@@ -84,16 +84,16 @@ AUTHENTICATION MODEL
 
 Type:              Client-side password gate
 Password:          Energy@WSU (hardcoded in JS)
-Storage:           sessionStorage key: wsuEnergyAuth
-Persistence:       Cleared when browser tab closes
+Storage:           localStorage key: wsuEnergyAuth
+Persistence:       Persists across tabs and browser sessions (user enters password once)
 Security level:    DETERRENT ONLY -- anyone who views page source can see the password
 
 How it works:
-1. On page load, checks sessionStorage.getItem('wsuEnergyAuth')
+1. On page load, checks localStorage.getItem('wsuEnergyAuth')
 2. If 'ok', hides the auth gate immediately
 3. If not, shows full-screen overlay with password input
 4. On submit, compares input to 'Energy@WSU' (case-sensitive)
-5. If match: sets sessionStorage, hides gate
+5. If match: sets localStorage, hides gate
 6. If no match: shows error message
 
 To change the password: Edit the string comparison in the tryAuth() function inside the auth gate IIFE.
@@ -201,7 +201,7 @@ gray        #6b7280    Normals, reference lines
 purple      #7c3aed    (Reserved)
 orange      #ea580c    Avista in pie chart
 
-Dark mode limitation: Chart.js text/grid colors are set once at page load. If the user toggles dark mode after charts are rendered, the chart text won't update until a page refresh.
+Dark mode support: applyChartTheme() sets Chart.defaults.color and Chart.defaults.borderColor based on the current theme. When the user toggles dark mode, all chart instances in the chartInstances[] array are updated and re-rendered automatically.
 
 
 DARK MODE
@@ -250,12 +250,12 @@ fetch('data.json')  // Relative URL -- served by GitHub Pages
 EXTERNAL DEPENDENCIES
 ---------------------
 
-Dependency     Version   Source               Purpose
-----------     -------   ------               -------
-Chart.js       4.4.7     cdn.jsdelivr.net     All charts and visualizations
-GitHub Pages   --        github.com           Static site hosting
+Dependency     Version   Source                        Purpose
+----------     -------   ------                        -------
+Chart.js       4.4.7     Local file (chart.umd.min.js) All charts and visualizations
+GitHub Pages   --        github.com                    Static site hosting
 
-No other dependencies. No CSS framework, no JS framework, no build tools.
+No other dependencies. No CSS framework, no JS framework, no build tools. No CDN required -- Chart.js is bundled in the repository.
 
 
 KNOWN LIMITATIONS & TECHNICAL DEBT
@@ -265,12 +265,19 @@ Issue                                       Impact                              
 -----                                       ------                                      ----------
 All code in one 58KB HTML file              Hard to navigate for large changes           Consider splitting CSS/JS into separate files
 Password is client-side plaintext           Anyone can read the page source              Move to private repo or server-side auth if needed
-FY year hardcoded in multiple places        Must update ~8 locations for FY rollover     See Operations Runbook fiscal year rollover procedure
-Chart.js colors don't respond to dark       Charts look wrong if toggled after load      Refresh after toggling (or toggle before load)
-  mode toggle
 No automated tests                          Changes could break silently                 Manual testing required
 No linting or formatting tools              Inconsistent code style                      Consider adding ESLint/Prettier
 VBA row/column offsets are hardcoded        Fragile if Excel layout changes              Keep Excel layout stable; update VBA if it changes
-Chart.js loaded from CDN                    Requires internet; CDN outage breaks charts  Download and host locally as fallback
-sessionStorage auth clears on every         User re-enters password per tab              Expected behavior for simple gate
+
+
+RESOLVED TECHNICAL DEBT (February 2026)
+-----------------------------------------
+
+Issue                                       Resolution
+-----                                       ----------
+FY year hardcoded in multiple places        Consolidated into single FY config object at top of script; only 5 values to change for FY rollover
+Chart.js colors don't respond to dark       Charts now rebuild on dark mode toggle via applyChartTheme() + chartInstances array
+  mode toggle
+Chart.js loaded from CDN                    chart.umd.min.js hosted locally in the repository; no CDN dependency
+sessionStorage auth clears on every         Switched to localStorage; password persists across tabs and browser sessions
   new tab

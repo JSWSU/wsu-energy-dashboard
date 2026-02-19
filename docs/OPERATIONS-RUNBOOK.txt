@@ -176,16 +176,29 @@ Change TO:
 
 2. Web App (index.html)
 
-Update these locations:
+All fiscal year references are driven by a single config object near the top of the <script> block.
+Find the FY object and update these 5 values:
 
-What                    Where                          Change From                  Change To
-----                    -----                          -----------                  ---------
-Page title              <title> tag (line 6)           "FY2026"                     "FY2027"
-Header title            <h1> in <header>               "FY2026"                     "FY2027"
-Header subtitle         <p> in header                  "July 2025 -- June 2026"     "July 2026 -- June 2027"
-Month labels            MONTH_FULL array in JS         "July 2025" thru "June 2026" "July 2026" thru "June 2027"
-Print summary header    #printSummary .ps-header       "FY2026"                     "FY2027"
-Footer                  <footer> text                  "FY2026"                     "FY2027"
+Change FROM:
+   const FY = {
+     label: 'FY2026',
+     range: 'July 2025 – June 2026',
+     startYear: 2025,
+     endYear: 2026,
+     priorLabel: 'FY2025'
+   };
+
+Change TO:
+   const FY = {
+     label: 'FY2027',
+     range: 'July 2026 – June 2027',
+     startYear: 2026,
+     endYear: 2027,
+     priorLabel: 'FY2026'
+   };
+
+That's it. The page title, header, footer, month labels, print summary, chart labels, and all
+other FY references are derived automatically from these 5 values.
 
 
 3. Excel Workbook

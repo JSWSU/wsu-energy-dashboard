@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WSU Energy Cost Projection - FY2026</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<title>WSU Energy Cost Projection - FY2026</title><!-- title also set dynamically by FY config -->
+<script src="chart.umd.min.js"></script><!-- Chart.js v4.4.7 - hosted locally, no CDN dependency -->
 <style>
   :root {
     --primary: #981e32;
@@ -636,9 +636,22 @@
 </div>
 
 <script>
+// ==================== FISCAL YEAR CONFIG ====================
+// >>> CHANGE THIS ONE OBJECT FOR FY ROLLOVER -- everything else reads from it <<<
+const FY = {
+  label: 'FY2026',                    // e.g. 'FY2027'
+  range: 'July 2025 \u2013 June 2026', // e.g. 'July 2026 \u2013 June 2027'
+  startYear: 2025,                     // calendar year of July (first month)
+  endYear: 2026,                       // calendar year of June (last month)
+  priorLabel: 'FY2025'                 // prior year label for YoY comparisons
+};
 const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
-const MONTH_FULL = ['July 2025','August 2025','September 2025','October 2025','November 2025','December 2025',
-  'January 2026','February 2026','March 2026','April 2026','May 2026','June 2026'];
+const MONTH_FULL = [
+  'July '+FY.startYear, 'August '+FY.startYear, 'September '+FY.startYear,
+  'October '+FY.startYear, 'November '+FY.startYear, 'December '+FY.startYear,
+  'January '+FY.endYear, 'February '+FY.endYear, 'March '+FY.endYear,
+  'April '+FY.endYear, 'May '+FY.endYear, 'June '+FY.endYear
+];
 
 const fmtDollar = v => '$' + v.toLocaleString('en-US');
 const fmtDollarM = v => '$' + (v/1e6).toFixed(2) + 'M';
@@ -652,11 +665,17 @@ Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Rob
 Chart.defaults.font.size = 12;
 Chart.defaults.plugins.legend.labels.usePointStyle = true;
 Chart.defaults.plugins.legend.labels.padding = 16;
-if (document.documentElement.classList.contains('dark')) {
-  Chart.defaults.color = '#9ca3af';
-  Chart.defaults.borderColor = 'rgba(75,85,99,0.3)';
-  Chart.defaults.plugins.legend.labels.color = '#9ca3af';
+
+function applyChartTheme() {
+  const dark = document.documentElement.classList.contains('dark');
+  Chart.defaults.color = dark ? '#9ca3af' : '#666';
+  Chart.defaults.borderColor = dark ? 'rgba(75,85,99,0.3)' : 'rgba(0,0,0,0.1)';
+  Chart.defaults.plugins.legend.labels.color = dark ? '#9ca3af' : '#666';
 }
+applyChartTheme();
+
+// Track all chart instances for dark mode rebuild
+const chartInstances = [];
 
 const C = {
   primary:'#981e32', primaryLight:'rgba(152,30,50,0.15)',
@@ -673,12 +692,12 @@ const C = {
   const input = document.getElementById('authInput');
   const btn = document.getElementById('authBtn');
   const err = document.getElementById('authError');
-  if (sessionStorage.getItem('wsuEnergyAuth') === 'ok') {
+  if (localStorage.getItem('wsuEnergyAuth') === 'ok') {
     gate.style.display = 'none';
   }
   function tryAuth() {
     if (input.value === 'Energy@WSU') {
-      sessionStorage.setItem('wsuEnergyAuth', 'ok');
+      localStorage.setItem('wsuEnergyAuth', 'ok');
       gate.style.display = 'none';
       err.textContent = '';
     } else {
@@ -700,7 +719,40 @@ const C = {
   toggle.addEventListener('click', function() {
     document.documentElement.classList.toggle('dark');
     localStorage.setItem('wsuDarkMode', document.documentElement.classList.contains('dark') ? 'on' : 'off');
+    // Rebuild all charts with correct theme colors
+    applyChartTheme();
+    chartInstances.forEach(c => { c.options.color = Chart.defaults.color; c.update(); });
   });
+})();
+
+// ==================== FY CONFIG -> HTML ====================
+// Apply FY config to static HTML elements so only the FY object needs changing at rollover
+(function applyFY() {
+  document.title = 'WSU Energy Cost Projection - ' + FY.label;
+  document.querySelector('header .header-text h1').textContent = 'WSU Energy Cost Projection Workbook & Report';
+  document.querySelector('header .header-text p').innerHTML =
+    FY.label + ' (' + FY.range + ') &bull; Last Updated: <span id="lastUpdated">...</span> <span id="verifiedBadge"></span>';
+  document.querySelector('#authGate .auth-header p').textContent = FY.label + ' Dashboard \u2022 WSU Facilities Services';
+  document.querySelector('#printSummary .ps-header h1').innerHTML = 'WSU Energy Cost Projection &mdash; ' + FY.label;
+  document.querySelector('footer').innerHTML =
+    'WSU Facilities Services &bull; Energy Cost Projection Workbook &amp; Report ' + FY.label + ' &bull; Data as of <span id="footerDate">--</span>';
+  document.querySelector('#printSummary .ps-footer').textContent =
+    'WSU Facilities Services \u2022 Energy Cost Projection ' + FY.label + ' \u2022 Confidential';
+  // Update section headings and table headers with FY labels
+  const fyShort = FY.label.replace('FY20','FY');  // 'FY26'
+  const prShort = FY.priorLabel.replace('FY20','FY');  // 'FY25'
+  const qsa = (sel) => document.querySelectorAll(sel);
+  // KPI labels
+  qsa('.kpi-card[data-kpi="actualYTD"] .kpi-label').forEach(el => el.textContent = FY.label+' Actual + Forecast');
+  qsa('.kpi-card[data-kpi="forecast"] .kpi-label').forEach(el => el.textContent = FY.label+' Forecast');
+  // Section titles (using data-fy attribute or direct selectors)
+  const setH2 = (sectionId, text) => { const h = document.querySelector('#'+sectionId+' h2'); if(h) h.textContent = text; };
+  setH2('monthly', FY.label+' Actuals vs Forecasts');
+  // Methodology note
+  const methLi = document.querySelector('#sources .notes li:last-child');
+  if(methLi && methLi.textContent.includes('FY2026')) {
+    methLi.textContent = FY.label+' = July '+FY.startYear+' through June '+FY.endYear+'; '+FY.priorLabel+' = July '+(FY.startYear-1)+' through June '+(FY.endYear-1);
+  }
 })();
 
 // Tab navigation
@@ -881,16 +933,16 @@ function initDashboard(D) {
   });
 
   // --- Dashboard Charts ---
-  new Chart(document.getElementById('chartMonthly'), {
+  chartInstances.push(new Chart(document.getElementById('chartMonthly'), {
     type:'bar', data:{ labels:MONTHS, datasets:[
       {label:'Actual',data:fy26.totalActual,backgroundColor:C.primary,borderRadius:3},
       {label:'Forecast',data:fy26.totalFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1.5,borderRadius:3}
     ]}, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollar(ctx.raw)}}},
       scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}
-  });
+  }));
 
-  new Chart(document.getElementById('chartBreakdown'), {
+  chartInstances.push(new Chart(document.getElementById('chartBreakdown'), {
     type:'bar', data:{ labels:MONTHS, datasets:[
       {label:'Electric (Actual)',data:fy26.elecActual,backgroundColor:C.primary,stack:'actual',borderRadius:2},
       {label:'Gas (Actual)',data:fy26.gasActual,backgroundColor:C.accent,stack:'actual',borderRadius:2},
@@ -899,26 +951,26 @@ function initDashboard(D) {
     ]}, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollar(ctx.raw)}}},
       scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}
-  });
+  }));
 
-  new Chart(document.getElementById('chartMMBTU'), {
+  chartInstances.push(new Chart(document.getElementById('chartMMBTU'), {
     type:'bar', data:{ labels:MONTHS, datasets:[
       {label:'Electric MMBTU',data:energyUse.elecActual,backgroundColor:C.primary,stack:'s1',borderRadius:2},
       {label:'Gas MMBTU',data:energyUse.gasActual,backgroundColor:C.accent,stack:'s1',borderRadius:2}
     ]}, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)}}},
       scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}
-  });
+  }));
 
   const pieElec = sum(fy26.elecActual), pieKintec = sum(fy26.kintecFcast), pieAvista = sum(fy26.avistaFcast);
   const pieTotal = pieElec + pieKintec + pieAvista;
-  new Chart(document.getElementById('chartPie'), {
+  chartInstances.push(new Chart(document.getElementById('chartPie'), {
     type:'doughnut', data:{
       labels:['Electric (Actual)','Gas - Kintec','Gas - Avista'],
       datasets:[{data:[pieElec,pieKintec,pieAvista],backgroundColor:[C.primary,C.accent,C.orange],borderWidth:2}]
     }, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmtDollarM(ctx.raw)+' ('+(ctx.raw/pieTotal*100).toFixed(1)+'%)'}},legend:{position:'bottom'}}}
-  });
+  }));
 
   // --- Monthly Detail Table ---
   const tb1 = document.querySelector('#tableMonthly tbody');
@@ -931,7 +983,8 @@ function initDashboard(D) {
   tb1.appendChild(tr1);
 
   // --- Gas FY25 Table ---
-  const mfy25=['July 2024','August 2024','September 2024','October 2024','November 2024','December 2024','January 2025','February 2025','March 2025','April 2025','May 2025','June 2025'];
+  const pStartYr = FY.startYear - 1, pEndYr = FY.endYear - 1;
+  const mfy25=['July '+pStartYr,'August '+pStartYr,'September '+pStartYr,'October '+pStartYr,'November '+pStartYr,'December '+pStartYr,'January '+pEndYr,'February '+pEndYr,'March '+pEndYr,'April '+pEndYr,'May '+pEndYr,'June '+pEndYr];
   const tb2=document.querySelector('#tableGas25 tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
     tr.innerHTML=`<td>${mfy25[i]}</td><td>${fmtDollar(fy25gas.cost[i])}</td><td>${fmtNum(fy25gas.mmbtu[i])}</td><td>${fmtRate(fy25gas.perUnit[i])}</td><td>${fmtDollar(fy25gas.kintec[i])}</td><td>${fmtDollar(fy25gas.avista[i])}</td>`;
@@ -941,21 +994,21 @@ function initDashboard(D) {
   tb2.appendChild(tr2);
 
   // --- Gas FY25 Chart ---
-  new Chart(document.getElementById('chartGas25'),{type:'bar',data:{labels:MONTHS,datasets:[
+  chartInstances.push(new Chart(document.getElementById('chartGas25'),{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'Gas Cost ($)',data:fy25gas.cost,backgroundColor:C.accent,borderRadius:3,yAxisID:'y'},
     {label:'Gas MMBTU',data:fy25gas.mmbtu,type:'line',borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,tension:0.3,yAxisID:'y1'}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{
     y:{position:'left',ticks:{callback:v=>'$'+(v/1e3).toFixed(0)+'K'}},
-    y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fmtNum(v)}}}}});
+    y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fmtNum(v)}}}}}));
 
   // --- Kintec Chart ---
-  new Chart(document.getElementById('chartKintec'),{type:'bar',data:{labels:kintec.months,datasets:[
+  chartInstances.push(new Chart(document.getElementById('chartKintec'),{type:'bar',data:{labels:kintec.months,datasets:[
     {label:'Dekatherms',data:kintec.dths,backgroundColor:C.accent,borderRadius:2,yAxisID:'y'},
     {label:'Cost ($)',data:kintec.cost,type:'line',borderColor:C.primary,pointRadius:2,tension:0.3,yAxisID:'y1'}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{
     x:{ticks:{maxRotation:45,font:{size:10}}},
     y:{position:'left',ticks:{callback:v=>fmtNum(v)}},
-    y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>'$'+(v/1e3).toFixed(0)+'K'}}}}});
+    y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>'$'+(v/1e3).toFixed(0)+'K'}}}}}));
 
   // --- Energy Use Table ---
   const tb3=document.querySelector('#tableEnergyUse tbody');
@@ -969,11 +1022,11 @@ function initDashboard(D) {
   tb3.appendChild(tr3);
 
   // --- Energy Use Chart ---
-  new Chart(document.getElementById('chartEnergyUse'),{type:'bar',data:{labels:MONTHS,datasets:[
+  chartInstances.push(new Chart(document.getElementById('chartEnergyUse'),{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'Electric MMBTU',data:energyUse.elecActual,backgroundColor:C.primary,stack:'s1',borderRadius:2},
     {label:'Gas MMBTU',data:energyUse.gasActual,backgroundColor:C.accent,stack:'s1',borderRadius:2},
     {label:'Total Forecast',data:energyUse.totalFcast,type:'line',borderColor:C.blue,borderDash:[5,5],pointRadius:4,tension:0.3,fill:false}
-  ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}});
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}}));
 
   // --- YoY Table (2 years: FY25 vs FY26) ---
   const tb4=document.querySelector('#tableYoY tbody');
@@ -988,17 +1041,18 @@ function initDashboard(D) {
   const yoyPctTotal=((sum(yoy.fy26total)-sum(yoy.fy25total))/sum(yoy.fy25total)*100).toFixed(1);
   const yoyPctElec=sum(yoy.fy25elec)>0?((sum(yoy.fy26elec)-sum(yoy.fy25elec))/sum(yoy.fy25elec)*100).toFixed(1):'N/A';
   const yoyPctGas=((sum(yoy.fy26gas)-sum(yoy.fy25gas))/sum(yoy.fy25gas)*100).toFixed(1);
-  document.getElementById('yoyNotes').innerHTML=`<li>FY26 vs FY25: ${yoyPctTotal}% total, ${yoyPctElec}% electric, ${yoyPctGas}% gas</li>`;
+  const fyS = FY.label.replace('FY20','FY'), prS = FY.priorLabel.replace('FY20','FY');
+  document.getElementById('yoyNotes').innerHTML=`<li>${fyS} vs ${prS}: ${yoyPctTotal}% total, ${yoyPctElec}% electric, ${yoyPctGas}% gas</li>`;
 
   // --- YoY Chart (2 years) ---
-  new Chart(document.getElementById('chartYoY'),{type:'line',data:{labels:MONTHS,datasets:[
-    {label:'FY2025',data:yoy.fy25total,borderColor:C.blue,backgroundColor:C.blueLight,pointRadius:3,tension:0.3},
-    {label:'FY2026',data:yoy.fy26total,borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,borderWidth:2.5,tension:0.3}
+  chartInstances.push(new Chart(document.getElementById('chartYoY'),{type:'line',data:{labels:MONTHS,datasets:[
+    {label:FY.priorLabel,data:yoy.fy25total,borderColor:C.blue,backgroundColor:C.blueLight,pointRadius:3,tension:0.3},
+    {label:FY.label,data:yoy.fy26total,borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,borderWidth:2.5,tension:0.3}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}},
-    plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)+' MMBTU'}}}}});
+    plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)+' MMBTU'}}}}}));
 
   // --- Cumulative Table ---
-  const mShort=['Jul 2025','Aug 2025','Sep 2025','Oct 2025','Nov 2025','Dec 2025','Jan 2026','Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026'];
+  const mShort=MONTHS.map((m,i) => m + ' ' + (i < 6 ? FY.startYear : FY.endYear));
   // 'last' already declared above for delta KPI
   const tb5=document.querySelector('#tableCumulative tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
@@ -1011,11 +1065,11 @@ function initDashboard(D) {
   tb5.appendChild(tr5);
 
   // --- Cumulative Chart ---
-  new Chart(document.getElementById('chartCumulative'),{type:'line',data:{labels:MONTHS,datasets:[
+  chartInstances.push(new Chart(document.getElementById('chartCumulative'),{type:'line',data:{labels:MONTHS,datasets:[
     {label:'Actual (Cumulative)',data:cumul.actual,borderColor:C.primary,backgroundColor:C.primaryLight,fill:true,pointRadius:4,tension:0.3,borderWidth:2.5},
     {label:'Forecast (Cumulative)',data:cumul.forecast,borderColor:C.blue,backgroundColor:C.blueLight,fill:true,pointRadius:4,borderDash:[6,3],tension:0.3}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(0)+'M'}}},
-    plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollarM(ctx.raw)}}}}});
+    plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollarM(ctx.raw)}}}}}));
 
   // --- Variance Table ---
   if(variance){
@@ -1030,16 +1084,16 @@ function initDashboard(D) {
     tb7.appendChild(tr7);
 
     // Variance charts
-    new Chart(document.getElementById('chartVarianceCost'),{type:'bar',data:{labels:MONTHS,datasets:[
-      {label:'FY2025',data:variance.fy25cost,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
-      {label:'FY2026',data:variance.fy26cost,backgroundColor:C.primary,borderRadius:3}
-    ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}});
+    chartInstances.push(new Chart(document.getElementById('chartVarianceCost'),{type:'bar',data:{labels:MONTHS,datasets:[
+      {label:FY.priorLabel,data:variance.fy25cost,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
+      {label:FY.label,data:variance.fy26cost,backgroundColor:C.primary,borderRadius:3}
+    ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}}));
 
-    new Chart(document.getElementById('chartVarianceMmbtu'),{type:'bar',data:{labels:MONTHS,datasets:[
-      {label:'FY2025 MMBTU',data:variance.fy25mmbtu,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
-      {label:'FY2026 MMBTU',data:variance.fy26mmbtu,backgroundColor:C.primary,borderRadius:3},
+    chartInstances.push(new Chart(document.getElementById('chartVarianceMmbtu'),{type:'bar',data:{labels:MONTHS,datasets:[
+      {label:FY.priorLabel+' MMBTU',data:variance.fy25mmbtu,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
+      {label:FY.label+' MMBTU',data:variance.fy26mmbtu,backgroundColor:C.primary,borderRadius:3},
       {label:'30-Yr Normal HDD',data:variance.normalHdd,type:'line',borderColor:C.gray,borderDash:[5,5],pointRadius:3,tension:0.3,fill:false}
-    ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}}}});
+    ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}}}}));
   }
 
   // --- HDD Table ---
@@ -1050,14 +1104,14 @@ function initDashboard(D) {
   const tr6=document.createElement('tr');tr6.className='total-row';
   tr6.innerHTML=`<td>FY Total</td><td>${fmtNum(sum(hdd.fy25))}</td><td>${fmtNum(sum(hdd.fy26))}</td><td>${fmtNum(sum(hdd.normal))}</td>`;
   tb6.appendChild(tr6);
-  document.getElementById('hddTotals').textContent='FY2025 Total: '+fmtNum(sum(hdd.fy25))+' HDD | FY2026 Total: '+fmtNum(sum(hdd.fy26))+' HDD | 30-Yr Normal: '+fmtNum(sum(hdd.normal))+' HDD';
+  document.getElementById('hddTotals').textContent=FY.priorLabel+' Total: '+fmtNum(sum(hdd.fy25))+' HDD | '+FY.label+' Total: '+fmtNum(sum(hdd.fy26))+' HDD | 30-Yr Normal: '+fmtNum(sum(hdd.normal))+' HDD';
 
   // --- HDD Chart ---
-  new Chart(document.getElementById('chartHDD'),{type:'bar',data:{labels:MONTHS,datasets:[
-    {label:'FY2025 HDD',data:hdd.fy25,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
-    {label:'FY2026 HDD',data:hdd.fy26,backgroundColor:C.primary,borderRadius:3},
+  chartInstances.push(new Chart(document.getElementById('chartHDD'),{type:'bar',data:{labels:MONTHS,datasets:[
+    {label:FY.priorLabel+' HDD',data:hdd.fy25,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
+    {label:FY.label+' HDD',data:hdd.fy26,backgroundColor:C.primary,borderRadius:3},
     {label:'30-Yr Normal',data:hdd.normal,type:'line',borderColor:C.gray,borderDash:[5,5],pointRadius:3,tension:0.3,fill:false}
-  ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}}}});
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}}}}));
 
   // ==================== PRINT SUMMARY ====================
   // Populate the hidden print summary section so it's ready when user clicks Print
@@ -1092,8 +1146,8 @@ function initDashboard(D) {
     // KPI grid (8 boxes)
     const psGrid = document.getElementById('psKpiGrid');
     const kpis = [
-      { label: 'FY2026 Actual + Forecast', value: fmtDollarM(totalAct), sub: 'Actuals + forecast remaining', cls: '', valCls: '' },
-      { label: 'FY2026 Forecast', value: fmtDollarM(totalFcast), sub: 'Full-year projection', cls: 'forecast', valCls: 'blue' },
+      { label: FY.label+' Actual + Forecast', value: fmtDollarM(totalAct), sub: 'Actuals + forecast remaining', cls: '', valCls: '' },
+      { label: FY.label+' Forecast', value: fmtDollarM(totalFcast), sub: 'Full-year projection', cls: 'forecast', valCls: 'blue' },
       { label: 'Forecast vs Actual', value: (delta >= 0 ? '+' : '-') + fmtDollarM(Math.abs(delta)), sub: fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' over actuals' : ' under actuals'), cls: 'delta', valCls: delta >= 0 ? 'green' : 'red' },
       { label: 'Total Energy Use', value: fmtNum(totalMMBTU) + ' MMBTU', sub: 'Elec: ' + fmtNum(totalElecMMBTU) + ' | Gas: ' + fmtNum(totalGasMMBTU), cls: 'energy', valCls: '' },
       { label: 'Electric Cost', value: fmtDollarM(totalElec), sub: (totalElec / totalAct * 100).toFixed(1) + '% of total', cls: '', valCls: '' },

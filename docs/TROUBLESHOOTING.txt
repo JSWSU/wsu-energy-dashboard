@@ -72,9 +72,10 @@ Solution:
 CHARTS LOOK WRONG IN DARK MODE
 --------------------------------
 
-Cause: Known limitation -- Chart.js sets text and grid colors once at page load. Toggling dark mode after the page loads doesn't update chart colors.
+This issue was fixed in February 2026. Charts now automatically update their text and grid colors when dark mode is toggled. If charts still look wrong:
 
-Solution: Refresh the page after toggling dark mode. The charts will render with the correct colors on the fresh load.
+1. Hard-refresh the page (Ctrl+Shift+R) to ensure you have the latest version of index.html
+2. If the problem persists, clear the browser cache entirely
 
 
 PASSWORD NOT WORKING
@@ -131,19 +132,18 @@ Solution:
 4. The crimson "Export data.json" button will appear near cell M2 on the "Executive Summary (Print)" sheet
 
 
-CHART.JS CDN IS DOWN (CHARTS NOT LOADING)
--------------------------------------------
+CHARTS NOT LOADING (Chart.js file missing)
+---------------------------------------------
 
-Cause: cdn.jsdelivr.net is unavailable or blocked by a firewall.
+Cause: chart.umd.min.js is missing from the repository or the shared drive folder.
+
+Note: As of February 2026, Chart.js is hosted locally (no CDN dependency). The file chart.umd.min.js should be in the same folder as index.html.
 
 Solution:
-1. Download chart.umd.min.js v4.4.7 from https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js
-2. Save it in the repository root as chart.umd.min.js
-3. Edit index.html line 7 -- change:
-   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-   to:
-   <script src="chart.umd.min.js"></script>
-4. Commit and push both files to GitHub
+1. Check that chart.umd.min.js exists in the repository root (same folder as index.html)
+2. If missing, download it from: https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js
+3. Save it as chart.umd.min.js in the repository root
+4. Commit and push to GitHub
 
 
 VBA MACRO MODULE IS MISSING FROM EXCEL
