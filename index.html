@@ -180,11 +180,6 @@
     .ps-table tbody tr.total-row { font-weight: 700; background: #f0f4ff; border-top: 1.5px solid #981e32; }
     .ps-table .positive { color: #059669; }
     .ps-table .negative { color: #dc2626; }
-    /* --- Chart --- */
-    .ps-chart-section { margin: 0 0 4px; }
-    .ps-chart-section h3 { font-size: 9pt; font-weight: 600; color: #981e32; margin-bottom: 3px; }
-    .ps-chart-wrap { position: relative; width: 100%; height: 150px; }
-    .ps-chart-wrap canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
     /* --- Footer --- */
     .ps-footer {
       text-align: center; font-size: 7pt; color: #6b7280;
@@ -634,10 +629,6 @@
       </tr></thead>
       <tbody id="psMonthlyBody"></tbody>
     </table>
-  </div>
-  <div class="ps-chart-section">
-    <h3>Cumulative Cost Trend &mdash; Actual vs Forecast</h3>
-    <div class="ps-chart-wrap"><canvas id="chartPrintCumulative"></canvas></div>
   </div>
   <div class="ps-footer">
     WSU Facilities Services &bull; Energy Cost Projection FY2026 &bull; Confidential
@@ -1145,40 +1136,6 @@ function initDashboard(D) {
       '<td>' + fmtNum(totalMMBTU) + '</td>';
     psBody.appendChild(trT);
 
-    // Cumulative chart for print — briefly show container so Chart.js can measure
-    const psSummary = document.getElementById('printSummary');
-    psSummary.style.display = 'block';
-    psSummary.style.position = 'absolute';
-    psSummary.style.left = '-9999px';
-    psSummary.style.width = '7in'; // 8.5in letter minus 0.75in margins each side
-    const psCanvas = document.getElementById('chartPrintCumulative');
-    new Chart(psCanvas, {
-      type: 'line',
-      data: {
-        labels: MONTHS,
-        datasets: [
-          { label: 'Actual (Cumulative)', data: cumul.actual, borderColor: '#981e32', backgroundColor: 'rgba(152,30,50,0.1)', fill: true, pointRadius: 3, tension: 0.3, borderWidth: 2 },
-          { label: 'Forecast (Cumulative)', data: cumul.forecast, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, pointRadius: 3, borderDash: [5, 3], tension: 0.3 }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: { legend: { position: 'bottom', labels: { font: { size: 8 }, padding: 6, usePointStyle: true, color: '#6b7280' } } },
-        scales: {
-          y: { ticks: { callback: v => '$' + (v / 1e6).toFixed(0) + 'M', font: { size: 7 }, color: '#6b7280' }, grid: { color: 'rgba(0,0,0,0.06)' } },
-          x: { ticks: { font: { size: 7 }, color: '#6b7280' }, grid: { display: false } }
-        }
-      }
-    });
-    // Re-hide after chart renders
-    requestAnimationFrame(() => {
-      psSummary.style.display = '';
-      psSummary.style.position = '';
-      psSummary.style.left = '';
-      psSummary.style.width = '';
-    });
   })();
 }
 
