@@ -117,7 +117,72 @@
   .legend-item { display: flex; align-items: center; gap: 0.35rem; }
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   footer { text-align: center; padding: 1.5rem; color: var(--text-light); font-size: 0.78rem; border-top: 1px solid var(--border); margin-top: 2rem; }
-  @media print { header { print-color-adjust: exact; -webkit-print-color-adjust: exact; } .nav-tabs { display: none; } .section { display: block !important; page-break-inside: avoid; } #authGate { display: none !important; } .kpi-tooltip { display: none !important; } .kpi-expand { max-height: none !important; opacity: 1 !important; } .kpi-expand-icon { display: none !important; } .print-btn { display: none !important; } .dark-toggle { display: none !important; } }
+  /* --- Print Summary Styles (screen: hidden) --- */
+  #printSummary { display: none; }
+  /* --- Print Media --- */
+  @media print {
+    @page { size: letter; margin: 0.4in 0.5in; }
+    * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+    body { background: #fff !important; color: #2d2d2d !important; font-size: 11px; }
+    /* Force light mode */
+    html.dark { --bg:#f5f5f5; --card-bg:#fff; --text:#2d2d2d; --text-light:#6b7280; --border:#e5e7eb; --secondary:#5f6b6d; --green:#059669; --red:#dc2626; --forecast-blue:#3b82f6; --table-head-bg:#f9fafb; --total-row-bg:#f0f4ff; }
+    /* Hide all screen content */
+    header, .container, footer, #authGate, #loading, #error { display: none !important; }
+    /* Show print summary */
+    #printSummary { display: block !important; }
+    .ps-header {
+      background: linear-gradient(135deg, #981e32, #7a1828); color: #fff;
+      padding: 0.35in 0.1in; text-align: center; margin: -0.4in -0.5in 0; width: calc(100% + 1in);
+    }
+    .ps-header h1 { font-size: 16pt; font-weight: 700; margin: 0; letter-spacing: 0.02em; }
+    .ps-header p { font-size: 8.5pt; opacity: 0.9; margin: 2px 0 0; }
+    .ps-header .verified { background: rgba(255,255,255,0.2); color: #fff; font-size: 7pt; padding: 1px 6px; border-radius: 3px; }
+    .ps-budget-print {
+      padding: 5px 10px; border-radius: 4px; font-size: 8pt; font-weight: 500;
+      margin: 10px 0 8px; display: flex; align-items: center; gap: 6px;
+    }
+    .ps-budget-print.on-track { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .ps-budget-print.watch { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+    .ps-budget-print.over-budget { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .ps-kpi-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+      margin: 8px 0;
+    }
+    .ps-kpi {
+      border: 1px solid #e5e7eb; border-radius: 5px; padding: 6px 8px;
+      border-left: 3px solid #981e32; background: #fff;
+    }
+    .ps-kpi.forecast { border-left-color: #3b82f6; }
+    .ps-kpi.delta { border-left-color: #c69214; }
+    .ps-kpi.energy { border-left-color: #059669; }
+    .ps-kpi-label { font-size: 6.5pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+    .ps-kpi-value { font-size: 13pt; font-weight: 700; margin: 1px 0; line-height: 1.2; }
+    .ps-kpi-value.blue { color: #3b82f6; }
+    .ps-kpi-value.green { color: #059669; }
+    .ps-kpi-value.red { color: #dc2626; }
+    .ps-kpi-sub { font-size: 6pt; color: #6b7280; }
+    .ps-table-section { margin: 8px 0 6px; }
+    .ps-table-section h3 { font-size: 9pt; font-weight: 600; color: #981e32; margin-bottom: 4px; }
+    .ps-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+    .ps-table thead th {
+      background: #f9fafb; padding: 3px 5px; text-align: right; font-weight: 600;
+      color: #5f6b6d; border-bottom: 1.5px solid #e5e7eb; font-size: 7pt;
+    }
+    .ps-table thead th:first-child { text-align: left; }
+    .ps-table tbody td { padding: 2.5px 5px; text-align: right; border-bottom: 0.5px solid #f3f4f6; }
+    .ps-table tbody td:first-child { text-align: left; font-weight: 500; }
+    .ps-table tbody tr.forecast-row { color: #3b82f6; font-style: italic; }
+    .ps-table tbody tr.total-row { font-weight: 700; background: #f0f4ff; border-top: 1.5px solid #981e32; }
+    .ps-table .positive { color: #059669; }
+    .ps-table .negative { color: #dc2626; }
+    .ps-chart-section { margin: 8px 0 4px; }
+    .ps-chart-section h3 { font-size: 9pt; font-weight: 600; color: #981e32; margin-bottom: 4px; }
+    .ps-chart-section canvas { width: 100% !important; height: 160px !important; }
+    .ps-footer {
+      text-align: center; font-size: 7pt; color: #6b7280;
+      border-top: 1px solid #e5e7eb; padding-top: 4px; margin-top: 6px;
+    }
+  }
   @keyframes spin { to { transform: rotate(360deg); } }
   #loading { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; }
   #error { position: fixed; inset: 0; background: var(--bg); align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; padding: 2rem; text-align: center; }
@@ -540,6 +605,33 @@
 <footer>
   WSU Facilities Services &bull; Energy Cost Projection Workbook &amp; Report FY2026 &bull; Data as of <span id="footerDate">--</span>
 </footer>
+
+<!-- Print Summary (hidden on screen, visible only when printing) -->
+<div id="printSummary">
+  <div class="ps-header">
+    <h1>WSU Energy Cost Projection &mdash; FY2026</h1>
+    <p>WSU Facilities Services &bull; Data as of <span class="ps-date">--</span> <span class="ps-verified"></span></p>
+  </div>
+  <div class="ps-budget-print" id="psBudget" style="display:none;"></div>
+  <div class="ps-kpi-grid" id="psKpiGrid"></div>
+  <div class="ps-table-section">
+    <h3>Monthly Cost Summary &mdash; Actual + Forecast</h3>
+    <table class="ps-table">
+      <thead><tr>
+        <th>Month</th><th>Total Actual</th><th>Total Forecast</th><th>Delta</th>
+        <th>Electric</th><th>Gas</th><th>MMBTU</th>
+      </tr></thead>
+      <tbody id="psMonthlyBody"></tbody>
+    </table>
+  </div>
+  <div class="ps-chart-section">
+    <h3>Cumulative Cost Trend &mdash; Actual vs Forecast</h3>
+    <canvas id="chartPrintCumulative"></canvas>
+  </div>
+  <div class="ps-footer">
+    WSU Facilities Services &bull; Energy Cost Projection FY2026 &bull; Confidential
+  </div>
+</div>
 
 <script>
 const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
@@ -964,6 +1056,107 @@ function initDashboard(D) {
     {label:'FY2026 HDD',data:hdd.fy26,backgroundColor:C.primary,borderRadius:3},
     {label:'30-Yr Normal',data:hdd.normal,type:'line',borderColor:C.gray,borderDash:[5,5],pointRadius:3,tension:0.3,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}}}});
+
+  // ==================== PRINT SUMMARY ====================
+  // Populate the hidden print summary section so it's ready when user clicks Print
+  (function buildPrintSummary() {
+    // Date & verified badge
+    document.querySelectorAll('.ps-date').forEach(el => { el.textContent = D.lastUpdated; });
+    if (D.verification) {
+      document.querySelectorAll('.ps-verified').forEach(el => { el.innerHTML = '<span class="verified">Verified</span>'; });
+    }
+
+    // Budget banner (mirror main banner logic)
+    const psBanner = document.getElementById('psBudget');
+    if (lastActualIdx >= 0) {
+      const curDelta = cumul.delta[lastActualIdx];
+      const curPct = cumul.deltaPct[lastActualIdx];
+      let cls, icon, label, detail;
+      if (curDelta > 0 && curPct > 3) {
+        cls = 'on-track'; icon = '\u2705'; label = 'UNDER BUDGET';
+        detail = 'Through ' + MONTHS[lastActualIdx] + ': ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') below forecast.';
+      } else if (curDelta > 0) {
+        cls = 'watch'; icon = '\u26A0\uFE0F'; label = 'WATCH';
+        detail = 'Through ' + MONTHS[lastActualIdx] + ': ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') under forecast — narrow margin.';
+      } else {
+        cls = 'over-budget'; icon = '\uD83D\uDED1'; label = 'OVER BUDGET';
+        detail = 'Through ' + MONTHS[lastActualIdx] + ': exceeds forecast by ' + fmtDollar(Math.abs(curDelta)) + ' (' + fmtPct(Math.abs(curPct)) + ').';
+      }
+      psBanner.className = 'ps-budget-print ' + cls;
+      psBanner.innerHTML = '<strong>' + icon + ' ' + label + '</strong> ' + detail + ' (' + actualMonthCount + ' of 12 months actual)';
+      psBanner.style.display = 'flex';
+    }
+
+    // KPI grid (8 boxes)
+    const psGrid = document.getElementById('psKpiGrid');
+    const kpis = [
+      { label: 'FY2026 Actual + Forecast', value: fmtDollarM(totalAct), sub: 'Actuals + forecast remaining', cls: '', valCls: '' },
+      { label: 'FY2026 Forecast', value: fmtDollarM(totalFcast), sub: 'Full-year projection', cls: 'forecast', valCls: 'blue' },
+      { label: 'Forecast vs Actual', value: (delta >= 0 ? '+' : '-') + fmtDollarM(Math.abs(delta)), sub: fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' over actuals' : ' under actuals'), cls: 'delta', valCls: delta >= 0 ? 'green' : 'red' },
+      { label: 'Total Energy Use', value: fmtNum(totalMMBTU) + ' MMBTU', sub: 'Elec: ' + fmtNum(totalElecMMBTU) + ' | Gas: ' + fmtNum(totalGasMMBTU), cls: 'energy', valCls: '' },
+      { label: 'Electric Cost', value: fmtDollarM(totalElec), sub: (totalElec / totalAct * 100).toFixed(1) + '% of total', cls: '', valCls: '' },
+      { label: 'Gas Cost', value: fmtDollarM(totalGas), sub: (totalGas / totalAct * 100).toFixed(1) + '% of total', cls: '', valCls: '' },
+      { label: 'Avg Elec Rate', value: fmtRate(elecRateAct) + ' /MMBTU', sub: 'Forecast: ' + fmtRate(elecRateFcast) + ' /MMBTU', cls: 'forecast', valCls: 'blue' },
+      { label: 'Avg Gas Rate', value: fmtRate(gasRateAct) + ' /MMBTU', sub: 'Forecast: ' + fmtRate(gasRateFcast) + ' /MMBTU', cls: 'forecast', valCls: 'blue' }
+    ];
+    psGrid.innerHTML = kpis.map(k =>
+      '<div class="ps-kpi' + (k.cls ? ' ' + k.cls : '') + '">' +
+        '<div class="ps-kpi-label">' + k.label + '</div>' +
+        '<div class="ps-kpi-value' + (k.valCls ? ' ' + k.valCls : '') + '">' + k.value + '</div>' +
+        '<div class="ps-kpi-sub">' + k.sub + '</div>' +
+      '</div>'
+    ).join('');
+
+    // Monthly table
+    const psBody = document.getElementById('psMonthlyBody');
+    for (let i = 0; i < 12; i++) {
+      const tr = document.createElement('tr');
+      if (!isActual[i]) tr.className = 'forecast-row';
+      const d = fy26.totalActual[i] - fy26.totalFcast[i];
+      const dCls = d > 0 ? 'negative' : d < 0 ? 'positive' : '';
+      tr.innerHTML = '<td>' + MONTHS[i] + '</td><td>' + fmtDollar(fy26.totalActual[i]) + '</td>' +
+        '<td>' + fmtDollar(fy26.totalFcast[i]) + '</td>' +
+        '<td class="' + dCls + '">' + fmtDollar(d) + '</td>' +
+        '<td>' + fmtDollar(fy26.elecActual[i]) + '</td>' +
+        '<td>' + fmtDollar(fy26.gasActual[i]) + '</td>' +
+        '<td>' + fmtNum(energyUse.totalActual[i]) + '</td>';
+      psBody.appendChild(tr);
+    }
+    const trT = document.createElement('tr');
+    trT.className = 'total-row';
+    const totalDelta = totalAct - totalFcast;
+    const tdCls = totalDelta > 0 ? 'negative' : totalDelta < 0 ? 'positive' : '';
+    trT.innerHTML = '<td>FY TOTAL</td><td>' + fmtDollar(totalAct) + '</td>' +
+      '<td>' + fmtDollar(totalFcast) + '</td>' +
+      '<td class="' + tdCls + '">' + fmtDollar(totalDelta) + '</td>' +
+      '<td>' + fmtDollar(totalElec) + '</td>' +
+      '<td>' + fmtDollar(totalGas) + '</td>' +
+      '<td>' + fmtNum(totalMMBTU) + '</td>';
+    psBody.appendChild(trT);
+
+    // Cumulative chart for print (rendered off-screen, visible in print)
+    const psCanvas = document.getElementById('chartPrintCumulative');
+    new Chart(psCanvas, {
+      type: 'line',
+      data: {
+        labels: MONTHS,
+        datasets: [
+          { label: 'Actual (Cumulative)', data: cumul.actual, borderColor: '#981e32', backgroundColor: 'rgba(152,30,50,0.1)', fill: true, pointRadius: 3, tension: 0.3, borderWidth: 2 },
+          { label: 'Forecast (Cumulative)', data: cumul.forecast, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, pointRadius: 3, borderDash: [5, 3], tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 8 }, padding: 8, usePointStyle: true, color: '#6b7280' } } },
+        scales: {
+          y: { ticks: { callback: v => '$' + (v / 1e6).toFixed(0) + 'M', font: { size: 8 }, color: '#6b7280' }, grid: { color: 'rgba(0,0,0,0.06)' } },
+          x: { ticks: { font: { size: 8 }, color: '#6b7280' }, grid: { display: false } }
+        }
+      }
+    });
+  })();
 }
 
 // ==================== FETCH & GO ====================
