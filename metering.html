@@ -119,7 +119,7 @@
     transition: max-height 0.35s ease, margin-top 0.35s ease, opacity 0.25s ease;
     opacity: 0; margin-top: 0;
   }
-  .kpi-card.expanded .kpi-expand { max-height: 500px; opacity: 1; margin-top: 0.75rem; }
+  .kpi-card.expanded .kpi-expand { max-height: 500px; overflow: auto; opacity: 1; margin-top: 0.75rem; }
   .kpi-card.expanded { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
   .kpi-expand-icon {
     position: absolute; top: 0.75rem; right: 0.75rem; font-size: 0.7rem;
@@ -136,6 +136,7 @@
   .kpi-mini-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
   .kpi-mini-table tr:last-child { font-weight: 700; border-top: 2px solid var(--primary); }
   .kpi-mini-table tr:last-child td { border-bottom: none; padding-top: 0.4rem; }
+  .kpi-card.dq-wide { grid-column: span 2; }
   .kpi-card.electric { border-left-color: var(--clr-electric); }
   .kpi-card.steam { border-left-color: var(--clr-steam); }
   .kpi-card.chw-energy { border-left-color: var(--clr-chw-energy); }
@@ -1042,7 +1043,7 @@ function renderVerification(vr) {
   const overviewGrid = document.getElementById('kpiOverview');
   const borderCls = vr.overall === 'pass' ? 'ok' : vr.overall === 'warn' ? 'electric' : 'fault';
   const dqCard = document.createElement('div');
-  dqCard.className = 'kpi-card ' + borderCls;
+  dqCard.className = 'kpi-card dq-wide ' + borderCls;
   dqCard.innerHTML =
     '<span class="kpi-expand-icon">&#9660;</span>' +
     '<span class="kpi-tooltip">Automated integrity checks run at load time across all datasets</span>' +
