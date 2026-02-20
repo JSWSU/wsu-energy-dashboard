@@ -193,6 +193,42 @@
     font-size: 0.78rem; font-family: 'Courier New', monospace;
   }
   html.dark .info-box code { background: rgba(255,255,255,0.08); }
+  /* Verification Badge */
+  .verified-badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600;
+    white-space: nowrap;
+  }
+  .verified-badge.pass { background: #ecfdf5; color: #059669; }
+  .verified-badge.warn { background: #fffbeb; color: #92400e; }
+  .verified-badge.fail { background: #fef2f2; color: #991b1b; }
+  html.dark .verified-badge.pass { background: #064e3b; color: #34d399; }
+  html.dark .verified-badge.warn { background: #78350f; color: #fbbf24; }
+  html.dark .verified-badge.fail { background: #7f1d1d; color: #f87171; }
+  /* Data Quality Panel */
+  .dq-summary { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+  .dq-stat { padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.78rem; font-weight: 600; }
+  .dq-stat.pass { background: #ecfdf5; color: #059669; }
+  .dq-stat.warn { background: #fffbeb; color: #92400e; }
+  .dq-stat.fail { background: #fef2f2; color: #991b1b; }
+  html.dark .dq-stat.pass { background: #064e3b; color: #34d399; }
+  html.dark .dq-stat.warn { background: #78350f; color: #fbbf24; }
+  html.dark .dq-stat.fail { background: #7f1d1d; color: #f87171; }
+  .dq-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.75rem; }
+  .dq-table th { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 2px solid var(--border); color: var(--secondary); font-weight: 600; font-size: 0.75rem; }
+  .dq-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); }
+  .dq-table td:first-child { font-weight: 500; }
+  .dq-icon { display: inline-block; width: 16px; text-align: center; }
+  .dq-icon.pass { color: #059669; }
+  .dq-icon.warn { color: #d97706; }
+  .dq-icon.fail { color: #dc2626; }
+  .dq-kpi-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.75rem; }
+  .dq-kpi-table th { text-align: right; padding: 0.4rem 0.6rem; border-bottom: 2px solid var(--border); color: var(--secondary); font-weight: 600; font-size: 0.75rem; }
+  .dq-kpi-table th:first-child { text-align: left; }
+  .dq-kpi-table td { text-align: right; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); }
+  .dq-kpi-table td:first-child { text-align: left; font-weight: 500; }
+  .dq-match { color: var(--green); font-weight: 600; }
+  .dq-mismatch { color: var(--red); font-weight: 600; }
   /* Loading */
   #loading {
     position: fixed; inset: 0; background: var(--bg);
@@ -285,7 +321,7 @@
 <header>
   <div class="header-text">
     <h1>WSU Campus Metering Dashboard</h1>
-    <p>Jan 2025 &ndash; Feb 2026 &bull; 721 Sites &bull; Pullman Campus</p>
+    <p>Jan 2025 &ndash; Feb 2026 &bull; 721 Sites &bull; Pullman Campus <span id="verifiedBadge"></span></p>
   </div>
   <div class="header-actions">
     <a href="index.html">Energy Cost Projection</a>
@@ -442,6 +478,18 @@
           <tbody id="tblFiles"></tbody>
         </table>
       </div>
+    </div>
+    <!-- Data Quality Card -->
+    <div class="card" id="dataQualityCard">
+      <h2>Data Quality &amp; Verification</h2>
+      <div id="dqSummary" class="dq-summary"></div>
+      <h3>Integrity Checks</h3>
+      <div class="table-wrap"><table class="dq-table"><thead><tr><th style="width:24px"></th><th>Check</th><th>Result</th></tr></thead><tbody id="dqChecks"></tbody></table></div>
+      <h3 style="margin-top:1.25rem">KPI Cross-Check</h3>
+      <p style="font-size:0.78rem;color:var(--text-light);margin-bottom:0.5rem">Independent recalculation from raw data vs. dashboard KPIs</p>
+      <div class="table-wrap"><table class="dq-kpi-table"><thead><tr><th>Utility</th><th>Raw Sum</th><th>Converted</th><th>Dashboard KPI</th><th>Match</th></tr></thead><tbody id="dqKpi"></tbody></table></div>
+      <h3 style="margin-top:1.25rem">Per-Utility Breakdown</h3>
+      <div class="table-wrap"><table class="dq-table"><thead><tr><th>Utility</th><th>Rows</th><th>Valid</th><th>NA/Invalid</th><th>Negative</th><th>Zero</th><th>Buildings</th><th>Date Range</th></tr></thead><tbody id="dqUtility"></tbody></table></div>
     </div>
   </div>
 </div>
@@ -633,9 +681,20 @@ function barChart(canvasId, labels, datasets, opts) {
         tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed[opts?.horizontal ? 'x' : 'y'], 1) } }
       },
       scales: {
-        x: { stacked: opts?.stacked, grid: { display: false } },
-        y: { stacked: opts?.stacked, beginAtZero: true,
-          ticks: { callback: v => v >= 1000000 ? (v/1000000).toFixed(1) + 'M' : v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }
+        x: {
+          stacked: opts?.stacked,
+          grid: { display: !opts?.horizontal },
+          beginAtZero: opts?.horizontal || false,
+          ...(opts?.horizontal ? {
+            ticks: { callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'k' : v }
+          } : {})
+        },
+        y: {
+          stacked: opts?.stacked,
+          beginAtZero: !opts?.horizontal,
+          ...(!opts?.horizontal ? {
+            ticks: { callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'k' : v }
+          } : {})
         }
       }
     }
@@ -674,6 +733,184 @@ function renderKPIs(containerId, cards) {
       <div class="kpi-value">${c.value}</div>
       <div class="kpi-sub">${c.sub || ''}</div>
     </div>`
+  ).join('');
+}
+
+// ============================================================
+//  DATA VERIFICATION (10 checks)
+// ============================================================
+function runVerification(data, totals) {
+  const checks = [];
+  const utilities = {};
+  const kpiCheck = {};
+
+  // Helper: analyze one utility dataset
+  function analyzeUtility(rows, name) {
+    let valid = 0, naCount = 0, negCount = 0, zeroCount = 0, rawSum = 0;
+    const bldgs = new Set();
+    const dates = new Set();
+    const bldgMonths = {};  // bldgNo -> Set of month keys
+
+    rows.forEach(r => {
+      const u = r.usage;
+      const isNum = typeof u === 'number' && isFinite(u);
+      if (!isNum) { naCount++; return; }
+      if (u < 0) negCount++;
+      if (u === 0) zeroCount++;
+      else { valid++; bldgs.add(r.bldgNo); }
+      rawSum += u;
+      const mk = parseMonthKey(r.startDate);
+      if (mk) {
+        dates.add(mk);
+        if (u > 0) {
+          if (!bldgMonths[r.bldgNo]) bldgMonths[r.bldgNo] = new Set();
+          bldgMonths[r.bldgNo].add(mk);
+        }
+      }
+    });
+
+    const sortedDates = [...dates].sort();
+    const dateRange = sortedDates.length > 0
+      ? monthLabel(sortedDates[0]) + ' - ' + monthLabel(sortedDates[sortedDates.length - 1])
+      : 'None';
+    const totalMonths = sortedDates.length;
+    let gapBuildings = 0;
+    Object.values(bldgMonths).forEach(ms => { if (ms.size < totalMonths) gapBuildings++; });
+
+    utilities[name] = { rows: rows.length, valid, naCount, negCount, zeroCount, buildings: bldgs.size, dateRange, rawSum, gapBuildings, totalMonths };
+    return { rawSum, bldgs };
+  }
+
+  const elecA = analyzeUtility(data.electric, 'Electric');
+  const steamA = analyzeUtility(data.condensate, 'Steam');
+  const chwA = analyzeUtility(data.chw, 'CHW Energy');
+  const domA = analyzeUtility(data.domesticWater, 'Domestic Water');
+  const irrigA = analyzeUtility(data.irrigation, 'Irrigation');
+
+  // Check 1: Row counts (pass if all > 0)
+  const rowDetail = Object.entries(utilities).map(([k, v]) => k + ': ' + fmt(v.rows)).join(' | ');
+  const allHaveRows = Object.values(utilities).every(v => v.rows > 0);
+  checks.push({ name: 'Row Counts', status: allHaveRows ? 'pass' : 'fail', detail: rowDetail });
+
+  // Check 2: NA/invalid values
+  const totalNA = Object.values(utilities).reduce((s, v) => s + v.naCount, 0);
+  const totalRows = Object.values(utilities).reduce((s, v) => s + v.rows, 0);
+  const naPct = totalRows > 0 ? (totalNA / totalRows * 100).toFixed(2) : 0;
+  const naDetail = totalNA === 0
+    ? 'No NA/invalid values found across all datasets'
+    : totalNA + ' NA/invalid values (' + naPct + '%) ' + Object.entries(utilities).filter(([,v]) => v.naCount > 0).map(([k,v]) => k + ': ' + v.naCount).join(', ');
+  checks.push({ name: 'NA/Invalid Values', status: totalNA === 0 ? 'pass' : 'warn', detail: naDetail });
+
+  // Check 3: Negative values
+  const totalNeg = Object.values(utilities).reduce((s, v) => s + v.negCount, 0);
+  const negDetail = totalNeg === 0
+    ? 'No negative values found'
+    : totalNeg + ' negative values (likely meter rollover): ' + Object.entries(utilities).filter(([,v]) => v.negCount > 0).map(([k,v]) => k + ': ' + v.negCount).join(', ');
+  checks.push({ name: 'Negative Values', status: totalNeg === 0 ? 'pass' : 'warn', detail: negDetail });
+
+  // Check 4: Zero-usage months
+  const totalZero = Object.values(utilities).reduce((s, v) => s + v.zeroCount, 0);
+  const zeroPct = totalRows > 0 ? (totalZero / totalRows * 100).toFixed(1) : 0;
+  checks.push({ name: 'Zero-Usage Months', status: 'pass', detail: fmt(totalZero) + ' zero-usage rows (' + zeroPct + '%) across all utilities' });
+
+  // Check 5: Date range consistency
+  const allRanges = Object.values(utilities).map(v => v.dateRange);
+  const rangeConsistent = allRanges.every(r => r === allRanges[0]);
+  checks.push({ name: 'Date Range', status: rangeConsistent ? 'pass' : 'warn',
+    detail: rangeConsistent ? 'All utilities: ' + allRanges[0] : Object.entries(utilities).map(([k,v]) => k + ': ' + v.dateRange).join(' | ') });
+
+  // Check 6: Building coverage
+  const totalSites = data.sites.length;
+  const coverDetail = Object.entries(utilities).map(([k,v]) => k + ': ' + v.buildings + '/' + totalSites).join(' | ');
+  checks.push({ name: 'Building Coverage', status: 'pass', detail: coverDetail });
+
+  // Check 7: Monthly continuity
+  const totalGaps = Object.values(utilities).reduce((s, v) => s + v.gapBuildings, 0);
+  const gapDetail = totalGaps === 0
+    ? 'All active buildings have data for every month'
+    : totalGaps + ' building-utility combos missing 1+ months: ' + Object.entries(utilities).filter(([,v]) => v.gapBuildings > 0).map(([k,v]) => k + ': ' + v.gapBuildings).join(', ');
+  checks.push({ name: 'Monthly Continuity', status: totalGaps === 0 ? 'pass' : 'warn', detail: gapDetail });
+
+  // Check 8: Cross-utility sanity (top-5 electric vs top-5 steam)
+  const elecTop5 = Object.entries(aggregateByBuilding(data.electric, v => v)).sort((a,b) => b[1].total - a[1].total).slice(0,5).map(e => e[0]);
+  const steamTop5 = Object.entries(aggregateByBuilding(data.condensate, v => v)).sort((a,b) => b[1].total - a[1].total).slice(0,5).map(e => e[0]);
+  const overlap = elecTop5.filter(b => steamTop5.includes(b)).length;
+  checks.push({ name: 'Cross-Utility Sanity', status: overlap >= 2 ? 'pass' : 'warn',
+    detail: overlap + '/5 of top electric buildings also appear in top 5 steam. Elec: ' + elecTop5.join(', ') + ' | Steam: ' + steamTop5.join(', ') });
+
+  // Check 9: KPI recalculation
+  const conversionMap = {
+    'Electric':       { rawUnit: 'kWh',     convUnit: 'MMBtu', fn: kwhToMmbtu,     dashVal: totals.elec },
+    'Steam':          { rawUnit: 'lb',      convUnit: 'MMBtu', fn: lbToMmbtu,      dashVal: totals.steam },
+    'CHW Energy':     { rawUnit: 'tonrefh', convUnit: 'MMBtu', fn: tonrefhToMmbtu, dashVal: totals.chwE },
+    'Domestic Water': { rawUnit: 'gal',     convUnit: 'kGal',  fn: galToKgal,      dashVal: totals.dom },
+    'Irrigation':     { rawUnit: 'gal',     convUnit: 'kGal',  fn: galToKgal,      dashVal: totals.irrig }
+  };
+
+  let allMatch = true;
+  Object.entries(conversionMap).forEach(([name, c]) => {
+    const rawSum = utilities[name].rawSum;
+    const converted = c.fn(rawSum);
+    const tolerance = Math.abs(converted) * 0.001; // 0.1% tolerance for floating point
+    const match = Math.abs(converted - c.dashVal) <= Math.max(tolerance, 0.01);
+    if (!match) allMatch = false;
+    kpiCheck[name] = { rawSum, rawUnit: c.rawUnit, converted, convUnit: c.convUnit, dashVal: c.dashVal, match };
+  });
+  checks.push({ name: 'KPI Recalculation', status: allMatch ? 'pass' : 'fail',
+    detail: allMatch ? 'All 5 utility KPIs match independent recalculation (within 0.1%)' : 'One or more KPIs do not match independent recalculation' });
+
+  // Check 10: Conversion check (always pass, informational)
+  checks.push({ name: 'Conversion Reference', status: 'pass',
+    detail: 'kWh\u00d70.003412=MMBtu | lb\u00d70.001=MMBtu | tonrefh\u00d70.012=MMBtu | gal\u00f71000=kGal' });
+
+  const passCount = checks.filter(c => c.status === 'pass').length;
+  const warnCount = checks.filter(c => c.status === 'warn').length;
+  const failCount = checks.filter(c => c.status === 'fail').length;
+  const overall = failCount > 0 ? 'fail' : warnCount > 0 ? 'warn' : 'pass';
+
+  return { overall, passCount, warnCount, failCount, checks, utilities, kpiCheck };
+}
+
+function renderVerification(vr) {
+  const icon = vr.overall === 'pass' ? '\u2713' : vr.overall === 'warn' ? '\u26a0' : '\u2717';
+  const label = vr.overall === 'pass' ? 'Data Verified' : vr.overall === 'warn' ? vr.warnCount + ' Warning' + (vr.warnCount > 1 ? 's' : '') : 'Verification Failed';
+
+  // Header badge
+  document.getElementById('verifiedBadge').innerHTML =
+    '<span class="verified-badge ' + vr.overall + '">' + icon + ' ' + label + '</span>';
+
+  // Summary
+  document.getElementById('dqSummary').innerHTML =
+    '<span class="dq-stat pass">' + vr.passCount + ' Passed</span>' +
+    (vr.warnCount > 0 ? '<span class="dq-stat warn">' + vr.warnCount + ' Warnings</span>' : '') +
+    (vr.failCount > 0 ? '<span class="dq-stat fail">' + vr.failCount + ' Failed</span>' : '') +
+    '<span style="font-size:0.75rem;color:var(--text-light)">' + vr.checks.length + ' checks run at load time</span>';
+
+  // Checks table
+  const statusIcon = s => '<span class="dq-icon ' + s + '">' + (s === 'pass' ? '\u2713' : s === 'warn' ? '\u26a0' : '\u2717') + '</span>';
+  document.getElementById('dqChecks').innerHTML = vr.checks.map(c =>
+    '<tr><td>' + statusIcon(c.status) + '</td><td>' + c.name + '</td><td style="font-size:0.75rem">' + c.detail + '</td></tr>'
+  ).join('');
+
+  // KPI cross-check table
+  document.getElementById('dqKpi').innerHTML = Object.entries(vr.kpiCheck).map(([name, k]) =>
+    '<tr><td>' + name + '</td>' +
+    '<td>' + fmt(k.rawSum, 0) + ' ' + k.rawUnit + '</td>' +
+    '<td>' + fmt(k.converted, 1) + ' ' + k.convUnit + '</td>' +
+    '<td>' + fmt(k.dashVal, 1) + ' ' + k.convUnit + '</td>' +
+    '<td class="' + (k.match ? 'dq-match' : 'dq-mismatch') + '">' + (k.match ? '\u2713 Match' : '\u2717 Mismatch') + '</td></tr>'
+  ).join('');
+
+  // Per-utility breakdown
+  document.getElementById('dqUtility').innerHTML = Object.entries(vr.utilities).map(([name, u]) =>
+    '<tr><td>' + name + '</td>' +
+    '<td>' + fmt(u.rows) + '</td>' +
+    '<td>' + fmt(u.valid) + '</td>' +
+    '<td>' + (u.naCount > 0 ? '<span style="color:var(--red)">' + u.naCount + '</span>' : '0') + '</td>' +
+    '<td>' + (u.negCount > 0 ? '<span style="color:var(--red)">' + u.negCount + '</span>' : '0') + '</td>' +
+    '<td>' + fmt(u.zeroCount) + '</td>' +
+    '<td>' + u.buildings + '</td>' +
+    '<td>' + u.dateRange + '</td></tr>'
   ).join('');
 }
 
@@ -719,6 +956,10 @@ loadAllData().then(data => {
   const connFault = data.connectors.filter(c => c.connStatus === 'fault').length;
   const connDisabled = data.connectors.filter(c => c.connStatus === 'disabled').length;
   const connOther = data.connectors.length - connOk - connFault - connDisabled;
+
+  // ==================== DATA VERIFICATION ====================
+  const vr = runVerification(data, { elec: totalElec, steam: totalSteam, chwE: totalChwE, dom: totalDom, irrig: totalIrrig });
+  renderVerification(vr);
 
   // ==================== OVERVIEW TAB ====================
   renderKPIs('kpiOverview', [
