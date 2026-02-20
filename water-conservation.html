@@ -179,6 +179,17 @@
   .severity-high { border-left: 3px solid var(--red); }
   .severity-med { border-left: 3px solid #f59e0b; }
   .severity-winter { border-left: 3px solid var(--clr-irrigation); }
+  /* Anomaly row expand */
+  .anomaly-row { cursor: pointer; }
+  .anomaly-row td:first-child::before {
+    content: '\25B6'; font-size: 0.65rem; margin-right: 0.4rem; color: var(--text-light);
+    display: inline-block; transition: transform 0.2s;
+  }
+  .anomaly-row.expanded td:first-child::before { transform: rotate(90deg); }
+  .anomaly-chart-row { display: none; }
+  .anomaly-chart-row.visible { display: table-row; }
+  .anomaly-chart-row td { padding: 0.75rem 1rem; }
+  .anomaly-chart-cell { height: 200px; position: relative; }
   /* Editable cells */
   .editable { cursor: text; min-width: 80px; }
   .editable:hover { background: rgba(152,30,50,0.05); border-radius: 4px; }
@@ -1264,17 +1275,21 @@ function renderAnomalyTab() {
     return (b.usage || 0) - (a.usage || 0);
   });
 
-  tbody.innerHTML = sorted.map(a => {
+  // Destroy any existing anomaly mini-charts
+  anomalyCharts.forEach(c => c.destroy());
+  anomalyCharts = [];
+
+  tbody.innerHTML = sorted.map((a, i) => {
     const task = findTaskForAnomaly(a, tasks);
     const severityCls = a.type === 'winter_irrigation' ? 'severity-winter' :
       (a.deviation > 200 ? 'severity-high' : 'severity-med');
     const typeLabel = a.type === 'spike' ? 'Spike' : 'Winter Irrigation';
     const devStr = a.deviation != null ? '+' + a.deviation + '%' : 'N/A';
     const actionHtml = task
-      ? '<button class="btn-sm" onclick="switchToTask(\'' + task.issueId + '\')">' + task.issueId + '</button>'
-      : '<button class="btn-sm primary" data-anomaly-idx="' + G_anomalies.indexOf(a) + '" onclick="openCreateModal(this)">Create Task</button>';
+      ? '<button class="btn-sm" onclick="event.stopPropagation(); switchToTask(\'' + task.issueId + '\')">' + task.issueId + '</button>'
+      : '<button class="btn-sm primary" data-anomaly-idx="' + G_anomalies.indexOf(a) + '" onclick="event.stopPropagation(); openCreateModal(this)">Create Task</button>';
 
-    return `<tr class="${severityCls}">
+    return `<tr class="anomaly-row ${severityCls}" data-chart-idx="${i}" onclick="toggleAnomalyChart(this)">
       <td style="text-align:left">${a.bldgNo}</td>
       <td style="text-align:left">${a.bldgName}</td>
       <td style="text-align:left">${typeLabel}</td>
@@ -1284,8 +1299,104 @@ function renderAnomalyTab() {
       <td>${a.baseline > 0 ? fmt(a.baseline, 1) : '0 (expected)'}</td>
       <td>${devStr}</td>
       <td style="text-align:center">${actionHtml}</td>
+    </tr>
+    <tr class="anomaly-chart-row" id="acr-${i}">
+      <td colspan="9">
+        <div class="anomaly-chart-cell"><canvas id="anomChart-${i}"></canvas></div>
+      </td>
     </tr>`;
   }).join('');
+}
+
+// Track mini-charts for anomaly row expanders
+let anomalyCharts = [];
+
+function toggleAnomalyChart(row) {
+  const idx = parseInt(row.dataset.chartIdx, 10);
+  const chartRow = document.getElementById('acr-' + idx);
+  const isExpanded = row.classList.contains('expanded');
+
+  if (isExpanded) {
+    // Collapse
+    row.classList.remove('expanded');
+    chartRow.classList.remove('visible');
+    // Destroy chart to free memory
+    if (anomalyCharts[idx]) { anomalyCharts[idx].destroy(); anomalyCharts[idx] = null; }
+    return;
+  }
+
+  // Expand
+  row.classList.add('expanded');
+  chartRow.classList.add('visible');
+
+  // Get the anomaly data for this row
+  const sorted = [...G_anomalies].sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'spike' ? -1 : 1;
+    if (a.type === 'spike') return (b.deviation || 0) - (a.deviation || 0);
+    return (b.usage || 0) - (a.usage || 0);
+  });
+  const a = sorted[idx];
+  if (!a) return;
+
+  // Get building's monthly data
+  const byBldg = a.service === 'Irrigation Water' ? G_irrigByBldg : G_domByBldg;
+  const bldg = byBldg[a.bldgNo];
+  if (!bldg) return;
+
+  const monthData = G_months.map(mk => bldg.months[mk] || 0);
+  const anomalyMonthIdx = G_months.indexOf(a.month);
+  const dark = document.documentElement.classList.contains('dark');
+  const color = a.service === 'Irrigation Water' ? COLORS.irrigation : COLORS.domestic;
+
+  // Point styling: highlight the anomaly month with a larger red dot
+  const pointRadius = G_months.map((mk, i) => i === anomalyMonthIdx ? 7 : 3);
+  const pointBgColor = G_months.map((mk, i) => i === anomalyMonthIdx ? '#dc2626' : color);
+  const pointBorderColor = G_months.map((mk, i) => i === anomalyMonthIdx ? '#dc2626' : color);
+
+  // Destroy existing chart if any
+  if (anomalyCharts[idx]) { anomalyCharts[idx].destroy(); }
+
+  const canvas = document.getElementById('anomChart-' + idx);
+  anomalyCharts[idx] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: G_monthLabels,
+      datasets: [{
+        label: a.bldgNo + ' ' + a.service + ' (kGal)',
+        data: monthData,
+        borderColor: color,
+        backgroundColor: color + '22',
+        fill: true,
+        pointRadius: pointRadius,
+        pointBackgroundColor: pointBgColor,
+        pointBorderColor: pointBorderColor,
+        pointBorderWidth: G_months.map((mk, i) => i === anomalyMonthIdx ? 2 : 1),
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => fmt(ctx.parsed.y, 1) + ' kGal' +
+              (ctx.dataIndex === anomalyMonthIdx ? ' \u25C6 ANOMALY' : '')
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            font: { size: 10 },
+            callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v
+          }
+        }
+      }
+    }
+  });
 }
 
 // ============================================================
