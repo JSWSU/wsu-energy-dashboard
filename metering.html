@@ -653,9 +653,34 @@ function detectAnomalies(campusData, monthKeys, byBldg, convertFn, threshold) {
   return anomalies;
 }
 
-// Chart.js custom plugin for anomaly callouts
+// Chart.js custom plugin for anomaly callouts (hover-activated)
 const anomalyCalloutPlugin = {
   id: 'anomalyCallout',
+  afterEvent: function(chart, args) {
+    const pluginOpts = chart.options.plugins.anomalyCallout;
+    if (!pluginOpts || !pluginOpts.items || pluginOpts.items.length === 0) return;
+    const evt = args.event;
+    if (evt.type !== 'mousemove' && evt.type !== 'mouseout') return;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+    var prev = chart._anomalyHover || null;
+    var next = null;
+    if (evt.type === 'mousemove') {
+      var mx = evt.x, my = evt.y;
+      var bestDist = 18;
+      pluginOpts.items.forEach(function(group, dsIdx) {
+        if (!group || group.length === 0) return;
+        group.forEach(function(a) {
+          var px = xScale.getPixelForValue(a.index);
+          var py = yScale.getPixelForValue(a.value);
+          var d = Math.sqrt((mx - px) * (mx - px) + (my - py) * (my - py));
+          if (d < bestDist) { bestDist = d; next = { dsIdx: dsIdx, index: a.index }; }
+        });
+      });
+    }
+    var changed = (!prev && next) || (prev && !next) || (prev && next && (prev.dsIdx !== next.dsIdx || prev.index !== next.index));
+    if (changed) { chart._anomalyHover = next; chart.draw(); }
+  },
   afterDatasetsDraw: function(chart) {
     const pluginOpts = chart.options.plugins.anomalyCallout;
     if (!pluginOpts || !pluginOpts.items || pluginOpts.items.length === 0) return;
@@ -663,6 +688,7 @@ const anomalyCalloutPlugin = {
     const xScale = chart.scales.x;
     const yScale = chart.scales.y;
     const dark = document.documentElement.classList.contains('dark');
+    const hover = chart._anomalyHover || null;
 
     pluginOpts.items.forEach(function(group, dsIdx) {
       if (!group || group.length === 0) return;
@@ -670,9 +696,10 @@ const anomalyCalloutPlugin = {
       group.forEach(function(a) {
         var x = xScale.getPixelForValue(a.index);
         var y = yScale.getPixelForValue(a.value);
-        var hasDriver = a.driver && a.driver.length > 0;
-        // Draw diamond marker
+        var isHovered = hover && hover.dsIdx === dsIdx && hover.index === a.index;
+        // Always draw diamond marker
         ctx.save();
+        ctx.globalAlpha = isHovered ? 1.0 : 0.7;
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.moveTo(x, y - 7);
@@ -681,48 +708,47 @@ const anomalyCalloutPlugin = {
         ctx.lineTo(x - 6, y);
         ctx.closePath();
         ctx.fill();
-        // Measure text for callout box
-        ctx.font = 'bold 10px -apple-system, sans-serif';
-        ctx.textAlign = 'center';
-        var line1 = a.label;
-        var line2 = hasDriver ? 'Driven by ' + a.driver : '';
-        var w1 = ctx.measureText(line1).width;
-        ctx.font = '9px -apple-system, sans-serif';
-        var w2 = hasDriver ? ctx.measureText(line2).width : 0;
-        var boxW = Math.max(w1, w2) + 12;
-        var boxH = hasDriver ? 30 : 18;
-        // Position callout above point
-        var labelY = y - 22 - (hasDriver ? 8 : 0);
-        if (labelY < 10) labelY = y + 22; // flip below if near top
-        // Background box
-        ctx.fillStyle = dark ? 'rgba(31,41,55,0.92)' : 'rgba(255,255,255,0.95)';
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        var rx = x - boxW/2, ry = labelY - boxH/2, rr = 4;
-        ctx.beginPath();
-        if (ctx.roundRect) { ctx.roundRect(rx, ry, boxW, boxH, rr); }
-        else { ctx.moveTo(rx+rr,ry); ctx.arcTo(rx+boxW,ry,rx+boxW,ry+boxH,rr); ctx.arcTo(rx+boxW,ry+boxH,rx,ry+boxH,rr); ctx.arcTo(rx,ry+boxH,rx,ry,rr); ctx.arcTo(rx,ry,rx+boxW,ry,rr); ctx.closePath(); }
-        ctx.fill();
-        ctx.stroke();
-        // Line 1: percentage
-        ctx.font = 'bold 10px -apple-system, sans-serif';
-        ctx.fillStyle = color;
-        ctx.fillText(line1, x, hasDriver ? labelY - 2 : labelY + 4);
-        // Line 2: driver building
-        if (hasDriver) {
+        ctx.globalAlpha = 1.0;
+        // Only draw callout box on hover
+        if (isHovered) {
+          var hasDriver = a.driver && a.driver.length > 0;
+          ctx.font = 'bold 10px -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          var line1 = a.label;
+          var line2 = hasDriver ? 'Driven by ' + a.driver : '';
+          var w1 = ctx.measureText(line1).width;
           ctx.font = '9px -apple-system, sans-serif';
-          ctx.fillStyle = dark ? '#d1d5db' : '#4b5563';
-          ctx.fillText(line2, x, labelY + 11);
+          var w2 = hasDriver ? ctx.measureText(line2).width : 0;
+          var boxW = Math.max(w1, w2) + 12;
+          var boxH = hasDriver ? 30 : 18;
+          var labelY = y - 22 - (hasDriver ? 8 : 0);
+          if (labelY < 10) labelY = y + 22;
+          ctx.fillStyle = dark ? 'rgba(31,41,55,0.92)' : 'rgba(255,255,255,0.95)';
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          var rx = x - boxW/2, ry = labelY - boxH/2, rr = 4;
+          ctx.beginPath();
+          if (ctx.roundRect) { ctx.roundRect(rx, ry, boxW, boxH, rr); }
+          else { ctx.moveTo(rx+rr,ry); ctx.arcTo(rx+boxW,ry,rx+boxW,ry+boxH,rr); ctx.arcTo(rx+boxW,ry+boxH,rx,ry+boxH,rr); ctx.arcTo(rx,ry+boxH,rx,ry,rr); ctx.arcTo(rx,ry,rx+boxW,ry,rr); ctx.closePath(); }
+          ctx.fill();
+          ctx.stroke();
+          ctx.font = 'bold 10px -apple-system, sans-serif';
+          ctx.fillStyle = color;
+          ctx.fillText(line1, x, hasDriver ? labelY - 2 : labelY + 4);
+          if (hasDriver) {
+            ctx.font = '9px -apple-system, sans-serif';
+            ctx.fillStyle = dark ? '#d1d5db' : '#4b5563';
+            ctx.fillText(line2, x, labelY + 11);
+          }
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 2]);
+          ctx.beginPath();
+          ctx.moveTo(x, y - 7);
+          ctx.lineTo(x, ry + boxH);
+          ctx.stroke();
+          ctx.setLineDash([]);
         }
-        // Connector line
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([2, 2]);
-        ctx.beginPath();
-        ctx.moveTo(x, y - 7);
-        ctx.lineTo(x, ry + boxH);
-        ctx.stroke();
-        ctx.setLineDash([]);
         ctx.restore();
       });
     });
