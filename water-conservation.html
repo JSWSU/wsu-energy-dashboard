@@ -230,6 +230,22 @@
   .severity-high { border-left: 3px solid var(--red); }
   .severity-med { border-left: 3px solid #f59e0b; }
   .severity-winter { border-left: 3px solid var(--clr-irrigation); }
+  /* Task status badges in anomaly table */
+  .task-status-badge {
+    display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.5rem;
+    border-radius: 10px; white-space: nowrap; line-height: 1.4;
+  }
+  .ts-open { background: #fef3c7; color: #92400e; }
+  .ts-progress { background: #dbeafe; color: #1e40af; }
+  .ts-monitor { background: #d1fae5; color: #065f46; }
+  .ts-resolved { background: #d1fae5; color: #065f46; }
+  .ts-closed { background: #f3f4f6; color: #6b7280; }
+  .ts-none { color: var(--text-light); font-weight: 400; }
+  html.dark .ts-open { background: #78350f; color: #fde68a; }
+  html.dark .ts-progress { background: #1e3a5f; color: #93c5fd; }
+  html.dark .ts-monitor { background: #064e3b; color: #6ee7b7; }
+  html.dark .ts-resolved { background: #064e3b; color: #6ee7b7; }
+  html.dark .ts-closed { background: #374151; color: #9ca3af; }
   /* Anomaly row expand */
   .anomaly-row { cursor: pointer; }
   .anomaly-row td:first-child::before {
@@ -1378,6 +1394,13 @@ function findTaskForAnomaly(anomaly, tasks) {
     !t.status.startsWith('Closed')
   );
 }
+function findAnyTaskForAnomaly(anomaly, tasks) {
+  return tasks.find(t =>
+    t.bldgNo === anomaly.bldgNo &&
+    t.service === anomaly.service &&
+    (t.description || '').indexOf(monthLabel(anomaly.month)) >= 0
+  );
+}
 
 function getTaskStats(tasks) {
   const stats = {};
@@ -1565,8 +1588,14 @@ function renderKPIs(containerId, cards) {
 // ============================================================
 
 // Shared helper: filter + sort anomalies for the current filter/sort/column-filter state
-function getFilteredAnomalies(filter) {
+function getTaskStatusLabel(anomaly, tasks) {
+  const t = findAnyTaskForAnomaly(anomaly, tasks);
+  return t ? t.status : 'No Task';
+}
+
+function getFilteredAnomalies(filter, tasks) {
   filter = filter || currentAnomalyFilter || 'all';
+  tasks = tasks || loadTasks();
   let list = [...G_anomalies];
 
   // 1. Apply button-bar filter (service/type)
@@ -1582,6 +1611,10 @@ function getFilteredAnomalies(filter) {
   Object.keys(anomalyColFilters).forEach(colKey => {
     const allowed = anomalyColFilters[colKey];
     if (!allowed || allowed.size === 0) return;
+    if (colKey === 'taskStatus') {
+      list = list.filter(a => allowed.has(getTaskStatusLabel(a, tasks)));
+      return;
+    }
     const col = ANOMALY_COLS.find(c => c.key === colKey);
     if (!col || !col.valFn) return;
     list = list.filter(a => allowed.has(String(col.valFn(a))));
@@ -1590,11 +1623,12 @@ function getFilteredAnomalies(filter) {
   // 3. Sort
   if (anomalySortCol) {
     const col = ANOMALY_COLS.find(c => c.key === anomalySortCol);
-    if (col && col.valFn) {
+    if (col) {
       const dir = anomalySortDir === 'desc' ? -1 : 1;
       const isNum = ['usage', 'baseline', 'deviation'].includes(anomalySortCol);
       // For month, sort by raw month key for correct chronological order
-      const rawFn = anomalySortCol === 'month' ? (a => a.month) : col.valFn;
+      const rawFn = anomalySortCol === 'month' ? (a => a.month) :
+        (anomalySortCol === 'taskStatus' ? (a => getTaskStatusLabel(a, tasks)) : col.valFn);
       list.sort((a, b) => {
         let va = rawFn(a), vb = rawFn(b);
         if (isNum) {
@@ -1646,6 +1680,15 @@ function renderAnomalyTab(filter) {
   const uniqueVals = {};
   ANOMALY_COLS.forEach(col => {
     if (!col.filterable) return;
+    if (col.key === 'taskStatus') {
+      const vals = new Set();
+      allForHeaders.forEach(a => {
+        const t = findAnyTaskForAnomaly(a, tasks);
+        vals.add(t ? t.status : 'No Task');
+      });
+      uniqueVals[col.key] = [...vals].sort();
+      return;
+    }
     const vals = new Set();
     allForHeaders.forEach(a => vals.add(String(col.valFn(a))));
     uniqueVals[col.key] = [...vals].sort();
@@ -1691,7 +1734,7 @@ function renderAnomalyTab(filter) {
 
   // Anomaly table body
   const tbody = document.getElementById('anomalyBody');
-  const sorted = getFilteredAnomalies(filter);
+  const sorted = getFilteredAnomalies(filter, tasks);
 
   // Update count display
   const countEl = document.getElementById('anomalyCount');
@@ -1709,7 +1752,7 @@ function renderAnomalyTab(filter) {
     const msg = G_anomalies.length === 0
       ? 'No anomalies detected in current data.'
       : 'No anomalies match the selected filter.';
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-light);padding:2rem;">' + msg + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-light);padding:2rem;">' + msg + '</td></tr>';
     return;
   }
 
@@ -1719,6 +1762,7 @@ function renderAnomalyTab(filter) {
 
   tbody.innerHTML = sorted.map((a, i) => {
     const task = findTaskForAnomaly(a, tasks);
+    const anyTask = findAnyTaskForAnomaly(a, tasks);
     const severityCls = a.type === 'winter_irrigation' ? 'severity-winter' :
       (a.deviation > 200 ? 'severity-high' : 'severity-med');
     const typeLabel = a.type === 'spike' ? 'Spike' : 'Winter Irrigation';
@@ -1726,6 +1770,21 @@ function renderAnomalyTab(filter) {
     const actionHtml = task
       ? '<button class="btn-sm" onclick="event.stopPropagation(); switchToTask(\'' + task.issueId + '\')">' + task.issueId + '</button>'
       : '<button class="btn-sm primary" data-anomaly-idx="' + G_anomalies.indexOf(a) + '" onclick="event.stopPropagation(); openCreateModal(this)">Create Task</button>';
+
+    // Task Status cell
+    let taskStatusHtml;
+    if (anyTask) {
+      const s = anyTask.status;
+      const isOpen = s.startsWith('Open');
+      const isClosed = s.startsWith('Closed');
+      const shortLabel = s.replace('Open - ', '').replace('Closed - ', '');
+      const icon = isClosed ? (s.includes('Resolved') && !s.includes('Not') ? '\u2705' : '\u2716') : '\u2714';
+      const cls = isClosed ? (s.includes('Resolved') && !s.includes('Not') ? 'ts-resolved' : 'ts-closed') :
+        (s.includes('In Progress') ? 'ts-progress' : s.includes('Monitor') ? 'ts-monitor' : 'ts-open');
+      taskStatusHtml = '<span class="task-status-badge ' + cls + '">' + icon + ' ' + shortLabel + '</span>';
+    } else {
+      taskStatusHtml = '<span class="task-status-badge ts-none">&mdash;</span>';
+    }
 
     return `<tr class="anomaly-row ${severityCls}" data-chart-idx="${i}" onclick="toggleAnomalyChart(this)">
       <td style="text-align:left">${a.bldgNo}</td>
@@ -1736,10 +1795,11 @@ function renderAnomalyTab(filter) {
       <td>${fmt(a.usage, 1)}</td>
       <td>${a.baseline > 0 ? fmt(a.baseline, 1) : '0 (expected)'}</td>
       <td>${devStr}</td>
+      <td style="text-align:center">${taskStatusHtml}</td>
       <td style="text-align:center">${actionHtml}</td>
     </tr>
     <tr class="anomaly-chart-row" id="acr-${i}">
-      <td colspan="9">
+      <td colspan="10">
         <div class="anomaly-chart-cell"><canvas id="anomChart-${i}"></canvas></div>
         <div class="anomaly-detail-wrap" id="anomTable-${i}"></div>
       </td>
@@ -2130,6 +2190,7 @@ const ANOMALY_COLS = [
   { key: 'usage',     label: 'Usage (kGal)',     align: 'right',  sortable: true,  filterable: false, valFn: a => a.usage },
   { key: 'baseline',  label: 'Baseline (kGal)',  align: 'right',  sortable: true,  filterable: false, valFn: a => a.baseline },
   { key: 'deviation', label: 'Deviation',        align: 'right',  sortable: true,  filterable: false, valFn: a => a.deviation },
+  { key: 'taskStatus',label: 'Task Status',      align: 'center', sortable: true,  filterable: true,  valFn: null },
   { key: 'action',    label: 'Action',           align: 'center', sortable: false, filterable: false, valFn: null }
 ];
 
