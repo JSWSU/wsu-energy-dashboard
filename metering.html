@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WSU Campus Metering Dashboard</title>
+<script src="chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #981e32;
+    --primary-dark: #7a1828;
+    --secondary: #5f6b6d;
+    --accent: #c69214;
+    --bg: #f5f5f5;
+    --card-bg: #fff;
+    --text: #2d2d2d;
+    --text-light: #6b7280;
+    --border: #e5e7eb;
+    --green: #059669;
+    --red: #dc2626;
+    --blue: #2563eb;
+    --table-head-bg: #f9fafb;
+    --table-hover: #f9fafb;
+    --total-row-bg: #f0f4ff;
+    --info-bg: #f0f9ff;
+    --info-border: #bae6fd;
+    --info-text: #0c4a6e;
+    /* Utility colors */
+    --clr-electric: #f59e0b;
+    --clr-steam: #ef4444;
+    --clr-chw-energy: #06b6d4;
+    --clr-domestic: #3b82f6;
+    --clr-irrigation: #22c55e;
+    --clr-chw-water: #8b5cf6;
+  }
+  html.dark {
+    --bg: #111827;
+    --card-bg: #1f2937;
+    --text: #e5e7eb;
+    --text-light: #9ca3af;
+    --border: #374151;
+    --secondary: #9ca3af;
+    --green: #34d399;
+    --red: #f87171;
+    --table-head-bg: #1a2332;
+    --table-hover: #253347;
+    --total-row-bg: #1e293b;
+    --info-bg: #1e293b;
+    --info-border: #334155;
+    --info-text: #7dd3fc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; padding: 1.5rem 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .header-text { flex: 1; min-width: 0; }
+  .header-text h1 { font-size: 1.6rem; font-weight: 700; }
+  .header-text p { opacity: 0.85; font-size: 0.9rem; margin-top: 0.25rem; }
+  .header-actions { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+  .header-actions a {
+    color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.82rem;
+    padding: 0.4rem 0.8rem; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .header-actions a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .btn-icon {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25);
+    color: #fff; border-radius: 6px; padding: 0.4rem 0.6rem; cursor: pointer;
+    font-size: 1rem; transition: all 0.2s;
+  }
+  .btn-icon:hover { background: rgba(255,255,255,0.2); }
+  .container { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
+  /* Nav Tabs */
+  .nav-tabs {
+    display: flex; gap: 0.25rem; background: var(--card-bg); border-radius: 8px;
+    padding: 0.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto;
+  }
+  .nav-tab {
+    padding: 0.6rem 1.2rem; border: none; background: transparent; border-radius: 6px;
+    cursor: pointer; font-size: 0.85rem; font-weight: 500; color: var(--text-light);
+    white-space: nowrap; transition: all 0.2s;
+  }
+  .nav-tab:hover { background: var(--table-hover); color: var(--text); }
+  .nav-tab.active { background: var(--primary); color: #fff; }
+  /* KPI */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card {
+    background: var(--card-bg); border-radius: 10px; padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary);
+  }
+  .kpi-label { font-size: 0.78rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.05em; }
+  .kpi-value { font-size: 1.8rem; font-weight: 700; margin: 0.25rem 0; }
+  .kpi-sub { font-size: 0.8rem; color: var(--text-light); }
+  .kpi-card.electric { border-left-color: var(--clr-electric); }
+  .kpi-card.steam { border-left-color: var(--clr-steam); }
+  .kpi-card.chw-energy { border-left-color: var(--clr-chw-energy); }
+  .kpi-card.domestic { border-left-color: var(--clr-domestic); }
+  .kpi-card.irrigation { border-left-color: var(--clr-irrigation); }
+  .kpi-card.chw-water { border-left-color: var(--clr-chw-water); }
+  .kpi-card.ok { border-left-color: var(--green); }
+  .kpi-card.fault { border-left-color: var(--red); }
+  /* Cards */
+  .card {
+    background: var(--card-bg); border-radius: 10px; padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem;
+  }
+  .card h2 {
+    font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--primary);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  html.dark .card h2 { color: var(--clr-electric); }
+  .chart-container { position: relative; height: 350px; width: 100%; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th {
+    background: var(--table-head-bg); padding: 0.6rem 0.75rem; text-align: right;
+    font-weight: 600; color: var(--secondary); border-bottom: 2px solid var(--border); white-space: nowrap;
+  }
+  thead th:first-child, thead th:nth-child(2) { text-align: left; }
+  tbody td { padding: 0.5rem 0.75rem; text-align: right; border-bottom: 1px solid var(--border); }
+  tbody td:first-child, tbody td:nth-child(2) { text-align: left; }
+  tbody tr:hover { background: var(--table-hover); }
+  tbody tr.total-row { font-weight: 700; background: var(--total-row-bg); border-top: 2px solid var(--primary); }
+  /* Sections */
+  .section { display: none; }
+  .section.active { display: block; }
+  /* Search */
+  .search-bar {
+    width: 100%; padding: 0.65rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+    background: var(--card-bg); color: var(--text); margin-bottom: 1rem;
+  }
+  .search-bar:focus { border-color: var(--primary); }
+  .search-bar::placeholder { color: var(--text-light); }
+  /* Filter buttons */
+  .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .filter-btn {
+    padding: 0.4rem 0.9rem; border: 1px solid var(--border); background: var(--card-bg);
+    border-radius: 6px; font-size: 0.82rem; cursor: pointer; color: var(--text); transition: all 0.2s;
+  }
+  .filter-btn:hover { border-color: var(--primary); }
+  .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  /* Status dots */
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem; }
+  .dot.ok { background: var(--green); }
+  .dot.fault { background: var(--red); }
+  .dot.disabled { background: var(--text-light); }
+  /* Building cards */
+  .bldg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; }
+  .bldg-card {
+    background: var(--card-bg); border-radius: 10px; padding: 1rem 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary);
+    cursor: pointer; transition: box-shadow 0.2s, transform 0.15s;
+  }
+  .bldg-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-2px); }
+  .bldg-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .bldg-card .bldg-no { font-size: 0.78rem; color: var(--text-light); }
+  .bldg-badges { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  .badge {
+    font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600;
+    color: #fff;
+  }
+  .badge.electric { background: var(--clr-electric); }
+  .badge.steam { background: var(--clr-steam); }
+  .badge.chw-energy { background: var(--clr-chw-energy); }
+  .badge.domestic { background: var(--clr-domestic); }
+  .badge.irrigation { background: var(--clr-irrigation); }
+  .badge.chw-water { background: var(--clr-chw-water); }
+  /* Detail expand */
+  .bldg-detail {
+    max-height: 0; overflow: hidden; transition: max-height 0.35s ease;
+    margin-top: 0; font-size: 0.82rem;
+  }
+  .bldg-card.expanded .bldg-detail { max-height: 600px; margin-top: 0.75rem; }
+  .bldg-detail table { font-size: 0.78rem; }
+  /* Info box */
+  .info-box {
+    background: var(--info-bg); border: 1px solid var(--info-border); border-radius: 8px;
+    padding: 1rem 1.25rem; font-size: 0.82rem; color: var(--info-text); margin-bottom: 1rem;
+  }
+  .info-box code {
+    background: rgba(0,0,0,0.06); padding: 0.1rem 0.4rem; border-radius: 3px;
+    font-size: 0.78rem; font-family: 'Courier New', monospace;
+  }
+  html.dark .info-box code { background: rgba(255,255,255,0.08); }
+  /* Loading */
+  #loading {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; z-index: 9999;
+    flex-direction: column; gap: 1rem;
+  }
+  .spinner {
+    width: 40px; height: 40px; border: 4px solid var(--border);
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Auth Gate */
+  #authGate {
+    position: fixed; inset: 0; z-index: 99999; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+  }
+  #authGate .auth-header {
+    position: absolute; top: 0; left: 0; right: 0;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; padding: 1.5rem 2rem; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  #authGate .auth-header h1 { font-size: 1.4rem; font-weight: 700; }
+  #authGate .auth-header p { opacity: 0.85; font-size: 0.85rem; margin-top: 0.25rem; }
+  #authGate .auth-card {
+    background: var(--card-bg); border-radius: 12px; padding: 2.5rem 2rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1); text-align: center;
+    width: 100%; max-width: 380px; margin-top: 60px;
+  }
+  #authGate .auth-card h2 { font-size: 1.1rem; color: var(--text); margin-bottom: 0.5rem; }
+  #authGate .auth-card p { font-size: 0.82rem; color: var(--text-light); margin-bottom: 1.5rem; }
+  #authGate .auth-input {
+    width: 100%; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+    background: var(--card-bg); color: var(--text);
+  }
+  #authGate .auth-input:focus { border-color: var(--primary); }
+  #authGate .auth-btn {
+    width: 100%; padding: 0.75rem; margin-top: 1rem; border: none; border-radius: 8px;
+    background: var(--primary); color: #fff; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  #authGate .auth-btn:hover { background: var(--primary-dark); }
+  #authGate .auth-error { color: var(--red); font-size: 0.8rem; margin-top: 0.75rem; min-height: 1.2rem; }
+  html.dark #authGate .auth-input { background: var(--bg); color: var(--text); border-color: var(--border); }
+  /* Footer */
+  footer {
+    text-align: center; padding: 1.5rem; color: var(--text-light); font-size: 0.78rem;
+    border-top: 1px solid var(--border); margin-top: 2rem;
+  }
+  footer a { color: var(--primary); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  /* Print */
+  @media print {
+    @page { size: landscape; margin: 0.5in; }
+    * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+    body { background: #fff !important; }
+    html.dark { --bg:#f5f5f5; --card-bg:#fff; --text:#2d2d2d; --text-light:#6b7280; --border:#e5e7eb; }
+    header, #authGate, #loading, .nav-tabs, .search-bar, .filter-bar, .btn-icon, .header-actions { display: none !important; }
+    .section { display: block !important; page-break-inside: avoid; }
+    .card { box-shadow: none; border: 1px solid #e5e7eb; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Auth Gate -->
+<div id="authGate">
+  <div class="auth-header">
+    <h1>WSU Campus Metering</h1>
+    <p>Campus Metering Dashboard &bull; WSU Facilities Services</p>
+  </div>
+  <div class="auth-card">
+    <h2>Restricted Access</h2>
+    <p>Enter the dashboard password to continue.</p>
+    <input type="password" class="auth-input" id="authInput" placeholder="Password" autocomplete="off">
+    <button class="auth-btn" id="authBtn">Sign In</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="color:var(--text-light); font-size:0.9rem;">Loading metering data...</div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="header-text">
+    <h1>WSU Campus Metering Dashboard</h1>
+    <p>Jan 2025 &ndash; Feb 2026 &bull; 721 Sites &bull; Pullman Campus</p>
+  </div>
+  <div class="header-actions">
+    <a href="index.html">Energy Cost Projection</a>
+    <button class="btn-icon" id="darkToggle" title="Toggle dark mode">&#9790;</button>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Nav Tabs -->
+  <div class="nav-tabs" id="navTabs">
+    <button class="nav-tab active" data-tab="overview">Overview</button>
+    <button class="nav-tab" data-tab="electric">Electric</button>
+    <button class="nav-tab" data-tab="thermal">Thermal</button>
+    <button class="nav-tab" data-tab="water">Water</button>
+    <button class="nav-tab" data-tab="buildings">Buildings</button>
+    <button class="nav-tab" data-tab="connectors">Connectors</button>
+    <button class="nav-tab" data-tab="info">Data Info</button>
+  </div>
+
+  <!-- ==================== OVERVIEW TAB ==================== -->
+  <div class="section active" id="sec-overview">
+    <div class="kpi-grid" id="kpiOverview"></div>
+    <div class="chart-row">
+      <div class="card">
+        <h2>Top 20 Buildings by Total Energy (MMBtu)</h2>
+        <div class="chart-container"><canvas id="chartTopEnergy"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Top 20 Buildings by Total Water (kGal)</h2>
+        <div class="chart-container"><canvas id="chartTopWater"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="card">
+        <h2>Monthly Campus Energy Totals</h2>
+        <div class="chart-container"><canvas id="chartMonthlyEnergy"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Monthly Campus Water Totals</h2>
+        <div class="chart-container"><canvas id="chartMonthlyWater"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ELECTRIC TAB ==================== -->
+  <div class="section" id="sec-electric">
+    <div class="kpi-grid" id="kpiElectric"></div>
+    <div class="card">
+      <h2>Monthly Electric Trend (MMBtu)</h2>
+      <div class="chart-container"><canvas id="chartElecTrend"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Top 15 Buildings &mdash; Electric (MMBtu, 14-mo Total)</h2>
+      <div class="chart-container"><canvas id="chartElecTop"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Building Electric Consumption</h2>
+      <input type="text" class="search-bar" id="searchElec" placeholder="Search buildings...">
+      <div class="table-wrap"><table id="tblElec"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ==================== THERMAL TAB ==================== -->
+  <div class="section" id="sec-thermal">
+    <div class="kpi-grid" id="kpiThermal"></div>
+    <div class="card">
+      <h2>Monthly Thermal Trend (MMBtu)</h2>
+      <div class="chart-container"><canvas id="chartThermalTrend"></canvas></div>
+    </div>
+    <div class="chart-row">
+      <div class="card">
+        <h2>Top 15 Buildings &mdash; Steam (MMBtu)</h2>
+        <div class="chart-container"><canvas id="chartSteamTop"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Top 15 Buildings &mdash; CHW Energy (MMBtu)</h2>
+        <div class="chart-container"><canvas id="chartChwETop"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== WATER TAB ==================== -->
+  <div class="section" id="sec-water">
+    <div class="kpi-grid" id="kpiWater"></div>
+    <div class="card">
+      <h2>Monthly Water Trend (kGal)</h2>
+      <div class="chart-container"><canvas id="chartWaterTrend"></canvas></div>
+    </div>
+    <div class="chart-row">
+      <div class="card">
+        <h2>Top 15 Buildings &mdash; Domestic Water (kGal)</h2>
+        <div class="chart-container"><canvas id="chartDomTop"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Top 15 Buildings &mdash; Irrigation (kGal)</h2>
+        <div class="chart-container"><canvas id="chartIrrigTop"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== BUILDINGS TAB ==================== -->
+  <div class="section" id="sec-buildings">
+    <input type="text" class="search-bar" id="searchBldg" placeholder="Search by building name or number...">
+    <div class="bldg-grid" id="bldgGrid"></div>
+  </div>
+
+  <!-- ==================== CONNECTORS TAB ==================== -->
+  <div class="section" id="sec-connectors">
+    <div class="kpi-grid" id="kpiConn"></div>
+    <div class="filter-bar" id="connFilterBar">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="ok">OK</button>
+      <button class="filter-btn" data-filter="fault">Fault</button>
+      <button class="filter-btn" data-filter="disabled">Disabled</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table id="tblConn"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ==================== DATA INFO TAB ==================== -->
+  <div class="section" id="sec-info">
+    <div class="card">
+      <h2>Data Sources</h2>
+      <div class="info-box">
+        <p><strong>Data Period:</strong> January 2025 &ndash; February 2026 (14 months)</p>
+        <p><strong>Source:</strong> SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code></p>
+        <p><strong>Export Method:</strong> Existing <code>view_*</code> functions with Export Format, run via Shell</p>
+      </div>
+      <h2>Export Commands</h2>
+      <div class="info-box">
+        <p>Run these in the SkySpark Shell to refresh data:</p>
+        <p><code>view_elecMeters(2025-01-01..2026-02-28, "Energy (kWh)", "Site", "Export Format")</code></p>
+        <p><code>view_condensate(2025-01-01..2026-02-28, "Site", "Export Format")</code></p>
+        <p><code>view_water(2025-01-01..2026-02-28, "Site", "Domestic", "Export Format")</code></p>
+        <p><code>view_water(2025-01-01..2026-02-28, "Site", "Irrigation", "Export Format")</code></p>
+        <p><code>view_chwExport(2025-01-01..2026-02-28, "CHW (tonhr)", "Site", "Export Format")</code></p>
+      </div>
+      <h2>Unit Conversions</h2>
+      <div class="info-box">
+        <p>Raw values exported in native units. Conversions applied in this dashboard:</p>
+        <ul style="margin:0.5rem 0 0 1.25rem;">
+          <li><strong>Electric:</strong> kWh &times; 0.003412 = MMBtu</li>
+          <li><strong>Steam:</strong> lb &times; 0.001 = MMBtu (1 lb steam &asymp; 1,000 BTU)</li>
+          <li><strong>CHW Energy:</strong> tonrefh &times; 0.012 = MMBtu (1 tonrefh = 12,000 BTU)</li>
+          <li><strong>Domestic Water:</strong> gal &div; 1,000 = kGal</li>
+          <li><strong>Irrigation:</strong> gal &div; 1,000 = kGal</li>
+        </ul>
+      </div>
+      <h2>File Inventory</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="text-align:left">File</th><th>Rows</th><th style="text-align:left">Description</th></tr></thead>
+          <tbody id="tblFiles"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  WSU Facilities Services &bull; Campus Metering Dashboard &bull;
+  <a href="index.html">Energy Cost Projection</a>
+</footer>
+
+<script>
+// ============================================================
+//  AUTH GATE
+// ============================================================
+(function() {
+  const gate = document.getElementById('authGate');
+  const input = document.getElementById('authInput');
+  const btn = document.getElementById('authBtn');
+  const err = document.getElementById('authError');
+  if (localStorage.getItem('wsuMeteringAuth') === 'ok') {
+    gate.style.display = 'none';
+  }
+  function tryAuth() {
+    if (input.value === 'Energy@WSU') {
+      localStorage.setItem('wsuMeteringAuth', 'ok');
+      gate.style.display = 'none';
+      err.textContent = '';
+    } else {
+      err.textContent = 'Incorrect password. Please try again.';
+      input.value = '';
+      input.focus();
+    }
+  }
+  btn.addEventListener('click', tryAuth);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+})();
+
+// ============================================================
+//  DARK MODE
+// ============================================================
+(function() {
+  if (localStorage.getItem('wsuDarkMode') === 'on') {
+    document.documentElement.classList.add('dark');
+  }
+  document.getElementById('darkToggle').addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('wsuDarkMode', document.documentElement.classList.contains('dark') ? 'on' : 'off');
+    applyChartTheme();
+    chartInstances.forEach(c => { c.options.color = Chart.defaults.color; c.update(); });
+  });
+})();
+
+// ============================================================
+//  TAB NAVIGATION
+// ============================================================
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ============================================================
+//  GLOBALS
+// ============================================================
+const chartInstances = [];
+const COLORS = {
+  electric: '#f59e0b', steam: '#ef4444', chwEnergy: '#06b6d4',
+  domestic: '#3b82f6', irrigation: '#22c55e', chwWater: '#8b5cf6'
+};
+
+function applyChartTheme() {
+  const dark = document.documentElement.classList.contains('dark');
+  Chart.defaults.color = dark ? '#9ca3af' : '#6b7280';
+  Chart.defaults.borderColor = dark ? '#374151' : '#e5e7eb';
+}
+applyChartTheme();
+
+function fmt(n, dec) {
+  if (n == null || isNaN(n)) return '0';
+  dec = dec ?? 0;
+  return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+function parseMonthKey(startDate) {
+  // startDate format: "MM-DD-YYYY" -> "YYYY-MM"
+  if (!startDate) return '';
+  const parts = startDate.split('-');
+  if (parts.length === 3) return parts[2] + '-' + parts[0];
+  return startDate;
+}
+
+function monthLabel(key) {
+  // "2025-01" -> "Jan 25"
+  const [y, m] = key.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(m, 10) - 1] + ' ' + y.slice(2);
+}
+
+// ============================================================
+//  DATA LOADING
+// ============================================================
+async function loadJSON(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('Failed to load ' + url);
+  const data = await resp.json();
+  return data.rows || [];
+}
+
+async function loadAllData() {
+  const [electric, condensate, domesticWater, irrigation, chw, sites, connectors] = await Promise.all([
+    loadJSON('data/electric.json'),
+    loadJSON('data/condensate.json'),
+    loadJSON('data/domestic_water.json'),
+    loadJSON('data/irrigation.json'),
+    loadJSON('data/chw.json'),
+    loadJSON('data/sites.json'),
+    loadJSON('data/connectors.json')
+  ]);
+  return { electric, condensate, domesticWater, irrigation, chw, sites, connectors };
+}
+
+// ============================================================
+//  CONVERSION HELPERS
+// ============================================================
+function kwhToMmbtu(kwh) { return (kwh || 0) * 0.003412; }
+function lbToMmbtu(lb) { return (lb || 0) * 0.001; }
+function tonrefhToMmbtu(t) { return (t || 0) * 0.012; }
+function galToKgal(g) { return (g || 0) / 1000; }
+
+// ============================================================
+//  AGGREGATION
+// ============================================================
+function aggregateByBuilding(rows, convertFn) {
+  const map = {};
+  rows.forEach(r => {
+    const key = r.bldgNo || 'Unknown';
+    if (!map[key]) map[key] = { bldgNo: key, bldgName: r.bldgName || '', total: 0, months: {} };
+    const mk = parseMonthKey(r.startDate);
+    const val = convertFn(r.usage || 0);
+    map[key].total += val;
+    map[key].months[mk] = (map[key].months[mk] || 0) + val;
+  });
+  return map;
+}
+
+function aggregateByMonth(rows, convertFn) {
+  const map = {};
+  rows.forEach(r => {
+    const mk = parseMonthKey(r.startDate);
+    if (!mk) return;
+    map[mk] = (map[mk] || 0) + convertFn(r.usage || 0);
+  });
+  return map;
+}
+
+function getSortedMonths(data) {
+  const all = new Set();
+  [data.electric, data.condensate, data.domesticWater, data.irrigation, data.chw].forEach(arr => {
+    arr.forEach(r => { const mk = parseMonthKey(r.startDate); if (mk) all.add(mk); });
+  });
+  return [...all].sort();
+}
+
+// ============================================================
+//  CHART FACTORY
+// ============================================================
+function createChart(canvasId, config) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  const c = new Chart(ctx, config);
+  chartInstances.push(c);
+  return c;
+}
+
+function barChart(canvasId, labels, datasets, opts) {
+  return createChart(canvasId, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: opts?.horizontal ? 'y' : 'x',
+      plugins: {
+        legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed[opts?.horizontal ? 'x' : 'y'], 1) } }
+      },
+      scales: {
+        x: { stacked: opts?.stacked, grid: { display: false } },
+        y: { stacked: opts?.stacked, beginAtZero: true,
+          ticks: { callback: v => v >= 1000000 ? (v/1000000).toFixed(1) + 'M' : v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }
+        }
+      }
+    }
+  });
+}
+
+function lineChart(canvasId, labels, datasets) {
+  return createChart(canvasId, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 1) } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true,
+          ticks: { callback: v => v >= 1000000 ? (v/1000000).toFixed(1) + 'M' : v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }
+        }
+      },
+      elements: { point: { radius: 3, hoverRadius: 5 }, line: { tension: 0.3 } }
+    }
+  });
+}
+
+// ============================================================
+//  KPI HELPERS
+// ============================================================
+function renderKPIs(containerId, cards) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = cards.map(c =>
+    `<div class="kpi-card ${c.cls || ''}">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}</div>
+      <div class="kpi-sub">${c.sub || ''}</div>
+    </div>`
+  ).join('');
+}
+
+// ============================================================
+//  MAIN INIT
+// ============================================================
+loadAllData().then(data => {
+  document.getElementById('loading').style.display = 'none';
+
+  const months = getSortedMonths(data);
+  const monthLabels = months.map(monthLabel);
+
+  // ---- Aggregations ----
+  const elecByBldg = aggregateByBuilding(data.electric, kwhToMmbtu);
+  const steamByBldg = aggregateByBuilding(data.condensate, lbToMmbtu);
+  const chwEByBldg = aggregateByBuilding(data.chw, tonrefhToMmbtu);
+  const domByBldg = aggregateByBuilding(data.domesticWater, galToKgal);
+  const irrigByBldg = aggregateByBuilding(data.irrigation, galToKgal);
+
+  const elecByMonth = aggregateByMonth(data.electric, kwhToMmbtu);
+  const steamByMonth = aggregateByMonth(data.condensate, lbToMmbtu);
+  const chwEByMonth = aggregateByMonth(data.chw, tonrefhToMmbtu);
+  const domByMonth = aggregateByMonth(data.domesticWater, galToKgal);
+  const irrigByMonth = aggregateByMonth(data.irrigation, galToKgal);
+
+  const totalElec = Object.values(elecByBldg).reduce((s, b) => s + b.total, 0);
+  const totalSteam = Object.values(steamByBldg).reduce((s, b) => s + b.total, 0);
+  const totalChwE = Object.values(chwEByBldg).reduce((s, b) => s + b.total, 0);
+  const totalDom = Object.values(domByBldg).reduce((s, b) => s + b.total, 0);
+  const totalIrrig = Object.values(irrigByBldg).reduce((s, b) => s + b.total, 0);
+  const totalEnergy = totalElec + totalSteam + totalChwE;
+  const totalWater = totalDom + totalIrrig;
+
+  // Unique buildings per utility
+  const elecBldgs = new Set(data.electric.filter(r => r.usage > 0).map(r => r.bldgNo));
+  const steamBldgs = new Set(data.condensate.filter(r => r.usage > 0).map(r => r.bldgNo));
+  const chwEBldgs = new Set(data.chw.filter(r => r.usage > 0).map(r => r.bldgNo));
+  const domBldgs = new Set(data.domesticWater.filter(r => r.usage > 0).map(r => r.bldgNo));
+  const irrigBldgs = new Set(data.irrigation.filter(r => r.usage > 0).map(r => r.bldgNo));
+
+  // Connectors
+  const connOk = data.connectors.filter(c => c.connStatus === 'ok').length;
+  const connFault = data.connectors.filter(c => c.connStatus === 'fault').length;
+  const connDisabled = data.connectors.filter(c => c.connStatus === 'disabled').length;
+  const connOther = data.connectors.length - connOk - connFault - connDisabled;
+
+  // ==================== OVERVIEW TAB ====================
+  renderKPIs('kpiOverview', [
+    { label: 'Total Sites', value: fmt(data.sites.length), sub: 'Campus buildings', cls: '' },
+    { label: 'Total Energy', value: fmt(totalEnergy, 0) + ' MMBtu', sub: '14-month total', cls: 'electric' },
+    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: '14-month total', cls: 'domestic' },
+    { label: 'Connector Health', value: Math.round(connOk / data.connectors.length * 100) + '%', sub: connOk + ' OK / ' + connFault + ' Fault / ' + connDisabled + ' Disabled', cls: 'ok' },
+    { label: 'Electric', value: fmt(totalElec, 0) + ' MMBtu', sub: elecBldgs.size + ' buildings', cls: 'electric' },
+    { label: 'Steam', value: fmt(totalSteam, 0) + ' MMBtu', sub: steamBldgs.size + ' buildings', cls: 'steam' },
+    { label: 'Domestic Water', value: fmt(totalDom, 0) + ' kGal', sub: domBldgs.size + ' buildings', cls: 'domestic' },
+    { label: 'Irrigation', value: fmt(totalIrrig, 0) + ' kGal', sub: irrigBldgs.size + ' buildings', cls: 'irrigation' }
+  ]);
+
+  // Top 20 buildings by total energy
+  const allBldgEnergy = {};
+  [elecByBldg, steamByBldg, chwEByBldg].forEach(map => {
+    Object.entries(map).forEach(([k, v]) => {
+      if (!allBldgEnergy[k]) allBldgEnergy[k] = { bldgNo: k, bldgName: v.bldgName, elec: 0, steam: 0, chwE: 0 };
+      if (map === elecByBldg) allBldgEnergy[k].elec = v.total;
+      if (map === steamByBldg) allBldgEnergy[k].steam = v.total;
+      if (map === chwEByBldg) allBldgEnergy[k].chwE = v.total;
+    });
+  });
+  const top20Energy = Object.values(allBldgEnergy)
+    .map(b => ({ ...b, total: b.elec + b.steam + b.chwE }))
+    .sort((a, b) => b.total - a.total).slice(0, 20);
+
+  barChart('chartTopEnergy',
+    top20Energy.map(b => b.bldgName || b.bldgNo),
+    [
+      { label: 'Electric', data: top20Energy.map(b => b.elec), backgroundColor: COLORS.electric },
+      { label: 'Steam', data: top20Energy.map(b => b.steam), backgroundColor: COLORS.steam },
+      { label: 'CHW Energy', data: top20Energy.map(b => b.chwE), backgroundColor: COLORS.chwEnergy }
+    ],
+    { stacked: true, horizontal: true }
+  );
+
+  // Top 20 buildings by total water
+  const allBldgWater = {};
+  [domByBldg, irrigByBldg].forEach(map => {
+    Object.entries(map).forEach(([k, v]) => {
+      if (!allBldgWater[k]) allBldgWater[k] = { bldgNo: k, bldgName: v.bldgName, dom: 0, irrig: 0 };
+      if (map === domByBldg) allBldgWater[k].dom = v.total;
+      if (map === irrigByBldg) allBldgWater[k].irrig = v.total;
+    });
+  });
+  const top20Water = Object.values(allBldgWater)
+    .map(b => ({ ...b, total: b.dom + b.irrig }))
+    .sort((a, b) => b.total - a.total).slice(0, 20);
+
+  barChart('chartTopWater',
+    top20Water.map(b => b.bldgName || b.bldgNo),
+    [
+      { label: 'Domestic', data: top20Water.map(b => b.dom), backgroundColor: COLORS.domestic },
+      { label: 'Irrigation', data: top20Water.map(b => b.irrig), backgroundColor: COLORS.irrigation }
+    ],
+    { stacked: true, horizontal: true }
+  );
+
+  // Monthly campus energy totals (stacked bar)
+  barChart('chartMonthlyEnergy', monthLabels, [
+    { label: 'Electric', data: months.map(m => elecByMonth[m] || 0), backgroundColor: COLORS.electric },
+    { label: 'Steam', data: months.map(m => steamByMonth[m] || 0), backgroundColor: COLORS.steam },
+    { label: 'CHW Energy', data: months.map(m => chwEByMonth[m] || 0), backgroundColor: COLORS.chwEnergy }
+  ], { stacked: true });
+
+  // Monthly campus water totals (stacked bar)
+  barChart('chartMonthlyWater', monthLabels, [
+    { label: 'Domestic', data: months.map(m => domByMonth[m] || 0), backgroundColor: COLORS.domestic },
+    { label: 'Irrigation', data: months.map(m => irrigByMonth[m] || 0), backgroundColor: COLORS.irrigation }
+  ], { stacked: true });
+
+  // ==================== ELECTRIC TAB ====================
+  renderKPIs('kpiElectric', [
+    { label: 'Total Electric', value: fmt(totalElec, 0) + ' MMBtu', sub: fmt(totalElec / 0.003412, 0) + ' kWh', cls: 'electric' },
+    { label: 'Buildings', value: fmt(elecBldgs.size), sub: 'With electric data', cls: 'electric' },
+    { label: 'Data Points', value: fmt(data.electric.length), sub: 'Row records', cls: 'electric' },
+    { label: 'Avg per Building', value: fmt(totalElec / Math.max(elecBldgs.size, 1), 0) + ' MMBtu', sub: '14-month average', cls: 'electric' }
+  ]);
+
+  lineChart('chartElecTrend', monthLabels, [
+    { label: 'Electric (MMBtu)', data: months.map(m => elecByMonth[m] || 0), borderColor: COLORS.electric, backgroundColor: COLORS.electric + '33', fill: true }
+  ]);
+
+  const elecTop15 = Object.values(elecByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
+  barChart('chartElecTop',
+    elecTop15.map(b => b.bldgName || b.bldgNo),
+    [{ label: 'Electric MMBtu', data: elecTop15.map(b => b.total), backgroundColor: COLORS.electric }],
+    { horizontal: true }
+  );
+
+  // Electric table
+  buildUtilityTable('tblElec', 'searchElec', elecByBldg, months, 'MMBtu');
+
+  // ==================== THERMAL TAB ====================
+  renderKPIs('kpiThermal', [
+    { label: 'Total Steam', value: fmt(totalSteam, 0) + ' MMBtu', sub: steamBldgs.size + ' buildings', cls: 'steam' },
+    { label: 'Total CHW Energy', value: fmt(totalChwE, 0) + ' MMBtu', sub: chwEBldgs.size + ' buildings', cls: 'chw-energy' },
+    { label: 'Combined Thermal', value: fmt(totalSteam + totalChwE, 0) + ' MMBtu', sub: '14-month total', cls: 'steam' },
+    { label: 'Steam Records', value: fmt(data.condensate.length), sub: 'Condensate rows', cls: 'steam' }
+  ]);
+
+  lineChart('chartThermalTrend', monthLabels, [
+    { label: 'Steam (MMBtu)', data: months.map(m => steamByMonth[m] || 0), borderColor: COLORS.steam, backgroundColor: COLORS.steam + '33', fill: false },
+    { label: 'CHW Energy (MMBtu)', data: months.map(m => chwEByMonth[m] || 0), borderColor: COLORS.chwEnergy, backgroundColor: COLORS.chwEnergy + '33', fill: false }
+  ]);
+
+  const steamTop15 = Object.values(steamByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
+  barChart('chartSteamTop',
+    steamTop15.map(b => b.bldgName || b.bldgNo),
+    [{ label: 'Steam MMBtu', data: steamTop15.map(b => b.total), backgroundColor: COLORS.steam }],
+    { horizontal: true }
+  );
+
+  const chwETop15 = Object.values(chwEByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
+  barChart('chartChwETop',
+    chwETop15.map(b => b.bldgName || b.bldgNo),
+    [{ label: 'CHW Energy MMBtu', data: chwETop15.map(b => b.total), backgroundColor: COLORS.chwEnergy }],
+    { horizontal: true }
+  );
+
+  // ==================== WATER TAB ====================
+  renderKPIs('kpiWater', [
+    { label: 'Domestic Water', value: fmt(totalDom, 0) + ' kGal', sub: domBldgs.size + ' buildings', cls: 'domestic' },
+    { label: 'Irrigation', value: fmt(totalIrrig, 0) + ' kGal', sub: irrigBldgs.size + ' buildings', cls: 'irrigation' },
+    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: '14-month total', cls: 'domestic' },
+    { label: 'Data Records', value: fmt(data.domesticWater.length + data.irrigation.length), sub: 'Water rows', cls: 'domestic' }
+  ]);
+
+  lineChart('chartWaterTrend', monthLabels, [
+    { label: 'Domestic (kGal)', data: months.map(m => domByMonth[m] || 0), borderColor: COLORS.domestic, backgroundColor: COLORS.domestic + '33', fill: false },
+    { label: 'Irrigation (kGal)', data: months.map(m => irrigByMonth[m] || 0), borderColor: COLORS.irrigation, backgroundColor: COLORS.irrigation + '33', fill: false }
+  ]);
+
+  const domTop15 = Object.values(domByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
+  barChart('chartDomTop',
+    domTop15.map(b => b.bldgName || b.bldgNo),
+    [{ label: 'Domestic kGal', data: domTop15.map(b => b.total), backgroundColor: COLORS.domestic }],
+    { horizontal: true }
+  );
+
+  const irrigTop15 = Object.values(irrigByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
+  barChart('chartIrrigTop',
+    irrigTop15.map(b => b.bldgName || b.bldgNo),
+    [{ label: 'Irrigation kGal', data: irrigTop15.map(b => b.total), backgroundColor: COLORS.irrigation }],
+    { horizontal: true }
+  );
+
+  // ==================== BUILDINGS TAB ====================
+  buildBuildingCards(data, elecByBldg, steamByBldg, chwEByBldg, domByBldg, irrigByBldg, months);
+
+  // ==================== CONNECTORS TAB ====================
+  renderKPIs('kpiConn', [
+    { label: 'Total Connectors', value: fmt(data.connectors.length), sub: 'All connectors', cls: '' },
+    { label: 'OK', value: fmt(connOk), sub: Math.round(connOk / data.connectors.length * 100) + '% healthy', cls: 'ok' },
+    { label: 'Fault', value: fmt(connFault), sub: 'Needs investigation', cls: 'fault' },
+    { label: 'Disabled', value: fmt(connDisabled + connOther), sub: 'Intentionally off + other', cls: '' }
+  ]);
+  buildConnectorTable(data.connectors);
+
+  // ==================== DATA INFO TAB ====================
+  const fileMeta = [
+    { file: 'electric.json', rows: data.electric.length, desc: 'Electric consumption (kWh), Export Format' },
+    { file: 'condensate.json', rows: data.condensate.length, desc: 'Steam condensate (lb), Export Format' },
+    { file: 'domestic_water.json', rows: data.domesticWater.length, desc: 'Domestic water (gal), Export Format' },
+    { file: 'irrigation.json', rows: data.irrigation.length, desc: 'Irrigation water (gal), Export Format' },
+    { file: 'chw.json', rows: data.chw.length, desc: 'CHW energy (tonrefh), Export Format' },
+    { file: 'sites.json', rows: data.sites.length, desc: 'Site/building metadata' },
+    { file: 'connectors.json', rows: data.connectors.length, desc: 'Connector status records' }
+  ];
+  document.getElementById('tblFiles').innerHTML = fileMeta.map(f =>
+    `<tr><td style="text-align:left"><code>${f.file}</code></td><td>${fmt(f.rows)}</td><td style="text-align:left">${f.desc}</td></tr>`
+  ).join('');
+
+}).catch(err => {
+  document.getElementById('loading').innerHTML =
+    '<div style="color:var(--red);text-align:center;"><h2>Error Loading Data</h2><p>' + err.message + '</p></div>';
+});
+
+// ============================================================
+//  UTILITY TABLE BUILDER
+// ============================================================
+function buildUtilityTable(tableId, searchId, byBldg, months, unit) {
+  const tbl = document.getElementById(tableId);
+  const thead = tbl.querySelector('thead');
+  const tbody = tbl.querySelector('tbody');
+
+  // Header
+  let hdr = '<tr><th style="text-align:left">Bldg #</th><th style="text-align:left">Building Name</th><th>14-mo Total</th>';
+  months.forEach(m => { hdr += '<th>' + monthLabel(m) + '</th>'; });
+  hdr += '</tr>';
+  thead.innerHTML = hdr;
+
+  // Sort by total descending
+  const sorted = Object.values(byBldg).sort((a, b) => b.total - a.total);
+
+  function renderRows(filter) {
+    const q = (filter || '').toLowerCase();
+    const rows = sorted.filter(b =>
+      !q || b.bldgNo.toLowerCase().includes(q) || (b.bldgName || '').toLowerCase().includes(q)
+    );
+    tbody.innerHTML = rows.map(b => {
+      let row = `<tr><td style="text-align:left">${b.bldgNo}</td><td style="text-align:left">${b.bldgName}</td><td><strong>${fmt(b.total, 1)}</strong></td>`;
+      months.forEach(m => { row += `<td>${fmt(b.months[m] || 0, 1)}</td>`; });
+      row += '</tr>';
+      return row;
+    }).join('');
+  }
+
+  renderRows('');
+  if (searchId) {
+    document.getElementById(searchId).addEventListener('input', function() { renderRows(this.value); });
+  }
+}
+
+// ============================================================
+//  BUILDING CARDS
+// ============================================================
+function buildBuildingCards(data, elecByBldg, steamByBldg, chwEByBldg, domByBldg, irrigByBldg, months) {
+  const grid = document.getElementById('bldgGrid');
+  const siteMap = {};
+  data.sites.forEach(s => {
+    const no = s.dis || '';
+    siteMap[no] = {
+      bldgNo: no,
+      bldgName: s.building || '',
+      area: s.area ? (s.area.val || s.area) : null
+    };
+  });
+
+  // Merge all buildings that appear in any utility
+  const allBldgNos = new Set();
+  [elecByBldg, steamByBldg, chwEByBldg, domByBldg, irrigByBldg].forEach(map => {
+    Object.keys(map).forEach(k => allBldgNos.add(k));
+  });
+  data.sites.forEach(s => { if (s.dis) allBldgNos.add(s.dis); });
+
+  const buildings = [...allBldgNos].map(no => {
+    const site = siteMap[no] || { bldgNo: no, bldgName: '' };
+    return {
+      bldgNo: no,
+      bldgName: site.bldgName,
+      area: site.area,
+      elec: elecByBldg[no]?.total || 0,
+      steam: steamByBldg[no]?.total || 0,
+      chwE: chwEByBldg[no]?.total || 0,
+      dom: domByBldg[no]?.total || 0,
+      irrig: irrigByBldg[no]?.total || 0,
+      elecMonths: elecByBldg[no]?.months || {},
+      steamMonths: steamByBldg[no]?.months || {},
+      chwEMonths: chwEByBldg[no]?.months || {},
+      domMonths: domByBldg[no]?.months || {},
+      irrigMonths: irrigByBldg[no]?.months || {}
+    };
+  }).sort((a, b) => {
+    const totalA = a.elec + a.steam + a.chwE + a.dom + a.irrig;
+    const totalB = b.elec + b.steam + b.chwE + b.dom + b.irrig;
+    return totalB - totalA;
+  });
+
+  function renderCards(filter) {
+    const q = (filter || '').toLowerCase();
+    const filtered = buildings.filter(b =>
+      !q || b.bldgNo.toLowerCase().includes(q) || b.bldgName.toLowerCase().includes(q)
+    );
+
+    grid.innerHTML = filtered.slice(0, 200).map(b => {
+      let badges = '';
+      if (b.elec > 0) badges += `<span class="badge electric">${fmt(b.elec, 0)} MMBtu</span>`;
+      if (b.steam > 0) badges += `<span class="badge steam">${fmt(b.steam, 0)} MMBtu</span>`;
+      if (b.chwE > 0) badges += `<span class="badge chw-energy">${fmt(b.chwE, 0)} MMBtu</span>`;
+      if (b.dom > 0) badges += `<span class="badge domestic">${fmt(b.dom, 0)} kGal</span>`;
+      if (b.irrig > 0) badges += `<span class="badge irrigation">${fmt(b.irrig, 0)} kGal</span>`;
+
+      // Detail table
+      let detailRows = '';
+      months.forEach(m => {
+        const ml = monthLabel(m);
+        const eV = b.elecMonths[m] || 0;
+        const sV = b.steamMonths[m] || 0;
+        const cV = b.chwEMonths[m] || 0;
+        const dV = b.domMonths[m] || 0;
+        const iV = b.irrigMonths[m] || 0;
+        if (eV || sV || cV || dV || iV) {
+          detailRows += `<tr><td style="text-align:left">${ml}</td><td>${eV ? fmt(eV, 1) : '-'}</td><td>${sV ? fmt(sV, 1) : '-'}</td><td>${cV ? fmt(cV, 1) : '-'}</td><td>${dV ? fmt(dV, 1) : '-'}</td><td>${iV ? fmt(iV, 1) : '-'}</td></tr>`;
+        }
+      });
+
+      return `<div class="bldg-card" onclick="this.classList.toggle('expanded')">
+        <h3>${b.bldgName || b.bldgNo}</h3>
+        <div class="bldg-no">${b.bldgNo}${b.area ? ' &bull; ' + fmt(b.area, 0) + ' ft&sup2;' : ''}</div>
+        <div class="bldg-badges">${badges || '<span style="color:var(--text-light);font-size:0.78rem;">No metered data</span>'}</div>
+        <div class="bldg-detail">
+          <table>
+            <thead><tr><th style="text-align:left">Month</th><th>Elec</th><th>Steam</th><th>CHW E</th><th>Dom W</th><th>Irrig</th></tr></thead>
+            <tbody>${detailRows || '<tr><td colspan="6" style="text-align:center;color:var(--text-light);">No data</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  renderCards('');
+  document.getElementById('searchBldg').addEventListener('input', function() { renderCards(this.value); });
+}
+
+// ============================================================
+//  CONNECTOR TABLE
+// ============================================================
+function buildConnectorTable(connectors) {
+  const tbl = document.getElementById('tblConn');
+  const thead = tbl.querySelector('thead');
+  const tbody = tbl.querySelector('tbody');
+
+  thead.innerHTML = '<tr><th style="text-align:left">Connector</th><th style="text-align:left">Status</th><th style="text-align:left">Error</th></tr>';
+
+  const sorted = [...connectors].sort((a, b) => {
+    const order = { fault: 0, disabled: 1, ok: 2 };
+    return (order[a.connStatus] ?? 3) - (order[b.connStatus] ?? 3);
+  });
+
+  function renderRows(filter) {
+    const rows = filter === 'all' ? sorted : sorted.filter(c => c.connStatus === filter);
+    tbody.innerHTML = rows.map(c => {
+      const status = c.connStatus || 'unknown';
+      const dotCls = status === 'ok' ? 'ok' : status === 'fault' ? 'fault' : 'disabled';
+      return `<tr><td style="text-align:left">${c.dis || ''}</td><td style="text-align:left"><span class="dot ${dotCls}"></span>${status}</td><td style="text-align:left;font-size:0.75rem;color:var(--text-light);">${c.connErr || ''}</td></tr>`;
+    }).join('');
+  }
+
+  renderRows('all');
+
+  document.querySelectorAll('#connFilterBar .filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#connFilterBar .filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderRows(btn.dataset.filter);
+    });
+  });
+}
+</script>
+</body>
+</html>
