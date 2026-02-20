@@ -419,7 +419,7 @@
       <div class="chart-container tall"><canvas id="chartElecTop"></canvas></div>
     </div>
     <div class="card">
-      <h2>Building Electric Consumption</h2>
+      <h2>Building Electric Consumption (MMBtu)</h2>
       <input type="text" class="search-bar" id="searchElec" placeholder="Search buildings...">
       <div class="table-wrap"><table id="tblElec"><thead></thead><tbody></tbody></table></div>
     </div>
@@ -1414,8 +1414,8 @@ function buildUtilityTable(tableId, searchId, byBldg, months, unit) {
   const tbody = tbl.querySelector('tbody');
 
   // Header
-  let hdr = '<tr><th style="text-align:left">Bldg #</th><th style="text-align:left">Building Name</th><th>14-mo Total</th>';
-  months.forEach(m => { hdr += '<th>' + monthLabel(m) + '</th>'; });
+  let hdr = '<tr><th style="text-align:left">Bldg #</th><th style="text-align:left">Building Name</th><th>14-mo Total (' + unit + ')</th>';
+  months.forEach(m => { hdr += '<th>' + monthLabel(m) + ' (' + unit + ')</th>'; });
   hdr += '</tr>';
   thead.innerHTML = hdr;
 
