@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WSU Water Conservation Meeting Dashboard</title>
+<script src="chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #981e32;
+    --primary-dark: #7a1828;
+    --secondary: #5f6b6d;
+    --accent: #c69214;
+    --bg: #f5f5f5;
+    --card-bg: #fff;
+    --text: #2d2d2d;
+    --text-light: #6b7280;
+    --border: #e5e7eb;
+    --green: #059669;
+    --red: #dc2626;
+    --blue: #2563eb;
+    --table-head-bg: #f9fafb;
+    --table-hover: #f9fafb;
+    --total-row-bg: #f0f4ff;
+    --info-bg: #f0f9ff;
+    --info-border: #bae6fd;
+    --info-text: #0c4a6e;
+    --clr-domestic: #3b82f6;
+    --clr-irrigation: #22c55e;
+    --mini-row-border: #f3f4f6;
+  }
+  html.dark {
+    --bg: #111827;
+    --card-bg: #1f2937;
+    --text: #e5e7eb;
+    --text-light: #9ca3af;
+    --border: #374151;
+    --secondary: #9ca3af;
+    --green: #34d399;
+    --red: #f87171;
+    --table-head-bg: #1a2332;
+    --table-hover: #253347;
+    --total-row-bg: #1e293b;
+    --info-bg: #1e293b;
+    --info-border: #334155;
+    --info-text: #7dd3fc;
+    --mini-row-border: #253347;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; padding: 1.5rem 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .header-text { flex: 1; min-width: 0; }
+  .header-text h1 { font-size: 1.6rem; font-weight: 700; }
+  .header-text p { opacity: 0.85; font-size: 0.9rem; margin-top: 0.25rem; }
+  .header-actions { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+  .header-actions a {
+    color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.82rem;
+    padding: 0.4rem 0.8rem; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .header-actions a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .btn-icon {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25);
+    color: #fff; border-radius: 6px; padding: 0.4rem 0.6rem; cursor: pointer;
+    font-size: 1rem; transition: all 0.2s;
+  }
+  .btn-icon:hover { background: rgba(255,255,255,0.2); }
+  .btn-action {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+    color: #fff; border-radius: 6px; padding: 0.4rem 0.8rem; cursor: pointer;
+    font-size: 0.82rem; font-weight: 500; transition: all 0.2s;
+  }
+  .btn-action:hover { background: rgba(255,255,255,0.25); }
+  .container { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
+  /* Nav Tabs */
+  .nav-tabs {
+    display: flex; gap: 0.25rem; background: var(--card-bg); border-radius: 8px;
+    padding: 0.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto;
+  }
+  .nav-tab {
+    padding: 0.6rem 1.2rem; border: none; background: transparent; border-radius: 6px;
+    cursor: pointer; font-size: 0.85rem; font-weight: 500; color: var(--text-light);
+    white-space: nowrap; transition: all 0.2s;
+  }
+  .nav-tab:hover { background: var(--table-hover); color: var(--text); }
+  .nav-tab.active { background: var(--primary); color: #fff; }
+  /* KPI */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card {
+    background: var(--card-bg); border-radius: 10px; padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary);
+    cursor: pointer; transition: box-shadow 0.2s ease, transform 0.15s ease; position: relative;
+  }
+  .kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-2px); }
+  .kpi-label { font-size: 0.78rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.05em; }
+  .kpi-value { font-size: 1.8rem; font-weight: 700; margin: 0.25rem 0; }
+  .kpi-sub { font-size: 0.8rem; color: var(--text-light); }
+  .kpi-tooltip {
+    visibility: hidden; opacity: 0; position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); background: #1f2937; color: #fff; font-size: 0.75rem;
+    line-height: 1.4; padding: 0.5rem 0.75rem; border-radius: 6px; white-space: normal;
+    width: max-content; max-width: 260px; z-index: 100; pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .kpi-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #1f2937;
+  }
+  .kpi-card:hover .kpi-tooltip { visibility: visible; opacity: 1; }
+  .kpi-card.domestic { border-left-color: var(--clr-domestic); }
+  .kpi-card.irrigation { border-left-color: var(--clr-irrigation); }
+  .kpi-card.alert { border-left-color: var(--red); }
+  .kpi-card.task { border-left-color: var(--accent); }
+  /* Cards */
+  .card {
+    background: var(--card-bg); border-radius: 10px; padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem;
+  }
+  .card h2 {
+    font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--primary);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  html.dark .card h2 { color: var(--clr-domestic); }
+  .chart-container { position: relative; height: 350px; width: 100%; }
+  .chart-container.tall { height: 550px; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th {
+    background: var(--table-head-bg); padding: 0.6rem 0.75rem; text-align: right;
+    font-weight: 600; color: var(--secondary); border-bottom: 2px solid var(--border); white-space: nowrap;
+  }
+  thead th:first-child, thead th:nth-child(2) { text-align: left; }
+  tbody td { padding: 0.5rem 0.75rem; text-align: right; border-bottom: 1px solid var(--border); }
+  tbody td:first-child, tbody td:nth-child(2) { text-align: left; }
+  tbody tr:hover { background: var(--table-hover); }
+  tbody tr.total-row { font-weight: 700; background: var(--total-row-bg); border-top: 2px solid var(--primary); }
+  /* Sections */
+  .section { display: none; }
+  .section.active { display: block; }
+  /* Search */
+  .search-bar {
+    width: 100%; padding: 0.65rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+    background: var(--card-bg); color: var(--text); margin-bottom: 1rem;
+  }
+  .search-bar:focus { border-color: var(--primary); }
+  .search-bar::placeholder { color: var(--text-light); }
+  /* Filter buttons */
+  .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+  .filter-btn {
+    padding: 0.4rem 0.9rem; border: 1px solid var(--border); background: var(--card-bg);
+    border-radius: 6px; font-size: 0.82rem; cursor: pointer; color: var(--text); transition: all 0.2s;
+  }
+  .filter-btn:hover { border-color: var(--primary); }
+  .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  /* Status pills */
+  .status-pills { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .status-pill {
+    padding: 0.25rem 0.7rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;
+  }
+  .status-pill.open { background: #eff6ff; color: #1d4ed8; }
+  .status-pill.monitor { background: #fffbeb; color: #92400e; }
+  .status-pill.closed { background: #ecfdf5; color: #059669; }
+  html.dark .status-pill.open { background: #1e3a5f; color: #60a5fa; }
+  html.dark .status-pill.monitor { background: #78350f; color: #fbbf24; }
+  html.dark .status-pill.closed { background: #064e3b; color: #34d399; }
+  /* Anomaly table severity */
+  .severity-high { border-left: 3px solid var(--red); }
+  .severity-med { border-left: 3px solid #f59e0b; }
+  .severity-winter { border-left: 3px solid var(--clr-irrigation); }
+  /* Editable cells */
+  .editable { cursor: text; min-width: 80px; }
+  .editable:hover { background: rgba(152,30,50,0.05); border-radius: 4px; }
+  .editable:focus { outline: 2px solid var(--primary); border-radius: 4px; background: var(--card-bg); }
+  select.task-status {
+    padding: 0.25rem 0.4rem; border: 1px solid var(--border); border-radius: 4px;
+    font-size: 0.78rem; background: var(--card-bg); color: var(--text); cursor: pointer;
+  }
+  /* Buttons */
+  .btn-sm {
+    padding: 0.3rem 0.7rem; border: 1px solid var(--border); background: var(--card-bg);
+    border-radius: 6px; font-size: 0.78rem; cursor: pointer; color: var(--text); transition: all 0.2s;
+  }
+  .btn-sm:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-sm.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .btn-sm.primary:hover { background: var(--primary-dark); }
+  .btn-sm.danger { color: var(--red); }
+  .btn-sm.danger:hover { background: #fef2f2; border-color: var(--red); }
+  html.dark .btn-sm.danger:hover { background: #7f1d1d; }
+  /* Building cards */
+  .bldg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; }
+  .bldg-card {
+    background: var(--card-bg); border-radius: 10px; padding: 1rem 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary);
+    cursor: pointer; transition: box-shadow 0.2s, transform 0.15s;
+  }
+  .bldg-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-2px); }
+  .bldg-card.has-tasks { border-left-color: var(--accent); }
+  .bldg-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .bldg-card .bldg-no { font-size: 0.78rem; color: var(--text-light); }
+  .bldg-badges { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  .badge {
+    font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600;
+    color: #fff;
+  }
+  .badge.domestic { background: var(--clr-domestic); }
+  .badge.irrigation { background: var(--clr-irrigation); }
+  .badge.tasks { background: var(--accent); }
+  .bldg-detail {
+    max-height: 0; overflow: hidden; transition: max-height 0.35s ease;
+    margin-top: 0; font-size: 0.82rem;
+  }
+  .bldg-card.expanded .bldg-detail { max-height: 600px; margin-top: 0.75rem; overflow: auto; }
+  .bldg-detail table { font-size: 0.78rem; }
+  /* Info box */
+  .info-box {
+    background: var(--info-bg); border: 1px solid var(--info-border); border-radius: 8px;
+    padding: 1rem 1.25rem; font-size: 0.82rem; color: var(--info-text); margin-bottom: 1rem;
+  }
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal-card {
+    background: var(--card-bg); border-radius: 12px; padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2); width: 100%; max-width: 560px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-card h2 { font-size: 1.1rem; margin-bottom: 1rem; color: var(--primary); }
+  html.dark .modal-card h2 { color: var(--clr-domestic); }
+  .modal-card label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--text-light); }
+  .modal-card input, .modal-card select, .modal-card textarea {
+    width: 100%; padding: 0.6rem 0.8rem; border: 2px solid var(--border); border-radius: 6px;
+    font-size: 0.88rem; margin-bottom: 0.75rem; background: var(--card-bg); color: var(--text);
+    font-family: inherit; outline: none; transition: border-color 0.2s;
+  }
+  .modal-card input:focus, .modal-card select:focus, .modal-card textarea:focus { border-color: var(--primary); }
+  .modal-card textarea { resize: vertical; min-height: 80px; }
+  .modal-card .modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem; }
+  .modal-actions button { padding: 0.6rem 1.2rem; border-radius: 6px; font-size: 0.88rem; cursor: pointer; font-weight: 600; }
+  .modal-actions .btn-cancel { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .modal-actions .btn-save { background: var(--primary); border: none; color: #fff; }
+  .modal-actions .btn-save:hover { background: var(--primary-dark); }
+  /* Import summary */
+  .import-summary {
+    background: var(--info-bg); border: 1px solid var(--info-border); border-radius: 8px;
+    padding: 0.75rem 1rem; font-size: 0.82rem; color: var(--info-text); margin-bottom: 1rem;
+  }
+  .import-summary.hidden { display: none; }
+  /* Loading */
+  #loading {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; z-index: 9999;
+    flex-direction: column; gap: 1rem;
+  }
+  .spinner {
+    width: 40px; height: 40px; border: 4px solid var(--border);
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Auth Gate */
+  #authGate {
+    position: fixed; inset: 0; z-index: 99999; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+  }
+  #authGate .auth-header {
+    position: absolute; top: 0; left: 0; right: 0;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; padding: 1.5rem 2rem; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  #authGate .auth-header h1 { font-size: 1.4rem; font-weight: 700; }
+  #authGate .auth-header p { opacity: 0.85; font-size: 0.85rem; margin-top: 0.25rem; }
+  #authGate .auth-card {
+    background: var(--card-bg); border-radius: 12px; padding: 2.5rem 2rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1); text-align: center;
+    width: 100%; max-width: 380px; margin-top: 60px;
+  }
+  #authGate .auth-card h2 { font-size: 1.1rem; color: var(--text); margin-bottom: 0.5rem; }
+  #authGate .auth-card p { font-size: 0.82rem; color: var(--text-light); margin-bottom: 1.5rem; }
+  #authGate .auth-input {
+    width: 100%; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+    background: var(--card-bg); color: var(--text);
+  }
+  #authGate .auth-input:focus { border-color: var(--primary); }
+  #authGate .auth-btn {
+    width: 100%; padding: 0.75rem; margin-top: 1rem; border: none; border-radius: 8px;
+    background: var(--primary); color: #fff; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  #authGate .auth-btn:hover { background: var(--primary-dark); }
+  #authGate .auth-error { color: var(--red); font-size: 0.8rem; margin-top: 0.75rem; min-height: 1.2rem; }
+  html.dark #authGate .auth-input { background: var(--bg); color: var(--text); border-color: var(--border); }
+  /* Footer */
+  footer {
+    text-align: center; padding: 1.5rem; color: var(--text-light); font-size: 0.78rem;
+    border-top: 1px solid var(--border); margin-top: 2rem;
+  }
+  footer a { color: var(--primary); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  /* Print */
+  @media print {
+    @page { size: landscape; margin: 0.5in; }
+    * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+    body { background: #fff !important; }
+    html.dark { --bg:#f5f5f5; --card-bg:#fff; --text:#2d2d2d; --text-light:#6b7280; --border:#e5e7eb; }
+    header, #authGate, #loading, .nav-tabs, .header-actions, .btn-icon, .modal-overlay { display: none !important; }
+    .section { display: none !important; }
+    #printSummary { display: block !important; }
+    .card { box-shadow: none; border: 1px solid #e5e7eb; }
+    .no-print { display: none !important; }
+  }
+  #printSummary { display: none; }
+  #printSummary h1 { font-size: 1.3rem; margin-bottom: 0.5rem; color: var(--primary); }
+  #printSummary h2 { font-size: 1rem; margin: 1rem 0 0.5rem; color: var(--primary); }
+  #printSummary .print-meta { font-size: 0.82rem; color: var(--text-light); margin-bottom: 1rem; }
+  #printSummary table { font-size: 0.78rem; }
+  #printSummary .sig-line { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 0.5rem; font-size: 0.82rem; color: var(--text-light); }
+</style>
+</head>
+<body>
+
+<!-- Auth Gate -->
+<div id="authGate">
+  <div class="auth-header">
+    <h1>WSU Water Conservation</h1>
+    <p>Water Conservation Meeting Dashboard &bull; WSU Facilities Services</p>
+  </div>
+  <div class="auth-card">
+    <h2>Restricted Access</h2>
+    <p>Enter the dashboard password to continue.</p>
+    <input type="password" class="auth-input" id="authInput" placeholder="Password" autocomplete="off">
+    <button class="auth-btn" id="authBtn">Sign In</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="color:var(--text-light); font-size:0.9rem;">Loading water data...</div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="header-text">
+    <h1>Water Conservation Meeting Dashboard</h1>
+    <p>Anomaly Review &amp; Task Tracking &bull; WSU Facilities Services</p>
+  </div>
+  <div class="header-actions">
+    <a href="metering.html">Campus Metering</a>
+    <a href="index.html">Energy Cost Projection</a>
+    <button class="btn-icon" id="darkToggle" title="Toggle dark mode">&#9790;</button>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Nav Tabs -->
+  <div class="nav-tabs" id="navTabs">
+    <button class="nav-tab active" data-tab="anomalies">Anomaly Review</button>
+    <button class="nav-tab" data-tab="tasks">Task Tracker</button>
+    <button class="nav-tab" data-tab="trends">Historical Trends</button>
+    <button class="nav-tab" data-tab="buildings">Building Index</button>
+  </div>
+
+  <!-- ==================== ANOMALY REVIEW TAB ==================== -->
+  <div class="section active" id="sec-anomalies">
+    <div class="kpi-grid" id="kpiAnomalies"></div>
+    <div class="card">
+      <h2>Detected Anomalies</h2>
+      <div class="info-box">
+        Spike anomalies flag buildings where a month's usage exceeds 100% above its neighbor-month average.
+        Winter irrigation flags any irrigation usage during Nov&ndash;Feb when systems should be off.
+      </div>
+      <div style="margin-bottom:1rem;">
+        <button class="btn-sm primary" id="btnCreateAll">Create Tasks for All New Anomalies</button>
+      </div>
+      <div class="table-wrap">
+        <table id="tblAnomalies">
+          <thead>
+            <tr>
+              <th style="text-align:left">Bldg #</th>
+              <th style="text-align:left">Building Name</th>
+              <th style="text-align:left">Type</th>
+              <th style="text-align:left">Service</th>
+              <th>Month</th>
+              <th>Usage (kGal)</th>
+              <th>Baseline (kGal)</th>
+              <th>Deviation</th>
+              <th style="text-align:center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="anomalyBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TASK TRACKER TAB ==================== -->
+  <div class="section" id="sec-tasks">
+    <div class="filter-bar" id="taskFilterBar">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="Open - Not Started">Not Started</button>
+      <button class="filter-btn" data-filter="Open - In Progress">In Progress</button>
+      <button class="filter-btn" data-filter="Open - Monitor">Monitor</button>
+      <button class="filter-btn" data-filter="Closed - Resolved">Resolved</button>
+      <button class="filter-btn" data-filter="Closed - Not Resolved">Not Resolved</button>
+      <div style="flex:1"></div>
+      <button class="btn-sm" id="btnImport">Import from Smartsheet</button>
+      <button class="btn-sm primary" id="btnExport">Export to Smartsheet</button>
+      <input type="file" id="importFile" accept=".csv" style="display:none">
+    </div>
+    <div id="importSummary" class="import-summary hidden"></div>
+    <div class="status-pills" id="statusPills"></div>
+    <input type="text" class="search-bar" id="searchTasks" placeholder="Search tasks by building, meter, assignee, or description...">
+    <div class="card">
+      <div class="table-wrap">
+        <table id="tblTasks">
+          <thead>
+            <tr>
+              <th style="text-align:left">Issue ID</th>
+              <th style="text-align:left">Bldg #</th>
+              <th style="text-align:left">Building Name</th>
+              <th style="text-align:left">Service</th>
+              <th style="text-align:left">Status</th>
+              <th style="text-align:left">Assigned To</th>
+              <th style="text-align:left">Description</th>
+              <th style="text-align:left">Action Note</th>
+              <th>Entry Date</th>
+              <th style="text-align:left">WO#</th>
+              <th style="text-align:center">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="taskBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== HISTORICAL TRENDS TAB ==================== -->
+  <div class="section" id="sec-trends">
+    <div class="card">
+      <h2>Campus Domestic Water Trend (kGal)</h2>
+      <div class="chart-container"><canvas id="chartDomTrend"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Campus Irrigation Trend (kGal)</h2>
+      <div class="chart-container"><canvas id="chartIrrigTrend"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Top 10 Buildings by Total Water (kGal)</h2>
+      <div class="chart-container tall"><canvas id="chartTopWater"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ==================== BUILDING INDEX TAB ==================== -->
+  <div class="section" id="sec-buildings">
+    <input type="text" class="search-bar" id="searchBldg" placeholder="Search by building name or number...">
+    <div class="bldg-grid" id="bldgGrid"></div>
+  </div>
+</div>
+
+<!-- Print Summary -->
+<div id="printSummary">
+  <h1>WSU Water Conservation Meeting Minutes</h1>
+  <div class="print-meta" id="printMeta"></div>
+  <h2>Anomalies Reviewed</h2>
+  <div id="printAnomalies"></div>
+  <h2>Open Tasks</h2>
+  <div id="printTasks"></div>
+  <div class="sig-line">
+    Next Meeting Date: _________________________ &nbsp;&nbsp;&nbsp; Notes: _________________________
+  </div>
+</div>
+
+<!-- Task Create/Edit Modal -->
+<div class="modal-overlay hidden" id="taskModal">
+  <div class="modal-card">
+    <h2 id="modalTitle">Create Task</h2>
+    <input type="hidden" id="modalTaskId">
+    <div class="modal-row">
+      <div>
+        <label>Building Number</label>
+        <input type="text" id="modalBldgNo" readonly>
+      </div>
+      <div>
+        <label>Building Name</label>
+        <input type="text" id="modalBldgName" readonly>
+      </div>
+    </div>
+    <div class="modal-row">
+      <div>
+        <label>Utility Type</label>
+        <input type="text" id="modalService" readonly>
+      </div>
+      <div>
+        <label>MeterID</label>
+        <input type="text" id="modalMeter" readonly>
+      </div>
+    </div>
+    <div class="modal-row">
+      <div>
+        <label>Status</label>
+        <select id="modalStatus">
+          <option value="Open - Not Started">Open - Not Started</option>
+          <option value="Open - In Progress">Open - In Progress</option>
+          <option value="Open - Monitor">Open - Monitor</option>
+          <option value="Closed - Resolved">Closed - Resolved</option>
+          <option value="Closed - Not Resolved">Closed - Not Resolved</option>
+        </select>
+      </div>
+      <div>
+        <label>WO#</label>
+        <input type="text" id="modalWO" placeholder="NA">
+      </div>
+    </div>
+    <label>Assigned To</label>
+    <input type="text" id="modalAssigned" placeholder="Name(s), comma-separated">
+    <label>Action / Description</label>
+    <textarea id="modalDesc" placeholder="Original issue description..."></textarea>
+    <label>Action Note</label>
+    <textarea id="modalNote" placeholder="Ongoing updates, resolution notes..."></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modalCancel">Cancel</button>
+      <button class="btn-save" id="modalSave">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  WSU Facilities Services &bull; Water Conservation Dashboard &bull;
+  <a href="metering.html">Campus Metering</a> &bull;
+  <a href="index.html">Energy Cost Projection</a>
+</footer>
+
+<script>
+// ============================================================
+//  AUTH GATE
+// ============================================================
+(function() {
+  const gate = document.getElementById('authGate');
+  const input = document.getElementById('authInput');
+  const btn = document.getElementById('authBtn');
+  const err = document.getElementById('authError');
+  if (localStorage.getItem('wsuMeteringAuth') === 'ok') {
+    gate.style.display = 'none';
+  }
+  function tryAuth() {
+    if (input.value === 'Energy@WSU') {
+      localStorage.setItem('wsuMeteringAuth', 'ok');
+      gate.style.display = 'none';
+      err.textContent = '';
+    } else {
+      err.textContent = 'Incorrect password. Please try again.';
+      input.value = '';
+      input.focus();
+    }
+  }
+  btn.addEventListener('click', tryAuth);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+})();
+
+// ============================================================
+//  DARK MODE
+// ============================================================
+(function() {
+  if (localStorage.getItem('wsuDarkMode') === 'on') {
+    document.documentElement.classList.add('dark');
+  }
+  document.getElementById('darkToggle').addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('wsuDarkMode', document.documentElement.classList.contains('dark') ? 'on' : 'off');
+    applyChartTheme();
+    chartInstances.forEach(c => { c.options.color = Chart.defaults.color; c.update(); });
+  });
+})();
+
+// ============================================================
+//  TAB NAVIGATION
+// ============================================================
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ============================================================
+//  GLOBALS
+// ============================================================
+const chartInstances = [];
+const COLORS = { domestic: '#3b82f6', irrigation: '#22c55e' };
+const STORAGE_KEY = 'wsu_water_tasks';
+const ID_COUNTER_KEY = 'wsu_water_task_counter';
+const WINTER_MONTHS = [11, 12, 1, 2];
+const STATUSES = ['Open - Not Started', 'Open - In Progress', 'Open - Monitor', 'Closed - Resolved', 'Closed - Not Resolved'];
+
+// Global data references (set during init)
+let G_anomalies = [];
+let G_domByBldg = {};
+let G_irrigByBldg = {};
+let G_months = [];
+let G_monthLabels = [];
+
+function applyChartTheme() {
+  const dark = document.documentElement.classList.contains('dark');
+  Chart.defaults.color = dark ? '#9ca3af' : '#6b7280';
+  Chart.defaults.borderColor = dark ? '#374151' : '#e5e7eb';
+}
+applyChartTheme();
+
+// ============================================================
+//  CHART.JS ANOMALY CALLOUT PLUGIN (hover-activated)
+// ============================================================
+const anomalyCalloutPlugin = {
+  id: 'anomalyCallout',
+  afterEvent: function(chart, args) {
+    const pluginOpts = chart.options.plugins.anomalyCallout;
+    if (!pluginOpts || !pluginOpts.items || pluginOpts.items.length === 0) return;
+    const evt = args.event;
+    if (evt.type !== 'mousemove' && evt.type !== 'mouseout') return;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+    var prev = chart._anomalyHover || null;
+    var next = null;
+    if (evt.type === 'mousemove') {
+      var mx = evt.x, my = evt.y;
+      var bestDist = 18;
+      pluginOpts.items.forEach(function(group, dsIdx) {
+        if (!group || group.length === 0) return;
+        group.forEach(function(a) {
+          var px = xScale.getPixelForValue(a.index);
+          var py = yScale.getPixelForValue(a.value);
+          var d = Math.sqrt((mx - px) * (mx - px) + (my - py) * (my - py));
+          if (d < bestDist) { bestDist = d; next = { dsIdx: dsIdx, index: a.index }; }
+        });
+      });
+    }
+    var changed = (!prev && next) || (prev && !next) || (prev && next && (prev.dsIdx !== next.dsIdx || prev.index !== next.index));
+    if (changed) { chart._anomalyHover = next; chart.draw(); }
+  },
+  afterDatasetsDraw: function(chart) {
+    const pluginOpts = chart.options.plugins.anomalyCallout;
+    if (!pluginOpts || !pluginOpts.items || pluginOpts.items.length === 0) return;
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+    const dark = document.documentElement.classList.contains('dark');
+    const hover = chart._anomalyHover || null;
+    pluginOpts.items.forEach(function(group, dsIdx) {
+      if (!group || group.length === 0) return;
+      var color = pluginOpts.colors && pluginOpts.colors[dsIdx] ? pluginOpts.colors[dsIdx] : '#dc2626';
+      group.forEach(function(a) {
+        var x = xScale.getPixelForValue(a.index);
+        var y = yScale.getPixelForValue(a.value);
+        var isHovered = hover && hover.dsIdx === dsIdx && hover.index === a.index;
+        ctx.save();
+        ctx.globalAlpha = isHovered ? 1.0 : 0.7;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 7); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 6, y);
+        ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 1.0;
+        if (isHovered) {
+          var hasDriver = a.driver && a.driver.length > 0;
+          ctx.font = 'bold 10px -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          var line1 = a.label;
+          var line2 = hasDriver ? 'Driven by ' + a.driver : '';
+          var w1 = ctx.measureText(line1).width;
+          ctx.font = '9px -apple-system, sans-serif';
+          var w2 = hasDriver ? ctx.measureText(line2).width : 0;
+          var boxW = Math.max(w1, w2) + 12;
+          var boxH = hasDriver ? 30 : 18;
+          var labelY = y - 22 - (hasDriver ? 8 : 0);
+          if (labelY < 10) labelY = y + 22;
+          ctx.fillStyle = dark ? 'rgba(31,41,55,0.92)' : 'rgba(255,255,255,0.95)';
+          ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+          var rx = x - boxW/2, ry = labelY - boxH/2, rr = 4;
+          ctx.beginPath();
+          if (ctx.roundRect) { ctx.roundRect(rx, ry, boxW, boxH, rr); }
+          else { ctx.moveTo(rx+rr,ry); ctx.arcTo(rx+boxW,ry,rx+boxW,ry+boxH,rr); ctx.arcTo(rx+boxW,ry+boxH,rx,ry+boxH,rr); ctx.arcTo(rx,ry+boxH,rx,ry,rr); ctx.arcTo(rx,ry,rx+boxW,ry,rr); ctx.closePath(); }
+          ctx.fill(); ctx.stroke();
+          ctx.font = 'bold 10px -apple-system, sans-serif';
+          ctx.fillStyle = color;
+          ctx.fillText(line1, x, hasDriver ? labelY - 2 : labelY + 4);
+          if (hasDriver) {
+            ctx.font = '9px -apple-system, sans-serif';
+            ctx.fillStyle = dark ? '#d1d5db' : '#4b5563';
+            ctx.fillText(line2, x, labelY + 11);
+          }
+          ctx.strokeStyle = color; ctx.lineWidth = 1;
+          ctx.setLineDash([2, 2]);
+          ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x, ry + boxH); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
+      });
+    });
+  }
+};
+Chart.register(anomalyCalloutPlugin);
+
+// ============================================================
+//  UTILITIES
+// ============================================================
+function fmt(n, dec) {
+  if (n == null || isNaN(n)) return '0';
+  dec = dec ?? 0;
+  return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+function parseMonthKey(startDate) {
+  if (!startDate) return '';
+  const parts = startDate.split('-');
+  if (parts.length === 3) return parts[2] + '-' + parts[0];
+  return startDate;
+}
+
+function monthLabel(key) {
+  const [y, m] = key.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(m, 10) - 1] + ' ' + y.slice(2);
+}
+
+function galToKgal(g) { return (g || 0) / 1000; }
+function bldgLabel(b) { return b.bldgNo + (b.bldgName ? ' - ' + b.bldgName : ''); }
+
+function isWinterMonth(monthKey) {
+  if (!monthKey) return false;
+  const m = parseInt(monthKey.split('-')[1], 10);
+  return WINTER_MONTHS.includes(m);
+}
+
+function todayStr() {
+  return new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+}
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ============================================================
+//  DATA LOADING & AGGREGATION
+// ============================================================
+async function loadJSON(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('Failed to load ' + url);
+  const data = await resp.json();
+  return data.rows || [];
+}
+
+function aggregateByBuilding(rows, convertFn) {
+  const map = {};
+  rows.forEach(r => {
+    const key = r.bldgNo || 'Unknown';
+    if (!map[key]) map[key] = { bldgNo: key, bldgName: r.bldgName || '', meters: r.meters || '', total: 0, months: {} };
+    const mk = parseMonthKey(r.startDate);
+    const raw = typeof r.usage === 'number' && isFinite(r.usage) ? r.usage : 0;
+    const val = convertFn(raw);
+    map[key].total += val;
+    map[key].months[mk] = (map[key].months[mk] || 0) + val;
+  });
+  return map;
+}
+
+function aggregateByMonth(rows, convertFn) {
+  const map = {};
+  rows.forEach(r => {
+    const mk = parseMonthKey(r.startDate);
+    if (!mk) return;
+    const raw = typeof r.usage === 'number' && isFinite(r.usage) ? r.usage : 0;
+    map[mk] = (map[mk] || 0) + convertFn(raw);
+  });
+  return map;
+}
+
+function getSortedMonths(domestic, irrigation) {
+  const all = new Set();
+  [domestic, irrigation].forEach(arr => {
+    arr.forEach(r => { const mk = parseMonthKey(r.startDate); if (mk) all.add(mk); });
+  });
+  return [...all].sort();
+}
+
+// ============================================================
+//  CHART FACTORY
+// ============================================================
+function createChart(canvasId, config) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  const c = new Chart(ctx, config);
+  chartInstances.push(c);
+  return c;
+}
+
+function barChart(canvasId, labels, datasets, opts) {
+  return createChart(canvasId, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: opts?.horizontal ? 'y' : 'x',
+      plugins: {
+        legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed[opts?.horizontal ? 'x' : 'y'], 1) } }
+      },
+      scales: {
+        x: {
+          stacked: opts?.stacked,
+          grid: { display: !opts?.horizontal },
+          beginAtZero: opts?.horizontal || false,
+          ...(opts?.horizontal ? {
+            ticks: { callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'k' : v }
+          } : {})
+        },
+        y: {
+          stacked: opts?.stacked,
+          beginAtZero: !opts?.horizontal,
+          ...(!opts?.horizontal ? {
+            ticks: { callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'k' : v }
+          } : {
+            ticks: { autoSkip: false, font: { size: 11 } }
+          })
+        }
+      }
+    }
+  });
+}
+
+function lineChart(canvasId, labels, datasets, anomalies) {
+  const anomalyOpts = anomalies ? {
+    items: anomalies,
+    colors: datasets.map(d => d.borderColor || '#dc2626')
+  } : { items: [] };
+  return createChart(canvasId, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 1) } },
+        anomalyCallout: anomalyOpts
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true,
+          ticks: { callback: v => v >= 1000000 ? (v/1000000).toFixed(1) + 'M' : v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }
+        }
+      },
+      elements: { point: { radius: 3, hoverRadius: 5 }, line: { tension: 0.3 } }
+    }
+  });
+}
+
+// ============================================================
+//  ANOMALY DETECTION
+// ============================================================
+
+// Building-level spike detection
+function detectBuildingAnomalies(byBldg, monthKeys, service) {
+  const anomalies = [];
+  Object.values(byBldg).forEach(b => {
+    const vals = monthKeys.map(mk => b.months[mk] || 0);
+    for (let i = 1; i < vals.length - 1; i++) {
+      const val = vals[i];
+      if (!val || val === 0) continue;
+      const neighbors = [vals[i-1], vals[i+1]].filter(v => v && v > 0);
+      if (neighbors.length === 0) continue;
+      const avg = neighbors.reduce((s,v) => s + v, 0) / neighbors.length;
+      if (avg === 0) continue;
+      const pctDev = (val - avg) / avg;
+      if (pctDev > 1.0) { // >100% deviation
+        anomalies.push({
+          bldgNo: b.bldgNo,
+          bldgName: b.bldgName,
+          service: service,
+          meter: b.meters || '',
+          month: monthKeys[i],
+          usage: val,
+          baseline: avg,
+          deviation: Math.round(pctDev * 100),
+          type: 'spike'
+        });
+      }
+    }
+  });
+  return anomalies;
+}
+
+// Winter irrigation detection
+function detectWinterIrrigation(byBldg, monthKeys) {
+  const anomalies = [];
+  Object.values(byBldg).forEach(b => {
+    monthKeys.forEach(mk => {
+      if (!isWinterMonth(mk)) return;
+      const val = b.months[mk] || 0;
+      if (val > 0) {
+        anomalies.push({
+          bldgNo: b.bldgNo,
+          bldgName: b.bldgName,
+          service: 'Irrigation Water',
+          meter: b.meters || '',
+          month: mk,
+          usage: val,
+          baseline: 0,
+          deviation: null,
+          type: 'winter_irrigation'
+        });
+      }
+    });
+  });
+  return anomalies;
+}
+
+// Campus-level anomaly detection for chart markers (reuses metering pattern)
+function detectCampusAnomalies(campusData, monthKeys, byBldg) {
+  const threshold = 1.0;
+  var anomalies = [];
+  for (var i = 1; i < campusData.length - 1; i++) {
+    var val = campusData[i];
+    if (!val || val === 0) continue;
+    var neighbors = [campusData[i-1], campusData[i+1]].filter(v => v && v > 0);
+    if (neighbors.length === 0) continue;
+    var avg = neighbors.reduce((s,v) => s + v, 0) / neighbors.length;
+    if (avg === 0) continue;
+    var pctDev = (val - avg) / avg;
+    if (pctDev > threshold) {
+      var mk = monthKeys[i];
+      var drivers = [];
+      Object.values(byBldg).forEach(b => {
+        var bVal = b.months[mk] || 0;
+        var bPrev = b.months[monthKeys[i-1]] || 0;
+        var bNext = b.months[monthKeys[i+1]] || 0;
+        var bNeighbors = [bPrev, bNext].filter(v => v > 0);
+        if (bNeighbors.length === 0 || bVal === 0) return;
+        var bAvg = bNeighbors.reduce((s,v) => s + v, 0) / bNeighbors.length;
+        var delta = bVal - bAvg;
+        if (delta > 0) drivers.push({ bldgNo: b.bldgNo, bldgName: b.bldgName, delta });
+      });
+      drivers.sort((a,b) => b.delta - a.delta);
+      var topDriver = drivers.length > 0 ? drivers[0] : null;
+      var driverLabel = topDriver ? (topDriver.bldgNo + (topDriver.bldgName ? ' ' + topDriver.bldgName : '')) : '';
+      anomalies.push({
+        index: i, value: val, expected: avg, pctDev,
+        label: '+' + Math.round(pctDev * 100) + '% vs avg',
+        driver: driverLabel
+      });
+    }
+  }
+  return anomalies;
+}
+
+// ============================================================
+//  TASK MANAGEMENT (localStorage)
+// ============================================================
+function loadTasks() {
+  try {
+    const json = localStorage.getItem(STORAGE_KEY);
+    return json ? JSON.parse(json) : [];
+  } catch (e) { return []; }
+}
+
+function saveTasks(tasks) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+}
+
+function getNextIssueId() {
+  const year = new Date().getFullYear();
+  let counter = parseInt(localStorage.getItem(ID_COUNTER_KEY) || '0', 10);
+  counter++;
+  localStorage.setItem(ID_COUNTER_KEY, String(counter));
+  return 'WC-' + year + '-' + String(counter).padStart(3, '0');
+}
+
+function createTask(anomaly, opts) {
+  opts = opts || {};
+  const tasks = loadTasks();
+  const task = {
+    issueId: getNextIssueId(),
+    entryDate: todayStr(),
+    status: opts.status || 'Open - Not Started',
+    wo: opts.wo || 'NA',
+    actionNote: opts.actionNote || '',
+    service: anomaly.service || '',
+    bldgNo: anomaly.bldgNo || '',
+    meterId: anomaly.meter || '',
+    bldgName: anomaly.bldgName || '',
+    description: opts.description || buildDefaultDescription(anomaly),
+    assignedTo: opts.assignedTo || ''
+  };
+  tasks.push(task);
+  saveTasks(tasks);
+  return task;
+}
+
+function buildDefaultDescription(anomaly) {
+  if (anomaly.type === 'spike') {
+    return monthLabel(anomaly.month) + ': ' + fmt(anomaly.usage, 1) + ' kGal (' +
+      '+' + anomaly.deviation + '% vs ' + fmt(anomaly.baseline, 1) + ' kGal baseline). Investigate cause.';
+  }
+  if (anomaly.type === 'winter_irrigation') {
+    return monthLabel(anomaly.month) + ': ' + fmt(anomaly.usage, 1) +
+      ' kGal irrigation usage during winter. Should be zero. Check meter/system.';
+  }
+  return '';
+}
+
+function updateTask(issueId, updates) {
+  const tasks = loadTasks();
+  const idx = tasks.findIndex(t => t.issueId === issueId);
+  if (idx < 0) return null;
+  Object.assign(tasks[idx], updates);
+  saveTasks(tasks);
+  return tasks[idx];
+}
+
+function deleteTask(issueId) {
+  const tasks = loadTasks();
+  saveTasks(tasks.filter(t => t.issueId !== issueId));
+}
+
+function findTaskForAnomaly(anomaly, tasks) {
+  return tasks.find(t =>
+    t.bldgNo === anomaly.bldgNo &&
+    t.service === anomaly.service &&
+    (t.description || '').indexOf(monthLabel(anomaly.month)) >= 0 &&
+    !t.status.startsWith('Closed')
+  );
+}
+
+function getTaskStats(tasks) {
+  const stats = {};
+  STATUSES.forEach(s => { stats[s] = 0; });
+  tasks.forEach(t => { if (stats[t.status] !== undefined) stats[t.status]++; });
+  return stats;
+}
+
+// ============================================================
+//  SMARTSHEET CSV IMPORT / EXPORT
+// ============================================================
+function autoCorrectBldgNo(bldgNo, meterId) {
+  if (!meterId) return bldgNo;
+  // Extract building number prefix from meterId
+  // Patterns: 0078_DW_001, 0180ADW_001, 0003BIR_001, 0812SDW_001
+  const match = meterId.match(/^(\d{4}[A-Z]?)(?:_?(?:DW|IR|CIR))/i);
+  if (match) {
+    const extracted = match[1];
+    if (extracted && extracted !== bldgNo) return extracted;
+  }
+  return bldgNo;
+}
+
+function parseCSV(text) {
+  const rows = [];
+  const lines = text.split('\n');
+  if (lines.length < 2) return rows;
+  // Parse header
+  const headers = parseCSVLine(lines[0]);
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const cells = parseCSVLine(line);
+    const row = {};
+    headers.forEach((h, j) => { row[h.trim()] = (cells[j] || '').trim(); });
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseCSVLine(line) {
+  const cells = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i+1] === '"') { current += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') inQuotes = true;
+      else if (ch === ',') { cells.push(current); current = ''; }
+      else current += ch;
+    }
+  }
+  cells.push(current);
+  return cells;
+}
+
+function importSmartsheetCSV(text) {
+  const rows = parseCSV(text);
+  const tasks = loadTasks();
+  let updated = 0, created = 0, unchanged = 0;
+
+  rows.forEach(r => {
+    // Skip empty rows
+    if (!r['Building Number'] && !r['MeterID'] && !r['Building Name']) return;
+
+    const bldgNo = autoCorrectBldgNo(r['Building Number'] || '', r['MeterID'] || '');
+    const issueId = r['Issue ID'] || '';
+
+    // Try to match by Issue ID first
+    let existing = issueId ? tasks.find(t => t.issueId === issueId) : null;
+
+    // Fallback: match by building + meter + entry date
+    if (!existing) {
+      existing = tasks.find(t =>
+        t.bldgNo === bldgNo &&
+        t.meterId === (r['MeterID'] || '') &&
+        t.entryDate === (r['Entry Date'] || '')
+      );
+    }
+
+    if (existing) {
+      // Update from Smartsheet
+      const changed =
+        existing.status !== (r['Status'] || existing.status) ||
+        existing.wo !== (r['WO#'] || existing.wo) ||
+        existing.actionNote !== (r['Action Note'] || existing.actionNote) ||
+        existing.assignedTo !== (r['Assigned To'] || existing.assignedTo);
+
+      if (changed) {
+        existing.status = r['Status'] || existing.status;
+        existing.wo = r['WO#'] || existing.wo;
+        existing.actionNote = r['Action Note'] || existing.actionNote;
+        existing.assignedTo = r['Assigned To'] || existing.assignedTo;
+        if (r['Building Name']) existing.bldgName = r['Building Name'];
+        updated++;
+      } else {
+        unchanged++;
+      }
+    } else {
+      // Create new task
+      tasks.push({
+        issueId: issueId || getNextIssueId(),
+        entryDate: r['Entry Date'] || todayStr(),
+        status: r['Status'] || 'Open - Not Started',
+        wo: r['WO#'] || 'NA',
+        actionNote: r['Action Note'] || '',
+        service: r['Utility Type'] || '',
+        bldgNo: bldgNo,
+        meterId: r['MeterID'] || '',
+        bldgName: r['Building Name'] || '',
+        description: r['Action / Description'] || '',
+        assignedTo: r['Assigned To'] || ''
+      });
+      created++;
+    }
+  });
+
+  saveTasks(tasks);
+  return { total: rows.length, updated, created, unchanged };
+}
+
+function exportSmartsheetCSV() {
+  const tasks = loadTasks();
+  const headers = ['Issue ID','Entry Date','Status','WO#','Action Note','Utility Type','Building Number','MeterID','Building Name','Action / Description','Assigned To'];
+  let csv = headers.join(',') + '\n';
+  tasks.forEach(t => {
+    const row = [
+      csvCell(t.issueId),
+      csvCell(t.entryDate),
+      csvCell(t.status),
+      csvCell(t.wo),
+      csvCell(t.actionNote),
+      csvCell(t.service),
+      csvCell(t.bldgNo),
+      csvCell(t.meterId),
+      csvCell(t.bldgName),
+      csvCell(t.description),
+      csvCell(t.assignedTo)
+    ];
+    csv += row.join(',') + '\n';
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'water_conservation_tasks_' + todayISO() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(val) {
+  val = String(val || '');
+  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+    return '"' + val.replace(/"/g, '""') + '"';
+  }
+  return val;
+}
+
+// ============================================================
+//  RENDER: KPI CARDS
+// ============================================================
+function renderKPIs(containerId, cards) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = cards.map(c =>
+    `<div class="kpi-card ${c.cls || ''}">
+      ${c.tooltip ? '<span class="kpi-tooltip">' + c.tooltip + '</span>' : ''}
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}</div>
+      <div class="kpi-sub">${c.sub || ''}</div>
+    </div>`
+  ).join('');
+}
+
+// ============================================================
+//  RENDER: ANOMALY REVIEW TAB
+// ============================================================
+function renderAnomalyTab() {
+  const tasks = loadTasks();
+
+  // KPI cards
+  const spikes = G_anomalies.filter(a => a.type === 'spike');
+  const winter = G_anomalies.filter(a => a.type === 'winter_irrigation');
+  const openTasks = tasks.filter(t => t.status.startsWith('Open'));
+  renderKPIs('kpiAnomalies', [
+    { label: 'Domestic Spike Anomalies', value: spikes.filter(a => a.service === 'Domestic Water').length, cls: 'domestic',
+      tooltip: 'Buildings with >100% usage increase vs neighbor months', sub: 'Domestic Water' },
+    { label: 'Irrigation Spike Anomalies', value: spikes.filter(a => a.service === 'Irrigation Water').length, cls: 'irrigation',
+      tooltip: 'Irrigation meters with >100% usage increase vs neighbor months', sub: 'Irrigation Water' },
+    { label: 'Winter Irrigation Alerts', value: winter.length, cls: 'alert',
+      tooltip: 'Irrigation usage detected Nov-Feb when systems should be off', sub: 'Nov - Feb' },
+    { label: 'Open Tasks', value: openTasks.length, cls: 'task',
+      tooltip: 'Tasks with Open status (Not Started, In Progress, Monitor)', sub: tasks.length + ' total tasks' }
+  ]);
+
+  // Anomaly table
+  const tbody = document.getElementById('anomalyBody');
+  if (G_anomalies.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-light);padding:2rem;">No anomalies detected in current data.</td></tr>';
+    return;
+  }
+
+  // Sort: spikes by deviation desc, then winter by usage desc
+  const sorted = [...G_anomalies].sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'spike' ? -1 : 1;
+    if (a.type === 'spike') return (b.deviation || 0) - (a.deviation || 0);
+    return (b.usage || 0) - (a.usage || 0);
+  });
+
+  tbody.innerHTML = sorted.map(a => {
+    const task = findTaskForAnomaly(a, tasks);
+    const severityCls = a.type === 'winter_irrigation' ? 'severity-winter' :
+      (a.deviation > 200 ? 'severity-high' : 'severity-med');
+    const typeLabel = a.type === 'spike' ? 'Spike' : 'Winter Irrigation';
+    const devStr = a.deviation != null ? '+' + a.deviation + '%' : 'N/A';
+    const actionHtml = task
+      ? '<button class="btn-sm" onclick="switchToTask(\'' + task.issueId + '\')">' + task.issueId + '</button>'
+      : '<button class="btn-sm primary" data-anomaly-idx="' + G_anomalies.indexOf(a) + '" onclick="openCreateModal(this)">Create Task</button>';
+
+    return `<tr class="${severityCls}">
+      <td style="text-align:left">${a.bldgNo}</td>
+      <td style="text-align:left">${a.bldgName}</td>
+      <td style="text-align:left">${typeLabel}</td>
+      <td style="text-align:left">${a.service}</td>
+      <td>${monthLabel(a.month)}</td>
+      <td>${fmt(a.usage, 1)}</td>
+      <td>${a.baseline > 0 ? fmt(a.baseline, 1) : '0 (expected)'}</td>
+      <td>${devStr}</td>
+      <td style="text-align:center">${actionHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+//  RENDER: TASK TRACKER TAB
+// ============================================================
+function renderTaskTab(filterStatus, searchQuery) {
+  filterStatus = filterStatus || 'all';
+  searchQuery = (searchQuery || '').toLowerCase();
+  const tasks = loadTasks();
+  const stats = getTaskStats(tasks);
+
+  // Status pills
+  const pillsEl = document.getElementById('statusPills');
+  pillsEl.innerHTML = STATUSES.map(s => {
+    const count = stats[s] || 0;
+    const cls = s.startsWith('Closed') ? 'closed' : (s === 'Open - Monitor' ? 'monitor' : 'open');
+    return `<span class="status-pill ${cls}">${s.replace('Open - ','').replace('Closed - ','')} ${count}</span>`;
+  }).join('');
+
+  // Filter tasks
+  let filtered = tasks;
+  if (filterStatus !== 'all') {
+    filtered = filtered.filter(t => t.status === filterStatus);
+  }
+  if (searchQuery) {
+    filtered = filtered.filter(t =>
+      (t.bldgNo || '').toLowerCase().includes(searchQuery) ||
+      (t.bldgName || '').toLowerCase().includes(searchQuery) ||
+      (t.meterId || '').toLowerCase().includes(searchQuery) ||
+      (t.assignedTo || '').toLowerCase().includes(searchQuery) ||
+      (t.description || '').toLowerCase().includes(searchQuery) ||
+      (t.issueId || '').toLowerCase().includes(searchQuery)
+    );
+  }
+
+  const tbody = document.getElementById('taskBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-light);padding:2rem;">No tasks found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(t => {
+    const statusOpts = STATUSES.map(s =>
+      `<option value="${s}" ${s === t.status ? 'selected' : ''}>${s}</option>`
+    ).join('');
+
+    return `<tr data-id="${t.issueId}">
+      <td style="text-align:left;white-space:nowrap;font-weight:600;font-size:0.75rem;">${t.issueId}</td>
+      <td style="text-align:left">${t.bldgNo}</td>
+      <td style="text-align:left">${t.bldgName}</td>
+      <td style="text-align:left">${t.service}</td>
+      <td style="text-align:left"><select class="task-status" onchange="handleStatusChange('${t.issueId}', this.value)">${statusOpts}</select></td>
+      <td style="text-align:left"><span class="editable" contenteditable="true" data-field="assignedTo" data-id="${t.issueId}" onblur="handleCellEdit(this)">${t.assignedTo || ''}</span></td>
+      <td style="text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(t.description || '').replace(/"/g, '&quot;')}">${t.description || ''}</td>
+      <td style="text-align:left"><span class="editable" contenteditable="true" data-field="actionNote" data-id="${t.issueId}" onblur="handleCellEdit(this)">${t.actionNote || ''}</span></td>
+      <td>${t.entryDate || ''}</td>
+      <td style="text-align:left"><span class="editable" contenteditable="true" data-field="wo" data-id="${t.issueId}" onblur="handleCellEdit(this)">${t.wo || ''}</span></td>
+      <td style="text-align:center">
+        <button class="btn-sm" onclick="openEditModal('${t.issueId}')" title="Edit">&#9998;</button>
+        <button class="btn-sm danger" onclick="handleDeleteTask('${t.issueId}')" title="Delete">&#128465;</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+//  RENDER: HISTORICAL TRENDS TAB
+// ============================================================
+function renderTrendsTab(domestic, irrigation) {
+  const domByMonth = aggregateByMonth(domestic, galToKgal);
+  const irrigByMonth = aggregateByMonth(irrigation, galToKgal);
+  const domTrend = G_months.map(m => domByMonth[m] || 0);
+  const irrigTrend = G_months.map(m => irrigByMonth[m] || 0);
+
+  // Domestic trend with campus-level anomaly markers
+  lineChart('chartDomTrend', G_monthLabels, [
+    { label: 'Domestic (kGal)', data: domTrend, borderColor: COLORS.domestic, backgroundColor: COLORS.domestic + '33', fill: true }
+  ], [detectCampusAnomalies(domTrend, G_months, G_domByBldg)]);
+
+  // Irrigation trend with campus-level anomaly markers
+  lineChart('chartIrrigTrend', G_monthLabels, [
+    { label: 'Irrigation (kGal)', data: irrigTrend, borderColor: COLORS.irrigation, backgroundColor: COLORS.irrigation + '33', fill: true }
+  ], [detectCampusAnomalies(irrigTrend, G_months, G_irrigByBldg)]);
+
+  // Top 10 buildings by total water (stacked)
+  const allBldg = {};
+  [G_domByBldg, G_irrigByBldg].forEach((map, i) => {
+    Object.entries(map).forEach(([k, v]) => {
+      if (!allBldg[k]) allBldg[k] = { bldgNo: k, bldgName: v.bldgName, dom: 0, irrig: 0 };
+      if (i === 0) allBldg[k].dom = v.total;
+      else allBldg[k].irrig = v.total;
+    });
+  });
+  const top10 = Object.values(allBldg)
+    .map(b => ({ ...b, total: b.dom + b.irrig }))
+    .sort((a, b) => b.total - a.total).slice(0, 10);
+
+  barChart('chartTopWater', top10.map(b => bldgLabel(b)), [
+    { label: 'Domestic (kGal)', data: top10.map(b => b.dom), backgroundColor: COLORS.domestic },
+    { label: 'Irrigation (kGal)', data: top10.map(b => b.irrig), backgroundColor: COLORS.irrigation }
+  ], { horizontal: true, stacked: true });
+}
+
+// ============================================================
+//  RENDER: BUILDING INDEX TAB
+// ============================================================
+function renderBuildingTab(searchQuery) {
+  searchQuery = (searchQuery || '').toLowerCase();
+  const tasks = loadTasks();
+  const openTasksByBldg = {};
+  tasks.filter(t => t.status.startsWith('Open')).forEach(t => {
+    openTasksByBldg[t.bldgNo] = (openTasksByBldg[t.bldgNo] || 0) + 1;
+  });
+
+  // Merge domestic + irrigation building data
+  const allBldg = {};
+  Object.entries(G_domByBldg).forEach(([k, v]) => {
+    if (!allBldg[k]) allBldg[k] = { bldgNo: k, bldgName: v.bldgName, dom: 0, irrig: 0, domMonths: {}, irrigMonths: {} };
+    allBldg[k].dom = v.total;
+    allBldg[k].domMonths = v.months;
+  });
+  Object.entries(G_irrigByBldg).forEach(([k, v]) => {
+    if (!allBldg[k]) allBldg[k] = { bldgNo: k, bldgName: v.bldgName, dom: 0, irrig: 0, domMonths: {}, irrigMonths: {} };
+    allBldg[k].irrig = v.total;
+    allBldg[k].irrigMonths = v.months;
+  });
+
+  let buildings = Object.values(allBldg).sort((a, b) => (b.dom + b.irrig) - (a.dom + a.irrig));
+  if (searchQuery) {
+    buildings = buildings.filter(b =>
+      b.bldgNo.toLowerCase().includes(searchQuery) ||
+      b.bldgName.toLowerCase().includes(searchQuery)
+    );
+  }
+
+  const grid = document.getElementById('bldgGrid');
+  grid.innerHTML = buildings.map(b => {
+    const taskCount = openTasksByBldg[b.bldgNo] || 0;
+    const hasTasks = taskCount > 0;
+    let badges = '';
+    if (b.dom > 0) badges += `<span class="badge domestic">${fmt(b.dom, 0)} kGal DW</span>`;
+    if (b.irrig > 0) badges += `<span class="badge irrigation">${fmt(b.irrig, 0)} kGal IR</span>`;
+    if (hasTasks) badges += `<span class="badge tasks">${taskCount} task${taskCount > 1 ? 's' : ''}</span>`;
+
+    // Build monthly detail table
+    let detail = '<table><thead><tr><th style="text-align:left">Month</th><th>Domestic (kGal)</th><th>Irrigation (kGal)</th></tr></thead><tbody>';
+    G_months.forEach(mk => {
+      const dv = b.domMonths[mk] || 0;
+      const iv = b.irrigMonths[mk] || 0;
+      if (dv === 0 && iv === 0) return;
+      detail += `<tr><td style="text-align:left">${monthLabel(mk)}</td><td>${dv > 0 ? fmt(dv, 1) : '-'}</td><td>${iv > 0 ? fmt(iv, 1) : '-'}</td></tr>`;
+    });
+    detail += '</tbody></table>';
+
+    return `<div class="bldg-card ${hasTasks ? 'has-tasks' : ''}" onclick="this.classList.toggle('expanded')">
+      <h3>${b.bldgName || b.bldgNo}</h3>
+      <div class="bldg-no">${b.bldgNo}</div>
+      <div class="bldg-badges">${badges}</div>
+      <div class="bldg-detail">${detail}</div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+//  MODAL HANDLERS
+// ============================================================
+function openCreateModal(btn) {
+  const idx = parseInt(btn.dataset.anomalyIdx, 10);
+  const a = G_anomalies[idx];
+  if (!a) return;
+  document.getElementById('modalTitle').textContent = 'Create Task';
+  document.getElementById('modalTaskId').value = '';
+  document.getElementById('modalBldgNo').value = a.bldgNo;
+  document.getElementById('modalBldgName').value = a.bldgName;
+  document.getElementById('modalService').value = a.service;
+  document.getElementById('modalMeter').value = a.meter || '';
+  document.getElementById('modalStatus').value = 'Open - Not Started';
+  document.getElementById('modalWO').value = 'NA';
+  document.getElementById('modalAssigned').value = '';
+  document.getElementById('modalDesc').value = buildDefaultDescription(a);
+  document.getElementById('modalNote').value = '';
+  document.getElementById('taskModal').classList.remove('hidden');
+}
+
+function openEditModal(issueId) {
+  const tasks = loadTasks();
+  const t = tasks.find(x => x.issueId === issueId);
+  if (!t) return;
+  document.getElementById('modalTitle').textContent = 'Edit Task ' + t.issueId;
+  document.getElementById('modalTaskId').value = t.issueId;
+  document.getElementById('modalBldgNo').value = t.bldgNo;
+  document.getElementById('modalBldgName').value = t.bldgName;
+  document.getElementById('modalService').value = t.service;
+  document.getElementById('modalMeter').value = t.meterId || '';
+  document.getElementById('modalStatus').value = t.status;
+  document.getElementById('modalWO').value = t.wo || '';
+  document.getElementById('modalAssigned').value = t.assignedTo || '';
+  document.getElementById('modalDesc').value = t.description || '';
+  document.getElementById('modalNote').value = t.actionNote || '';
+  document.getElementById('taskModal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('taskModal').classList.add('hidden');
+}
+
+function saveModal() {
+  const taskId = document.getElementById('modalTaskId').value;
+  const data = {
+    status: document.getElementById('modalStatus').value,
+    wo: document.getElementById('modalWO').value,
+    assignedTo: document.getElementById('modalAssigned').value,
+    description: document.getElementById('modalDesc').value,
+    actionNote: document.getElementById('modalNote').value
+  };
+
+  if (taskId) {
+    // Edit existing
+    updateTask(taskId, data);
+  } else {
+    // Create new
+    const tasks = loadTasks();
+    tasks.push({
+      issueId: getNextIssueId(),
+      entryDate: todayStr(),
+      status: data.status,
+      wo: data.wo,
+      actionNote: data.actionNote,
+      service: document.getElementById('modalService').value,
+      bldgNo: document.getElementById('modalBldgNo').value,
+      meterId: document.getElementById('modalMeter').value,
+      bldgName: document.getElementById('modalBldgName').value,
+      description: data.description,
+      assignedTo: data.assignedTo
+    });
+    saveTasks(tasks);
+  }
+
+  closeModal();
+  renderAnomalyTab();
+  renderTaskTab(currentFilter, document.getElementById('searchTasks').value);
+}
+
+// ============================================================
+//  EVENT HANDLERS
+// ============================================================
+let currentFilter = 'all';
+
+function handleStatusChange(issueId, newStatus) {
+  updateTask(issueId, { status: newStatus });
+  renderTaskTab(currentFilter, document.getElementById('searchTasks').value);
+  renderAnomalyTab(); // Update action buttons
+}
+
+function handleCellEdit(el) {
+  const id = el.dataset.id;
+  const field = el.dataset.field;
+  const val = el.textContent.trim();
+  updateTask(id, { [field]: val });
+}
+
+function handleDeleteTask(issueId) {
+  if (!confirm('Delete task ' + issueId + '?')) return;
+  deleteTask(issueId);
+  renderTaskTab(currentFilter, document.getElementById('searchTasks').value);
+  renderAnomalyTab();
+}
+
+function switchToTask(issueId) {
+  // Switch to Tasks tab and highlight the task
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelector('[data-tab="tasks"]').classList.add('active');
+  document.getElementById('sec-tasks').classList.add('active');
+  document.getElementById('searchTasks').value = issueId;
+  renderTaskTab('all', issueId);
+}
+
+function createAllNewTasks() {
+  const tasks = loadTasks();
+  let count = 0;
+  G_anomalies.forEach(a => {
+    if (!findTaskForAnomaly(a, tasks)) {
+      createTask(a);
+      count++;
+    }
+  });
+  if (count > 0) {
+    alert('Created ' + count + ' new task' + (count > 1 ? 's' : '') + '.');
+    renderAnomalyTab();
+  } else {
+    alert('All anomalies already have tasks.');
+  }
+}
+
+// ============================================================
+//  PRINT SETUP
+// ============================================================
+window.addEventListener('beforeprint', function() {
+  const meta = document.getElementById('printMeta');
+  meta.innerHTML = 'Date: ' + new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Clone anomaly table
+  const anomTbl = document.getElementById('tblAnomalies');
+  if (anomTbl) {
+    document.getElementById('printAnomalies').innerHTML = anomTbl.outerHTML;
+  }
+
+  // Open tasks table
+  const tasks = loadTasks().filter(t => t.status.startsWith('Open'));
+  let html = '<table><thead><tr><th style="text-align:left">Issue ID</th><th style="text-align:left">Bldg</th><th style="text-align:left">Status</th><th style="text-align:left">Assigned To</th><th style="text-align:left">Description</th></tr></thead><tbody>';
+  tasks.forEach(t => {
+    html += `<tr><td style="text-align:left">${t.issueId}</td><td style="text-align:left">${t.bldgNo} ${t.bldgName}</td><td style="text-align:left">${t.status}</td><td style="text-align:left">${t.assignedTo}</td><td style="text-align:left">${t.description}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('printTasks').innerHTML = html;
+});
+
+// ============================================================
+//  INIT
+// ============================================================
+(async function init() {
+  try {
+    const [domestic, irrigation] = await Promise.all([
+      loadJSON('data/domestic_water.json'),
+      loadJSON('data/irrigation.json')
+    ]);
+
+    G_months = getSortedMonths(domestic, irrigation);
+    G_monthLabels = G_months.map(monthLabel);
+    G_domByBldg = aggregateByBuilding(domestic, galToKgal);
+    G_irrigByBldg = aggregateByBuilding(irrigation, galToKgal);
+
+    // Detect all anomalies
+    const domSpikes = detectBuildingAnomalies(G_domByBldg, G_months, 'Domestic Water');
+    const irrigSpikes = detectBuildingAnomalies(G_irrigByBldg, G_months, 'Irrigation Water');
+    const winterIrrig = detectWinterIrrigation(G_irrigByBldg, G_months);
+    G_anomalies = [...domSpikes, ...irrigSpikes, ...winterIrrig];
+
+    // Render default tab
+    renderAnomalyTab();
+
+    // Render trends (lazy)
+    renderTrendsTab(domestic, irrigation);
+
+    // Render building index
+    renderBuildingTab();
+
+    // Render task tracker
+    renderTaskTab();
+
+    // Wire up filter buttons
+    document.querySelectorAll('#taskFilterBar .filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#taskFilterBar .filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        renderTaskTab(currentFilter, document.getElementById('searchTasks').value);
+      });
+    });
+
+    // Task search
+    document.getElementById('searchTasks').addEventListener('input', function() {
+      renderTaskTab(currentFilter, this.value);
+    });
+
+    // Building search
+    document.getElementById('searchBldg').addEventListener('input', function() {
+      renderBuildingTab(this.value);
+    });
+
+    // Create all tasks button
+    document.getElementById('btnCreateAll').addEventListener('click', createAllNewTasks);
+
+    // Modal buttons
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    document.getElementById('modalSave').addEventListener('click', saveModal);
+    document.getElementById('taskModal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+
+    // Import / Export
+    document.getElementById('btnImport').addEventListener('click', () => {
+      document.getElementById('importFile').click();
+    });
+    document.getElementById('importFile').addEventListener('change', function() {
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const result = importSmartsheetCSV(e.target.result);
+        const summary = document.getElementById('importSummary');
+        summary.classList.remove('hidden');
+        summary.textContent = 'Imported ' + result.total + ' rows: ' + result.created + ' new, ' + result.updated + ' updated, ' + result.unchanged + ' unchanged.';
+        renderTaskTab(currentFilter);
+        renderAnomalyTab();
+      };
+      reader.readAsText(file);
+      this.value = ''; // Reset for re-import
+    });
+    document.getElementById('btnExport').addEventListener('click', exportSmartsheetCSV);
+
+    // Done loading
+    document.getElementById('loading').style.display = 'none';
+  } catch (err) {
+    console.error('Init error:', err);
+    document.getElementById('loading').innerHTML =
+      '<div style="color:var(--red);font-size:1rem;text-align:center;">Error loading data.<br><small>' + err.message + '</small></div>';
+  }
+})();
+</script>
+</body>
+</html>
