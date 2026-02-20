@@ -1386,20 +1386,46 @@ function deleteTask(issueId) {
   saveTasks(tasks.filter(t => t.issueId !== issueId));
 }
 
+function taskMatchesAnomaly(t, anomaly) {
+  // Match by building number (required)
+  if (t.bldgNo !== anomaly.bldgNo) return false;
+  // Match by service — exact, case-insensitive, or via meter ID prefix
+  if (t.service === anomaly.service) return true;
+  if (t.service && anomaly.service && t.service.toLowerCase() === anomaly.service.toLowerCase()) return true;
+  // Match by meter ID containing the anomaly meter
+  if (anomaly.meter && t.meterId && t.meterId === anomaly.meter) return true;
+  // If task has no service (Smartsheet data gap), match on building alone
+  if (!t.service) return true;
+  return false;
+}
 function findTaskForAnomaly(anomaly, tasks) {
-  return tasks.find(t =>
-    t.bldgNo === anomaly.bldgNo &&
-    t.service === anomaly.service &&
+  // First try exact match (bldg + service + month in description)
+  const exact = tasks.find(t =>
+    taskMatchesAnomaly(t, anomaly) &&
     (t.description || '').indexOf(monthLabel(anomaly.month)) >= 0 &&
+    !t.status.startsWith('Closed')
+  );
+  if (exact) return exact;
+  // Fallback: match by building + service (catches Smartsheet-imported tasks)
+  return tasks.find(t =>
+    taskMatchesAnomaly(t, anomaly) &&
     !t.status.startsWith('Closed')
   );
 }
 function findAnyTaskForAnomaly(anomaly, tasks) {
-  return tasks.find(t =>
-    t.bldgNo === anomaly.bldgNo &&
-    t.service === anomaly.service &&
+  // First try exact match (bldg + service + month in description)
+  const exact = tasks.find(t =>
+    taskMatchesAnomaly(t, anomaly) &&
     (t.description || '').indexOf(monthLabel(anomaly.month)) >= 0
   );
+  if (exact) return exact;
+  // Fallback: match by building + service, prefer open tasks over closed
+  const open = tasks.find(t =>
+    taskMatchesAnomaly(t, anomaly) &&
+    !t.status.startsWith('Closed')
+  );
+  if (open) return open;
+  return tasks.find(t => taskMatchesAnomaly(t, anomaly));
 }
 
 function getTaskStats(tasks) {
