@@ -175,6 +175,51 @@
   html.dark .status-pill.open { background: #1e3a5f; color: #60a5fa; }
   html.dark .status-pill.monitor { background: #78350f; color: #fbbf24; }
   html.dark .status-pill.closed { background: #064e3b; color: #34d399; }
+  /* Sortable column headers */
+  .th-sort {
+    cursor: pointer; user-select: none; position: relative; white-space: nowrap;
+  }
+  .th-sort:hover { color: var(--primary); }
+  html.dark .th-sort:hover { color: var(--clr-domestic); }
+  .sort-arrow { font-size: 0.65rem; margin-left: 0.3rem; opacity: 0.3; }
+  .th-sort.asc .sort-arrow, .th-sort.desc .sort-arrow { opacity: 1; color: var(--primary); }
+  html.dark .th-sort.asc .sort-arrow, html.dark .th-sort.desc .sort-arrow { color: var(--clr-domestic); }
+  /* Column filter dropdowns */
+  .th-filter-wrap { position: relative; display: inline-flex; align-items: center; gap: 0.25rem; }
+  .th-filter-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border: none; background: transparent; cursor: pointer;
+    font-size: 0.7rem; color: var(--text-light); border-radius: 3px; padding: 0;
+    transition: background 0.15s, color 0.15s; flex-shrink: 0;
+  }
+  .th-filter-btn:hover { background: var(--border); color: var(--text); }
+  .th-filter-btn.active-filter { color: var(--primary); background: rgba(152,30,50,0.1); }
+  html.dark .th-filter-btn.active-filter { color: var(--clr-domestic); background: rgba(59,130,246,0.15); }
+  .col-filter-menu {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 0.5rem; min-width: 180px; max-height: 280px;
+  }
+  .col-filter-menu.open { display: block; }
+  .col-filter-menu label {
+    display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.35rem;
+    font-size: 0.78rem; cursor: pointer; border-radius: 4px; color: var(--text);
+  }
+  .col-filter-menu label:hover { background: var(--table-hover); }
+  .col-filter-menu input[type="checkbox"] { accent-color: var(--primary); width: 14px; height: 14px; }
+  .col-filter-list { max-height: 180px; overflow-y: auto; margin-top: 0.25rem; }
+  .col-filter-actions {
+    display: flex; gap: 0.4rem; justify-content: flex-end; margin-top: 0.5rem;
+    padding-top: 0.4rem; border-top: 1px solid var(--border);
+  }
+  .col-filter-actions button {
+    padding: 0.25rem 0.6rem; font-size: 0.72rem; border: 1px solid var(--border);
+    border-radius: 4px; cursor: pointer; background: var(--card-bg); color: var(--text);
+  }
+  .col-filter-actions button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .col-filter-actions button:hover { opacity: 0.85; }
+  /* Active filter indicator on header text */
+  .th-filtered { font-style: italic; }
   /* Anomaly table severity */
   .severity-high { border-left: 3px solid var(--red); }
   .severity-med { border-left: 3px solid #f59e0b; }
@@ -394,7 +439,7 @@
   <div class="section active" id="sec-anomalies">
     <div class="kpi-grid" id="kpiAnomalies"></div>
     <div class="card">
-      <h2>Detected Anomalies</h2>
+      <h2>Detected Anomalies <span id="anomalyCount" style="font-weight:400;font-size:0.82rem;color:var(--text-light);"></span></h2>
       <div class="info-box">
         Spike anomalies flag buildings where a month's usage exceeds 100% above its neighbor-month average.
         Irrigation spikes during irrigation season (May&ndash;Sep) are excluded.
@@ -412,16 +457,8 @@
       <div class="table-wrap">
         <table id="tblAnomalies">
           <thead>
+            <!-- Dynamic: built by renderAnomalyTab() with sort + filter controls -->
             <tr>
-              <th style="text-align:left">Bldg #</th>
-              <th style="text-align:left">Building Name</th>
-              <th style="text-align:left">Type</th>
-              <th style="text-align:left">Service</th>
-              <th>Month</th>
-              <th>Usage (kGal)</th>
-              <th>Baseline (kGal)</th>
-              <th>Deviation</th>
-              <th style="text-align:center">Action</th>
             </tr>
           </thead>
           <tbody id="anomalyBody"></tbody>
@@ -1260,10 +1297,12 @@ function renderKPIs(containerId, cards) {
 //  RENDER: ANOMALY REVIEW TAB
 // ============================================================
 
-// Shared helper: filter + sort anomalies for the current filter setting
+// Shared helper: filter + sort anomalies for the current filter/sort/column-filter state
 function getFilteredAnomalies(filter) {
   filter = filter || currentAnomalyFilter || 'all';
   let list = [...G_anomalies];
+
+  // 1. Apply button-bar filter (service/type)
   if (filter === 'Domestic Water' || filter === 'Irrigation Water') {
     list = list.filter(a => a.service === filter);
   } else if (filter === 'spike') {
@@ -1271,12 +1310,45 @@ function getFilteredAnomalies(filter) {
   } else if (filter === 'winter_irrigation') {
     list = list.filter(a => a.type === 'winter_irrigation');
   }
-  // Sort: spikes by deviation desc, then winter by usage desc
-  list.sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'spike' ? -1 : 1;
-    if (a.type === 'spike') return (b.deviation || 0) - (a.deviation || 0);
-    return (b.usage || 0) - (a.usage || 0);
+
+  // 2. Apply per-column filters
+  Object.keys(anomalyColFilters).forEach(colKey => {
+    const allowed = anomalyColFilters[colKey];
+    if (!allowed || allowed.size === 0) return;
+    const col = ANOMALY_COLS.find(c => c.key === colKey);
+    if (!col || !col.valFn) return;
+    list = list.filter(a => allowed.has(String(col.valFn(a))));
   });
+
+  // 3. Sort
+  if (anomalySortCol) {
+    const col = ANOMALY_COLS.find(c => c.key === anomalySortCol);
+    if (col && col.valFn) {
+      const dir = anomalySortDir === 'desc' ? -1 : 1;
+      const isNum = ['usage', 'baseline', 'deviation'].includes(anomalySortCol);
+      // For month, sort by raw month key for correct chronological order
+      const rawFn = anomalySortCol === 'month' ? (a => a.month) : col.valFn;
+      list.sort((a, b) => {
+        let va = rawFn(a), vb = rawFn(b);
+        if (isNum) {
+          va = va == null ? -Infinity : Number(va);
+          vb = vb == null ? -Infinity : Number(vb);
+          return (va - vb) * dir;
+        }
+        va = String(va || '').toLowerCase();
+        vb = String(vb || '').toLowerCase();
+        return va < vb ? -dir : va > vb ? dir : 0;
+      });
+    }
+  } else {
+    // Default sort: spikes by deviation desc, then winter by usage desc
+    list.sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'spike' ? -1 : 1;
+      if (a.type === 'spike') return (b.deviation || 0) - (a.deviation || 0);
+      return (b.usage || 0) - (a.usage || 0);
+    });
+  }
+
   return list;
 }
 
@@ -1300,9 +1372,68 @@ function renderAnomalyTab(filter) {
       tooltip: 'Tasks with Open status (Not Started, In Progress, Monitor)', sub: tasks.length + ' total tasks' }
   ]);
 
-  // Anomaly table
+  // Build dynamic thead with sort + filter controls
+  const thead = document.querySelector('#tblAnomalies thead');
+  // Collect unique values per filterable column (from full anomaly set, not just filtered)
+  const allForHeaders = [...G_anomalies];
+  const uniqueVals = {};
+  ANOMALY_COLS.forEach(col => {
+    if (!col.filterable) return;
+    const vals = new Set();
+    allForHeaders.forEach(a => vals.add(String(col.valFn(a))));
+    uniqueVals[col.key] = [...vals].sort();
+  });
+
+  thead.innerHTML = '<tr>' + ANOMALY_COLS.map(col => {
+    const align = col.align === 'center' ? 'text-align:center' : 'text-align:' + col.align;
+    if (!col.sortable && !col.filterable) {
+      return '<th style="' + align + '">' + col.label + '</th>';
+    }
+
+    // Sort indicator
+    const isSorted = anomalySortCol === col.key;
+    const arrow = isSorted ? (anomalySortDir === 'asc' ? '\u25B2' : '\u25BC') : '\u25B4\u25BE';
+    const sortCls = isSorted ? ' ' + anomalySortDir : '';
+
+    // Filter dropdown
+    let filterHtml = '';
+    if (col.filterable && uniqueVals[col.key]) {
+      const hasFilter = anomalyColFilters[col.key] && anomalyColFilters[col.key].size > 0;
+      const btnCls = hasFilter ? ' active-filter' : '';
+      filterHtml = '<span class="th-filter-wrap">' +
+        '<button class="th-filter-btn' + btnCls + '" onclick="event.stopPropagation(); toggleColFilterMenu(\'' + col.key + '\', this)" title="Filter ' + col.label + '">\u2630</button>' +
+        '<div class="col-filter-menu" id="cfm-' + col.key + '" onclick="event.stopPropagation()">' +
+          '<div class="col-filter-list">' +
+          uniqueVals[col.key].map(v => {
+            const checked = !hasFilter || anomalyColFilters[col.key].has(v) ? ' checked' : '';
+            return '<label><input type="checkbox" value="' + v.replace(/"/g, '&quot;') + '"' + checked + '> ' + v + '</label>';
+          }).join('') +
+          '</div>' +
+          '<div class="col-filter-actions">' +
+            '<button onclick="clearColFilter(\'' + col.key + '\')">Clear</button>' +
+            '<button class="primary" onclick="applyColFilter(\'' + col.key + '\')">Apply</button>' +
+          '</div>' +
+        '</div>' +
+        '</span>';
+    }
+
+    const filteredCls = anomalyColFilters[col.key] ? ' th-filtered' : '';
+    return '<th class="th-sort' + sortCls + filteredCls + '" style="' + align + '" onclick="toggleAnomalySort(\'' + col.key + '\')">' +
+      col.label + '<span class="sort-arrow">' + arrow + '</span>' + filterHtml + '</th>';
+  }).join('') + '</tr>';
+
+  // Anomaly table body
   const tbody = document.getElementById('anomalyBody');
   const sorted = getFilteredAnomalies(filter);
+
+  // Update count display
+  const countEl = document.getElementById('anomalyCount');
+  if (countEl) {
+    const isFiltered = sorted.length !== G_anomalies.length;
+    countEl.textContent = isFiltered
+      ? '(' + sorted.length + ' of ' + G_anomalies.length + ' shown)'
+      : '(' + G_anomalies.length + ' total)';
+  }
 
   if (sorted.length === 0) {
     // Destroy any existing anomaly mini-charts
@@ -1681,6 +1812,75 @@ function saveModal() {
 // ============================================================
 let currentFilter = 'all';
 let currentAnomalyFilter = 'all';
+
+// Column sorting & filtering state for anomaly table
+let anomalySortCol = null;   // null = default sort (type then deviation/usage)
+let anomalySortDir = 'asc';  // 'asc' or 'desc'
+let anomalyColFilters = {};  // { colKey: Set of allowed values } — empty = show all
+
+// Column definitions for sortable anomaly table
+const ANOMALY_COLS = [
+  { key: 'bldgNo',    label: 'Bldg #',          align: 'left',   sortable: true,  filterable: true,  valFn: a => a.bldgNo },
+  { key: 'bldgName',  label: 'Building Name',    align: 'left',   sortable: true,  filterable: true,  valFn: a => a.bldgName },
+  { key: 'type',      label: 'Type',             align: 'left',   sortable: true,  filterable: true,  valFn: a => a.type === 'spike' ? 'Spike' : 'Winter Irrigation' },
+  { key: 'service',   label: 'Service',          align: 'left',   sortable: true,  filterable: true,  valFn: a => a.service },
+  { key: 'month',     label: 'Month',            align: 'right',  sortable: true,  filterable: true,  valFn: a => monthLabel(a.month) },
+  { key: 'usage',     label: 'Usage (kGal)',     align: 'right',  sortable: true,  filterable: false, valFn: a => a.usage },
+  { key: 'baseline',  label: 'Baseline (kGal)',  align: 'right',  sortable: true,  filterable: false, valFn: a => a.baseline },
+  { key: 'deviation', label: 'Deviation',        align: 'right',  sortable: true,  filterable: false, valFn: a => a.deviation },
+  { key: 'action',    label: 'Action',           align: 'center', sortable: false, filterable: false, valFn: null }
+];
+
+function toggleAnomalySort(colKey) {
+  if (anomalySortCol === colKey) {
+    anomalySortDir = anomalySortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    anomalySortCol = colKey;
+    anomalySortDir = colKey === 'deviation' || colKey === 'usage' || colKey === 'baseline' ? 'desc' : 'asc';
+  }
+  renderAnomalyTab();
+}
+
+function toggleColFilterMenu(colKey, btnEl) {
+  // Close any other open menus
+  document.querySelectorAll('.col-filter-menu.open').forEach(m => {
+    if (m.id !== 'cfm-' + colKey) m.classList.remove('open');
+  });
+  const menu = document.getElementById('cfm-' + colKey);
+  if (menu) menu.classList.toggle('open');
+}
+
+function applyColFilter(colKey) {
+  const menu = document.getElementById('cfm-' + colKey);
+  const checks = menu.querySelectorAll('.col-filter-list input[type="checkbox"]');
+  const selected = new Set();
+  checks.forEach(cb => { if (cb.checked) selected.add(cb.value); });
+  // If all are selected or none, clear the filter for this column
+  if (selected.size === checks.length || selected.size === 0) {
+    delete anomalyColFilters[colKey];
+  } else {
+    anomalyColFilters[colKey] = selected;
+  }
+  menu.classList.remove('open');
+  renderAnomalyTab();
+}
+
+function clearColFilter(colKey) {
+  delete anomalyColFilters[colKey];
+  const menu = document.getElementById('cfm-' + colKey);
+  if (menu) {
+    menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+    menu.classList.remove('open');
+  }
+  renderAnomalyTab();
+}
+
+// Close filter menus when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.th-filter-wrap')) {
+    document.querySelectorAll('.col-filter-menu.open').forEach(m => m.classList.remove('open'));
+  }
+});
 
 function handleStatusChange(issueId, newStatus) {
   updateTask(issueId, { status: newStatus });
