@@ -613,20 +613,41 @@ applyChartTheme();
 // ============================================================
 //  ANOMALY DETECTION
 // ============================================================
-function detectAnomalies(data, threshold) {
-  threshold = threshold || 0.35;
-  const anomalies = [];
-  for (let i = 1; i < data.length - 1; i++) {
-    const val = data[i];
+function detectAnomalies(campusData, monthKeys, byBldg, convertFn, threshold) {
+  threshold = threshold || 1.0; // 100% deviation = only major spikes
+  var anomalies = [];
+  for (var i = 1; i < campusData.length - 1; i++) {
+    var val = campusData[i];
     if (!val || val === 0) continue;
-    const neighbors = [data[i-1], data[i+1]].filter(function(v) { return v && v > 0; });
+    var neighbors = [campusData[i-1], campusData[i+1]].filter(function(v) { return v && v > 0; });
     if (neighbors.length === 0) continue;
     var avg = neighbors.reduce(function(s,v) { return s+v; }, 0) / neighbors.length;
     if (avg === 0) continue;
     var pctDev = (val - avg) / avg;
-    if (Math.abs(pctDev) > threshold) {
-      anomalies.push({ index: i, value: val, expected: avg, pctDev: pctDev,
-        label: (pctDev > 0 ? '+' : '') + Math.round(pctDev * 100) + '% vs avg' });
+    if (pctDev > threshold) { // Only positive spikes (peaks), not dips
+      // Find which buildings drove the spike
+      var mk = monthKeys[i];
+      var mkPrev = monthKeys[i-1];
+      var mkNext = monthKeys[i+1];
+      var drivers = [];
+      Object.values(byBldg).forEach(function(b) {
+        var bVal = b.months[mk] || 0;
+        var bPrev = b.months[mkPrev] || 0;
+        var bNext = b.months[mkNext] || 0;
+        var bNeighbors = [bPrev, bNext].filter(function(v) { return v > 0; });
+        if (bNeighbors.length === 0 || bVal === 0) return;
+        var bAvg = bNeighbors.reduce(function(s,v) { return s+v; }, 0) / bNeighbors.length;
+        var delta = bVal - bAvg;
+        if (delta > 0) drivers.push({ bldgNo: b.bldgNo, bldgName: b.bldgName, delta: delta, val: bVal, avg: bAvg });
+      });
+      drivers.sort(function(a,b) { return b.delta - a.delta; });
+      var topDriver = drivers.length > 0 ? drivers[0] : null;
+      var driverLabel = topDriver ? (topDriver.bldgNo + (topDriver.bldgName ? ' ' + topDriver.bldgName : '')) : '';
+      anomalies.push({
+        index: i, value: val, expected: avg, pctDev: pctDev,
+        label: '+' + Math.round(pctDev * 100) + '% vs avg',
+        driver: driverLabel
+      });
     }
   }
   return anomalies;
@@ -649,43 +670,57 @@ const anomalyCalloutPlugin = {
       group.forEach(function(a) {
         var x = xScale.getPixelForValue(a.index);
         var y = yScale.getPixelForValue(a.value);
+        var hasDriver = a.driver && a.driver.length > 0;
         // Draw diamond marker
         ctx.save();
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.moveTo(x, y - 6);
-        ctx.lineTo(x + 5, y);
-        ctx.lineTo(x, y + 6);
-        ctx.lineTo(x - 5, y);
+        ctx.moveTo(x, y - 7);
+        ctx.lineTo(x + 6, y);
+        ctx.lineTo(x, y + 7);
+        ctx.lineTo(x - 6, y);
         ctx.closePath();
         ctx.fill();
-        // Draw callout label above
-        var labelY = y - 18;
-        if (labelY < 20) labelY = y + 20; // flip below if near top
+        // Measure text for callout box
         ctx.font = 'bold 10px -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillStyle = dark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)';
-        // Background pill
-        var textW = ctx.measureText(a.label).width + 8;
-        ctx.fillStyle = dark ? 'rgba(31,41,55,0.9)' : 'rgba(255,255,255,0.92)';
+        var line1 = a.label;
+        var line2 = hasDriver ? 'Driven by ' + a.driver : '';
+        var w1 = ctx.measureText(line1).width;
+        ctx.font = '9px -apple-system, sans-serif';
+        var w2 = hasDriver ? ctx.measureText(line2).width : 0;
+        var boxW = Math.max(w1, w2) + 12;
+        var boxH = hasDriver ? 30 : 18;
+        // Position callout above point
+        var labelY = y - 22 - (hasDriver ? 8 : 0);
+        if (labelY < 10) labelY = y + 22; // flip below if near top
+        // Background box
+        ctx.fillStyle = dark ? 'rgba(31,41,55,0.92)' : 'rgba(255,255,255,0.95)';
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        var rx = x - textW/2, ry = labelY - 8, rw = textW, rh = 16, rr = 3;
+        ctx.lineWidth = 1.5;
+        var rx = x - boxW/2, ry = labelY - boxH/2, rr = 4;
         ctx.beginPath();
-        if (ctx.roundRect) { ctx.roundRect(rx, ry, rw, rh, rr); }
-        else { ctx.moveTo(rx+rr,ry); ctx.arcTo(rx+rw,ry,rx+rw,ry+rh,rr); ctx.arcTo(rx+rw,ry+rh,rx,ry+rh,rr); ctx.arcTo(rx,ry+rh,rx,ry,rr); ctx.arcTo(rx,ry,rx+rw,ry,rr); ctx.closePath(); }
+        if (ctx.roundRect) { ctx.roundRect(rx, ry, boxW, boxH, rr); }
+        else { ctx.moveTo(rx+rr,ry); ctx.arcTo(rx+boxW,ry,rx+boxW,ry+boxH,rr); ctx.arcTo(rx+boxW,ry+boxH,rx,ry+boxH,rr); ctx.arcTo(rx,ry+boxH,rx,ry,rr); ctx.arcTo(rx,ry,rx+boxW,ry,rr); ctx.closePath(); }
         ctx.fill();
         ctx.stroke();
-        // Text
+        // Line 1: percentage
+        ctx.font = 'bold 10px -apple-system, sans-serif';
         ctx.fillStyle = color;
-        ctx.fillText(a.label, x, labelY + 4);
+        ctx.fillText(line1, x, hasDriver ? labelY - 2 : labelY + 4);
+        // Line 2: driver building
+        if (hasDriver) {
+          ctx.font = '9px -apple-system, sans-serif';
+          ctx.fillStyle = dark ? '#d1d5db' : '#4b5563';
+          ctx.fillText(line2, x, labelY + 11);
+        }
         // Connector line
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
         ctx.setLineDash([2, 2]);
         ctx.beginPath();
-        ctx.moveTo(x, y - 6);
-        ctx.lineTo(x, labelY + 8);
+        ctx.moveTo(x, y - 7);
+        ctx.lineTo(x, ry + boxH);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();
@@ -1279,7 +1314,7 @@ loadAllData().then(data => {
   const elecTrendData = months.map(m => elecByMonth[m] || 0);
   lineChart('chartElecTrend', monthLabels, [
     { label: 'Electric (MMBtu)', data: elecTrendData, borderColor: COLORS.electric, backgroundColor: COLORS.electric + '33', fill: true }
-  ], [detectAnomalies(elecTrendData)]);
+  ], [detectAnomalies(elecTrendData, months, elecByBldg)]);
 
   const elecTop15 = Object.values(elecByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartElecTop',
@@ -1317,7 +1352,7 @@ loadAllData().then(data => {
   lineChart('chartThermalTrend', monthLabels, [
     { label: 'Steam (MMBtu)', data: steamTrendData, borderColor: COLORS.steam, backgroundColor: COLORS.steam + '33', fill: false },
     { label: 'CHW Energy (MMBtu)', data: chwETrendData, borderColor: COLORS.chwEnergy, backgroundColor: COLORS.chwEnergy + '33', fill: false }
-  ], [detectAnomalies(steamTrendData), detectAnomalies(chwETrendData)]);
+  ], [detectAnomalies(steamTrendData, months, steamByBldg), detectAnomalies(chwETrendData, months, chwEByBldg)]);
 
   const steamTop15 = Object.values(steamByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartSteamTop',
@@ -1353,7 +1388,7 @@ loadAllData().then(data => {
   lineChart('chartWaterTrend', monthLabels, [
     { label: 'Domestic (kGal)', data: domTrendData, borderColor: COLORS.domestic, backgroundColor: COLORS.domestic + '33', fill: false },
     { label: 'Irrigation (kGal)', data: irrigTrendData, borderColor: COLORS.irrigation, backgroundColor: COLORS.irrigation + '33', fill: false }
-  ], [detectAnomalies(domTrendData), detectAnomalies(irrigTrendData)]);
+  ], [detectAnomalies(domTrendData, months, domByBldg), detectAnomalies(irrigTrendData, months, irrigByBldg)]);
 
   const domTop15 = Object.values(domByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartDomTop',
