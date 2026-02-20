@@ -1,0 +1,151 @@
+CAMPUS METERING DASHBOARD -- TROUBLESHOOTING GUIDE
+=====================================================
+
+Quick-reference for common problems with the Campus Metering Dashboard. Organized as Symptom > Cause > Solution.
+
+
+DASHBOARD SHOWS "ERROR LOADING DATA"
+--------------------------------------
+
+Cause: One or more of the 7 JSON files in the data/ folder is missing or malformed.
+
+Solution:
+1. Go to https://github.com/JSWSU/wsu-energy-dashboard and verify all 7 files exist in data/:
+   electric.json, condensate.json, domestic_water.json, irrigation.json, chw.json, sites.json, connectors.json
+2. Open each file and verify it contains valid JSON with a "rows" array
+3. If a file is missing: re-export from SkySpark and upload to GitHub
+4. Validate suspicious files at https://jsonlint.com/
+
+
+DATA QUALITY CARD SHOWS "FAIL" (RED)
+--------------------------------------
+
+Cause: The KPI Recalculation check found that dashboard totals don't match independent sums from the raw data. This usually means a conversion error or a corrupted data file.
+
+Solution:
+1. Go to the Data Info tab and review the "KPI Cross-Check" table
+2. Note which utilities show mismatches
+3. Re-export the affected utility JSON from SkySpark
+4. Upload the corrected file and refresh the dashboard
+
+
+DATA QUALITY SHOWS "NEGATIVE VALUES" WARNING
+----------------------------------------------
+
+Cause: Some meter readings have negative usage values. This is typically caused by meter rollovers, manual corrections, or faulty meter reads.
+
+Solution:
+1. This is a warning, not a failure -- the dashboard still works
+2. Review the affected buildings on the utility-specific tab
+3. In SkySpark, check for meter rollover events or data corrections
+4. If the values are genuinely wrong, correct them in SkySpark and re-export
+
+
+CHARTS SHOW NO DATA OR WRONG PERIOD
+--------------------------------------
+
+Cause: The startDate field in the JSON files is not in the expected MM-DD-YYYY format, or the data covers a different time period than expected.
+
+Solution:
+1. Open one of the JSON files and check the startDate format
+2. Expected format: "01-01-2025" (MM-DD-YYYY)
+3. If the format is different (e.g., ISO "2025-01-01"), the parseMonthKey() function
+   won't parse it correctly
+4. Re-export with the correct date format, or update parseMonthKey() in metering.html
+
+
+BUILDING SHOWS ZERO USAGE WHEN DATA EXISTS
+--------------------------------------------
+
+Cause: The building number in the data file doesn't match between utilities (e.g., "0078" in electric vs "0078A" in water).
+
+Solution:
+1. Check the building's bldgNo in each JSON file
+2. Verify consistent building numbering across all utility exports
+3. Update SkySpark tagging if building numbers are inconsistent
+
+
+ANOMALY MARKERS DON'T APPEAR ON CHARTS
+-----------------------------------------
+
+Cause: No data points exceed the 100% deviation threshold, or the chart has too few months of data (need at least 3 months for neighbor comparison).
+
+Solution:
+1. This is expected behavior if no significant spikes exist in the data
+2. If you expect anomalies: check that the data has at least 3 consecutive months
+   with non-zero values
+3. To adjust sensitivity: change the threshold constant in detectAnomalies()
+   (currently 1.0 = 100% deviation)
+
+
+CONNECTOR TABLE SHOWS ALL "DISABLED" OR "FAULT"
+--------------------------------------------------
+
+Cause: The connectors.json export captured a snapshot when connectors were in a degraded state.
+
+Solution:
+1. Check SkySpark directly to see current connector status
+2. Re-export connectors.json when the system is healthy
+3. If connectors are genuinely faulted: investigate in SkySpark and contact
+   the controls team
+
+
+PASSWORD NOT WORKING
+---------------------
+
+Cause: Password is case-sensitive: "Energy@WSU" (capital E, capital W, capital S, capital U).
+
+Solution:
+1. Try the exact password: Energy@WSU
+2. Clear browser cache or try an incognito/private window
+3. If someone changed the password: search for the string comparison in metering.html
+   (look for "tryAuth" function)
+
+
+DARK MODE TOGGLE NOT WORKING
+-------------------------------
+
+Cause: JavaScript error earlier in page load prevented the toggle from initializing.
+
+Solution:
+1. Open browser dev tools (F12) > Console tab
+2. Look for red error messages
+3. Fix the underlying error (usually a data loading issue)
+4. If dark mode is stuck: open dev tools > Application > Local Storage > clear "wsuDarkMode" key
+
+
+DASHBOARD LOADS BUT CHARTS ARE BLANK
+---------------------------------------
+
+Cause: Chart.js library failed to load, or a JavaScript error occurred during chart creation.
+
+Solution:
+1. Verify chart.umd.min.js exists in the repository root
+2. Open dev tools (F12) > Console tab and check for errors
+3. If you see "Chart is not defined": the chart.umd.min.js file is missing or corrupted
+4. Re-download Chart.js v4.4.7 and add it to the repository
+
+
+SEARCH ON BUILDINGS TAB RETURNS NO RESULTS
+--------------------------------------------
+
+Cause: Search matches building number or name (case-insensitive). If the building
+exists but doesn't appear, the search term may not match.
+
+Solution:
+1. Try searching by just the building number (e.g., "0078")
+2. Try a partial building name (e.g., "engineering" instead of the full name)
+3. Only 200 buildings are rendered at once -- clear the search to see all
+
+
+PRINT OUTPUT LOOKS WRONG
+--------------------------
+
+Cause: Browser print settings or dark mode affecting print layout.
+
+Solution:
+1. Use Chrome or Edge for best print results
+2. Set page orientation to Landscape in print dialog
+3. Enable "Background graphics" / "Background colors and images" in print settings
+4. Dark mode is automatically forced to light for printing, but if colors look wrong,
+   toggle dark mode off before printing

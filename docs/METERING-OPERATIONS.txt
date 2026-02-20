@@ -1,0 +1,139 @@
+CAMPUS METERING DASHBOARD -- OPERATIONS RUNBOOK
+=================================================
+
+Step-by-step guide for updating the Campus Metering Dashboard with new SkySpark data exports. Written for someone with no development background.
+
+
+OVERVIEW
+--------
+
+What this covers: The monthly cycle of exporting metering data from SkySpark and publishing it to the web dashboard.
+
+Frequency: Monthly (or as needed when new data is available in SkySpark).
+
+Time required: ~5 minutes.
+
+
+WHERE EVERYTHING LIVES
+----------------------
+
+GitHub repository:
+  https://github.com/JSWSU/wsu-energy-dashboard
+
+Live dashboard:
+  https://jswsu.github.io/wsu-energy-dashboard/metering.html  (password: Energy@WSU)
+
+Data files (in repository):
+  data/electric.json         Electric consumption (kWh)
+  data/condensate.json       Steam consumption (lb)
+  data/domestic_water.json   Domestic water (gal)
+  data/irrigation.json       Irrigation water (gal)
+  data/chw.json              Chilled water energy (tonrefh)
+  data/sites.json            Building metadata
+  data/connectors.json       SkySpark connector status
+
+
+PREREQUISITES
+-------------
+
+Before you begin, make sure you have:
+
+[ ] Access to SkySpark with read permissions for the Pullman campus project
+[ ] A GitHub account with push access to https://github.com/JSWSU/wsu-energy-dashboard
+[ ] A web browser (Chrome, Edge, or Firefox)
+
+
+STEP 1: EXPORT DATA FROM SKYSPARK
+-----------------------------------
+
+1. Log into SkySpark for the Pullman campus project
+2. Run the data export queries for each utility:
+   - Electric (kWh)
+   - Condensate/Steam (lb)
+   - Domestic Water (gal)
+   - Irrigation Water (gal)
+   - Chilled Water Energy (tonrefh)
+   - Sites (building metadata)
+   - Connectors (connector status)
+3. Each export should produce a JSON file with a "rows" array
+4. Name the files exactly:
+   - electric.json
+   - condensate.json
+   - domestic_water.json
+   - irrigation.json
+   - chw.json
+   - sites.json
+   - connectors.json
+
+Each row in the utility JSON files must contain:
+  bldgNo, bldgName, meters, startDate (MM-DD-YYYY), endDate, usage
+
+
+STEP 2: UPLOAD DATA TO GITHUB
+-------------------------------
+
+Option A -- GitHub web upload (no special software needed):
+
+1. Go to https://github.com/JSWSU/wsu-energy-dashboard
+2. Navigate to the data/ folder
+3. Click "Add file" > "Upload files"
+4. Drag all 7 JSON files into the upload area
+5. Add a commit message like "Update metering data for [month] [year]"
+6. Click "Commit changes"
+
+Option B -- Git command line (for those with Git installed):
+
+  cd /path/to/wsu-energy-dashboard
+  cp /path/to/exports/*.json data/
+  git add data/
+  git commit -m "Update metering data for [month] [year]"
+  git push
+
+
+STEP 3: VERIFY THE LIVE DASHBOARD
+-----------------------------------
+
+1. Go to https://jswsu.github.io/wsu-energy-dashboard/metering.html
+2. Enter the password: Energy@WSU
+3. Check the Data Info tab:
+   - Verify the Data Quality card shows "Pass" (green) or review any warnings
+   - Check row counts match your export
+   - Review the 10 automated data quality checks
+4. Spot-check a few buildings on the Buildings tab
+5. Review the Overview tab KPIs for reasonableness
+
+
+TROUBLESHOOTING
+---------------
+
+Dashboard shows "Error loading data":
+  - Verify all 7 JSON files exist in the data/ folder on GitHub
+  - Check that each file is valid JSON (use https://jsonlint.com/)
+  - Ensure each file has a top-level "rows" array
+
+Data Quality shows warnings:
+  - NA/Invalid Values: Check for corrupted rows in the export
+  - Negative Values: Likely meter rollovers -- review with SkySpark admin
+  - Date Range mismatch: Ensure all utilities cover the same period
+  - KPI Recalculation mismatch: Dashboard totals don't match raw sums; re-export
+
+Charts look empty or wrong:
+  - Verify the startDate format is MM-DD-YYYY in all JSON files
+  - Check that usage values are in the expected native units (not pre-converted)
+
+Building appears with wrong name:
+  - Update sites.json with the correct building metadata from SkySpark
+
+
+ADDING A NEW UTILITY OR DATA SOURCE
+--------------------------------------
+
+To add a new utility type to the dashboard:
+
+1. Export the new data as a JSON file with the standard row format
+2. Add a loadJSON() call to the loadAllData() function in metering.html
+3. Add a conversion function if needed (e.g., newUnitToMmbtu)
+4. Add aggregation calls (aggregateByBuilding, aggregateByMonth)
+5. Add KPI cards, charts, and table columns as needed
+6. Update the color palette (COLORS object) with a new color
+7. Update the verification checks if the new utility should be cross-checked

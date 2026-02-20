@@ -67,12 +67,18 @@
     transition: all 0.2s;
   }
   .header-actions a:hover { background: rgba(255,255,255,0.1); color: #fff; }
-  .btn-icon {
-    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25);
-    color: #fff; border-radius: 6px; padding: 0.4rem 0.6rem; cursor: pointer;
-    font-size: 1rem; transition: all 0.2s;
+  .dark-toggle { display: flex; align-items: center; gap: 0.5rem; }
+  .dark-toggle-label { font-size: 0.75rem; opacity: 0.85; color: #fff; }
+  .dark-toggle-switch {
+    position: relative; width: 40px; height: 22px; background: rgba(255,255,255,0.25);
+    border-radius: 11px; cursor: pointer; transition: background 0.3s; border: none; padding: 0;
   }
-  .btn-icon:hover { background: rgba(255,255,255,0.2); }
+  .dark-toggle-switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+    background: #fff; border-radius: 50%; transition: transform 0.3s;
+  }
+  html.dark .dark-toggle-switch { background: var(--accent); }
+  html.dark .dark-toggle-switch::after { transform: translateX(18px); }
   .btn-action {
     background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
     color: #fff; border-radius: 6px; padding: 0.4rem 0.8rem; cursor: pointer;
@@ -399,7 +405,7 @@
     * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
     body { background: #fff !important; }
     html.dark { --bg:#f5f5f5; --card-bg:#fff; --text:#2d2d2d; --text-light:#6b7280; --border:#e5e7eb; }
-    header, #authGate, #loading, .nav-tabs, .header-actions, .btn-icon, .modal-overlay { display: none !important; }
+    header, #authGate, #loading, .nav-tabs, .header-actions, .dark-toggle, .modal-overlay { display: none !important; }
     .section { display: none !important; }
     #printSummary { display: block !important; }
     .card { box-shadow: none; border: 1px solid #e5e7eb; }
@@ -445,7 +451,10 @@
   <div class="header-actions">
     <a href="metering.html">Campus Metering</a>
     <a href="index.html">Energy Cost Projection</a>
-    <button class="btn-icon" id="darkToggle" title="Toggle dark mode">&#9790;</button>
+    <div class="dark-toggle">
+      <span class="dark-toggle-label">Dark Mode</span>
+      <button class="dark-toggle-switch" id="darkToggle" aria-label="Toggle dark mode"></button>
+    </div>
   </div>
 </header>
 

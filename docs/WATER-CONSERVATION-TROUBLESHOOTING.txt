@@ -1,0 +1,176 @@
+WATER CONSERVATION MEETING DASHBOARD -- TROUBLESHOOTING GUIDE
+================================================================
+
+Quick-reference for common problems with the Water Conservation Dashboard. Organized as Symptom > Cause > Solution.
+
+
+DASHBOARD SHOWS "ERROR LOADING DATA"
+--------------------------------------
+
+Cause: One or both JSON files (domestic_water.json, irrigation.json) is missing from the data/ folder or contains invalid JSON.
+
+Solution:
+1. Go to https://github.com/JSWSU/wsu-energy-dashboard and verify both files exist in data/
+2. Open each file and check for valid JSON with a "rows" array
+3. If missing: re-export from SkySpark and upload to GitHub
+4. Validate at https://jsonlint.com/
+
+
+NO ANOMALIES DETECTED
+-----------------------
+
+Cause A: Data has fewer than 3 months, so no neighbor comparison is possible.
+Cause B: No buildings have usage spikes exceeding 100% of their neighbor-month average.
+Cause C: Irrigation spikes during May-Sep are intentionally excluded.
+
+Solution:
+1. Check that data spans at least 3 consecutive months with non-zero values
+2. This may be expected if usage patterns are stable
+3. For irrigation: spikes during irrigation season (May-Sep) are normal and excluded
+   by design. Only off-season irrigation anomalies are flagged.
+
+
+FILTER SHOWS "NO ANOMALIES MATCH THE SELECTED FILTER"
+-------------------------------------------------------
+
+Cause: The combination of filter bar selection and column filters has excluded all anomalies.
+
+Solution:
+1. Click "All Services" in the filter bar to reset the main filter
+2. Check each column header for active filters (highlighted hamburger icon)
+3. Click the hamburger icon on any filtered column and click "Clear" to reset
+
+
+IMPORTED TASKS HAVE WRONG BUILDING NUMBERS
+--------------------------------------------
+
+Cause: The Smartsheet CSV has building numbers that don't match the MeterID prefix. This was a known data quality issue in the original Smartsheet (column shift in rows 28-38).
+
+Solution:
+1. The dashboard auto-corrects building numbers from MeterID on import
+   (e.g., MeterID "0180ADW_001" corrects Building Number to "0180A")
+2. If auto-correct doesn't work: check that MeterID values follow the expected pattern
+   (BldgNo + service code + meter number, e.g., "0078_DW_001")
+3. Fix the source data in Smartsheet if corrections are needed
+
+
+IMPORT SHOWS "0 ROWS" OR DOESN'T RECOGNIZE COLUMNS
+------------------------------------------------------
+
+Cause: CSV column headers don't match the expected names, or the file uses a different delimiter.
+
+Solution:
+1. Verify CSV headers match exactly (case-sensitive):
+   Issue ID, Entry Date, Status, WO#, Action Note, Utility Type,
+   Building Number, MeterID, Building Name, Action / Description, Assigned To
+2. Ensure the file is comma-separated (not tab or semicolon)
+3. If exported from Excel: save as "CSV (Comma delimited)" not "CSV UTF-8"
+4. Open the CSV in a text editor to verify the format
+
+
+TASKS DISAPPEARED AFTER BROWSER UPDATE / CLEARING CACHE
+----------------------------------------------------------
+
+Cause: Tasks are stored in browser localStorage. Clearing browser data, switching browsers, or using incognito mode will lose tasks.
+
+Solution:
+1. Always export tasks to CSV after each meeting as a backup
+2. Import the CSV to restore tasks: Task Tracker tab > "Import from Smartsheet"
+3. For the future: export before clearing browser data
+
+
+DUPLICATE TASKS AFTER IMPORT
+------------------------------
+
+Cause: The merge logic couldn't match imported rows to existing tasks. This happens when Issue IDs are empty AND building/meter/date combinations don't match.
+
+Solution:
+1. Ensure Issue IDs are populated in the CSV before importing
+2. The dashboard auto-generates Issue IDs for rows without them
+3. After the first import/export cycle, all tasks will have Issue IDs
+4. Subsequent imports will match by Issue ID and avoid duplicates
+5. If duplicates exist: delete them manually on the Task Tracker tab
+
+
+EXPANDED ANOMALY ROW SHOWS NO CHART OR TABLE
+-----------------------------------------------
+
+Cause: JavaScript error during chart creation, or the building's data is missing from the aggregated dataset.
+
+Solution:
+1. Open browser dev tools (F12) > Console tab
+2. Click the row again and check for red error messages
+3. If the building number in the anomaly doesn't match any building in the water data,
+   the chart won't render
+4. Verify the building exists in domestic_water.json or irrigation.json
+
+
+SORT/FILTER ARROWS DON'T RESPOND
+-----------------------------------
+
+Cause: A JavaScript error earlier in page load prevented event handlers from binding.
+
+Solution:
+1. Open browser dev tools (F12) > Console tab
+2. Look for red error messages during page load
+3. Fix the underlying error (usually a data loading issue)
+4. Hard refresh the page (Ctrl+Shift+R)
+
+
+EXPORTED CSV WON'T IMPORT INTO SMARTSHEET
+-------------------------------------------
+
+Cause: Smartsheet may expect specific formatting or encoding.
+
+Solution:
+1. Open the exported CSV in Excel first to verify it looks correct
+2. Check for special characters in task descriptions that might cause parsing issues
+3. If Smartsheet rejects the file: try opening in Excel, saving as a new CSV, then importing
+4. Verify the CSV has exactly 11 columns matching Smartsheet's expected structure
+
+
+PASSWORD NOT WORKING
+---------------------
+
+Cause: Password is case-sensitive: "Energy@WSU" (capital E, capital W, capital S, capital U).
+
+Solution:
+1. Try the exact password: Energy@WSU
+2. Clear browser cache or try an incognito/private window
+3. The auth gate uses localStorage key "wsuMeteringAuth" -- shared across all dashboards
+
+
+DARK MODE TOGGLE NOT RESPONDING
+---------------------------------
+
+Cause: JavaScript error prevented the toggle from initializing.
+
+Solution:
+1. Open browser dev tools (F12) > Console tab
+2. Look for errors during page load
+3. If dark mode is stuck: clear "wsuDarkMode" from localStorage
+   (Dev tools > Application > Local Storage > delete the key)
+
+
+PRINT LAYOUT SHOWS WRONG DATA
+-------------------------------
+
+Cause: The print layout snapshots the current anomaly table and open tasks at the moment you print.
+
+Solution:
+1. Make sure you're on the Anomaly Review tab with the filters you want
+2. Verify the Task Tracker tab has up-to-date task information
+3. Press Ctrl+P to print
+4. Use Landscape orientation for best results
+5. Enable "Background graphics" in print settings for severity colors
+
+
+CHART.JS LIBRARY NOT LOADING
+-------------------------------
+
+Cause: chart.umd.min.js is missing from the repository root.
+
+Solution:
+1. Verify chart.umd.min.js exists at the root of the GitHub repository
+2. If missing: download Chart.js v4.4.7 and add the UMD build to the repo
+3. The file should be ~200 KB

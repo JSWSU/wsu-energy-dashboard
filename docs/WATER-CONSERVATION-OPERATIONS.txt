@@ -1,0 +1,176 @@
+WATER CONSERVATION MEETING DASHBOARD -- OPERATIONS RUNBOOK
+=============================================================
+
+Step-by-step guide for running the monthly water conservation meeting using the dashboard. Written for someone with no development background.
+
+
+OVERVIEW
+--------
+
+What this covers: The monthly cycle of preparing for, running, and following up after the water conservation committee meeting.
+
+Frequency: Monthly, at the Water Conservation Task Force meeting.
+
+Time required: ~5 minutes prep, meeting duration, ~5 minutes follow-up.
+
+
+WHERE EVERYTHING LIVES
+----------------------
+
+Live dashboard:
+  https://jswsu.github.io/wsu-energy-dashboard/water-conservation.html  (password: Energy@WSU)
+
+Smartsheet:
+  Contains the official task tracker shared with the committee.
+  Export CSV from Smartsheet before each meeting.
+
+GitHub repository:
+  https://github.com/JSWSU/wsu-energy-dashboard
+
+Data files (updated separately via SkySpark export):
+  data/domestic_water.json   Domestic water usage (gallons)
+  data/irrigation.json       Irrigation water usage (gallons)
+
+
+BEFORE THE MEETING
+-------------------
+
+Step 1: Update water data (if new SkySpark data is available)
+
+  1. Export domestic_water.json and irrigation.json from SkySpark
+  2. Upload to the data/ folder on GitHub
+  3. Verify the dashboard loads with fresh data
+
+Step 2: Import latest tasks from Smartsheet
+
+  1. Open Smartsheet and export the task list as CSV
+  2. Open the dashboard: https://jswsu.github.io/wsu-energy-dashboard/water-conservation.html
+  3. Go to the Task Tracker tab
+  4. Click "Import from Smartsheet" and select the CSV file
+  5. Review the import summary (e.g., "Imported 47 rows: 12 updated, 35 unchanged, 0 new")
+  6. Verify tasks loaded correctly in the task table
+
+
+DURING THE MEETING
+-------------------
+
+Step 1: Review anomalies (Anomaly Review tab)
+
+  1. Start on the Anomaly Review tab (loads by default)
+  2. Review the KPI cards for an overview:
+     - Domestic spike count, Irrigation spike count, Winter irrigation alerts, Open tasks
+  3. Walk through the anomaly table row by row:
+     - Click a row to expand the line chart and data table for that building
+     - Use the filter buttons to focus on specific service types or anomaly types
+     - Use column headers to sort by deviation, building, month, etc.
+     - Use column filter dropdowns to narrow to specific buildings or months
+  4. For each anomaly requiring action:
+     - Click "Create Task" to open the task creation modal
+     - Fill in: Status, Assigned To, Description (pre-populated), Work Order #
+     - Click Save
+  5. To create tasks for all unassigned anomalies at once:
+     - Click "Create Tasks for All New Anomalies"
+
+Step 2: Review existing tasks (Task Tracker tab)
+
+  1. Switch to the Task Tracker tab
+  2. Filter by status to focus on open items:
+     - "In Progress" -- check for updates
+     - "Not Started" -- assign or discuss
+     - "Monitor" -- review for resolution
+  3. Update tasks inline:
+     - Change status via the dropdown
+     - Click the Assigned To or Action Note fields to edit directly
+     - Click the pencil icon for full edit modal
+  4. Close resolved tasks by changing status to "Closed - Resolved" or "Closed - Not Resolved"
+
+Step 3: Review trends (Historical Trends tab -- optional)
+
+  1. Switch to the Historical Trends tab for big-picture context
+  2. Review campus-level domestic and irrigation trends
+  3. Note any campus-wide anomaly markers (hover for details)
+  4. Review the top 10 buildings by water consumption
+
+
+AFTER THE MEETING
+------------------
+
+Step 1: Export updated tasks
+
+  1. Go to the Task Tracker tab
+  2. Click "Export to Smartsheet"
+  3. A CSV file will download: water_conservation_tasks_YYYY-MM-DD.csv
+  4. Open the CSV in Excel to verify it looks correct
+
+Step 2: Upload to Smartsheet
+
+  1. Open Smartsheet
+  2. Import the CSV file to update the task tracker
+  3. Verify tasks match what was discussed in the meeting
+
+Step 3: Print meeting minutes (optional)
+
+  1. Press Ctrl+P (or Cmd+P on Mac) from the dashboard
+  2. The print layout shows:
+     - Meeting date
+     - Anomaly review table
+     - Open tasks summary
+     - Signature line
+  3. Set orientation to Landscape for best results
+
+
+TASK STATUS GUIDE
+------------------
+
+Use these statuses consistently to match Smartsheet:
+
+Status                  When to Use
+------                  -----------
+Open - Not Started      New task, not yet investigated
+Open - In Progress      Someone is actively working on it (e.g., meter check scheduled, WO submitted)
+Open - Monitor          Investigation done, watching for changes (e.g., "usage came down, monitoring")
+Closed - Resolved       Issue fixed (e.g., leak repaired, meter corrected, multiplier fixed)
+Closed - Not Resolved   Issue investigated but no fix needed (e.g., usage explained by occupancy, seasonal)
+
+
+UNDERSTANDING ANOMALY TYPES
+-----------------------------
+
+Spike Anomalies:
+  - A building's monthly usage is >100% higher than the average of its neighbor months
+  - Severity: Red border = >200% deviation (high), Orange border = 100-200% (medium)
+  - Irrigation spikes during May-Sep are excluded (expected irrigation season ramp-up)
+  - Common causes: leaks, meter issues, multiplier errors, temporary high usage (construction, cooling)
+
+Winter Irrigation Alerts:
+  - Any irrigation water usage during Nov, Dec, Jan, or Feb
+  - Green border in the anomaly table
+  - Systems should be winterized; any usage may indicate a leak or valve left open
+
+
+TROUBLESHOOTING
+---------------
+
+Dashboard shows "Error loading data":
+  - Verify domestic_water.json and irrigation.json exist in the data/ folder on GitHub
+  - Check that each file is valid JSON with a "rows" array
+
+Import shows "0 rows imported":
+  - Verify the CSV has the expected 11 columns with headers matching:
+    Issue ID, Entry Date, Status, WO#, Action Note, Utility Type,
+    Building Number, MeterID, Building Name, Action / Description, Assigned To
+  - Check that the CSV is comma-separated (not tab or semicolon)
+
+Tasks disappeared:
+  - Tasks are stored in browser localStorage -- they're lost if browser data is cleared
+  - Always export to CSV after meetings as a backup
+  - Import the CSV to restore tasks
+
+Export CSV has wrong data:
+  - The export includes ALL tasks (both imported and dashboard-created)
+  - Verify tasks look correct on the Task Tracker tab before exporting
+
+Anomaly count seems wrong:
+  - Irrigation spikes during May-Sep are intentionally excluded
+  - Check the info box below the KPI cards for the detection rules
+  - Use column filters to verify which anomalies are shown vs hidden

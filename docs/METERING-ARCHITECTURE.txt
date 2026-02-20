@@ -1,0 +1,280 @@
+CAMPUS METERING DASHBOARD -- ARCHITECTURE REFERENCE
+=====================================================
+
+Technical deep dive for the developer who will maintain or extend the WSU Campus Metering Dashboard.
+
+
+SYSTEM ARCHITECTURE
+-------------------
+
+SkySpark (Haxall platform)
+      |
+      | SkySpark data export (7 JSON files)
+      v
+data/ folder (JSON files, one per utility + sites + connectors)
+      |
+      | GitHub push / file upload (manual step)
+      v
+GitHub Repository (main branch)
+      |
+      | GitHub Pages (automatic deployment)
+      v
+metering.html (fetches 7 JSON files via Fetch API)
+      |
+      v
+Browser (Chart.js renders charts, JS builds tables/KPIs/verification)
+
+No build step. No Node.js, no bundler, no package.json. The repository is deployed as-is by GitHub Pages.
+
+
+FILE LOCATIONS
+--------------
+
+GitHub repository (version-controlled source):
+  https://github.com/JSWSU/wsu-energy-dashboard
+
+Live dashboard:
+  https://jswsu.github.io/wsu-energy-dashboard/metering.html  (password: Energy@WSU)
+
+
+DATA FILES (7 JSON files in data/ folder)
+------------------------------------------
+
+File                       Content                              Rows (approx)
+----                       -------                              -----
+data/electric.json         Building-level electric kWh           ~3,000
+data/condensate.json       Building-level steam lb               ~2,000
+data/domestic_water.json   Building-level domestic water gal     ~3,000
+data/irrigation.json       Building-level irrigation water gal   ~1,300
+data/chw.json              Building-level CHW energy tonrefh     ~1,500
+data/sites.json            Building metadata (no, name, area)    ~721
+data/connectors.json       SkySpark connector status records     variable
+
+All JSON files have a top-level "rows" array. Each row contains:
+  bldgNo      Building number (e.g., "0078A")
+  bldgName    Building name (e.g., "ELEC/MECH ENG")
+  meters      Meter identifier (e.g., "0078_DW_001")
+  startDate   Period start date (MM-DD-YYYY format)
+  endDate     Period end date
+  usage       Usage value in native units (kWh, lb, gal, tonrefh)
+
+Data period: 14 months (Jan 2025 -- Feb 2026)
+
+
+FILE-BY-FILE BREAKDOWN
+-----------------------
+
+metering.html (~29 KB, single-file SPA)
+.......................................
+
+Section            Contents
+-------            --------
+<style> block      CSS variables, layout, components, dark mode, print styles, KPI tooltips
+<body> HTML        Auth gate, loading spinner, header, 7 tab sections, print summary, footer
+<script> block     Constants, formatters, auth gate, dark mode, tab nav, data loading, aggregation, charts, verification
+
+
+AUTHENTICATION MODEL
+--------------------
+
+Type:              Client-side password gate
+Password:          Energy@WSU (hardcoded in JS)
+Storage:           localStorage key: wsuMeteringAuth
+Persistence:       Persists across tabs and browser sessions
+Security level:    DETERRENT ONLY -- anyone who views page source can see the password
+
+To change the password: Edit the string comparison in the tryAuth() IIFE.
+
+
+TAB SYSTEM
+----------
+
+7 tabs managed by click handlers:
+
+Tab ID        Tab Name           Content
+------        --------           -------
+overview      Overview           Total sites, energy, water KPIs; top 20 buildings; monthly campus trends
+electric      Electric           Total electric MMBtu, building count; trend chart with anomalies; top 15; searchable table
+thermal       Thermal            Steam + CHW energy; trend charts with anomalies; top 15 for each
+water         Water              Domestic + irrigation; trend charts with anomalies; top 15 for each
+buildings     Buildings          Searchable grid of all campus buildings; utility badges; expandable monthly detail
+connectors    Connectors         SkySpark connector health; filterable table (All/OK/Fault/Disabled)
+info          Data Info          Data sources, unit conversions, file inventory, 10 automated data quality checks
+
+Implementation: Show/hide via .section { display: none; } and .section.active { display: block; }.
+
+
+KPI CARD SYSTEM
+----------------
+
+Cards on each tab with hover tooltips and click-to-expand monthly detail tables.
+
+Overview Tab (8 cards):
+  Total Sites      -- campus building count
+  Total Energy     -- Electric + Steam + CHW in MMBtu (14-month sum)
+  Total Water      -- Domestic + Irrigation in kGal (14-month sum)
+  Connector Health -- % OK / count by status
+  Electric         -- MMBtu with building count
+  Steam            -- MMBtu with building count
+  Domestic Water   -- kGal with building count
+  Irrigation       -- kGal with building count
+  Data Quality     -- dynamically appended; pass/warn/fail with expandable checks
+
+Electric Tab (4 cards):
+  Total Electric, Buildings, Data Points, Avg per Building
+
+Thermal Tab (4 cards):
+  Total Steam, Total CHW Energy, Combined Thermal, Steam Records
+
+Water Tab (4 cards):
+  Domestic Water, Irrigation, Total Water, Data Records
+
+Connectors Tab (4 cards):
+  Total Connectors, OK, Fault, Disabled
+
+
+CHART.JS CONFIGURATION
+-----------------------
+
+Version: 4.4.7, loaded locally as chart.umd.min.js (no CDN dependency)
+
+12 chart instances:
+
+Canvas ID              Type                    Tab          Description
+---------              ----                    ---          -----------
+chartTopEnergy         Stacked horiz bar       Overview     Top 20 buildings by total energy
+chartTopWater          Stacked horiz bar       Overview     Top 20 buildings by total water
+chartMonthlyEnergy     Stacked vert bar        Overview     Monthly campus energy by type
+chartMonthlyWater      Stacked vert bar        Overview     Monthly campus water by type
+chartElecTrend         Line + anomalies        Electric     Monthly electric trend w/ callouts
+chartElecTop           Horizontal bar          Electric     Top 15 buildings by electric
+chartThermalTrend      Multi-line + anomalies  Thermal      Monthly steam + CHW trend w/ callouts
+chartSteamTop          Horizontal bar          Thermal      Top 15 buildings by steam
+chartChwETop           Horizontal bar          Thermal      Top 15 buildings by CHW energy
+chartWaterTrend        Multi-line + anomalies  Water        Monthly domestic + irrigation trend
+chartDomTop            Horizontal bar          Water        Top 15 buildings by domestic water
+chartIrrigTop          Horizontal bar          Water        Top 15 buildings by irrigation
+
+Color palette:
+
+Variable        Hex        Usage
+--------        ---        -----
+electric        #f59e0b    Electric charts (orange/gold)
+steam           #ef4444    Steam/thermal charts (red)
+chwEnergy       #06b6d4    Chilled water energy (cyan)
+domestic        #3b82f6    Domestic water (blue)
+irrigation      #22c55e    Irrigation (green)
+chwWater        #8b5cf6    CHW water (purple)
+
+
+ANOMALY DETECTION
+-----------------
+
+Campus-level spike detection applied to line charts (Electric, Thermal, Water tabs).
+
+Algorithm:
+1. For each month (except first and last):
+   - Compare usage to average of neighbor months (month-1 and month+1)
+   - Skip if value or neighbors are zero
+   - Flag if deviation > 100% above average (positive spikes only)
+2. For each flagged spike:
+   - Identify top-contributing building (highest delta from its own baseline)
+   - Store building name as "driver" label
+
+Visualization:
+  anomalyCalloutPlugin -- custom Chart.js plugin
+  - Draws red diamond markers at anomaly data points
+  - On hover: shows callout box with "% vs avg" and driving building name
+  - Callout positioned above the data point with a connecting arrow
+
+
+UNIT CONVERSIONS
+-----------------
+
+All conversions applied during data aggregation:
+
+From             To            Function           Multiplier
+----             --            --------           ----------
+kWh              MMBtu         kwhToMmbtu()       x 0.003412
+lb (steam)       MMBtu         lbToMmbtu()        x 0.001
+tonrefh (CHW)    MMBtu         tonrefhToMmbtu()   x 0.012
+gallons          kGal          galToKgal()        / 1,000
+
+
+DATA QUALITY VERIFICATION
+--------------------------
+
+10 automated checks run on every data load (runVerification function):
+
+Check                        What it checks
+-----                        --------------
+Row Counts                   All 5 utilities have > 0 rows
+NA/Invalid Values            Flags any NaN/invalid values by utility
+Negative Values              Flags negative reads (meter rollover)
+Zero-Usage Months            Informational count of zero months
+Date Range Consistency       All utilities cover same date range
+Building Coverage            Count of buildings per utility
+Monthly Continuity           Buildings missing expected months
+Cross-Utility Sanity         Top-5 electric buildings overlap top-5 steam
+KPI Recalculation            Dashboard KPI values match raw sum (0.1% tolerance)
+Conversion Reference         Shows conversion formulas (always passes)
+
+Overall status: pass (all green), warn (warnings exist), fail (checks failed).
+Results displayed as KPI card on Overview tab and detail table on Data Info tab.
+
+
+BUILDING INDEX
+--------------
+
+Searchable grid of all campus buildings (Buildings tab):
+
+- Cards show building number, name, and area (sqft)
+- Colored utility badges with 14-month totals (Electric, Steam, CHW Energy, Domestic Water, Irrigation)
+- Click to expand: monthly detail table with all 5 utilities per month
+- Search matches building number or name (case-insensitive)
+- Capped at 200 rendered cards for DOM performance
+
+
+DARK MODE
+---------
+
+Toggle:        Slider switch in header ("Dark Mode" label + sliding dot)
+Storage:       localStorage key: wsuDarkMode (values: 'on' / 'off')
+Persistence:   Persists across sessions and page refreshes
+Implementation: Toggles html.dark class on <html> element
+
+CSS variables under html.dark override all colors. Charts rebuild on toggle via
+applyChartTheme() + chartInstances array update.
+
+
+PRINT OPTIMIZATION
+-------------------
+
+Landscape orientation, 0.5in margins, print-color-adjust: exact.
+
+Hidden on print: header, auth gate, nav tabs, search bars, filter buttons, dark toggle.
+Shown on print: all sections (display: block), each with page-break-inside: avoid.
+Dark mode override: forces light theme variables in print context.
+
+
+EXTERNAL DEPENDENCIES
+---------------------
+
+Dependency     Version   Source                         Purpose
+----------     -------   ------                         -------
+Chart.js       4.4.7     Local file (chart.umd.min.js)  All charts and visualizations
+GitHub Pages   --        github.com                     Static site hosting
+
+No other dependencies. No CSS framework, no JS framework, no build tools.
+
+
+KNOWN LIMITATIONS
+------------------
+
+Issue                                         Impact                                      Mitigation
+-----                                         ------                                      ----------
+All code in one 29KB HTML file                Hard to navigate for large changes           Consider splitting CSS/JS into separate files
+Password is client-side plaintext             Anyone can read the page source              Move to private repo or server-side auth if needed
+No automated tests                            Changes could break silently                 Data quality verification catches many issues
+Building grid capped at 200 cards             Large campuses may not show all buildings    Search filter helps locate specific buildings
+Anomaly threshold hardcoded at 100%           May miss moderate spikes                     Adjust threshold constant if needed
