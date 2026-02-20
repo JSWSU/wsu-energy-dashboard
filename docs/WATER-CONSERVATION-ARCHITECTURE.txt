@@ -68,15 +68,17 @@ Conversion: All values converted from gallons to kGal on load.
 FILE-BY-FILE BREAKDOWN
 -----------------------
 
-water-conservation.html (~2,000 lines, single-file SPA)
+water-conservation.html (~2,300 lines, single-file SPA)
 .......................................................
 
 Section            Contents
 -------            --------
-<style> block      CSS variables, layout, sortable headers, filter menus, severity colors, task editing, modals
-<body> HTML        Auth gate, loading spinner, header, 4 tab sections, print summary, modal, footer
+<style> block      CSS variables, layout, sortable headers, filter menus, severity colors, task status
+                   badges, task editing, modals, help tab styles
+<body> HTML        Auth gate, loading spinner, header, 5 tab sections, print summary, modal, footer
 <script> block     Constants, helpers, auth, dark mode, tabs, data loading, anomaly detection, task CRUD,
-                   Smartsheet import/export, render functions, column sort/filter, event handlers
+                   task-anomaly matching, Smartsheet import/export, render functions, column sort/filter,
+                   event handlers
 
 
 AUTHENTICATION MODEL
@@ -92,14 +94,15 @@ Security level:    DETERRENT ONLY
 TAB SYSTEM
 ----------
 
-4 tabs managed by click handlers:
+5 tabs managed by click handlers:
 
 Tab ID        Tab Name           Content
 ------        --------           -------
-anomalies     Anomaly Review     KPI cards, detected anomalies table with sort/filter/expand, task creation
+anomalies     Anomaly Review     KPI cards, detected anomalies table with sort/filter/expand, task status, task creation
 tasks         Task Tracker       Editable task table, status filters, search, Smartsheet import/export
 trends        Historical Trends  Campus domestic + irrigation line charts with anomaly markers; top 10 bar chart
 buildings     Building Index     Searchable card grid; domestic + irrigation badges; expandable monthly detail
+help          How to Use         Static SOP / in-app manual with 7 sections (no JavaScript needed)
 
 
 KPI CARDS
@@ -189,10 +192,22 @@ Sortable Column Headers:
   Month column sorts chronologically.
 
 Per-Column Filter Dropdowns:
-  Filterable columns: Bldg #, Building Name, Type, Service, Month
+  Filterable columns: Bldg #, Building Name, Type, Service, Month, Task Status
   Click the hamburger icon (three lines) to open a checkbox dropdown.
   Check/uncheck values to filter. Apply to commit, Clear to reset.
   Active filters highlighted with colored button and italic header.
+
+Task Status Column:
+  Shows color-coded badge for each anomaly's associated task (or dash if none).
+  Badge colors by status:
+    Yellow   "Not Started"     (ts-open)
+    Blue     "In Progress"     (ts-progress)
+    Green    "Monitor"         (ts-monitor)
+    Green    "Resolved"        (ts-resolved, with checkmark)
+    Gray     "Not Resolved"    (ts-closed)
+    Dash     No task assigned  (ts-none)
+  Sortable and filterable like other columns.
+  Includes both open and closed tasks so full history is visible.
 
 Service/Type Filter Bar:
   Quick-filter buttons above the table:
@@ -242,6 +257,18 @@ CRUD Functions:
   deleteTask(id)           -- Remove task by Issue ID
   getNextIssueId()         -- Generate next WC-YYYY-NNN identifier
 
+Task-Anomaly Matching (for Task Status column and Action buttons):
+  Function: taskMatchesAnomaly(task, anomaly)
+  Used by: findTaskForAnomaly() and findAnyTaskForAnomaly()
+  Layered matching strategy (first match wins):
+    1. Exact: bldgNo + service + month label in task description (dashboard-created tasks)
+    2. Fallback: bldgNo + service (catches Smartsheet-imported tasks)
+    3. Case-insensitive service comparison (handles "Domestic water" vs "Domestic Water")
+    4. Meter ID match (if task.meterId matches anomaly.meter)
+    5. Empty service tolerance (if Smartsheet Utility Type column was blank)
+  findTaskForAnomaly()    -- Returns first open task matching anomaly (excludes closed)
+  findAnyTaskForAnomaly() -- Returns any task matching anomaly (prefers open over closed)
+
 Task Tracker Tab Features:
   - Status filter buttons (All, Not Started, In Progress, Monitor, Resolved, Not Resolved)
   - Status count pills showing task distribution
@@ -276,6 +303,35 @@ Export (Dashboard to Smartsheet CSV):
      Building Number, MeterID, Building Name, Action / Description, Assigned To
   3. Escape cells (quote if contains comma, newline, or double quote)
   4. Trigger browser download: water_conservation_tasks_YYYY-MM-DD.csv
+
+
+HOW TO USE TAB
+---------------
+
+Static in-app SOP / manual. No JavaScript required -- content is pure HTML
+rendered using existing .card and .info-box CSS classes. The tab switcher
+handles it dynamically (data-tab="help" -> id="sec-help").
+
+7 content sections:
+  1. Meeting Workflow      3-step visual cards (Before / During / After)
+  2. Tab Guide             4 cards explaining each functional tab
+  3. Anomaly Types         Spike severity colors, irrigation season exclusion, winter alerts
+  4. Task Status Guide     5-status reference table matching Smartsheet
+  5. Smartsheet Sync       Numbered step-by-step for CSV import/export round-trip
+  6. Quick Tips            6 tips for power users (expand rows, sort/filter, print, etc.)
+  7. Troubleshooting       5-item FAQ with concise solutions
+
+Help-specific CSS classes:
+  .help-section        Section wrapper with bottom margin
+  .help-steps          3-column grid for workflow step cards
+  .help-step           Individual step card with numbered circle
+  .help-tab-cards      2-column grid for tab description cards
+  .help-table          Compact reference table (used for status guide, severity legend)
+  .help-tip            Icon + text row for quick tips
+  .help-faq            Definition list for FAQ items
+  .help-sync-steps     CSS-countered ordered list for sync steps
+
+Hidden in print layout (inherits from .section { display: none } in @media print).
 
 
 DARK MODE

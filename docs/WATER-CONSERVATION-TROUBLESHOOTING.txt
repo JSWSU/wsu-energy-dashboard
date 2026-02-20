@@ -92,6 +92,29 @@ Solution:
 5. If duplicates exist: delete them manually on the Task Tracker tab
 
 
+TASK STATUS COLUMN SHOWS DASH WHEN TASKS EXIST
+-------------------------------------------------
+
+Cause: The task-anomaly matching could not link the task to the anomaly. Matching
+uses a layered strategy: building number + service type, with fallbacks for
+case-insensitive service comparison, meter ID matching, and empty service fields.
+
+Common reasons for mismatch:
+  A. The "Utility Type" column in Smartsheet is blank or uses a different label
+     (e.g., "DW" instead of "Domestic Water")
+  B. The building number in the task doesn't match the anomaly's building number
+     (e.g., "0078" in Smartsheet vs "0078A" in the water data)
+  C. The task's MeterID doesn't match the anomaly's meter identifier
+
+Solution:
+1. On the Task Tracker tab, verify the task's Building Number and Utility Type
+   match what appears in the anomaly table
+2. Ensure Utility Type is "Domestic Water" or "Irrigation Water" (not abbreviations)
+3. If building numbers are inconsistent: the dashboard auto-corrects from MeterID
+   on import, but only if MeterID follows the pattern (e.g., "0078_DW_001")
+4. Re-import the Smartsheet CSV after correcting the data
+
+
 EXPANDED ANOMALY ROW SHOWS NO CHART OR TABLE
 -----------------------------------------------
 

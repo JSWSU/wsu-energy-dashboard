@@ -61,9 +61,12 @@ Step 1: Review anomalies (Anomaly Review tab)
      - Domestic spike count, Irrigation spike count, Winter irrigation alerts, Open tasks
   3. Walk through the anomaly table row by row:
      - Click a row to expand the line chart and data table for that building
+     - Check the "Task Status" column to see if a task already exists for that building
+       (color-coded badges show the current status; dash means no task)
      - Use the filter buttons to focus on specific service types or anomaly types
      - Use column headers to sort by deviation, building, month, etc.
-     - Use column filter dropdowns to narrow to specific buildings or months
+     - Use column filter dropdowns to narrow to specific buildings, months, or task statuses
+       (e.g., filter Task Status to "No Task" to find anomalies without assignments)
   4. For each anomaly requiring action:
      - Click "Create Task" to open the task creation modal
      - Fill in: Status, Assigned To, Description (pre-populated), Work Order #
@@ -90,6 +93,11 @@ Step 3: Review trends (Historical Trends tab -- optional)
   2. Review campus-level domestic and irrigation trends
   3. Note any campus-wide anomaly markers (hover for details)
   4. Review the top 10 buildings by water consumption
+
+Note: For first-time users or new committee members, the "How to Use" tab
+(rightmost tab) contains an in-app guide with the meeting workflow, tab
+descriptions, anomaly type explanations, task status reference, and
+troubleshooting tips.
 
 
 AFTER THE MEETING
