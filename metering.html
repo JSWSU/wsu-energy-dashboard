@@ -32,6 +32,7 @@
     --clr-domestic: #3b82f6;
     --clr-irrigation: #22c55e;
     --clr-chw-water: #8b5cf6;
+    --mini-row-border: #f3f4f6;
   }
   html.dark {
     --bg: #111827;
@@ -48,6 +49,7 @@
     --info-bg: #1e293b;
     --info-border: #334155;
     --info-text: #7dd3fc;
+    --mini-row-border: #253347;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -90,14 +92,50 @@
   .nav-tab:hover { background: var(--table-hover); color: var(--text); }
   .nav-tab.active { background: var(--primary); color: #fff; }
   /* KPI */
-  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
   .kpi-card {
     background: var(--card-bg); border-radius: 10px; padding: 1.25rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary);
+    cursor: pointer; transition: box-shadow 0.2s ease, transform 0.15s ease; position: relative;
   }
+  .kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-2px); }
   .kpi-label { font-size: 0.78rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.05em; }
   .kpi-value { font-size: 1.8rem; font-weight: 700; margin: 0.25rem 0; }
   .kpi-sub { font-size: 0.8rem; color: var(--text-light); }
+  .kpi-tooltip {
+    visibility: hidden; opacity: 0; position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); background: #1f2937; color: #fff; font-size: 0.75rem;
+    line-height: 1.4; padding: 0.5rem 0.75rem; border-radius: 6px; white-space: normal;
+    width: max-content; max-width: 260px; z-index: 100; pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .kpi-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #1f2937;
+  }
+  .kpi-card:hover .kpi-tooltip { visibility: visible; opacity: 1; }
+  .kpi-expand {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.35s ease, margin-top 0.35s ease, opacity 0.25s ease;
+    opacity: 0; margin-top: 0;
+  }
+  .kpi-card.expanded .kpi-expand { max-height: 500px; opacity: 1; margin-top: 0.75rem; }
+  .kpi-card.expanded { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+  .kpi-expand-icon {
+    position: absolute; top: 0.75rem; right: 0.75rem; font-size: 0.7rem;
+    color: var(--text-light); transition: transform 0.3s ease;
+  }
+  .kpi-card.expanded .kpi-expand-icon { transform: rotate(180deg); }
+  .kpi-mini-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+  .kpi-mini-table th {
+    text-align: left; font-weight: 600; color: var(--secondary); padding: 0.3rem 0.5rem;
+    border-bottom: 2px solid var(--border); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .kpi-mini-table th:not(:first-child) { text-align: right; }
+  .kpi-mini-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--mini-row-border); }
+  .kpi-mini-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+  .kpi-mini-table tr:last-child { font-weight: 700; border-top: 2px solid var(--primary); }
+  .kpi-mini-table tr:last-child td { border-bottom: none; padding-top: 0.4rem; }
   .kpi-card.electric { border-left-color: var(--clr-electric); }
   .kpi-card.steam { border-left-color: var(--clr-steam); }
   .kpi-card.chw-energy { border-left-color: var(--clr-chw-energy); }
@@ -117,6 +155,7 @@
   }
   html.dark .card h2 { color: var(--clr-electric); }
   .chart-container { position: relative; height: 350px; width: 100%; }
+  .chart-container.tall { height: 550px; }
   .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
   @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
   /* Tables */
@@ -321,7 +360,7 @@
 <header>
   <div class="header-text">
     <h1>WSU Campus Metering Dashboard</h1>
-    <p>Jan 2025 &ndash; Feb 2026 &bull; 721 Sites &bull; Pullman Campus <span id="verifiedBadge"></span></p>
+    <p>Jan 2025 &ndash; Feb 2026 &bull; 721 Sites &bull; Pullman Campus</p>
   </div>
   <div class="header-actions">
     <a href="index.html">Energy Cost Projection</a>
@@ -347,11 +386,11 @@
     <div class="chart-row">
       <div class="card">
         <h2>Top 20 Buildings by Total Energy (MMBtu)</h2>
-        <div class="chart-container"><canvas id="chartTopEnergy"></canvas></div>
+        <div class="chart-container tall"><canvas id="chartTopEnergy"></canvas></div>
       </div>
       <div class="card">
         <h2>Top 20 Buildings by Total Water (kGal)</h2>
-        <div class="chart-container"><canvas id="chartTopWater"></canvas></div>
+        <div class="chart-container tall"><canvas id="chartTopWater"></canvas></div>
       </div>
     </div>
     <div class="chart-row">
@@ -375,7 +414,7 @@
     </div>
     <div class="card">
       <h2>Top 15 Buildings &mdash; Electric (MMBtu, 14-mo Total)</h2>
-      <div class="chart-container"><canvas id="chartElecTop"></canvas></div>
+      <div class="chart-container tall"><canvas id="chartElecTop"></canvas></div>
     </div>
     <div class="card">
       <h2>Building Electric Consumption</h2>
@@ -394,11 +433,11 @@
     <div class="chart-row">
       <div class="card">
         <h2>Top 15 Buildings &mdash; Steam (MMBtu)</h2>
-        <div class="chart-container"><canvas id="chartSteamTop"></canvas></div>
+        <div class="chart-container tall"><canvas id="chartSteamTop"></canvas></div>
       </div>
       <div class="card">
         <h2>Top 15 Buildings &mdash; CHW Energy (MMBtu)</h2>
-        <div class="chart-container"><canvas id="chartChwETop"></canvas></div>
+        <div class="chart-container tall"><canvas id="chartChwETop"></canvas></div>
       </div>
     </div>
   </div>
@@ -413,11 +452,11 @@
     <div class="chart-row">
       <div class="card">
         <h2>Top 15 Buildings &mdash; Domestic Water (kGal)</h2>
-        <div class="chart-container"><canvas id="chartDomTop"></canvas></div>
+        <div class="chart-container tall"><canvas id="chartDomTop"></canvas></div>
       </div>
       <div class="card">
         <h2>Top 15 Buildings &mdash; Irrigation (kGal)</h2>
-        <div class="chart-container"><canvas id="chartIrrigTop"></canvas></div>
+        <div class="chart-container tall"><canvas id="chartIrrigTop"></canvas></div>
       </div>
     </div>
   </div>
@@ -569,6 +608,91 @@ function applyChartTheme() {
 }
 applyChartTheme();
 
+// ============================================================
+//  ANOMALY DETECTION
+// ============================================================
+function detectAnomalies(data, threshold) {
+  threshold = threshold || 0.35;
+  const anomalies = [];
+  for (let i = 1; i < data.length - 1; i++) {
+    const val = data[i];
+    if (!val || val === 0) continue;
+    const neighbors = [data[i-1], data[i+1]].filter(function(v) { return v && v > 0; });
+    if (neighbors.length === 0) continue;
+    var avg = neighbors.reduce(function(s,v) { return s+v; }, 0) / neighbors.length;
+    if (avg === 0) continue;
+    var pctDev = (val - avg) / avg;
+    if (Math.abs(pctDev) > threshold) {
+      anomalies.push({ index: i, value: val, expected: avg, pctDev: pctDev,
+        label: (pctDev > 0 ? '+' : '') + Math.round(pctDev * 100) + '% vs avg' });
+    }
+  }
+  return anomalies;
+}
+
+// Chart.js custom plugin for anomaly callouts
+const anomalyCalloutPlugin = {
+  id: 'anomalyCallout',
+  afterDatasetsDraw: function(chart) {
+    const pluginOpts = chart.options.plugins.anomalyCallout;
+    if (!pluginOpts || !pluginOpts.items || pluginOpts.items.length === 0) return;
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+    const dark = document.documentElement.classList.contains('dark');
+
+    pluginOpts.items.forEach(function(group, dsIdx) {
+      if (!group || group.length === 0) return;
+      var color = pluginOpts.colors && pluginOpts.colors[dsIdx] ? pluginOpts.colors[dsIdx] : '#dc2626';
+      group.forEach(function(a) {
+        var x = xScale.getPixelForValue(a.index);
+        var y = yScale.getPixelForValue(a.value);
+        // Draw diamond marker
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 6);
+        ctx.lineTo(x + 5, y);
+        ctx.lineTo(x, y + 6);
+        ctx.lineTo(x - 5, y);
+        ctx.closePath();
+        ctx.fill();
+        // Draw callout label above
+        var labelY = y - 18;
+        if (labelY < 20) labelY = y + 20; // flip below if near top
+        ctx.font = 'bold 10px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = dark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.75)';
+        // Background pill
+        var textW = ctx.measureText(a.label).width + 8;
+        ctx.fillStyle = dark ? 'rgba(31,41,55,0.9)' : 'rgba(255,255,255,0.92)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        var rx = x - textW/2, ry = labelY - 8, rw = textW, rh = 16, rr = 3;
+        ctx.beginPath();
+        if (ctx.roundRect) { ctx.roundRect(rx, ry, rw, rh, rr); }
+        else { ctx.moveTo(rx+rr,ry); ctx.arcTo(rx+rw,ry,rx+rw,ry+rh,rr); ctx.arcTo(rx+rw,ry+rh,rx,ry+rh,rr); ctx.arcTo(rx,ry+rh,rx,ry,rr); ctx.arcTo(rx,ry,rx+rw,ry,rr); ctx.closePath(); }
+        ctx.fill();
+        ctx.stroke();
+        // Text
+        ctx.fillStyle = color;
+        ctx.fillText(a.label, x, labelY + 4);
+        // Connector line
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(x, y - 6);
+        ctx.lineTo(x, labelY + 8);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      });
+    });
+  }
+};
+Chart.register(anomalyCalloutPlugin);
+
 function fmt(n, dec) {
   if (n == null || isNaN(n)) return '0';
   dec = dec ?? 0;
@@ -694,14 +818,21 @@ function barChart(canvasId, labels, datasets, opts) {
           beginAtZero: !opts?.horizontal,
           ...(!opts?.horizontal ? {
             ticks: { callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'k' : v }
-          } : {})
+          } : {
+            ticks: { autoSkip: false, font: { size: 11 } }
+          })
         }
       }
     }
   });
 }
 
-function lineChart(canvasId, labels, datasets) {
+function lineChart(canvasId, labels, datasets, anomalies) {
+  // anomalies: optional array of arrays (one per dataset), each containing anomaly objects
+  const anomalyOpts = anomalies ? {
+    items: anomalies,
+    colors: datasets.map(d => d.borderColor || '#dc2626')
+  } : { items: [] };
   return createChart(canvasId, {
     type: 'line',
     data: { labels, datasets },
@@ -709,7 +840,8 @@ function lineChart(canvasId, labels, datasets) {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, padding: 10 } },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 1) } }
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 1) } },
+        anomalyCallout: anomalyOpts
       },
       scales: {
         x: { grid: { display: false } },
@@ -725,15 +857,39 @@ function lineChart(canvasId, labels, datasets) {
 // ============================================================
 //  KPI HELPERS
 // ============================================================
+function buildMiniTable(headers, monthKeys, rowFn, totalLabel, totalFn) {
+  let html = '<table class="kpi-mini-table"><thead><tr>';
+  headers.forEach(h => { html += '<th>' + h + '</th>'; });
+  html += '</tr></thead><tbody>';
+  monthKeys.forEach((mk, i) => {
+    const cells = rowFn(mk, i);
+    html += '<tr>';
+    cells.forEach(c => { html += '<td>' + c + '</td>'; });
+    html += '</tr>';
+  });
+  html += '<tr><td>' + totalLabel + '</td>';
+  totalFn().forEach(t => { html += '<td>' + t + '</td>'; });
+  html += '</tr></tbody></table>';
+  return html;
+}
+
 function renderKPIs(containerId, cards) {
   const el = document.getElementById(containerId);
   el.innerHTML = cards.map(c =>
     `<div class="kpi-card ${c.cls || ''}">
+      ${c.expandHtml ? '<span class="kpi-expand-icon">&#9660;</span>' : ''}
+      ${c.tooltip ? '<span class="kpi-tooltip">' + c.tooltip + '</span>' : ''}
       <div class="kpi-label">${c.label}</div>
       <div class="kpi-value">${c.value}</div>
       <div class="kpi-sub">${c.sub || ''}</div>
+      ${c.expandHtml ? '<div class="kpi-expand">' + c.expandHtml + '</div>' : ''}
     </div>`
   ).join('');
+  el.querySelectorAll('.kpi-card').forEach(card => {
+    if (card.querySelector('.kpi-expand')) {
+      card.addEventListener('click', function() { this.classList.toggle('expanded'); });
+    }
+  });
 }
 
 // ============================================================
@@ -873,26 +1029,43 @@ function runVerification(data, totals) {
 
 function renderVerification(vr) {
   const icon = vr.overall === 'pass' ? '\u2713' : vr.overall === 'warn' ? '\u26a0' : '\u2717';
-  const label = vr.overall === 'pass' ? 'Data Verified' : vr.overall === 'warn' ? vr.warnCount + ' Warning' + (vr.warnCount > 1 ? 's' : '') : 'Verification Failed';
+  const label = vr.overall === 'pass' ? '\u2713 All Passed' : vr.overall === 'warn' ? '\u26a0 ' + vr.warnCount + ' Warning' + (vr.warnCount > 1 ? 's' : '') : '\u2717 Failed';
+  const statusIcon = s => '<span class="dq-icon ' + s + '">' + (s === 'pass' ? '\u2713' : s === 'warn' ? '\u26a0' : '\u2717') + '</span>';
 
-  // Header badge
-  document.getElementById('verifiedBadge').innerHTML =
-    '<span class="verified-badge ' + vr.overall + '">' + icon + ' ' + label + '</span>';
+  // Build checks mini-table for KPI expand
+  const checksHtml = '<table class="kpi-mini-table"><thead><tr><th style="width:20px"></th><th>Check</th><th>Result</th></tr></thead><tbody>' +
+    vr.checks.map(c =>
+      '<tr><td>' + statusIcon(c.status) + '</td><td>' + c.name + '</td><td style="font-size:0.7rem">' + c.detail + '</td></tr>'
+    ).join('') + '</tbody></table>';
 
-  // Summary
+  // Append Data Quality KPI card to overview grid
+  const overviewGrid = document.getElementById('kpiOverview');
+  const borderCls = vr.overall === 'pass' ? 'ok' : vr.overall === 'warn' ? 'electric' : 'fault';
+  const dqCard = document.createElement('div');
+  dqCard.className = 'kpi-card ' + borderCls;
+  dqCard.innerHTML =
+    '<span class="kpi-expand-icon">&#9660;</span>' +
+    '<span class="kpi-tooltip">Automated integrity checks run at load time across all datasets</span>' +
+    '<div class="kpi-label">Data Quality</div>' +
+    '<div class="kpi-value">' + label + '</div>' +
+    '<div class="kpi-sub">' + vr.passCount + ' of ' + vr.checks.length + ' checks passed \u00b7 Click for details</div>' +
+    '<div class="kpi-expand">' + checksHtml + '</div>';
+  dqCard.addEventListener('click', function() { this.classList.toggle('expanded'); });
+  overviewGrid.appendChild(dqCard);
+
+  // Data Info tab: Summary
   document.getElementById('dqSummary').innerHTML =
     '<span class="dq-stat pass">' + vr.passCount + ' Passed</span>' +
     (vr.warnCount > 0 ? '<span class="dq-stat warn">' + vr.warnCount + ' Warnings</span>' : '') +
     (vr.failCount > 0 ? '<span class="dq-stat fail">' + vr.failCount + ' Failed</span>' : '') +
     '<span style="font-size:0.75rem;color:var(--text-light)">' + vr.checks.length + ' checks run at load time</span>';
 
-  // Checks table
-  const statusIcon = s => '<span class="dq-icon ' + s + '">' + (s === 'pass' ? '\u2713' : s === 'warn' ? '\u26a0' : '\u2717') + '</span>';
+  // Data Info tab: Checks table
   document.getElementById('dqChecks').innerHTML = vr.checks.map(c =>
     '<tr><td>' + statusIcon(c.status) + '</td><td>' + c.name + '</td><td style="font-size:0.75rem">' + c.detail + '</td></tr>'
   ).join('');
 
-  // KPI cross-check table
+  // Data Info tab: KPI cross-check table
   document.getElementById('dqKpi').innerHTML = Object.entries(vr.kpiCheck).map(([name, k]) =>
     '<tr><td>' + name + '</td>' +
     '<td>' + fmt(k.rawSum, 0) + ' ' + k.rawUnit + '</td>' +
@@ -901,7 +1074,7 @@ function renderVerification(vr) {
     '<td class="' + (k.match ? 'dq-match' : 'dq-mismatch') + '">' + (k.match ? '\u2713 Match' : '\u2717 Mismatch') + '</td></tr>'
   ).join('');
 
-  // Per-utility breakdown
+  // Data Info tab: Per-utility breakdown
   document.getElementById('dqUtility').innerHTML = Object.entries(vr.utilities).map(([name, u]) =>
     '<tr><td>' + name + '</td>' +
     '<td>' + fmt(u.rows) + '</td>' +
@@ -959,19 +1132,75 @@ loadAllData().then(data => {
 
   // ==================== DATA VERIFICATION ====================
   const vr = runVerification(data, { elec: totalElec, steam: totalSteam, chwE: totalChwE, dom: totalDom, irrig: totalIrrig });
-  renderVerification(vr);
 
   // ==================== OVERVIEW TAB ====================
+  // Build expand tables for overview KPIs
+  const energyExpand = buildMiniTable(
+    ['Month', 'Electric', 'Steam', 'CHW', 'Total'],
+    months,
+    mk => [monthLabel(mk), fmt(elecByMonth[mk]||0,0), fmt(steamByMonth[mk]||0,0), fmt(chwEByMonth[mk]||0,0), fmt((elecByMonth[mk]||0)+(steamByMonth[mk]||0)+(chwEByMonth[mk]||0),0)],
+    'Total', () => [fmt(totalElec,0), fmt(totalSteam,0), fmt(totalChwE,0), fmt(totalEnergy,0)]
+  );
+  const waterExpand = buildMiniTable(
+    ['Month', 'Domestic', 'Irrigation', 'Total'],
+    months,
+    mk => [monthLabel(mk), fmt(domByMonth[mk]||0,0), fmt(irrigByMonth[mk]||0,0), fmt((domByMonth[mk]||0)+(irrigByMonth[mk]||0),0)],
+    'Total', () => [fmt(totalDom,0), fmt(totalIrrig,0), fmt(totalWater,0)]
+  );
+  const connExpand = '<table class="kpi-mini-table"><thead><tr><th>Status</th><th>Count</th><th>Pct</th></tr></thead><tbody>' +
+    '<tr><td>OK</td><td>' + connOk + '</td><td>' + Math.round(connOk/data.connectors.length*100) + '%</td></tr>' +
+    '<tr><td>Fault</td><td>' + connFault + '</td><td>' + Math.round(connFault/data.connectors.length*100) + '%</td></tr>' +
+    '<tr><td>Disabled</td><td>' + connDisabled + '</td><td>' + Math.round(connDisabled/data.connectors.length*100) + '%</td></tr>' +
+    (connOther > 0 ? '<tr><td>Other</td><td>' + connOther + '</td><td>' + Math.round(connOther/data.connectors.length*100) + '%</td></tr>' : '') +
+    '<tr><td>Total</td><td>' + data.connectors.length + '</td><td>100%</td></tr></tbody></table>';
+  const singleExpand = (byMonth, total, unit) => buildMiniTable(
+    ['Month', unit], months,
+    mk => [monthLabel(mk), fmt(byMonth[mk]||0,0)],
+    'Total', () => [fmt(total,0)]
+  );
+
+  // Top 10 for Sites expand
+  const allBldgTotal = {};
+  [elecByBldg, steamByBldg, chwEByBldg, domByBldg, irrigByBldg].forEach(map => {
+    Object.entries(map).forEach(([k,v]) => { allBldgTotal[k] = (allBldgTotal[k]||0) + v.total; });
+  });
+  const top10Sites = Object.entries(allBldgTotal).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const sitesExpand = '<table class="kpi-mini-table"><thead><tr><th>Building</th><th>Total</th></tr></thead><tbody>' +
+    top10Sites.map(([no,total]) => {
+      const name = (elecByBldg[no]||steamByBldg[no]||domByBldg[no]||{}).bldgName || '';
+      return '<tr><td>' + no + (name ? ' - ' + name : '') + '</td><td>' + fmt(total,0) + '</td></tr>';
+    }).join('') +
+    '<tr><td>All ' + data.sites.length + ' sites</td><td></td></tr></tbody></table>';
+
   renderKPIs('kpiOverview', [
-    { label: 'Total Sites', value: fmt(data.sites.length), sub: 'Campus buildings', cls: '' },
-    { label: 'Total Energy', value: fmt(totalEnergy, 0) + ' MMBtu', sub: '14-month total', cls: 'electric' },
-    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: '14-month total', cls: 'domestic' },
-    { label: 'Connector Health', value: Math.round(connOk / data.connectors.length * 100) + '%', sub: connOk + ' OK / ' + connFault + ' Fault / ' + connDisabled + ' Disabled', cls: 'ok' },
-    { label: 'Electric', value: fmt(totalElec, 0) + ' MMBtu', sub: elecBldgs.size + ' buildings', cls: 'electric' },
-    { label: 'Steam', value: fmt(totalSteam, 0) + ' MMBtu', sub: steamBldgs.size + ' buildings', cls: 'steam' },
-    { label: 'Domestic Water', value: fmt(totalDom, 0) + ' kGal', sub: domBldgs.size + ' buildings', cls: 'domestic' },
-    { label: 'Irrigation', value: fmt(totalIrrig, 0) + ' kGal', sub: irrigBldgs.size + ' buildings', cls: 'irrigation' }
+    { label: 'Total Sites', value: fmt(data.sites.length), sub: 'Campus buildings', cls: '',
+      tooltip: data.sites.length + ' campus buildings from SkySpark site records',
+      expandHtml: sitesExpand },
+    { label: 'Total Energy', value: fmt(totalEnergy, 0) + ' MMBtu', sub: '14-month total', cls: 'electric',
+      tooltip: 'Sum of Electric + Steam + CHW Energy, all converted to MMBtu',
+      expandHtml: energyExpand },
+    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: '14-month total', cls: 'domestic',
+      tooltip: 'Sum of Domestic Water + Irrigation in thousand gallons (kGal)',
+      expandHtml: waterExpand },
+    { label: 'Connector Health', value: Math.round(connOk / data.connectors.length * 100) + '%', sub: connOk + ' OK / ' + connFault + ' Fault / ' + connDisabled + ' Disabled', cls: 'ok',
+      tooltip: 'SkySpark connector status: OK = actively collecting data',
+      expandHtml: connExpand },
+    { label: 'Electric', value: fmt(totalElec, 0) + ' MMBtu', sub: elecBldgs.size + ' buildings', cls: 'electric',
+      tooltip: 'Electric consumption: kWh \u00d7 0.003412 = MMBtu',
+      expandHtml: singleExpand(elecByMonth, totalElec, 'MMBtu') },
+    { label: 'Steam', value: fmt(totalSteam, 0) + ' MMBtu', sub: steamBldgs.size + ' buildings', cls: 'steam',
+      tooltip: 'Steam condensate: lb \u00d7 0.001 = MMBtu',
+      expandHtml: singleExpand(steamByMonth, totalSteam, 'MMBtu') },
+    { label: 'Domestic Water', value: fmt(totalDom, 0) + ' kGal', sub: domBldgs.size + ' buildings', cls: 'domestic',
+      tooltip: 'Domestic water: gallons \u00f7 1,000 = kGal',
+      expandHtml: singleExpand(domByMonth, totalDom, 'kGal') },
+    { label: 'Irrigation', value: fmt(totalIrrig, 0) + ' kGal', sub: irrigBldgs.size + ' buildings', cls: 'irrigation',
+      tooltip: 'Irrigation water: gallons \u00f7 1,000 = kGal',
+      expandHtml: singleExpand(irrigByMonth, totalIrrig, 'kGal') }
   ]);
+
+  // Append Data Quality card to overview grid (must be after renderKPIs)
+  renderVerification(vr);
 
   // Top 20 buildings by total energy
   const allBldgEnergy = {};
@@ -1034,15 +1263,21 @@ loadAllData().then(data => {
 
   // ==================== ELECTRIC TAB ====================
   renderKPIs('kpiElectric', [
-    { label: 'Total Electric', value: fmt(totalElec, 0) + ' MMBtu', sub: fmt(totalElec / 0.003412, 0) + ' kWh', cls: 'electric' },
-    { label: 'Buildings', value: fmt(elecBldgs.size), sub: 'With electric data', cls: 'electric' },
-    { label: 'Data Points', value: fmt(data.electric.length), sub: 'Row records', cls: 'electric' },
-    { label: 'Avg per Building', value: fmt(totalElec / Math.max(elecBldgs.size, 1), 0) + ' MMBtu', sub: '14-month average', cls: 'electric' }
+    { label: 'Total Electric', value: fmt(totalElec, 0) + ' MMBtu', sub: fmt(totalElec / 0.003412, 0) + ' kWh', cls: 'electric',
+      tooltip: 'Total electric consumption across all metered buildings, converted from kWh to MMBtu',
+      expandHtml: singleExpand(elecByMonth, totalElec, 'MMBtu') },
+    { label: 'Buildings', value: fmt(elecBldgs.size), sub: 'With electric data', cls: 'electric',
+      tooltip: elecBldgs.size + ' buildings with electric usage > 0 out of ' + data.sites.length + ' total sites' },
+    { label: 'Data Points', value: fmt(data.electric.length), sub: 'Row records', cls: 'electric',
+      tooltip: 'Total rows in electric.json — one row per building per month' },
+    { label: 'Avg per Building', value: fmt(totalElec / Math.max(elecBldgs.size, 1), 0) + ' MMBtu', sub: '14-month average', cls: 'electric',
+      tooltip: 'Total Electric MMBtu \u00f7 ' + elecBldgs.size + ' active buildings' }
   ]);
 
+  const elecTrendData = months.map(m => elecByMonth[m] || 0);
   lineChart('chartElecTrend', monthLabels, [
-    { label: 'Electric (MMBtu)', data: months.map(m => elecByMonth[m] || 0), borderColor: COLORS.electric, backgroundColor: COLORS.electric + '33', fill: true }
-  ]);
+    { label: 'Electric (MMBtu)', data: elecTrendData, borderColor: COLORS.electric, backgroundColor: COLORS.electric + '33', fill: true }
+  ], [detectAnomalies(elecTrendData)]);
 
   const elecTop15 = Object.values(elecByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartElecTop',
@@ -1055,17 +1290,32 @@ loadAllData().then(data => {
   buildUtilityTable('tblElec', 'searchElec', elecByBldg, months, 'MMBtu');
 
   // ==================== THERMAL TAB ====================
+  const thermalExpand = buildMiniTable(
+    ['Month', 'Steam', 'CHW', 'Total'],
+    months,
+    mk => [monthLabel(mk), fmt(steamByMonth[mk]||0,0), fmt(chwEByMonth[mk]||0,0), fmt((steamByMonth[mk]||0)+(chwEByMonth[mk]||0),0)],
+    'Total', () => [fmt(totalSteam,0), fmt(totalChwE,0), fmt(totalSteam+totalChwE,0)]
+  );
   renderKPIs('kpiThermal', [
-    { label: 'Total Steam', value: fmt(totalSteam, 0) + ' MMBtu', sub: steamBldgs.size + ' buildings', cls: 'steam' },
-    { label: 'Total CHW Energy', value: fmt(totalChwE, 0) + ' MMBtu', sub: chwEBldgs.size + ' buildings', cls: 'chw-energy' },
-    { label: 'Combined Thermal', value: fmt(totalSteam + totalChwE, 0) + ' MMBtu', sub: '14-month total', cls: 'steam' },
-    { label: 'Steam Records', value: fmt(data.condensate.length), sub: 'Condensate rows', cls: 'steam' }
+    { label: 'Total Steam', value: fmt(totalSteam, 0) + ' MMBtu', sub: steamBldgs.size + ' buildings', cls: 'steam',
+      tooltip: 'Steam condensate converted from lb to MMBtu (\u00d70.001)',
+      expandHtml: singleExpand(steamByMonth, totalSteam, 'MMBtu') },
+    { label: 'Total CHW Energy', value: fmt(totalChwE, 0) + ' MMBtu', sub: chwEBldgs.size + ' buildings', cls: 'chw-energy',
+      tooltip: 'Chilled water energy converted from ton-ref-hr to MMBtu (\u00d70.012)',
+      expandHtml: singleExpand(chwEByMonth, totalChwE, 'MMBtu') },
+    { label: 'Combined Thermal', value: fmt(totalSteam + totalChwE, 0) + ' MMBtu', sub: '14-month total', cls: 'steam',
+      tooltip: 'Steam + CHW Energy combined thermal load',
+      expandHtml: thermalExpand },
+    { label: 'Steam Records', value: fmt(data.condensate.length), sub: 'Condensate rows', cls: 'steam',
+      tooltip: 'Total rows in condensate.json — one row per building per month' }
   ]);
 
+  const steamTrendData = months.map(m => steamByMonth[m] || 0);
+  const chwETrendData = months.map(m => chwEByMonth[m] || 0);
   lineChart('chartThermalTrend', monthLabels, [
-    { label: 'Steam (MMBtu)', data: months.map(m => steamByMonth[m] || 0), borderColor: COLORS.steam, backgroundColor: COLORS.steam + '33', fill: false },
-    { label: 'CHW Energy (MMBtu)', data: months.map(m => chwEByMonth[m] || 0), borderColor: COLORS.chwEnergy, backgroundColor: COLORS.chwEnergy + '33', fill: false }
-  ]);
+    { label: 'Steam (MMBtu)', data: steamTrendData, borderColor: COLORS.steam, backgroundColor: COLORS.steam + '33', fill: false },
+    { label: 'CHW Energy (MMBtu)', data: chwETrendData, borderColor: COLORS.chwEnergy, backgroundColor: COLORS.chwEnergy + '33', fill: false }
+  ], [detectAnomalies(steamTrendData), detectAnomalies(chwETrendData)]);
 
   const steamTop15 = Object.values(steamByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartSteamTop',
@@ -1083,16 +1333,25 @@ loadAllData().then(data => {
 
   // ==================== WATER TAB ====================
   renderKPIs('kpiWater', [
-    { label: 'Domestic Water', value: fmt(totalDom, 0) + ' kGal', sub: domBldgs.size + ' buildings', cls: 'domestic' },
-    { label: 'Irrigation', value: fmt(totalIrrig, 0) + ' kGal', sub: irrigBldgs.size + ' buildings', cls: 'irrigation' },
-    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: '14-month total', cls: 'domestic' },
-    { label: 'Data Records', value: fmt(data.domesticWater.length + data.irrigation.length), sub: 'Water rows', cls: 'domestic' }
+    { label: 'Domestic Water', value: fmt(totalDom, 0) + ' kGal', sub: domBldgs.size + ' buildings', cls: 'domestic',
+      tooltip: 'Domestic water consumption in thousand gallons (gal \u00f7 1,000)',
+      expandHtml: singleExpand(domByMonth, totalDom, 'kGal') },
+    { label: 'Irrigation', value: fmt(totalIrrig, 0) + ' kGal', sub: irrigBldgs.size + ' buildings', cls: 'irrigation',
+      tooltip: 'Irrigation water consumption in thousand gallons (gal \u00f7 1,000)',
+      expandHtml: singleExpand(irrigByMonth, totalIrrig, 'kGal') },
+    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: '14-month total', cls: 'domestic',
+      tooltip: 'Domestic + Irrigation water combined',
+      expandHtml: waterExpand },
+    { label: 'Data Records', value: fmt(data.domesticWater.length + data.irrigation.length), sub: 'Water rows', cls: 'domestic',
+      tooltip: 'Combined row count from domestic_water.json + irrigation.json' }
   ]);
 
+  const domTrendData = months.map(m => domByMonth[m] || 0);
+  const irrigTrendData = months.map(m => irrigByMonth[m] || 0);
   lineChart('chartWaterTrend', monthLabels, [
-    { label: 'Domestic (kGal)', data: months.map(m => domByMonth[m] || 0), borderColor: COLORS.domestic, backgroundColor: COLORS.domestic + '33', fill: false },
-    { label: 'Irrigation (kGal)', data: months.map(m => irrigByMonth[m] || 0), borderColor: COLORS.irrigation, backgroundColor: COLORS.irrigation + '33', fill: false }
-  ]);
+    { label: 'Domestic (kGal)', data: domTrendData, borderColor: COLORS.domestic, backgroundColor: COLORS.domestic + '33', fill: false },
+    { label: 'Irrigation (kGal)', data: irrigTrendData, borderColor: COLORS.irrigation, backgroundColor: COLORS.irrigation + '33', fill: false }
+  ], [detectAnomalies(domTrendData), detectAnomalies(irrigTrendData)]);
 
   const domTop15 = Object.values(domByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartDomTop',
@@ -1113,10 +1372,15 @@ loadAllData().then(data => {
 
   // ==================== CONNECTORS TAB ====================
   renderKPIs('kpiConn', [
-    { label: 'Total Connectors', value: fmt(data.connectors.length), sub: 'All connectors', cls: '' },
-    { label: 'OK', value: fmt(connOk), sub: Math.round(connOk / data.connectors.length * 100) + '% healthy', cls: 'ok' },
-    { label: 'Fault', value: fmt(connFault), sub: 'Needs investigation', cls: 'fault' },
-    { label: 'Disabled', value: fmt(connDisabled + connOther), sub: 'Intentionally off + other', cls: '' }
+    { label: 'Total Connectors', value: fmt(data.connectors.length), sub: 'All connectors', cls: '',
+      tooltip: 'All SkySpark connectors configured for the Pullman campus',
+      expandHtml: connExpand },
+    { label: 'OK', value: fmt(connOk), sub: Math.round(connOk / data.connectors.length * 100) + '% healthy', cls: 'ok',
+      tooltip: 'Connectors actively collecting data without errors' },
+    { label: 'Fault', value: fmt(connFault), sub: 'Needs investigation', cls: 'fault',
+      tooltip: 'Connectors with errors — check connector table below for details' },
+    { label: 'Disabled', value: fmt(connDisabled + connOther), sub: 'Intentionally off + other', cls: '',
+      tooltip: 'Connectors intentionally disabled or in an unknown state' }
   ]);
   buildConnectorTable(data.connectors);
 
