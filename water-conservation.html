@@ -235,6 +235,28 @@
   .anomaly-chart-row.visible { display: table-row; }
   .anomaly-chart-row td { padding: 0.75rem 1rem; }
   .anomaly-chart-cell { height: 200px; position: relative; }
+  /* Mini data table inside expanded anomaly row */
+  .anomaly-detail-table {
+    width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 0.75rem;
+  }
+  .anomaly-detail-table th {
+    background: var(--table-head-bg); padding: 0.35rem 0.5rem; text-align: right;
+    font-weight: 600; color: var(--secondary); border-bottom: 2px solid var(--border);
+    white-space: nowrap; font-size: 0.72rem;
+  }
+  .anomaly-detail-table th:first-child { text-align: left; }
+  .anomaly-detail-table td {
+    padding: 0.3rem 0.5rem; text-align: right; border-bottom: 1px solid var(--mini-row-border);
+    white-space: nowrap;
+  }
+  .anomaly-detail-table td:first-child { text-align: left; font-weight: 500; }
+  .anomaly-detail-table td.anomaly-cell {
+    background: rgba(220,38,38,0.1); font-weight: 700; color: var(--red);
+  }
+  html.dark .anomaly-detail-table td.anomaly-cell {
+    background: rgba(248,113,113,0.12);
+  }
+  .anomaly-detail-table td.zero-cell { color: var(--text-light); }
   /* Editable cells */
   .editable { cursor: text; min-width: 80px; }
   .editable:hover { background: rgba(152,30,50,0.05); border-radius: 4px; }
@@ -1474,6 +1496,7 @@ function renderAnomalyTab(filter) {
     <tr class="anomaly-chart-row" id="acr-${i}">
       <td colspan="9">
         <div class="anomaly-chart-cell"><canvas id="anomChart-${i}"></canvas></div>
+        <div id="anomTable-${i}"></div>
       </td>
     </tr>`;
   }).join('');
@@ -1564,6 +1587,40 @@ function toggleAnomalyChart(row) {
       }
     }
   });
+
+  // Build data table underneath chart
+  const tableDiv = document.getElementById('anomTable-' + idx);
+  if (tableDiv) {
+    // Month-over-month change calculation
+    const changes = monthData.map((v, i) => {
+      if (i === 0 || !monthData[i-1] || monthData[i-1] === 0) return null;
+      return ((v - monthData[i-1]) / monthData[i-1]) * 100;
+    });
+
+    const headerCells = '<th>Metric</th>' + G_monthLabels.map((lbl, i) =>
+      '<th' + (i === anomalyMonthIdx ? ' style="color:var(--red)"' : '') + '>' + lbl + '</th>'
+    ).join('');
+
+    const usageCells = '<td>Usage (kGal)</td>' + monthData.map((v, i) => {
+      const cls = i === anomalyMonthIdx ? ' class="anomaly-cell"' :
+        (v === 0 ? ' class="zero-cell"' : '');
+      return '<td' + cls + '>' + fmt(v, 1) + '</td>';
+    }).join('');
+
+    const changeCells = '<td>MoM Change</td>' + changes.map((c, i) => {
+      if (c == null) return '<td class="zero-cell">&mdash;</td>';
+      const sign = c >= 0 ? '+' : '';
+      const cls = i === anomalyMonthIdx ? ' class="anomaly-cell"' :
+        (Math.abs(c) > 100 ? ' style="font-weight:600"' : '');
+      return '<td' + cls + '>' + sign + fmt(c, 0) + '%</td>';
+    }).join('');
+
+    tableDiv.innerHTML =
+      '<table class="anomaly-detail-table"><thead><tr>' + headerCells +
+      '</tr></thead><tbody><tr>' + usageCells +
+      '</tr><tr>' + changeCells +
+      '</tr></tbody></table>';
+  }
 }
 
 // ============================================================
