@@ -397,9 +397,16 @@
       <h2>Detected Anomalies</h2>
       <div class="info-box">
         Spike anomalies flag buildings where a month's usage exceeds 100% above its neighbor-month average.
+        Irrigation spikes during irrigation season (May&ndash;Sep) are excluded.
         Winter irrigation flags any irrigation usage during Nov&ndash;Feb when systems should be off.
       </div>
-      <div style="margin-bottom:1rem;">
+      <div class="filter-bar" id="anomalyFilterBar" style="margin-bottom:1rem;">
+        <button class="filter-btn active" data-svc="all">All Services</button>
+        <button class="filter-btn" data-svc="Domestic Water">Domestic Water</button>
+        <button class="filter-btn" data-svc="Irrigation Water">Irrigation Water</button>
+        <button class="filter-btn" data-svc="spike">Spikes Only</button>
+        <button class="filter-btn" data-svc="winter_irrigation">Winter Irrigation Only</button>
+        <div style="flex:1"></div>
         <button class="btn-sm primary" id="btnCreateAll">Create Tasks for All New Anomalies</button>
       </div>
       <div class="table-wrap">
@@ -761,6 +768,13 @@ function isWinterMonth(monthKey) {
   return WINTER_MONTHS.includes(m);
 }
 
+const IRRIGATION_SEASON = [5, 6, 7, 8, 9]; // May-Sep
+function isIrrigationSeason(monthKey) {
+  if (!monthKey) return false;
+  const m = parseInt(monthKey.split('-')[1], 10);
+  return IRRIGATION_SEASON.includes(m);
+}
+
 function todayStr() {
   return new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
 }
@@ -895,6 +909,8 @@ function detectBuildingAnomalies(byBldg, monthKeys, service) {
     for (let i = 1; i < vals.length - 1; i++) {
       const val = vals[i];
       if (!val || val === 0) continue;
+      // Skip irrigation spikes during irrigation season (May-Sep) — expected ramp-up
+      if (service === 'Irrigation Water' && isIrrigationSeason(monthKeys[i])) continue;
       const neighbors = [vals[i-1], vals[i+1]].filter(v => v && v > 0);
       if (neighbors.length === 0) continue;
       const avg = neighbors.reduce((s,v) => s + v, 0) / neighbors.length;
@@ -1243,10 +1259,33 @@ function renderKPIs(containerId, cards) {
 // ============================================================
 //  RENDER: ANOMALY REVIEW TAB
 // ============================================================
-function renderAnomalyTab() {
+
+// Shared helper: filter + sort anomalies for the current filter setting
+function getFilteredAnomalies(filter) {
+  filter = filter || currentAnomalyFilter || 'all';
+  let list = [...G_anomalies];
+  if (filter === 'Domestic Water' || filter === 'Irrigation Water') {
+    list = list.filter(a => a.service === filter);
+  } else if (filter === 'spike') {
+    list = list.filter(a => a.type === 'spike');
+  } else if (filter === 'winter_irrigation') {
+    list = list.filter(a => a.type === 'winter_irrigation');
+  }
+  // Sort: spikes by deviation desc, then winter by usage desc
+  list.sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'spike' ? -1 : 1;
+    if (a.type === 'spike') return (b.deviation || 0) - (a.deviation || 0);
+    return (b.usage || 0) - (a.usage || 0);
+  });
+  return list;
+}
+
+function renderAnomalyTab(filter) {
+  filter = filter || currentAnomalyFilter || 'all';
+  currentAnomalyFilter = filter;
   const tasks = loadTasks();
 
-  // KPI cards
+  // KPI cards — always reflect full (unfiltered) totals
   const spikes = G_anomalies.filter(a => a.type === 'spike');
   const winter = G_anomalies.filter(a => a.type === 'winter_irrigation');
   const openTasks = tasks.filter(t => t.status.startsWith('Open'));
@@ -1263,20 +1302,21 @@ function renderAnomalyTab() {
 
   // Anomaly table
   const tbody = document.getElementById('anomalyBody');
-  if (G_anomalies.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-light);padding:2rem;">No anomalies detected in current data.</td></tr>';
+  const sorted = getFilteredAnomalies(filter);
+
+  if (sorted.length === 0) {
+    // Destroy any existing anomaly mini-charts
+    anomalyCharts.forEach(c => { if (c) c.destroy(); });
+    anomalyCharts = [];
+    const msg = G_anomalies.length === 0
+      ? 'No anomalies detected in current data.'
+      : 'No anomalies match the selected filter.';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-light);padding:2rem;">' + msg + '</td></tr>';
     return;
   }
 
-  // Sort: spikes by deviation desc, then winter by usage desc
-  const sorted = [...G_anomalies].sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'spike' ? -1 : 1;
-    if (a.type === 'spike') return (b.deviation || 0) - (a.deviation || 0);
-    return (b.usage || 0) - (a.usage || 0);
-  });
-
   // Destroy any existing anomaly mini-charts
-  anomalyCharts.forEach(c => c.destroy());
+  anomalyCharts.forEach(c => { if (c) c.destroy(); });
   anomalyCharts = [];
 
   tbody.innerHTML = sorted.map((a, i) => {
@@ -1329,12 +1369,8 @@ function toggleAnomalyChart(row) {
   row.classList.add('expanded');
   chartRow.classList.add('visible');
 
-  // Get the anomaly data for this row
-  const sorted = [...G_anomalies].sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'spike' ? -1 : 1;
-    if (a.type === 'spike') return (b.deviation || 0) - (a.deviation || 0);
-    return (b.usage || 0) - (a.usage || 0);
-  });
+  // Get the anomaly data for this row — must match the filtered+sorted list used by renderAnomalyTab
+  const sorted = getFilteredAnomalies();
   const a = sorted[idx];
   if (!a) return;
 
@@ -1644,6 +1680,7 @@ function saveModal() {
 //  EVENT HANDLERS
 // ============================================================
 let currentFilter = 'all';
+let currentAnomalyFilter = 'all';
 
 function handleStatusChange(issueId, newStatus) {
   updateTask(issueId, { status: newStatus });
@@ -1748,7 +1785,17 @@ window.addEventListener('beforeprint', function() {
     // Render task tracker
     renderTaskTab();
 
-    // Wire up filter buttons
+    // Wire up anomaly filter buttons
+    document.querySelectorAll('#anomalyFilterBar .filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#anomalyFilterBar .filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentAnomalyFilter = btn.dataset.svc;
+        renderAnomalyTab(currentAnomalyFilter);
+      });
+    });
+
+    // Wire up task filter buttons
     document.querySelectorAll('#taskFilterBar .filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('#taskFilterBar .filter-btn').forEach(b => b.classList.remove('active'));
