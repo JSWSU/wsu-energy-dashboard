@@ -572,6 +572,7 @@ function kwhToMmbtu(kwh) { return (kwh || 0) * 0.003412; }
 function lbToMmbtu(lb) { return (lb || 0) * 0.001; }
 function tonrefhToMmbtu(t) { return (t || 0) * 0.012; }
 function galToKgal(g) { return (g || 0) / 1000; }
+function bldgLabel(b) { return b.bldgNo + (b.bldgName ? ' - ' + b.bldgName : ''); }
 
 // ============================================================
 //  AGGREGATION
@@ -582,7 +583,8 @@ function aggregateByBuilding(rows, convertFn) {
     const key = r.bldgNo || 'Unknown';
     if (!map[key]) map[key] = { bldgNo: key, bldgName: r.bldgName || '', total: 0, months: {} };
     const mk = parseMonthKey(r.startDate);
-    const val = convertFn(r.usage || 0);
+    const raw = typeof r.usage === 'number' && isFinite(r.usage) ? r.usage : 0;
+    const val = convertFn(raw);
     map[key].total += val;
     map[key].months[mk] = (map[key].months[mk] || 0) + val;
   });
@@ -594,7 +596,8 @@ function aggregateByMonth(rows, convertFn) {
   rows.forEach(r => {
     const mk = parseMonthKey(r.startDate);
     if (!mk) return;
-    map[mk] = (map[mk] || 0) + convertFn(r.usage || 0);
+    const raw = typeof r.usage === 'number' && isFinite(r.usage) ? r.usage : 0;
+    map[mk] = (map[mk] || 0) + convertFn(raw);
   });
   return map;
 }
@@ -744,7 +747,7 @@ loadAllData().then(data => {
     .sort((a, b) => b.total - a.total).slice(0, 20);
 
   barChart('chartTopEnergy',
-    top20Energy.map(b => b.bldgName || b.bldgNo),
+    top20Energy.map(bldgLabel),
     [
       { label: 'Electric', data: top20Energy.map(b => b.elec), backgroundColor: COLORS.electric },
       { label: 'Steam', data: top20Energy.map(b => b.steam), backgroundColor: COLORS.steam },
@@ -767,7 +770,7 @@ loadAllData().then(data => {
     .sort((a, b) => b.total - a.total).slice(0, 20);
 
   barChart('chartTopWater',
-    top20Water.map(b => b.bldgName || b.bldgNo),
+    top20Water.map(bldgLabel),
     [
       { label: 'Domestic', data: top20Water.map(b => b.dom), backgroundColor: COLORS.domestic },
       { label: 'Irrigation', data: top20Water.map(b => b.irrig), backgroundColor: COLORS.irrigation }
@@ -802,7 +805,7 @@ loadAllData().then(data => {
 
   const elecTop15 = Object.values(elecByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartElecTop',
-    elecTop15.map(b => b.bldgName || b.bldgNo),
+    elecTop15.map(bldgLabel),
     [{ label: 'Electric MMBtu', data: elecTop15.map(b => b.total), backgroundColor: COLORS.electric }],
     { horizontal: true }
   );
@@ -825,14 +828,14 @@ loadAllData().then(data => {
 
   const steamTop15 = Object.values(steamByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartSteamTop',
-    steamTop15.map(b => b.bldgName || b.bldgNo),
+    steamTop15.map(bldgLabel),
     [{ label: 'Steam MMBtu', data: steamTop15.map(b => b.total), backgroundColor: COLORS.steam }],
     { horizontal: true }
   );
 
   const chwETop15 = Object.values(chwEByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartChwETop',
-    chwETop15.map(b => b.bldgName || b.bldgNo),
+    chwETop15.map(bldgLabel),
     [{ label: 'CHW Energy MMBtu', data: chwETop15.map(b => b.total), backgroundColor: COLORS.chwEnergy }],
     { horizontal: true }
   );
@@ -852,14 +855,14 @@ loadAllData().then(data => {
 
   const domTop15 = Object.values(domByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartDomTop',
-    domTop15.map(b => b.bldgName || b.bldgNo),
+    domTop15.map(bldgLabel),
     [{ label: 'Domestic kGal', data: domTop15.map(b => b.total), backgroundColor: COLORS.domestic }],
     { horizontal: true }
   );
 
   const irrigTop15 = Object.values(irrigByBldg).sort((a, b) => b.total - a.total).slice(0, 15);
   barChart('chartIrrigTop',
-    irrigTop15.map(b => b.bldgName || b.bldgNo),
+    irrigTop15.map(bldgLabel),
     [{ label: 'Irrigation kGal', data: irrigTop15.map(b => b.total), backgroundColor: COLORS.irrigation }],
     { horizontal: true }
   );
