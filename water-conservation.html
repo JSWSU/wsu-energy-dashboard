@@ -236,6 +236,7 @@
   .anomaly-chart-row td { padding: 0.75rem 1rem; }
   .anomaly-chart-cell { height: 200px; position: relative; }
   /* Mini data table inside expanded anomaly row */
+  .anomaly-detail-wrap { overflow-x: auto; margin-top: 0.5rem; }
   .anomaly-detail-table {
     width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 0.75rem;
   }
@@ -1496,7 +1497,7 @@ function renderAnomalyTab(filter) {
     <tr class="anomaly-chart-row" id="acr-${i}">
       <td colspan="9">
         <div class="anomaly-chart-cell"><canvas id="anomChart-${i}"></canvas></div>
-        <div id="anomTable-${i}"></div>
+        <div class="anomaly-detail-wrap" id="anomTable-${i}"></div>
       </td>
     </tr>`;
   }).join('');
