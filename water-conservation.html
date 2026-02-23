@@ -796,7 +796,7 @@
       <h2>Anomaly Types Explained</h2>
       <h3>Spike Anomalies</h3>
       <p style="font-size:0.82rem;line-height:1.6;margin-bottom:0.75rem;">
-        A building's monthly usage is compared to the average of its neighbor months (the month before and the month after). If usage is <strong>more than 100% higher</strong> than that average, it's flagged as a spike.
+        A building's monthly usage is compared to the average of the same month in prior years (Year-over-Year). If usage is <strong>more than 100% higher</strong> than that average, it's flagged as a spike. This approach accounts for normal seasonal patterns on a university campus.
       </p>
       <table class="help-table">
         <thead><tr><th>Severity</th><th>Color</th><th>Threshold</th></tr></thead>
@@ -1404,35 +1404,40 @@ function lineChart(canvasId, labels, datasets, anomalies) {
 //  ANOMALY DETECTION
 // ============================================================
 
-// Building-level spike detection
-function detectBuildingAnomalies(byBldg, monthKeys, service) {
+// Building-level spike detection — Year-over-Year same-month comparison
+// Compares each recent month to the average of the same calendar month in prior years.
+// This handles university seasonal patterns (student move-in/out) naturally.
+function detectBuildingAnomaliesYoY(byBldg, recentMonths, allMonths, service) {
   const anomalies = [];
   Object.values(byBldg).forEach(b => {
-    const vals = monthKeys.map(mk => b.months[mk] || 0);
-    for (let i = 1; i < vals.length - 1; i++) {
-      const val = vals[i];
-      if (!val || val === 0) continue;
-      // Skip irrigation spikes during irrigation season (May-Sep) — expected ramp-up
-      if (service === 'Irrigation Water' && isIrrigationSeason(monthKeys[i])) continue;
-      const neighbors = [vals[i-1], vals[i+1]].filter(v => v && v > 0);
-      if (neighbors.length === 0) continue;
-      const avg = neighbors.reduce((s,v) => s + v, 0) / neighbors.length;
-      if (avg === 0) continue;
+    recentMonths.forEach(mk => {
+      const val = b.months[mk] || 0;
+      if (!val || val === 0) return;
+      const calMonth = mk.split('-')[1]; // e.g. "01"
+      const currentYear = mk.split('-')[0];
+      // Gather same calendar month from prior years
+      const priorVals = allMonths
+        .filter(m => m.split('-')[1] === calMonth && m.split('-')[0] !== currentYear)
+        .map(m => b.months[m] || 0)
+        .filter(v => v > 0);
+      if (priorVals.length === 0) return; // No prior year data to compare
+      const avg = priorVals.reduce((s, v) => s + v, 0) / priorVals.length;
+      if (avg === 0) return;
       const pctDev = (val - avg) / avg;
-      if (pctDev > 1.0) { // >100% deviation
+      if (pctDev > 1.0) { // >100% above prior-year average
         anomalies.push({
           bldgNo: b.bldgNo,
           bldgName: b.bldgName,
           service: service,
           meter: b.meters || '',
-          month: monthKeys[i],
+          month: mk,
           usage: val,
           baseline: avg,
           deviation: Math.round(pctDev * 100),
           type: 'spike'
         });
       }
-    }
+    });
   });
   return anomalies;
 }
@@ -1618,8 +1623,9 @@ function createTask(anomaly, opts) {
 
 function buildDefaultDescription(anomaly) {
   if (anomaly.type === 'spike') {
+    const mName = CALENDAR_MONTHS[parseInt(anomaly.month.split('-')[1], 10) - 1];
     return monthLabel(anomaly.month) + ': ' + fmt(anomaly.usage, 1) + ' kGal (' +
-      '+' + anomaly.deviation + '% vs ' + fmt(anomaly.baseline, 1) + ' kGal baseline). Investigate cause.';
+      '+' + anomaly.deviation + '% vs prior ' + mName + ' avg of ' + fmt(anomaly.baseline, 1) + ' kGal). Investigate cause.';
   }
   if (anomaly.type === 'winter_irrigation') {
     return monthLabel(anomaly.month) + ': ' + fmt(anomaly.usage, 1) +
@@ -1980,9 +1986,9 @@ function renderAnomalyTab(filter) {
   const openTasks = tasks.filter(t => t.status.startsWith('Open'));
   renderKPIs('kpiAnomalies', [
     { label: 'Domestic Spike Anomalies', value: spikes.filter(a => a.service === 'Domestic Water').length, cls: 'domestic',
-      tooltip: 'Buildings with >100% usage increase vs neighbor months', sub: 'Domestic Water' },
+      tooltip: 'Buildings with >100% usage increase vs prior-year same month', sub: 'Domestic Water' },
     { label: 'Irrigation Spike Anomalies', value: spikes.filter(a => a.service === 'Irrigation Water').length, cls: 'irrigation',
-      tooltip: 'Irrigation meters with >100% usage increase vs neighbor months', sub: 'Irrigation Water' },
+      tooltip: 'Irrigation meters with >100% usage increase vs prior-year same month', sub: 'Irrigation Water' },
     { label: 'Winter Irrigation Alerts', value: winter.length, cls: 'alert',
       tooltip: 'Irrigation usage detected Nov-Feb when systems should be off', sub: 'Nov - Feb' },
     { label: 'Open Tasks', value: openTasks.length, cls: 'task',
@@ -2970,11 +2976,10 @@ function renderDataInfo(domestic, irrigation, totals) {
 
     // Detect all anomalies
     // Only flag anomalies for the most recent 3 months
-    // Spike detection needs neighbor context, so pass last 5 months (middle 3 get checked)
-    const recentWithContext = G_months.slice(-5);
-    const domSpikes = detectBuildingAnomalies(G_domByBldg, recentWithContext, 'Domestic Water');
-    const irrigSpikes = detectBuildingAnomalies(G_irrigByBldg, recentWithContext, 'Irrigation Water');
+    // YoY: compare each recent month to the same calendar month in prior years
     const recentMonths = G_months.slice(-3);
+    const domSpikes = detectBuildingAnomaliesYoY(G_domByBldg, recentMonths, G_months, 'Domestic Water');
+    const irrigSpikes = detectBuildingAnomaliesYoY(G_irrigByBldg, recentMonths, G_months, 'Irrigation Water');
     const winterIrrig = detectWinterIrrigation(G_irrigByBldg, recentMonths);
     G_anomalies = [...domSpikes, ...irrigSpikes, ...winterIrrig];
     G_allSiteRows = buildAllSiteRows();
