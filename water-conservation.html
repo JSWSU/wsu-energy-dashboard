@@ -204,13 +204,29 @@
   .col-filter-menu {
     display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
     background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 0.5rem; min-width: 180px; max-height: 280px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 0.5rem; min-width: 200px; max-height: 340px;
   }
   .col-filter-menu.open { display: block; }
+  .col-filter-search {
+    width: 100%; padding: 0.3rem 0.5rem; font-size: 0.78rem; border: 1px solid var(--border);
+    border-radius: 4px; background: var(--card-bg); color: var(--text); box-sizing: border-box;
+  }
+  .col-filter-search:focus { outline: none; border-color: var(--primary); }
+  .col-filter-search::placeholder { color: var(--text-light); }
+  .col-filter-toggle-row {
+    display: flex; gap: 0.4rem; margin-top: 0.35rem; padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .col-filter-toggle-row button {
+    padding: 0.15rem 0.45rem; font-size: 0.7rem; border: 1px solid var(--border);
+    border-radius: 4px; cursor: pointer; background: var(--card-bg); color: var(--text-light);
+  }
+  .col-filter-toggle-row button:hover { color: var(--text); background: var(--table-hover); }
   .col-filter-menu label {
     display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.35rem;
     font-size: 0.78rem; cursor: pointer; border-radius: 4px; color: var(--text);
   }
+  .col-filter-menu label.cf-hidden { display: none; }
   .col-filter-menu label:hover { background: var(--table-hover); }
   .col-filter-menu input[type="checkbox"] { accent-color: var(--primary); width: 14px; height: 14px; }
   .col-filter-list { max-height: 180px; overflow-y: auto; margin-top: 0.25rem; }
@@ -1920,6 +1936,11 @@ function renderAnomalyTab(filter) {
       filterHtml = '<span class="th-filter-wrap">' +
         '<button class="th-filter-btn' + btnCls + '" onclick="event.stopPropagation(); toggleColFilterMenu(\'' + col.key + '\', this)" title="Filter ' + col.label + '">\u2630</button>' +
         '<div class="col-filter-menu" id="cfm-' + col.key + '" onclick="event.stopPropagation()">' +
+          '<input type="text" class="col-filter-search" placeholder="Search..." oninput="filterColSearch(\'' + col.key + '\', this.value)">' +
+          '<div class="col-filter-toggle-row">' +
+            '<button onclick="toggleSelectAll(\'' + col.key + '\', true)">Select All</button>' +
+            '<button onclick="toggleSelectAll(\'' + col.key + '\', false)">Deselect All</button>' +
+          '</div>' +
           '<div class="col-filter-list">' +
           uniqueVals[col.key].map(v => {
             const checked = !hasFilter || anomalyColFilters[col.key].has(v) ? ' checked' : '';
@@ -2447,13 +2468,41 @@ function toggleAnomalySort(colKey) {
   renderAnomalyTab();
 }
 
+function filterColSearch(colKey, query) {
+  const menu = document.getElementById('cfm-' + colKey);
+  if (!menu) return;
+  const labels = menu.querySelectorAll('.col-filter-list label');
+  const q = query.toLowerCase();
+  labels.forEach(label => {
+    const text = label.textContent.toLowerCase();
+    label.classList.toggle('cf-hidden', q && !text.includes(q));
+  });
+}
+
+function toggleSelectAll(colKey, selectAll) {
+  const menu = document.getElementById('cfm-' + colKey);
+  if (!menu) return;
+  const labels = menu.querySelectorAll('.col-filter-list label');
+  labels.forEach(label => {
+    if (!label.classList.contains('cf-hidden')) {
+      label.querySelector('input[type="checkbox"]').checked = selectAll;
+    }
+  });
+}
+
 function toggleColFilterMenu(colKey, btnEl) {
   // Close any other open menus
   document.querySelectorAll('.col-filter-menu.open').forEach(m => {
     if (m.id !== 'cfm-' + colKey) m.classList.remove('open');
   });
   const menu = document.getElementById('cfm-' + colKey);
-  if (menu) menu.classList.toggle('open');
+  if (menu) {
+    menu.classList.toggle('open');
+    if (menu.classList.contains('open')) {
+      const searchInput = menu.querySelector('.col-filter-search');
+      if (searchInput) { searchInput.value = ''; filterColSearch(colKey, ''); searchInput.focus(); }
+    }
+  }
 }
 
 function applyColFilter(colKey) {
