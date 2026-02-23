@@ -61,14 +61,14 @@ data/domestic_water.json   Building-level domestic water (gal)  Campus Metering 
 data/irrigation.json       Building-level irrigation water (gal) Campus Metering Dashboard
 
 Row format: { bldgNo, bldgName, meters, startDate (MM-DD-YYYY), endDate, usage (gallons) }
-Data period: 14 months (Jan 2025 -- Feb 2026)
+Data period: 26 months (Jan 2024 -- Feb 2026)
 Conversion: All values converted from gallons to kGal on load.
 
 
 FILE-BY-FILE BREAKDOWN
 -----------------------
 
-water-conservation.html (~2,300 lines, single-file SPA)
+water-conservation.html (~3,100 lines, single-file SPA)
 .......................................................
 
 Section            Contents
@@ -98,7 +98,7 @@ TAB SYSTEM
 
 Tab ID        Tab Name           Content
 ------        --------           -------
-anomalies     Anomaly Review     KPI cards, detected anomalies table with sort/filter/expand, task status, task creation
+anomalies     Anomaly Review     KPI cards, all-sites table with anomaly toggle, sort/filter/expand, task status, task creation
 tasks         Task Tracker       Editable task table, status filters, search, Smartsheet import/export
 trends        Historical Trends  Campus domestic + irrigation line charts with anomaly markers; top 10 bar chart
 buildings     Building Index     Searchable card grid; domestic + irrigation badges; expandable monthly detail
@@ -113,7 +113,7 @@ KPI CARDS
 Card                          What It Shows
 ----                          -------------
 Domestic Spike Anomalies      Count of domestic water spikes (>100% deviation)
-Irrigation Spike Anomalies    Count of irrigation spikes (>100% deviation, excl. irrigation season)
+Irrigation Spike Anomalies    Count of irrigation spikes (>100% deviation vs prior-year same month)
 Winter Irrigation Alerts      Count of irrigation usage during Nov-Feb
 Open Tasks                    Count of tasks with "Open" status prefix
 
@@ -127,8 +127,8 @@ Chart instances:
 
 Canvas ID              Type              Tab          Description
 ---------              ----              ---          -----------
-chartDomTrend          Line + anomalies  Trends       Campus domestic water trend (14 months)
-chartIrrigTrend        Line + anomalies  Trends       Campus irrigation trend (14 months)
+chartDomTrend          Line + anomalies  Trends       Campus domestic water trend (26 months)
+chartIrrigTrend        Line + anomalies  Trends       Campus irrigation trend (26 months)
 chartTopWater          Horiz stacked bar Trends       Top 10 buildings by total water (domestic + irrigation)
 anomChart-{i}          Line              Anomalies    Per-building monthly usage (created on row expand)
 
@@ -140,51 +140,78 @@ Color palette:
 ANOMALY DETECTION
 -----------------
 
-Three types of anomaly detection:
+Detection runs only on the most recent 3 months of data to focus on actionable issues.
 
-1. Building-Level Spike Detection
-   Function: detectBuildingAnomalies(byBldg, monthKeys, service)
+Two types of anomaly detection:
+
+1. Building-Level Spike Detection (Year-over-Year)
+   Function: detectBuildingAnomaliesYoY(byBldg, recentMonths, allMonths, service)
    Algorithm:
-     - For each building and each month (except first/last):
-       - Compare usage to average of neighbor months (month-1, month+1)
-       - Skip zero values and months with no valid neighbors
-       - Flag if deviation > 100% above average (positive spikes only)
-     - IRRIGATION SEASON EXCLUSION: Spikes on irrigation meters during May-Sep
-       are skipped because usage ramp-up is expected during irrigation season
+     - For each building and each recent month:
+       - Compare usage to the average of the SAME CALENDAR MONTH in all prior years
+       - Example: Feb 2026 is compared to average of Feb 2025 + Feb 2024
+       - Skip zero values and months with no prior-year data
+       - Flag if deviation > 100% above prior-year average (positive spikes only)
+     - Year-over-Year comparison naturally handles university seasonal patterns
+       (student move-in/out, irrigation season) without needing explicit exclusions
    Output: { bldgNo, bldgName, service, meter, month, usage, baseline, deviation, type:'spike' }
 
 2. Winter Irrigation Detection
    Function: detectWinterIrrigation(byBldg, monthKeys)
    Algorithm:
      - For each building and each winter month (Nov, Dec, Jan, Feb):
-       - If irrigation usage > 0: flag as winter irrigation
+       - If irrigation usage >= 1 kGal: flag as winter irrigation
+       - Sub-1 kGal values are ignored (rounding artifacts from meter reads)
    Output: { bldgNo, bldgName, service:'Irrigation Water', meter, month, usage, baseline:0, deviation:null, type:'winter_irrigation' }
 
 3. Campus-Level Anomaly Detection (for chart markers)
    Function: detectCampusAnomalies(campusData, monthKeys, byBldg)
    Algorithm:
-     - Same as building spike detection but on campus totals
+     - Same neighbor-month comparison as before, applied to campus totals only
      - Identifies top-contributing building for each campus spike
-   Used by: Trend chart anomaly callout plugin
+   Used by: Trend chart anomaly callout plugin (not affected by YoY change)
 
 Constants:
-  IRRIGATION_SEASON = [5, 6, 7, 8, 9]    May through September
   WINTER_MONTHS = [11, 12, 1, 2]          November through February
 
+Init call:
+  const recentMonths = G_months.slice(-3);      // Last 3 months to check
+  detectBuildingAnomaliesYoY(byBldg, recentMonths, G_months, service)
+  // G_months provides full 26-month history for prior-year lookup
 
-ANOMALY TABLE FEATURES
------------------------
+
+ANOMALY REVIEW TAB (ALL-SITES VIEW)
+-------------------------------------
+
+Default view shows ALL building/service combinations, not just anomalies.
+An "Anomalies Only" toggle button filters to flagged rows only.
+
+Global state:
+  G_allSiteRows     Array of all building+service combinations with anomaly references
+  anomalyOnlyMode   Boolean toggle for anomaly-only filtering
+
+All-Sites Row Object:
+  { bldgNo, bldgName, service, meters, total,
+    anomalies: [...], anomalyCount, hasAnomaly, worstAnomaly }
+
+Table Columns (SITE_COLS):
+  Bldg # | Building Name | Service | Anomalies | Type | Month | Usage | Baseline | Deviation | Task Status | Action
+
+Default Sort:
+  Anomaly rows first (sorted by deviation descending), then non-anomaly rows by total descending.
 
 Severity Color Coding:
   Red left border     -- deviation > 200% (high severity spike)
   Orange left border  -- deviation 100-200% (medium severity spike)
   Green left border   -- winter irrigation alert
+  No border           -- non-anomaly row
 
 Expandable Rows:
-  Click any anomaly row to expand a panel showing:
-  - Line chart of that building's monthly usage (anomaly month highlighted with red dot)
-  - Data table with Usage (kGal) per month and Month-over-Month % change
-  - Anomaly month column highlighted in red in both chart and table
+  Click any row (anomaly or non-anomaly) to expand a panel showing:
+  - Line chart of that building's monthly usage per year (anomaly month highlighted with red dot if applicable)
+  - Data table with Usage (kGal) per month per year
+  - CY vs PY row showing year-over-year % change per calendar month
+  - Anomaly month column highlighted in red in both chart and table (anomaly rows only)
 
 Sortable Column Headers:
   Click any header to sort ascending/descending (toggles on repeated clicks).
@@ -194,6 +221,7 @@ Sortable Column Headers:
 Per-Column Filter Dropdowns:
   Filterable columns: Bldg #, Building Name, Type, Service, Month, Task Status
   Click the hamburger icon (three lines) to open a checkbox dropdown.
+  Search box at top filters checkbox options. Select All / Deselect All buttons.
   Check/uncheck values to filter. Apply to commit, Clear to reset.
   Active filters highlighted with colored button and italic header.
 
@@ -211,10 +239,18 @@ Task Status Column:
 
 Service/Type Filter Bar:
   Quick-filter buttons above the table:
-  All Services | Domestic Water | Irrigation Water | Spikes Only | Winter Irrigation Only
+  All Services | Domestic Water | Irrigation Water | [separator] | Anomalies Only | Spikes Only | Winter Irrigation Only
+  "Anomalies Only" button has red styling (border-color: var(--red))
+  Heading toggles between "All Sites" and "Detected Anomalies" based on mode
 
 Count Display:
   Heading shows "(X of Y shown)" when filters are active.
+
+Create Task Modal -- Prior Notes:
+  When creating a task, the modal shows a read-only info box with prior Smartsheet notes
+  for that building/service if any exist (prefers closed tasks for final notes).
+  Function: showPriorNotes(bldgNo, service)
+  Hidden during edit mode (user already sees the task's own notes).
 
 
 TASK MANAGEMENT SYSTEM
@@ -315,7 +351,7 @@ handles it dynamically (data-tab="help" -> id="sec-help").
 7 content sections:
   1. Meeting Workflow      3-step visual cards (Before / During / After)
   2. Tab Guide             4 cards explaining each functional tab
-  3. Anomaly Types         Spike severity colors, irrigation season exclusion, winter alerts
+  3. Anomaly Types         Spike severity colors, YoY methodology, winter alerts
   4. Task Status Guide     5-status reference table matching Smartsheet
   5. Smartsheet Sync       Numbered step-by-step for CSV import/export round-trip
   6. Quick Tips            6 tips for power users (expand rows, sort/filter, print, etc.)
@@ -361,16 +397,19 @@ GLOBAL STATE
 
 Variable          Type      Description
 --------          ----      -----------
-G_anomalies       Array     All detected anomalies (spikes + winter irrigation)
+G_anomalies       Array     All detected anomalies (spikes + winter irrigation, last 3 months only)
+G_allSiteRows     Array     All building+service combinations with anomaly references
 G_domByBldg       Object    Domestic water aggregated by building { bldgNo: { total, months } }
 G_irrigByBldg     Object    Irrigation aggregated by building (same structure)
-G_months          Array     Sorted month keys ["2025-01", "2025-02", ...]
-G_monthLabels     Array     Formatted labels ["Jan 25", "Feb 25", ...]
+G_months          Array     Sorted month keys ["2024-01", "2024-02", ..., "2026-02"]
+G_monthLabels     Array     Formatted labels ["Jan 24", "Feb 24", ...]
+G_years           Array     Sorted unique years [2024, 2025, 2026]
 chartInstances    Array     All Chart.js instances for dark mode syncing
 anomalyCharts     Array     Mini-chart instances in expanded anomaly rows
 anomalySortCol    String    Current sort column key (null = default sort)
 anomalySortDir    String    'asc' or 'desc'
 anomalyColFilters Object    Per-column filter state { colKey: Set of allowed values }
+anomalyOnlyMode   Boolean   Whether "Anomalies Only" toggle is active
 currentFilter     String    Active task tracker filter status
 currentAnomalyFilter String Active anomaly filter bar selection
 
@@ -395,4 +434,4 @@ Tasks stored in browser localStorage          Tasks lost if browser data cleared
 No real-time Smartsheet sync                  Manual file handoff required                 CSV round-trip before/after each meeting
 No multi-user collaboration                   Only one person can edit tasks at a time     Export/import serializes changes
 Anomaly threshold hardcoded at 100%           May miss moderate spikes                     Adjust threshold constant if needed
-Irrigation season months hardcoded            May need adjustment for climate changes      Update IRRIGATION_SEASON array
+YoY needs prior-year data for same month      New calendar months have no baseline         Will improve as data history grows

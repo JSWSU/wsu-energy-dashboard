@@ -19,15 +19,15 @@ Solution:
 NO ANOMALIES DETECTED
 -----------------------
 
-Cause A: Data has fewer than 3 months, so no neighbor comparison is possible.
-Cause B: No buildings have usage spikes exceeding 100% of their neighbor-month average.
-Cause C: Irrigation spikes during May-Sep are intentionally excluded.
+Cause A: No prior-year data exists for the same calendar month (YoY comparison needs at least 1 prior year).
+Cause B: No buildings have usage spikes exceeding 100% of their prior-year same-month average.
+Cause C: Only the most recent 3 months are checked for anomalies.
 
 Solution:
-1. Check that data spans at least 3 consecutive months with non-zero values
-2. This may be expected if usage patterns are stable
-3. For irrigation: spikes during irrigation season (May-Sep) are normal and excluded
-   by design. Only off-season irrigation anomalies are flagged.
+1. Check that data spans at least 2 years so prior-year comparison is possible
+2. This may be expected if usage patterns are consistent year-over-year
+3. Anomaly detection only runs on the last 3 months -- older anomalies are not shown
+4. Verify data files contain the expected date range (currently Jan 2024 -- Feb 2026)
 
 
 FILTER SHOWS "NO ANOMALIES MATCH THE SELECTED FILTER"

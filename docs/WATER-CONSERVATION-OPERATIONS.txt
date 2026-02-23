@@ -145,13 +145,15 @@ UNDERSTANDING ANOMALY TYPES
 -----------------------------
 
 Spike Anomalies:
-  - A building's monthly usage is >100% higher than the average of its neighbor months
+  - A building's monthly usage is >100% higher than the average of the same month in prior years (YoY)
+  - Only the most recent 3 months are checked for anomalies
   - Severity: Red border = >200% deviation (high), Orange border = 100-200% (medium)
-  - Irrigation spikes during May-Sep are excluded (expected irrigation season ramp-up)
+  - YoY comparison naturally handles university seasonal patterns (student move-in/out, irrigation season)
   - Common causes: leaks, meter issues, multiplier errors, temporary high usage (construction, cooling)
 
 Winter Irrigation Alerts:
-  - Any irrigation water usage during Nov, Dec, Jan, or Feb
+  - Irrigation water usage >= 1 kGal during Nov, Dec, Jan, or Feb
+  - Sub-1 kGal values are ignored (rounding artifacts from meter reads)
   - Green border in the anomaly table
   - Systems should be winterized; any usage may indicate a leak or valve left open
 
