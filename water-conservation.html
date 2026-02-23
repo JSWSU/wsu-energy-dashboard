@@ -170,6 +170,23 @@
   }
   .filter-btn:hover { border-color: var(--primary); }
   .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .filter-separator { width: 1px; height: 24px; background: var(--border); margin: 0 0.25rem; align-self: center; }
+  .filter-btn.anomaly-toggle { border-color: var(--red); color: var(--red); }
+  .filter-btn.anomaly-toggle:hover { background: rgba(220,38,38,0.08); }
+  .filter-btn.anomaly-toggle.active { background: var(--red); color: #fff; border-color: var(--red); }
+  .site-row { cursor: pointer; }
+  .site-row td:first-child::before {
+    content: '\25B6'; font-size: 0.65rem; margin-right: 0.4rem; color: var(--text-light);
+    display: inline-block; transition: transform 0.2s;
+  }
+  .site-row.expanded td:first-child::before { transform: rotate(90deg); }
+  .anomaly-count-badge {
+    display: inline-block; font-size: 0.7rem; font-weight: 700;
+    padding: 0.1rem 0.45rem; border-radius: 10px;
+    background: rgba(220,38,38,0.1); color: var(--red);
+  }
+  html.dark .anomaly-count-badge { background: rgba(248,113,113,0.15); color: #f87171; }
+  .anomaly-count-badge.none { background: transparent; color: var(--text-light); font-weight: 400; }
   /* Status pills */
   .status-pills { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
   .status-pill {
@@ -600,16 +617,19 @@
   <div class="section active" id="sec-anomalies">
     <div class="kpi-grid" id="kpiAnomalies"></div>
     <div class="card">
-      <h2>Detected Anomalies <span id="anomalyCount" style="font-weight:400;font-size:0.82rem;color:var(--text-light);"></span></h2>
+      <h2><span id="anomalyHeading">All Sites</span> <span id="anomalyCount" style="font-weight:400;font-size:0.82rem;color:var(--text-light);"></span></h2>
       <div class="info-box">
-        Spike anomalies flag buildings where a month's usage exceeds 100% above its neighbor-month average.
-        Irrigation spikes during irrigation season (May&ndash;Sep) are excluded.
-        Winter irrigation flags any irrigation usage during Nov&ndash;Feb when systems should be off.
+        Shows all metered building/service pairs. Click any row to expand year-over-year charts.
+        Spike anomalies flag months with &gt;100% usage increase vs neighbor-month average (irrigation season excluded).
+        Winter irrigation flags any usage Nov&ndash;Feb.
+        Use <strong>Anomalies Only</strong> to filter to flagged buildings.
       </div>
       <div class="filter-bar" id="anomalyFilterBar" style="margin-bottom:1rem;">
         <button class="filter-btn active" data-svc="all">All Services</button>
         <button class="filter-btn" data-svc="Domestic Water">Domestic Water</button>
         <button class="filter-btn" data-svc="Irrigation Water">Irrigation Water</button>
+        <span class="filter-separator"></span>
+        <button class="filter-btn anomaly-toggle" id="btnAnomalyOnly" data-svc="anomaly_only">Anomalies Only</button>
         <button class="filter-btn" data-svc="spike">Spikes Only</button>
         <button class="filter-btn" data-svc="winter_irrigation">Winter Irrigation Only</button>
         <div style="flex:1"></div>
@@ -750,7 +770,7 @@
       <div class="help-tab-cards">
         <div class="help-tab-card">
           <strong>Anomaly Review</strong>
-          The main meeting screen. Shows KPI summary cards, a sortable/filterable table of detected anomalies, and expandable rows with line charts and data tables for each building. Create tasks directly from anomaly rows.
+          The main meeting screen. Shows all metered building/service pairs with KPI summary cards. Click any row to expand year-over-year charts and data tables. Use <strong>Anomalies Only</strong> to filter to flagged buildings. Create tasks directly from any row.
         </div>
         <div class="help-tab-card">
           <strong>Task Tracker</strong>
@@ -1080,6 +1100,7 @@ let G_irrigByBldg = {};
 let G_months = [];
 let G_monthLabels = [];
 let G_years = [];
+let G_allSiteRows = [];
 
 function applyChartTheme() {
   const dark = document.documentElement.classList.contains('dark');
@@ -1514,6 +1535,40 @@ function detectCampusAnomaliesYoY(yearData, year, byBldg) {
   return anomalies;
 }
 
+// Build all-sites list (one row per building+service)
+function buildAllSiteRows() {
+  const rows = [];
+  Object.values(G_domByBldg).forEach(b => {
+    const anomalies = G_anomalies.filter(a => a.bldgNo === b.bldgNo && a.service === 'Domestic Water');
+    const worst = anomalies.length > 0
+      ? anomalies.reduce((w, a) => (a.deviation || 0) > (w.deviation || 0) ? a : w)
+      : null;
+    rows.push({
+      bldgNo: b.bldgNo, bldgName: b.bldgName, service: 'Domestic Water',
+      meters: b.meters, total: b.total,
+      anomalies: anomalies, anomalyCount: anomalies.length,
+      hasAnomaly: anomalies.length > 0, worstAnomaly: worst
+    });
+  });
+  Object.values(G_irrigByBldg).forEach(b => {
+    const anomalies = G_anomalies.filter(a => a.bldgNo === b.bldgNo && a.service === 'Irrigation Water');
+    const worst = anomalies.length > 0
+      ? anomalies.reduce((w, a) => {
+          if (a.type === 'spike' && w.type !== 'spike') return a;
+          if (w.type === 'spike' && a.type !== 'spike') return w;
+          return (a.deviation || a.usage || 0) > (w.deviation || w.usage || 0) ? a : w;
+        })
+      : null;
+    rows.push({
+      bldgNo: b.bldgNo, bldgName: b.bldgName, service: 'Irrigation Water',
+      meters: b.meters, total: b.total,
+      anomalies: anomalies, anomalyCount: anomalies.length,
+      hasAnomaly: anomalies.length > 0, worstAnomaly: worst
+    });
+  });
+  return rows;
+}
+
 // ============================================================
 //  TASK MANAGEMENT (localStorage)
 // ============================================================
@@ -1597,12 +1652,14 @@ function taskMatchesAnomaly(t, anomaly) {
 }
 function findTaskForAnomaly(anomaly, tasks) {
   // First try exact match (bldg + service + month in description)
-  const exact = tasks.find(t =>
-    taskMatchesAnomaly(t, anomaly) &&
-    (t.description || '').indexOf(monthLabel(anomaly.month)) >= 0 &&
-    !t.status.startsWith('Closed')
-  );
-  if (exact) return exact;
+  if (anomaly.month) {
+    const exact = tasks.find(t =>
+      taskMatchesAnomaly(t, anomaly) &&
+      (t.description || '').indexOf(monthLabel(anomaly.month)) >= 0 &&
+      !t.status.startsWith('Closed')
+    );
+    if (exact) return exact;
+  }
   // Fallback: match by building + service (catches Smartsheet-imported tasks)
   return tasks.find(t =>
     taskMatchesAnomaly(t, anomaly) &&
@@ -1611,11 +1668,13 @@ function findTaskForAnomaly(anomaly, tasks) {
 }
 function findAnyTaskForAnomaly(anomaly, tasks) {
   // First try exact match (bldg + service + month in description)
-  const exact = tasks.find(t =>
-    taskMatchesAnomaly(t, anomaly) &&
-    (t.description || '').indexOf(monthLabel(anomaly.month)) >= 0
-  );
-  if (exact) return exact;
+  if (anomaly.month) {
+    const exact = tasks.find(t =>
+      taskMatchesAnomaly(t, anomaly) &&
+      (t.description || '').indexOf(monthLabel(anomaly.month)) >= 0
+    );
+    if (exact) return exact;
+  }
   // Fallback: match by building + service, prefer open tasks over closed
   const open = tasks.find(t =>
     taskMatchesAnomaly(t, anomaly) &&
@@ -1816,18 +1875,31 @@ function getTaskStatusLabel(anomaly, tasks) {
   return t ? t.status : 'No Task';
 }
 
-function getFilteredAnomalies(filter, tasks) {
+function getFilteredRows(filter, tasks) {
   filter = filter || currentAnomalyFilter || 'all';
   tasks = tasks || loadTasks();
-  let list = [...G_anomalies];
+
+  // Determine source: anomaly-only mode or all sites
+  const isAnomalyOnly = anomalyOnlyMode || filter === 'spike' || filter === 'winter_irrigation';
+  let list;
+  if (isAnomalyOnly) {
+    list = G_anomalies.map(a => ({
+      bldgNo: a.bldgNo, bldgName: a.bldgName, service: a.service,
+      meters: a.meter, total: null,
+      anomalies: [a], anomalyCount: 1, hasAnomaly: true, worstAnomaly: a,
+      _raw: a
+    }));
+  } else {
+    list = G_allSiteRows.map(r => ({...r}));
+  }
 
   // 1. Apply button-bar filter (service/type)
   if (filter === 'Domestic Water' || filter === 'Irrigation Water') {
-    list = list.filter(a => a.service === filter);
+    list = list.filter(r => r.service === filter);
   } else if (filter === 'spike') {
-    list = list.filter(a => a.type === 'spike');
+    list = list.filter(r => (r.worstAnomaly || r._raw || {}).type === 'spike');
   } else if (filter === 'winter_irrigation') {
-    list = list.filter(a => a.type === 'winter_irrigation');
+    list = list.filter(r => (r.worstAnomaly || r._raw || {}).type === 'winter_irrigation');
   }
 
   // 2. Apply per-column filters
@@ -1835,23 +1907,33 @@ function getFilteredAnomalies(filter, tasks) {
     const allowed = anomalyColFilters[colKey];
     if (!allowed || allowed.size === 0) return;
     if (colKey === 'taskStatus') {
-      list = list.filter(a => allowed.has(getTaskStatusLabel(a, tasks)));
+      list = list.filter(r => {
+        const pseudo = { bldgNo: r.bldgNo, service: r.service,
+          month: r.worstAnomaly ? r.worstAnomaly.month : null, meter: r.meters || '' };
+        return allowed.has(getTaskStatusLabel(pseudo, tasks));
+      });
       return;
     }
-    const col = ANOMALY_COLS.find(c => c.key === colKey);
+    const col = SITE_COLS.find(c => c.key === colKey);
     if (!col || !col.valFn) return;
-    list = list.filter(a => allowed.has(String(col.valFn(a))));
+    list = list.filter(r => allowed.has(String(col.valFn(r))));
   });
 
   // 3. Sort
   if (anomalySortCol) {
-    const col = ANOMALY_COLS.find(c => c.key === anomalySortCol);
+    const col = SITE_COLS.find(c => c.key === anomalySortCol);
     if (col) {
       const dir = anomalySortDir === 'desc' ? -1 : 1;
-      const isNum = ['usage', 'baseline', 'deviation'].includes(anomalySortCol);
-      // For month, sort by raw month key for correct chronological order
-      const rawFn = anomalySortCol === 'month' ? (a => a.month) :
-        (anomalySortCol === 'taskStatus' ? (a => getTaskStatusLabel(a, tasks)) : col.valFn);
+      const isNum = ['usage', 'baseline', 'deviation', 'anomalyCount'].includes(anomalySortCol);
+      const rawFn = anomalySortCol === 'month'
+        ? (r => { const w = r.worstAnomaly || r._raw; return w ? w.month || '' : ''; })
+        : (anomalySortCol === 'taskStatus'
+          ? (r => {
+              const pseudo = { bldgNo: r.bldgNo, service: r.service,
+                month: r.worstAnomaly ? r.worstAnomaly.month : null, meter: r.meters || '' };
+              return getTaskStatusLabel(pseudo, tasks);
+            })
+          : col.valFn);
       list.sort((a, b) => {
         let va = rawFn(a), vb = rawFn(b);
         if (isNum) {
@@ -1865,11 +1947,18 @@ function getFilteredAnomalies(filter, tasks) {
       });
     }
   } else {
-    // Default sort: spikes by deviation desc, then winter by usage desc
+    // Default: anomaly rows first (by severity), then non-anomaly by total desc
     list.sort((a, b) => {
-      if (a.type !== b.type) return a.type === 'spike' ? -1 : 1;
-      if (a.type === 'spike') return (b.deviation || 0) - (a.deviation || 0);
-      return (b.usage || 0) - (a.usage || 0);
+      if (a.hasAnomaly && !b.hasAnomaly) return -1;
+      if (!a.hasAnomaly && b.hasAnomaly) return 1;
+      if (a.hasAnomaly && b.hasAnomaly) {
+        const wa = a.worstAnomaly || a._raw || {};
+        const wb = b.worstAnomaly || b._raw || {};
+        if (wa.type !== wb.type) return wa.type === 'spike' ? -1 : 1;
+        if (wa.type === 'spike') return (wb.deviation || 0) - (wa.deviation || 0);
+        return (wb.usage || 0) - (wa.usage || 0);
+      }
+      return (b.total || 0) - (a.total || 0);
     });
   }
 
@@ -1896,28 +1985,37 @@ function renderAnomalyTab(filter) {
       tooltip: 'Tasks with Open status (Not Started, In Progress, Monitor)', sub: tasks.length + ' total tasks' }
   ]);
 
+  // Update heading
+  const headingEl = document.getElementById('anomalyHeading');
+  const isAnomalyView = anomalyOnlyMode || filter === 'spike' || filter === 'winter_irrigation';
+  if (headingEl) headingEl.textContent = isAnomalyView ? 'Detected Anomalies' : 'All Sites';
+
   // Build dynamic thead with sort + filter controls
   const thead = document.querySelector('#tblAnomalies thead');
-  // Collect unique values per filterable column (from full anomaly set, not just filtered)
-  const allForHeaders = [...G_anomalies];
+  // Collect unique values per filterable column from correct source
+  const allForHeaders = isAnomalyView
+    ? G_anomalies.map(a => ({ bldgNo: a.bldgNo, bldgName: a.bldgName, service: a.service, worstAnomaly: a, anomalyCount: 1, hasAnomaly: true }))
+    : [...G_allSiteRows];
   const uniqueVals = {};
-  ANOMALY_COLS.forEach(col => {
+  SITE_COLS.forEach(col => {
     if (!col.filterable) return;
     if (col.key === 'taskStatus') {
       const vals = new Set();
-      allForHeaders.forEach(a => {
-        const t = findAnyTaskForAnomaly(a, tasks);
+      allForHeaders.forEach(r => {
+        const pseudo = { bldgNo: r.bldgNo, service: r.service,
+          month: r.worstAnomaly ? r.worstAnomaly.month : null, meter: r.meters || '' };
+        const t = findAnyTaskForAnomaly(pseudo, tasks);
         vals.add(t ? t.status : 'No Task');
       });
       uniqueVals[col.key] = [...vals].sort();
       return;
     }
     const vals = new Set();
-    allForHeaders.forEach(a => vals.add(String(col.valFn(a))));
+    allForHeaders.forEach(r => vals.add(String(col.valFn(r))));
     uniqueVals[col.key] = [...vals].sort();
   });
 
-  thead.innerHTML = '<tr>' + ANOMALY_COLS.map(col => {
+  thead.innerHTML = '<tr>' + SITE_COLS.map(col => {
     const align = col.align === 'center' ? 'text-align:center' : 'text-align:' + col.align;
     if (!col.sortable && !col.filterable) {
       return '<th style="' + align + '">' + col.label + '</th>';
@@ -1962,25 +2060,30 @@ function renderAnomalyTab(filter) {
 
   // Anomaly table body
   const tbody = document.getElementById('anomalyBody');
-  const sorted = getFilteredAnomalies(filter, tasks);
+  const sorted = getFilteredRows(filter, tasks);
 
   // Update count display
   const countEl = document.getElementById('anomalyCount');
+  const colCount = SITE_COLS.length;
   if (countEl) {
-    const isFiltered = sorted.length !== G_anomalies.length;
-    countEl.textContent = isFiltered
-      ? '(' + sorted.length + ' of ' + G_anomalies.length + ' shown)'
-      : '(' + G_anomalies.length + ' total)';
+    if (isAnomalyView) {
+      const isFiltered = sorted.length !== G_anomalies.length;
+      countEl.textContent = isFiltered
+        ? '(' + sorted.length + ' of ' + G_anomalies.length + ' anomalies shown)'
+        : '(' + G_anomalies.length + ' anomalies)';
+    } else {
+      const anomCount = sorted.filter(r => r.hasAnomaly).length;
+      countEl.textContent = '(' + sorted.length + ' sites, ' + anomCount + ' with anomalies)';
+    }
   }
 
   if (sorted.length === 0) {
-    // Destroy any existing anomaly mini-charts
     anomalyCharts.forEach(c => { if (c) c.destroy(); });
     anomalyCharts = [];
-    const msg = G_anomalies.length === 0
-      ? 'No anomalies detected in current data.'
-      : 'No anomalies match the selected filter.';
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-light);padding:2rem;">' + msg + '</td></tr>';
+    const msg = isAnomalyView
+      ? (G_anomalies.length === 0 ? 'No anomalies detected in current data.' : 'No anomalies match the selected filter.')
+      : 'No sites match the selected filter.';
+    tbody.innerHTML = '<tr><td colspan="' + colCount + '" style="text-align:center;color:var(--text-light);padding:2rem;">' + msg + '</td></tr>';
     return;
   }
 
@@ -1988,22 +2091,47 @@ function renderAnomalyTab(filter) {
   anomalyCharts.forEach(c => { if (c) c.destroy(); });
   anomalyCharts = [];
 
-  tbody.innerHTML = sorted.map((a, i) => {
-    const task = findTaskForAnomaly(a, tasks);
-    const anyTask = findAnyTaskForAnomaly(a, tasks);
-    const severityCls = a.type === 'winter_irrigation' ? 'severity-winter' :
-      (a.deviation > 200 ? 'severity-high' : 'severity-med');
-    const typeLabel = a.type === 'spike' ? 'Spike' : 'Winter Irrigation';
-    const devStr = a.deviation != null ? '+' + a.deviation + '%' : 'N/A';
-    const actionHtml = task
-      ? '<button class="btn-sm" onclick="event.stopPropagation(); switchToTask(\'' + task.issueId + '\')">' + task.issueId + '</button>'
-      : '<button class="btn-sm primary" data-anomaly-idx="' + G_anomalies.indexOf(a) + '" onclick="event.stopPropagation(); openCreateModal(this)">Create Task</button>';
+  tbody.innerHTML = sorted.map((r, i) => {
+    // Build pseudo-anomaly for task matching
+    const pseudo = { bldgNo: r.bldgNo, service: r.service, bldgName: r.bldgName,
+      month: r.worstAnomaly ? r.worstAnomaly.month : null, meter: r.meters || '' };
+    const task = findTaskForAnomaly(pseudo, tasks);
+    const anyTask = findAnyTaskForAnomaly(pseudo, tasks);
+
+    // Row styling
+    const w = r.worstAnomaly;
+    let severityCls = '';
+    if (r.hasAnomaly && w) {
+      severityCls = w.type === 'winter_irrigation' ? 'severity-winter' :
+        (w.deviation > 200 ? 'severity-high' : 'severity-med');
+    }
+    const rowCls = r.hasAnomaly ? 'anomaly-row' : 'site-row';
+
+    // Anomaly-specific columns
+    const typeLabel = w ? (w.type === 'spike' ? 'Spike' : 'Winter Irrigation') : '\u2014';
+    const countBadge = r.anomalyCount > 0
+      ? '<span class="anomaly-count-badge">' + r.anomalyCount + '</span>'
+      : '<span class="anomaly-count-badge none">\u2014</span>';
+    const monthStr = w && w.month ? monthLabel(w.month) : '\u2014';
+    const usageStr = w && w.usage != null ? fmt(w.usage, 1) : '\u2014';
+    const baseStr = w ? (w.baseline > 0 ? fmt(w.baseline, 1) : '0 (expected)') : '\u2014';
+    const devStr = w && w.deviation != null ? '+' + w.deviation + '%' : '\u2014';
+
+    // Action column
+    let actionHtml;
+    if (task) {
+      actionHtml = '<button class="btn-sm" onclick="event.stopPropagation(); switchToTask(\'' + task.issueId + '\')">' + task.issueId + '</button>';
+    } else if (r.hasAnomaly && w) {
+      const anomIdx = G_anomalies.indexOf(w);
+      actionHtml = '<button class="btn-sm primary" data-anomaly-idx="' + anomIdx + '" onclick="event.stopPropagation(); openCreateModal(this)">Create Task</button>';
+    } else {
+      actionHtml = '<button class="btn-sm" data-site-idx="' + i + '" onclick="event.stopPropagation(); openCreateModalForSite(this)">Create Task</button>';
+    }
 
     // Task Status cell
     let taskStatusHtml;
     if (anyTask) {
       const s = anyTask.status;
-      const isOpen = s.startsWith('Open');
       const isClosed = s.startsWith('Closed');
       const shortLabel = s.replace('Open - ', '').replace('Closed - ', '');
       const icon = isClosed ? (s.includes('Resolved') && !s.includes('Not') ? '\u2705' : '\u2716') : '\u2714';
@@ -2014,20 +2142,21 @@ function renderAnomalyTab(filter) {
       taskStatusHtml = '<span class="task-status-badge ts-none">&mdash;</span>';
     }
 
-    return `<tr class="anomaly-row ${severityCls}" data-chart-idx="${i}" onclick="toggleAnomalyChart(this)">
-      <td style="text-align:left">${a.bldgNo}</td>
-      <td style="text-align:left">${a.bldgName}</td>
+    return `<tr class="${rowCls} ${severityCls}" data-chart-idx="${i}" onclick="toggleSiteChart(this)">
+      <td style="text-align:left">${r.bldgNo}</td>
+      <td style="text-align:left">${r.bldgName}</td>
+      <td style="text-align:left">${r.service}</td>
+      <td style="text-align:center">${countBadge}</td>
       <td style="text-align:left">${typeLabel}</td>
-      <td style="text-align:left">${a.service}</td>
-      <td>${monthLabel(a.month)}</td>
-      <td>${fmt(a.usage, 1)}</td>
-      <td>${a.baseline > 0 ? fmt(a.baseline, 1) : '0 (expected)'}</td>
+      <td>${monthStr}</td>
+      <td>${usageStr}</td>
+      <td>${baseStr}</td>
       <td>${devStr}</td>
       <td style="text-align:center">${taskStatusHtml}</td>
       <td style="text-align:center">${actionHtml}</td>
     </tr>
     <tr class="anomaly-chart-row" id="acr-${i}">
-      <td colspan="10">
+      <td colspan="${colCount}">
         <div class="anomaly-chart-cell"><canvas id="anomChart-${i}"></canvas></div>
         <div class="anomaly-detail-wrap" id="anomTable-${i}"></div>
       </td>
@@ -2038,44 +2167,40 @@ function renderAnomalyTab(filter) {
 // Track mini-charts for anomaly row expanders
 let anomalyCharts = [];
 
-function toggleAnomalyChart(row) {
+function toggleSiteChart(row) {
   const idx = parseInt(row.dataset.chartIdx, 10);
   const chartRow = document.getElementById('acr-' + idx);
   const isExpanded = row.classList.contains('expanded');
 
   if (isExpanded) {
-    // Collapse
     row.classList.remove('expanded');
     chartRow.classList.remove('visible');
-    // Destroy chart to free memory
     if (anomalyCharts[idx]) { anomalyCharts[idx].destroy(); anomalyCharts[idx] = null; }
     return;
   }
 
-  // Expand
   row.classList.add('expanded');
   chartRow.classList.add('visible');
 
-  // Get the anomaly data for this row — must match the filtered+sorted list used by renderAnomalyTab
-  const sorted = getFilteredAnomalies();
-  const a = sorted[idx];
-  if (!a) return;
+  const sorted = getFilteredRows();
+  const r = sorted[idx];
+  if (!r) return;
 
-  // Get building's monthly data
-  const byBldg = a.service === 'Irrigation Water' ? G_irrigByBldg : G_domByBldg;
-  const bldg = byBldg[a.bldgNo];
+  const byBldg = r.service === 'Irrigation Water' ? G_irrigByBldg : G_domByBldg;
+  const bldg = byBldg[r.bldgNo];
   if (!bldg) return;
 
-  const color = a.service === 'Irrigation Water' ? COLORS.irrigation : COLORS.domestic;
-  const [anomalyYear, anomalyMon] = a.month.split('-').map(Number);
-  const anomalyCalIdx = anomalyMon - 1;
+  const color = r.service === 'Irrigation Water' ? COLORS.irrigation : COLORS.domestic;
+  const w = r.worstAnomaly;
+  const hasHighlight = w && w.month;
+  const anomalyYear = hasHighlight ? parseInt(w.month.split('-')[0], 10) : null;
+  const anomalyCalIdx = hasHighlight ? parseInt(w.month.split('-')[1], 10) - 1 : -1;
 
-  // Build one dataset per year — oldest first so most recent draws on top
   const yearsOldestFirst = [...G_years];
   const datasets = yearsOldestFirst.map(year => {
     const data = getYearMonthData(bldg.months, year);
     const cfg = getYearLineConfig(color, year, G_years);
-    const isAnomalyYear = year === anomalyYear;
+    const isAnomalyYear = hasHighlight && year === anomalyYear;
     return {
       label: year.toString(),
       data: data,
@@ -2093,7 +2218,6 @@ function toggleAnomalyChart(row) {
     };
   });
 
-  // Destroy existing chart if any
   if (anomalyCharts[idx]) { anomalyCharts[idx].destroy(); }
 
   const canvas = document.getElementById('anomChart-' + idx);
@@ -2109,7 +2233,7 @@ function toggleAnomalyChart(row) {
             label: ctx => {
               if (ctx.parsed.y == null) return null;
               const yr = yearsOldestFirst[ctx.datasetIndex];
-              const isAnomaly = yr === anomalyYear && ctx.dataIndex === anomalyCalIdx;
+              const isAnomaly = hasHighlight && yr === anomalyYear && ctx.dataIndex === anomalyCalIdx;
               return yr + ': ' + fmt(ctx.parsed.y, 1) + ' kGal' + (isAnomaly ? ' \u25C6 ANOMALY' : '');
             }
           }
@@ -2125,17 +2249,16 @@ function toggleAnomalyChart(row) {
     }
   });
 
-  // Build YoY data table underneath chart
   const tableDiv = document.getElementById('anomTable-' + idx);
   if (tableDiv) {
     const headerCells = '<th>Year</th>' + CALENDAR_MONTHS.map((lbl, mi) =>
-      '<th' + (mi === anomalyCalIdx ? ' style="color:var(--red)"' : '') + '>' + lbl + '</th>'
+      '<th' + (hasHighlight && mi === anomalyCalIdx ? ' style="color:var(--red)"' : '') + '>' + lbl + '</th>'
     ).join('') + '<th>Total</th>';
 
     const yearsDesc = [...G_years].reverse();
     const yearRows = yearsDesc.map(year => {
       const data = getYearMonthData(bldg.months, year);
-      const isAnomalyYear = year === anomalyYear;
+      const isAnomalyYear = hasHighlight && year === anomalyYear;
       const yearTotal = data.reduce((s, v) => s + (v || 0), 0);
       const cells = data.map((v, mi) => {
         if (v === null) return '<td class="zero-cell">&mdash;</td>';
@@ -2146,7 +2269,6 @@ function toggleAnomalyChart(row) {
         '<td style="font-weight:600">' + fmt(yearTotal, 1) + '</td></tr>';
     }).join('');
 
-    // YoY % change row (compare two most recent complete years)
     let yoyRow = '';
     if (G_years.length > 1) {
       const currYear = G_years.length > 2 ? G_years[G_years.length - 2] : G_years[G_years.length - 1];
@@ -2374,6 +2496,25 @@ function openCreateModal(btn) {
   document.getElementById('taskModal').classList.remove('hidden');
 }
 
+function openCreateModalForSite(btn) {
+  const idx = parseInt(btn.dataset.siteIdx, 10);
+  const sorted = getFilteredRows();
+  const r = sorted[idx];
+  if (!r) return;
+  document.getElementById('modalTitle').textContent = 'Create Task';
+  document.getElementById('modalTaskId').value = '';
+  document.getElementById('modalBldgNo').value = r.bldgNo;
+  document.getElementById('modalBldgName').value = r.bldgName;
+  document.getElementById('modalService').value = r.service;
+  document.getElementById('modalMeter').value = r.meters || '';
+  document.getElementById('modalStatus').value = 'Open - Not Started';
+  document.getElementById('modalWO').value = 'NA';
+  document.getElementById('modalAssigned').value = '';
+  document.getElementById('modalDesc').value = '';
+  document.getElementById('modalNote').value = '';
+  document.getElementById('taskModal').classList.remove('hidden');
+}
+
 function openEditModal(issueId) {
   const tasks = loadTasks();
   const t = tasks.find(x => x.issueId === issueId);
@@ -2439,23 +2580,30 @@ function saveModal() {
 let currentFilter = 'all';
 let currentAnomalyFilter = 'all';
 
-// Column sorting & filtering state for anomaly table
-let anomalySortCol = null;   // null = default sort (type then deviation/usage)
+// Column sorting & filtering state for site table
+let anomalySortCol = null;   // null = default sort
 let anomalySortDir = 'asc';  // 'asc' or 'desc'
 let anomalyColFilters = {};  // { colKey: Set of allowed values } — empty = show all
+let anomalyOnlyMode = false; // false = all sites, true = anomalies only
 
-// Column definitions for sortable anomaly table
-const ANOMALY_COLS = [
-  { key: 'bldgNo',    label: 'Bldg #',          align: 'left',   sortable: true,  filterable: true,  valFn: a => a.bldgNo },
-  { key: 'bldgName',  label: 'Building Name',    align: 'left',   sortable: true,  filterable: true,  valFn: a => a.bldgName },
-  { key: 'type',      label: 'Type',             align: 'left',   sortable: true,  filterable: true,  valFn: a => a.type === 'spike' ? 'Spike' : 'Winter Irrigation' },
-  { key: 'service',   label: 'Service',          align: 'left',   sortable: true,  filterable: true,  valFn: a => a.service },
-  { key: 'month',     label: 'Month',            align: 'right',  sortable: true,  filterable: true,  valFn: a => monthLabel(a.month) },
-  { key: 'usage',     label: 'Usage (kGal)',     align: 'right',  sortable: true,  filterable: false, valFn: a => a.usage },
-  { key: 'baseline',  label: 'Baseline (kGal)',  align: 'right',  sortable: true,  filterable: false, valFn: a => a.baseline },
-  { key: 'deviation', label: 'Deviation',        align: 'right',  sortable: true,  filterable: false, valFn: a => a.deviation },
-  { key: 'taskStatus',label: 'Task Status',      align: 'center', sortable: true,  filterable: true,  valFn: null },
-  { key: 'action',    label: 'Action',           align: 'center', sortable: false, filterable: false, valFn: null }
+// Column definitions for site/anomaly table
+const SITE_COLS = [
+  { key: 'bldgNo',       label: 'Bldg #',          align: 'left',   sortable: true,  filterable: true,  valFn: r => r.bldgNo },
+  { key: 'bldgName',     label: 'Building Name',    align: 'left',   sortable: true,  filterable: true,  valFn: r => r.bldgName },
+  { key: 'service',      label: 'Service',          align: 'left',   sortable: true,  filterable: true,  valFn: r => r.service },
+  { key: 'anomalyCount', label: 'Anomalies',        align: 'center', sortable: true,  filterable: false, valFn: r => r.anomalyCount != null ? r.anomalyCount : 1 },
+  { key: 'type',         label: 'Type',             align: 'left',   sortable: true,  filterable: true,
+    valFn: r => { const w = r.worstAnomaly || r; return w.type === 'spike' ? 'Spike' : w.type === 'winter_irrigation' ? 'Winter Irrigation' : '\u2014'; } },
+  { key: 'month',        label: 'Month',            align: 'right',  sortable: true,  filterable: true,
+    valFn: r => { const w = r.worstAnomaly || r; return w.month ? monthLabel(w.month) : '\u2014'; } },
+  { key: 'usage',        label: 'Usage (kGal)',     align: 'right',  sortable: true,  filterable: false,
+    valFn: r => { const w = r.worstAnomaly || r; return w.usage != null ? w.usage : null; } },
+  { key: 'baseline',     label: 'Baseline (kGal)',  align: 'right',  sortable: true,  filterable: false,
+    valFn: r => { const w = r.worstAnomaly || r; return w.baseline != null ? w.baseline : null; } },
+  { key: 'deviation',    label: 'Deviation',        align: 'right',  sortable: true,  filterable: false,
+    valFn: r => { const w = r.worstAnomaly || r; return w.deviation != null ? w.deviation : null; } },
+  { key: 'taskStatus',   label: 'Task Status',      align: 'center', sortable: true,  filterable: true,  valFn: null },
+  { key: 'action',       label: 'Action',           align: 'center', sortable: false, filterable: false, valFn: null }
 ];
 
 function toggleAnomalySort(colKey) {
@@ -2798,6 +2946,7 @@ function renderDataInfo(domestic, irrigation, totals) {
     const irrigSpikes = detectBuildingAnomalies(G_irrigByBldg, G_months, 'Irrigation Water');
     const winterIrrig = detectWinterIrrigation(G_irrigByBldg, G_months);
     G_anomalies = [...domSpikes, ...irrigSpikes, ...winterIrrig];
+    G_allSiteRows = buildAllSiteRows();
 
     // Render default tab
     renderAnomalyTab();
@@ -2819,9 +2968,17 @@ function renderDataInfo(domestic, irrigation, totals) {
     // Wire up anomaly filter buttons
     document.querySelectorAll('#anomalyFilterBar .filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('#anomalyFilterBar .filter-btn').forEach(b => b.classList.remove('active'));
+        const svc = btn.dataset.svc;
+        if (svc === 'anomaly_only') {
+          anomalyOnlyMode = !anomalyOnlyMode;
+          btn.classList.toggle('active', anomalyOnlyMode);
+          renderAnomalyTab(currentAnomalyFilter);
+          return;
+        }
+        // Deactivate service/type buttons (not the anomaly toggle)
+        document.querySelectorAll('#anomalyFilterBar .filter-btn:not(.anomaly-toggle)').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        currentAnomalyFilter = btn.dataset.svc;
+        currentAnomalyFilter = svc;
         renderAnomalyTab(currentAnomalyFilter);
       });
     });
