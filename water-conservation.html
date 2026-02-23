@@ -433,6 +433,31 @@
   #printSummary .print-meta { font-size: 0.82rem; color: var(--text-light); margin-bottom: 1rem; }
   #printSummary table { font-size: 0.78rem; }
   #printSummary .sig-line { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 0.5rem; font-size: 0.82rem; color: var(--text-light); }
+  /* Data Info tab */
+  .dq-summary { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+  .dq-stat { padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.78rem; font-weight: 600; }
+  .dq-stat.pass { background: #ecfdf5; color: #059669; }
+  .dq-stat.warn { background: #fffbeb; color: #92400e; }
+  .dq-stat.fail { background: #fef2f2; color: #991b1b; }
+  html.dark .dq-stat.pass { background: #064e3b; color: #34d399; }
+  html.dark .dq-stat.warn { background: #78350f; color: #fbbf24; }
+  html.dark .dq-stat.fail { background: #7f1d1d; color: #f87171; }
+  .dq-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.75rem; }
+  .dq-table th { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 2px solid var(--border); color: var(--secondary); font-weight: 600; font-size: 0.75rem; }
+  .dq-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); }
+  .dq-table td:first-child { font-weight: 500; }
+  .dq-icon { display: inline-block; width: 16px; text-align: center; }
+  .dq-icon.pass { color: #059669; }
+  .dq-icon.warn { color: #d97706; }
+  .dq-icon.fail { color: #dc2626; }
+  .dq-kpi-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.75rem; }
+  .dq-kpi-table th { text-align: right; padding: 0.4rem 0.6rem; border-bottom: 2px solid var(--border); color: var(--secondary); font-weight: 600; font-size: 0.75rem; }
+  .dq-kpi-table th:first-child { text-align: left; }
+  .dq-kpi-table td { text-align: right; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); }
+  .dq-kpi-table td:first-child { text-align: left; font-weight: 500; }
+  .dq-match { color: var(--green); font-weight: 600; }
+  .dq-mismatch { color: var(--red); font-weight: 600; }
+
   /* How to Use tab */
   .help-section { margin-bottom: 2rem; }
   .help-section h3 { font-size: 0.95rem; font-weight: 600; color: var(--primary); margin-bottom: 0.75rem; }
@@ -552,6 +577,7 @@
     <button class="nav-tab" data-tab="trends">Historical Trends</button>
     <button class="nav-tab" data-tab="buildings">Building Index</button>
     <button class="nav-tab" data-tab="help">How to Use</button>
+    <button class="nav-tab" data-tab="info">Data Info</button>
   </div>
 
   <!-- ==================== ANOMALY REVIEW TAB ==================== -->
@@ -660,7 +686,7 @@
         <div class="help-step">
           <div class="help-step-num">1</div>
           <div class="help-step-title">Before the Meeting</div>
-          <p>Update water data from SkySpark (if new data is available). Export the task list from Smartsheet as CSV and import it into the Task Tracker tab.</p>
+          <p>Update water data from SkySpark (see "Updating Data" below). Export the task list from Smartsheet as CSV and import it into the Task Tracker tab. Check the Data Info tab to verify data quality.</p>
         </div>
         <div class="help-step">
           <div class="help-step-num">2</div>
@@ -675,7 +701,34 @@
       </div>
     </div>
 
-    <!-- Section 2: Tab Guide -->
+    <!-- Section 2: Updating Data -->
+    <div class="card help-section">
+      <h2>Updating Data from SkySpark</h2>
+      <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Water data is exported from the SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code>. Run these commands in the SkySpark Shell to refresh the data files:</p>
+      <h3>Export Commands</h3>
+      <table class="help-table">
+        <thead><tr><th>File</th><th>SkySpark Shell Command</th></tr></thead>
+        <tbody>
+          <tr><td><code>domestic_water.json</code></td><td><code>view_water(2024-01-01..2026-02-28, "Site", "Domestic", "Export Format")</code></td></tr>
+          <tr><td><code>irrigation.json</code></td><td><code>view_water(2024-01-01..2026-02-28, "Site", "Irrigation", "Export Format")</code></td></tr>
+        </tbody>
+      </table>
+      <div class="info-box" style="margin-top:0.75rem;">
+        <strong>Tip:</strong> Update the end date in each command to include the latest complete month. For example, if it's March 2026, change the end date to <code>2026-03-31</code>.
+      </div>
+      <h3 style="margin-top:1rem;">After Export</h3>
+      <ol class="help-sync-steps">
+        <li>Save the Domestic export as <strong>domestic_water.json</strong></li>
+        <li>Save the Irrigation export as <strong>irrigation.json</strong></li>
+        <li>Upload both files to the <strong>data/</strong> folder on GitHub (replace existing files)</li>
+        <li>Wait ~1 minute for GitHub Pages to deploy, then hard-refresh the dashboard (Ctrl+Shift+R)</li>
+      </ol>
+      <div class="info-box" style="margin-top:0.75rem;">
+        <strong>Note:</strong> Both files are shared with the <a href="metering.html">Campus Metering</a> dashboard. Updating them here updates metering data too. See the <strong>Data Info</strong> tab for data quality checks and verification after uploading.
+      </div>
+    </div>
+
+    <!-- Section 3: Tab Guide -->
     <div class="card help-section">
       <h2>Tab Guide</h2>
       <div class="help-tab-cards">
@@ -695,10 +748,14 @@
           <strong>Building Index</strong>
           Searchable directory of all buildings with domestic and irrigation water badges. Click any building to expand its monthly usage detail.
         </div>
+        <div class="help-tab-card">
+          <strong>Data Info</strong>
+          Data source details, SkySpark export commands, unit conversions, file inventory, and automated data quality checks with integrity verification.
+        </div>
       </div>
     </div>
 
-    <!-- Section 3: Anomaly Types Explained -->
+    <!-- Section 4: Anomaly Types Explained -->
     <div class="card help-section">
       <h2>Anomaly Types Explained</h2>
       <h3>Spike Anomalies</h3>
@@ -728,7 +785,7 @@
       </table>
     </div>
 
-    <!-- Section 4: Task Status Guide -->
+    <!-- Section 5: Task Status Guide -->
     <div class="card help-section">
       <h2>Task Status Guide</h2>
       <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Use these statuses consistently to match the Smartsheet task tracker shared with the committee.</p>
@@ -744,7 +801,7 @@
       </table>
     </div>
 
-    <!-- Section 5: Smartsheet Sync -->
+    <!-- Section 6: Smartsheet Sync -->
     <div class="card help-section">
       <h2>Smartsheet Sync (Import / Export)</h2>
       <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Tasks are synced between this dashboard and Smartsheet via CSV files. Follow this cycle each meeting:</p>
@@ -761,7 +818,7 @@
       </div>
     </div>
 
-    <!-- Section 6: Quick Tips -->
+    <!-- Section 7: Quick Tips -->
     <div class="card help-section">
       <h2>Quick Tips</h2>
       <div class="help-tip">
@@ -790,7 +847,7 @@
       </div>
     </div>
 
-    <!-- Section 7: Troubleshooting -->
+    <!-- Section 8: Troubleshooting -->
     <div class="card help-section">
       <h2>Troubleshooting</h2>
       <dl class="help-faq">
@@ -811,6 +868,54 @@
       </dl>
     </div>
 
+  </div>
+
+  <!-- ==================== DATA INFO TAB ==================== -->
+  <div class="section" id="sec-info">
+    <div class="card">
+      <h2>Data Sources</h2>
+      <div class="info-box">
+        <p><strong>Data Period:</strong> <span id="diDateRange">Loading...</span></p>
+        <p><strong>Source:</strong> SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code></p>
+        <p><strong>Export Method:</strong> Existing <code>view_water</code> function with Export Format, run via Shell</p>
+      </div>
+      <h2>Export Commands</h2>
+      <div class="info-box">
+        <p>Run these in the SkySpark Shell to refresh data:</p>
+        <p><code>view_water(2024-01-01..2026-02-28, "Site", "Domestic", "Export Format")</code></p>
+        <p><code>view_water(2024-01-01..2026-02-28, "Site", "Irrigation", "Export Format")</code></p>
+      </div>
+      <div class="info-box" style="margin-top:0.75rem;">
+        <strong>After export:</strong> Save each file as <code>domestic_water.json</code> and <code>irrigation.json</code>, then upload to the <code>data/</code> folder on GitHub.
+      </div>
+      <h2>Unit Conversions</h2>
+      <div class="info-box">
+        <p>Raw values exported in gallons. Conversion applied in this dashboard:</p>
+        <ul style="margin:0.5rem 0 0 1.25rem;">
+          <li><strong>Domestic Water:</strong> gal &div; 1,000 = kGal</li>
+          <li><strong>Irrigation:</strong> gal &div; 1,000 = kGal</li>
+        </ul>
+      </div>
+      <h2>File Inventory</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="text-align:left">File</th><th>Rows</th><th style="text-align:left">Description</th></tr></thead>
+          <tbody id="tblFiles"></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- Data Quality Card -->
+    <div class="card" id="dataQualityCard">
+      <h2>Data Quality &amp; Verification</h2>
+      <div id="dqSummary" class="dq-summary"></div>
+      <h3>Integrity Checks</h3>
+      <div class="table-wrap"><table class="dq-table"><thead><tr><th style="width:24px"></th><th>Check</th><th>Result</th></tr></thead><tbody id="dqChecks"></tbody></table></div>
+      <h3 style="margin-top:1.25rem">KPI Cross-Check</h3>
+      <p style="font-size:0.78rem;color:var(--text-light);margin-bottom:0.5rem">Independent recalculation from raw data vs. dashboard KPIs</p>
+      <div class="table-wrap"><table class="dq-kpi-table"><thead><tr><th>Utility</th><th>Raw Sum</th><th>Converted</th><th>Dashboard KPI</th><th>Match</th></tr></thead><tbody id="dqKpi"></tbody></table></div>
+      <h3 style="margin-top:1.25rem">Per-Utility Breakdown</h3>
+      <div class="table-wrap"><table class="dq-table"><thead><tr><th>Utility</th><th>Rows</th><th>Valid</th><th>NA/Invalid</th><th>Negative</th><th>Zero</th><th>Buildings</th><th>Date Range</th></tr></thead><tbody id="dqUtility"></tbody></table></div>
+    </div>
   </div>
 </div>
 
@@ -950,6 +1055,7 @@ const STORAGE_KEY = 'wsu_water_tasks';
 const ID_COUNTER_KEY = 'wsu_water_task_counter';
 const WINTER_MONTHS = [11, 12, 1, 2];
 const STATUSES = ['Open - Not Started', 'Open - In Progress', 'Open - Monitor', 'Closed - Resolved', 'Closed - Not Resolved'];
+const CALENDAR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // Global data references (set during init)
 let G_anomalies = [];
@@ -957,6 +1063,7 @@ let G_domByBldg = {};
 let G_irrigByBldg = {};
 let G_months = [];
 let G_monthLabels = [];
+let G_years = [];
 
 function applyChartTheme() {
   const dark = document.documentElement.classList.contains('dark');
@@ -1104,6 +1211,44 @@ function todayISO() {
 }
 
 // ============================================================
+//  YEAR-OVER-YEAR HELPERS
+// ============================================================
+function getYearMonthData(monthsObj, year) {
+  return CALENDAR_MONTHS.map((_, i) => {
+    const mk = year + '-' + String(i + 1).padStart(2, '0');
+    const val = monthsObj[mk];
+    return val !== undefined ? val : null;
+  });
+}
+
+function getYearCampusData(byMonthMap, year) {
+  return CALENDAR_MONTHS.map((_, i) => {
+    const mk = year + '-' + String(i + 1).padStart(2, '0');
+    const val = byMonthMap[mk];
+    return val !== undefined ? val : null;
+  });
+}
+
+function yearShade(hexColor, factor) {
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+  const lr = Math.round(r + (255 - r) * factor);
+  const lg = Math.round(g + (255 - g) * factor);
+  const lb = Math.round(b + (255 - b) * factor);
+  return '#' + [lr, lg, lb].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function getYearLineConfig(baseColor, year, years) {
+  const idx = years.indexOf(year);
+  const total = years.length;
+  if (total === 1) return { color: baseColor, dash: [], width: 2 };
+  if (idx === 0) return { color: yearShade(baseColor, 0.35), dash: [6, 3], width: 1.5 };
+  if (idx === total - 1 && total > 2) return { color: baseColor, dash: [2, 2], width: 2 };
+  return { color: baseColor, dash: [], width: 2.5 };
+}
+
+// ============================================================
 //  DATA LOADING & AGGREGATION
 // ============================================================
 async function loadJSON(url) {
@@ -1203,7 +1348,7 @@ function lineChart(canvasId, labels, datasets, anomalies) {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, padding: 10 } },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 1) } },
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y != null ? ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 1) : null } },
         anomalyCallout: anomalyOpts
       },
       scales: {
@@ -1307,6 +1452,45 @@ function detectCampusAnomalies(campusData, monthKeys, byBldg) {
       drivers.sort((a,b) => b.delta - a.delta);
       var topDriver = drivers.length > 0 ? drivers[0] : null;
       var driverLabel = topDriver ? (topDriver.bldgNo + (topDriver.bldgName ? ' ' + topDriver.bldgName : '')) : '';
+      anomalies.push({
+        index: i, value: val, expected: avg, pctDev,
+        label: '+' + Math.round(pctDev * 100) + '% vs avg',
+        driver: driverLabel
+      });
+    }
+  }
+  return anomalies;
+}
+
+function detectCampusAnomaliesYoY(yearData, year, byBldg) {
+  const threshold = 1.0;
+  const anomalies = [];
+  for (let i = 1; i < yearData.length - 1; i++) {
+    const val = yearData[i];
+    if (val == null || val === 0) continue;
+    const neighbors = [yearData[i - 1], yearData[i + 1]].filter(v => v != null && v > 0);
+    if (neighbors.length === 0) continue;
+    const avg = neighbors.reduce((s, v) => s + v, 0) / neighbors.length;
+    if (avg === 0) continue;
+    const pctDev = (val - avg) / avg;
+    if (pctDev > threshold) {
+      const mk = year + '-' + String(i + 1).padStart(2, '0');
+      const prevMk = year + '-' + String(i).padStart(2, '0');
+      const nextMk = year + '-' + String(i + 2).padStart(2, '0');
+      const drivers = [];
+      Object.values(byBldg).forEach(b => {
+        const bVal = b.months[mk] || 0;
+        const bPrev = b.months[prevMk] || 0;
+        const bNext = b.months[nextMk] || 0;
+        const bNeighbors = [bPrev, bNext].filter(v => v > 0);
+        if (bNeighbors.length === 0 || bVal === 0) return;
+        const bAvg = bNeighbors.reduce((s, v) => s + v, 0) / bNeighbors.length;
+        const delta = bVal - bAvg;
+        if (delta > 0) drivers.push({ bldgNo: b.bldgNo, bldgName: b.bldgName, delta });
+      });
+      drivers.sort((a, b) => b.delta - a.delta);
+      const topDriver = drivers.length > 0 ? drivers[0] : null;
+      const driverLabel = topDriver ? (topDriver.bldgNo + (topDriver.bldgName ? ' ' + topDriver.bldgName : '')) : '';
       anomalies.push({
         index: i, value: val, expected: avg, pctDev,
         label: '+' + Math.round(pctDev * 100) + '% vs avg',
@@ -1864,15 +2048,31 @@ function toggleAnomalyChart(row) {
   const bldg = byBldg[a.bldgNo];
   if (!bldg) return;
 
-  const monthData = G_months.map(mk => bldg.months[mk] || 0);
-  const anomalyMonthIdx = G_months.indexOf(a.month);
-  const dark = document.documentElement.classList.contains('dark');
   const color = a.service === 'Irrigation Water' ? COLORS.irrigation : COLORS.domestic;
+  const [anomalyYear, anomalyMon] = a.month.split('-').map(Number);
+  const anomalyCalIdx = anomalyMon - 1;
 
-  // Point styling: highlight the anomaly month with a larger red dot
-  const pointRadius = G_months.map((mk, i) => i === anomalyMonthIdx ? 7 : 3);
-  const pointBgColor = G_months.map((mk, i) => i === anomalyMonthIdx ? '#dc2626' : color);
-  const pointBorderColor = G_months.map((mk, i) => i === anomalyMonthIdx ? '#dc2626' : color);
+  // Build one dataset per year
+  const datasets = G_years.map(year => {
+    const data = getYearMonthData(bldg.months, year);
+    const cfg = getYearLineConfig(color, year, G_years);
+    const isAnomalyYear = year === anomalyYear;
+    return {
+      label: year.toString(),
+      data: data,
+      borderColor: cfg.color,
+      backgroundColor: cfg.color + '22',
+      fill: false,
+      borderDash: cfg.dash,
+      borderWidth: cfg.width,
+      pointRadius: CALENDAR_MONTHS.map((_, mi) => isAnomalyYear && mi === anomalyCalIdx ? 7 : 3),
+      pointBackgroundColor: CALENDAR_MONTHS.map((_, mi) => isAnomalyYear && mi === anomalyCalIdx ? '#dc2626' : cfg.color),
+      pointBorderColor: CALENDAR_MONTHS.map((_, mi) => isAnomalyYear && mi === anomalyCalIdx ? '#dc2626' : cfg.color),
+      pointBorderWidth: CALENDAR_MONTHS.map((_, mi) => isAnomalyYear && mi === anomalyCalIdx ? 2 : 1),
+      tension: 0.3,
+      spanGaps: false
+    };
+  });
 
   // Destroy existing chart if any
   if (anomalyCharts[idx]) { anomalyCharts[idx].destroy(); }
@@ -1880,29 +2080,19 @@ function toggleAnomalyChart(row) {
   const canvas = document.getElementById('anomChart-' + idx);
   anomalyCharts[idx] = new Chart(canvas, {
     type: 'line',
-    data: {
-      labels: G_monthLabels,
-      datasets: [{
-        label: a.bldgNo + ' ' + a.service + ' (kGal)',
-        data: monthData,
-        borderColor: color,
-        backgroundColor: color + '22',
-        fill: true,
-        pointRadius: pointRadius,
-        pointBackgroundColor: pointBgColor,
-        pointBorderColor: pointBorderColor,
-        pointBorderWidth: G_months.map((mk, i) => i === anomalyMonthIdx ? 2 : 1),
-        tension: 0.3
-      }]
-    },
+    data: { labels: CALENDAR_MONTHS, datasets: datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: { display: true, position: 'top', labels: { boxWidth: 12, padding: 10 } },
         tooltip: {
           callbacks: {
-            label: ctx => fmt(ctx.parsed.y, 1) + ' kGal' +
-              (ctx.dataIndex === anomalyMonthIdx ? ' \u25C6 ANOMALY' : '')
+            label: ctx => {
+              if (ctx.parsed.y == null) return null;
+              const yr = G_years[ctx.datasetIndex];
+              const isAnomaly = yr === anomalyYear && ctx.dataIndex === anomalyCalIdx;
+              return yr + ': ' + fmt(ctx.parsed.y, 1) + ' kGal' + (isAnomaly ? ' \u25C6 ANOMALY' : '');
+            }
           }
         }
       },
@@ -1910,47 +2100,55 @@ function toggleAnomalyChart(row) {
         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
         y: {
           beginAtZero: true,
-          ticks: {
-            font: { size: 10 },
-            callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v
-          }
+          ticks: { font: { size: 10 }, callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }
         }
       }
     }
   });
 
-  // Build data table underneath chart
+  // Build YoY data table underneath chart
   const tableDiv = document.getElementById('anomTable-' + idx);
   if (tableDiv) {
-    // Month-over-month change calculation
-    const changes = monthData.map((v, i) => {
-      if (i === 0 || !monthData[i-1] || monthData[i-1] === 0) return null;
-      return ((v - monthData[i-1]) / monthData[i-1]) * 100;
-    });
+    const headerCells = '<th>Year</th>' + CALENDAR_MONTHS.map((lbl, mi) =>
+      '<th' + (mi === anomalyCalIdx ? ' style="color:var(--red)"' : '') + '>' + lbl + '</th>'
+    ).join('') + '<th>Total</th>';
 
-    const headerCells = '<th>Metric</th>' + G_monthLabels.map((lbl, i) =>
-      '<th' + (i === anomalyMonthIdx ? ' style="color:var(--red)"' : '') + '>' + lbl + '</th>'
-    ).join('');
-
-    const usageCells = '<td>Usage (kGal)</td>' + monthData.map((v, i) => {
-      const cls = i === anomalyMonthIdx ? ' class="anomaly-cell"' :
-        (v === 0 ? ' class="zero-cell"' : '');
-      return '<td' + cls + '>' + fmt(v, 1) + '</td>';
+    const yearRows = G_years.map(year => {
+      const data = getYearMonthData(bldg.months, year);
+      const isAnomalyYear = year === anomalyYear;
+      const yearTotal = data.reduce((s, v) => s + (v || 0), 0);
+      const cells = data.map((v, mi) => {
+        if (v === null) return '<td class="zero-cell">&mdash;</td>';
+        const cls = isAnomalyYear && mi === anomalyCalIdx ? ' class="anomaly-cell"' : (v === 0 ? ' class="zero-cell"' : '');
+        return '<td' + cls + '>' + fmt(v, 1) + '</td>';
+      }).join('');
+      return '<tr><td><strong>' + year + '</strong></td>' + cells +
+        '<td style="font-weight:600">' + fmt(yearTotal, 1) + '</td></tr>';
     }).join('');
 
-    const changeCells = '<td>MoM Change</td>' + changes.map((c, i) => {
-      if (c == null) return '<td class="zero-cell">&mdash;</td>';
-      const sign = c >= 0 ? '+' : '';
-      const cls = i === anomalyMonthIdx ? ' class="anomaly-cell"' :
-        (Math.abs(c) > 100 ? ' style="font-weight:600"' : '');
-      return '<td' + cls + '>' + sign + fmt(c, 0) + '%</td>';
-    }).join('');
+    // YoY % change row (compare first two complete years)
+    let yoyRow = '';
+    if (G_years.length > 1) {
+      const prevYear = G_years[0];
+      const currYear = G_years.length > 2 ? G_years[1] : G_years[G_years.length - 1];
+      const prevData = getYearMonthData(bldg.months, prevYear);
+      const currData = getYearMonthData(bldg.months, currYear);
+      const yoyCells = CALENDAR_MONTHS.map((_, mi) => {
+        const curr = currData[mi];
+        const prev = prevData[mi];
+        if (curr == null || prev == null || prev === 0) return '<td class="zero-cell">&mdash;</td>';
+        const pct = ((curr - prev) / prev) * 100;
+        const sign = pct >= 0 ? '+' : '';
+        const bold = Math.abs(pct) > 100 ? ' style="font-weight:600"' : '';
+        return '<td' + bold + '>' + sign + fmt(pct, 0) + '%</td>';
+      }).join('');
+      yoyRow = '<tr style="border-top:2px solid var(--border)"><td style="color:var(--text-light);font-size:0.75rem">YoY ' + currYear + ' vs ' + prevYear + '</td>' +
+        yoyCells + '<td></td></tr>';
+    }
 
     tableDiv.innerHTML =
       '<table class="anomaly-detail-table"><thead><tr>' + headerCells +
-      '</tr></thead><tbody><tr>' + usageCells +
-      '</tr><tr>' + changeCells +
-      '</tr></tbody></table>';
+      '</tr></thead><tbody>' + yearRows + yoyRow + '</tbody></table>';
   }
 }
 
@@ -2023,18 +2221,38 @@ function renderTaskTab(filterStatus, searchQuery) {
 function renderTrendsTab(domestic, irrigation) {
   const domByMonth = aggregateByMonth(domestic, galToKgal);
   const irrigByMonth = aggregateByMonth(irrigation, galToKgal);
-  const domTrend = G_months.map(m => domByMonth[m] || 0);
-  const irrigTrend = G_months.map(m => irrigByMonth[m] || 0);
 
-  // Domestic trend with campus-level anomaly markers
-  lineChart('chartDomTrend', G_monthLabels, [
-    { label: 'Domestic (kGal)', data: domTrend, borderColor: COLORS.domestic, backgroundColor: COLORS.domestic + '33', fill: true }
-  ], [detectCampusAnomalies(domTrend, G_months, G_domByBldg)]);
+  // Build per-year datasets for domestic trend
+  const domDatasets = G_years.map(year => {
+    const data = getYearCampusData(domByMonth, year);
+    const cfg = getYearLineConfig(COLORS.domestic, year, G_years);
+    return {
+      label: 'Domestic ' + year, data: data,
+      borderColor: cfg.color, backgroundColor: cfg.color + '33',
+      fill: false, borderDash: cfg.dash, borderWidth: cfg.width,
+      tension: 0.3, spanGaps: false
+    };
+  });
+  const domAnomalies = G_years.map(year =>
+    detectCampusAnomaliesYoY(getYearCampusData(domByMonth, year), year, G_domByBldg)
+  );
+  lineChart('chartDomTrend', CALENDAR_MONTHS, domDatasets, domAnomalies);
 
-  // Irrigation trend with campus-level anomaly markers
-  lineChart('chartIrrigTrend', G_monthLabels, [
-    { label: 'Irrigation (kGal)', data: irrigTrend, borderColor: COLORS.irrigation, backgroundColor: COLORS.irrigation + '33', fill: true }
-  ], [detectCampusAnomalies(irrigTrend, G_months, G_irrigByBldg)]);
+  // Build per-year datasets for irrigation trend
+  const irrigDatasets = G_years.map(year => {
+    const data = getYearCampusData(irrigByMonth, year);
+    const cfg = getYearLineConfig(COLORS.irrigation, year, G_years);
+    return {
+      label: 'Irrigation ' + year, data: data,
+      borderColor: cfg.color, backgroundColor: cfg.color + '33',
+      fill: false, borderDash: cfg.dash, borderWidth: cfg.width,
+      tension: 0.3, spanGaps: false
+    };
+  });
+  const irrigAnomalies = G_years.map(year =>
+    detectCampusAnomaliesYoY(getYearCampusData(irrigByMonth, year), year, G_irrigByBldg)
+  );
+  lineChart('chartIrrigTrend', CALENDAR_MONTHS, irrigDatasets, irrigAnomalies);
 
   // Top 10 buildings by total water (stacked)
   const allBldg = {};
@@ -2342,6 +2560,176 @@ window.addEventListener('beforeprint', function() {
 });
 
 // ============================================================
+//  DATA VERIFICATION & DATA INFO TAB
+// ============================================================
+function runWaterVerification(domestic, irrigation, totals) {
+  const checks = [];
+  const utilities = {};
+  const kpiCheck = {};
+
+  function analyzeUtility(rows, name) {
+    let valid = 0, naCount = 0, negCount = 0, zeroCount = 0, rawSum = 0;
+    const bldgs = new Set();
+    const dates = new Set();
+    const bldgMonths = {};
+
+    rows.forEach(r => {
+      const u = r.usage;
+      const isNum = typeof u === 'number' && isFinite(u);
+      if (!isNum) { naCount++; return; }
+      if (u < 0) negCount++;
+      if (u === 0) zeroCount++;
+      else { valid++; bldgs.add(r.bldgNo); }
+      rawSum += u;
+      const mk = parseMonthKey(r.startDate);
+      if (mk) {
+        dates.add(mk);
+        if (u > 0) {
+          if (!bldgMonths[r.bldgNo]) bldgMonths[r.bldgNo] = new Set();
+          bldgMonths[r.bldgNo].add(mk);
+        }
+      }
+    });
+
+    const sortedDates = [...dates].sort();
+    const dateRange = sortedDates.length > 0
+      ? monthLabel(sortedDates[0]) + ' \u2013 ' + monthLabel(sortedDates[sortedDates.length - 1])
+      : 'None';
+    const totalMonths = sortedDates.length;
+    let gapBuildings = 0;
+    Object.values(bldgMonths).forEach(ms => { if (ms.size < totalMonths) gapBuildings++; });
+
+    utilities[name] = { rows: rows.length, valid, naCount, negCount, zeroCount, buildings: bldgs.size, dateRange, rawSum, gapBuildings, totalMonths };
+  }
+
+  analyzeUtility(domestic, 'Domestic Water');
+  analyzeUtility(irrigation, 'Irrigation');
+
+  // Check 1: Row counts
+  const rowDetail = Object.entries(utilities).map(([k, v]) => k + ': ' + fmt(v.rows)).join(' | ');
+  const allHaveRows = Object.values(utilities).every(v => v.rows > 0);
+  checks.push({ name: 'Row Counts', status: allHaveRows ? 'pass' : 'fail', detail: rowDetail });
+
+  // Check 2: NA/invalid values
+  const totalNA = Object.values(utilities).reduce((s, v) => s + v.naCount, 0);
+  const totalRows = Object.values(utilities).reduce((s, v) => s + v.rows, 0);
+  const naPct = totalRows > 0 ? (totalNA / totalRows * 100).toFixed(2) : 0;
+  const naDetail = totalNA === 0
+    ? 'No NA/invalid values found across all datasets'
+    : totalNA + ' NA/invalid values (' + naPct + '%) ' + Object.entries(utilities).filter(([,v]) => v.naCount > 0).map(([k,v]) => k + ': ' + v.naCount).join(', ');
+  checks.push({ name: 'NA/Invalid Values', status: totalNA === 0 ? 'pass' : 'warn', detail: naDetail });
+
+  // Check 3: Negative values
+  const totalNeg = Object.values(utilities).reduce((s, v) => s + v.negCount, 0);
+  const negDetail = totalNeg === 0
+    ? 'No negative values found'
+    : totalNeg + ' negative values (likely meter rollover): ' + Object.entries(utilities).filter(([,v]) => v.negCount > 0).map(([k,v]) => k + ': ' + v.negCount).join(', ');
+  checks.push({ name: 'Negative Values', status: totalNeg === 0 ? 'pass' : 'warn', detail: negDetail });
+
+  // Check 4: Zero-usage months
+  const totalZero = Object.values(utilities).reduce((s, v) => s + v.zeroCount, 0);
+  const zeroPct = totalRows > 0 ? (totalZero / totalRows * 100).toFixed(1) : 0;
+  checks.push({ name: 'Zero-Usage Months', status: 'pass', detail: fmt(totalZero) + ' zero-usage rows (' + zeroPct + '%) across all utilities' });
+
+  // Check 5: Date range consistency
+  const allRanges = Object.values(utilities).map(v => v.dateRange);
+  const rangeConsistent = allRanges.every(r => r === allRanges[0]);
+  checks.push({ name: 'Date Range', status: rangeConsistent ? 'pass' : 'warn',
+    detail: rangeConsistent ? 'All utilities: ' + allRanges[0] : Object.entries(utilities).map(([k,v]) => k + ': ' + v.dateRange).join(' | ') });
+
+  // Check 6: Monthly continuity
+  const totalGaps = Object.values(utilities).reduce((s, v) => s + v.gapBuildings, 0);
+  const gapDetail = totalGaps === 0
+    ? 'All active buildings have data for every month'
+    : totalGaps + ' building-utility combos missing 1+ months: ' + Object.entries(utilities).filter(([,v]) => v.gapBuildings > 0).map(([k,v]) => k + ': ' + v.gapBuildings).join(', ');
+  checks.push({ name: 'Monthly Continuity', status: totalGaps === 0 ? 'pass' : 'warn', detail: gapDetail });
+
+  // Check 7: KPI recalculation
+  const conversionMap = {
+    'Domestic Water': { rawUnit: 'gal', convUnit: 'kGal', fn: galToKgal, dashVal: totals.dom },
+    'Irrigation':     { rawUnit: 'gal', convUnit: 'kGal', fn: galToKgal, dashVal: totals.irrig }
+  };
+
+  let allMatch = true;
+  Object.entries(conversionMap).forEach(([name, c]) => {
+    const rawSum = utilities[name].rawSum;
+    const converted = c.fn(rawSum);
+    const tolerance = Math.abs(converted) * 0.001;
+    const match = Math.abs(converted - c.dashVal) <= Math.max(tolerance, 0.01);
+    if (!match) allMatch = false;
+    kpiCheck[name] = { rawSum, rawUnit: c.rawUnit, converted, convUnit: c.convUnit, dashVal: c.dashVal, match };
+  });
+  checks.push({ name: 'KPI Recalculation', status: allMatch ? 'pass' : 'fail',
+    detail: allMatch ? 'Both utility KPIs match independent recalculation (within 0.1%)' : 'One or more KPIs do not match independent recalculation' });
+
+  // Check 8: Conversion reference (informational)
+  checks.push({ name: 'Conversion Reference', status: 'pass', detail: 'gal \u00f7 1,000 = kGal' });
+
+  const passCount = checks.filter(c => c.status === 'pass').length;
+  const warnCount = checks.filter(c => c.status === 'warn').length;
+  const failCount = checks.filter(c => c.status === 'fail').length;
+  const overall = failCount > 0 ? 'fail' : warnCount > 0 ? 'warn' : 'pass';
+
+  return { overall, passCount, warnCount, failCount, checks, utilities, kpiCheck };
+}
+
+function renderDataInfo(domestic, irrigation, totals) {
+  const statusIcon = s => '<span class="dq-icon ' + s + '">' + (s === 'pass' ? '\u2713' : s === 'warn' ? '\u26a0' : '\u2717') + '</span>';
+
+  // Date range header
+  const allDates = [...domestic, ...irrigation].map(r => parseMonthKey(r.startDate)).filter(Boolean).sort();
+  if (allDates.length > 0) {
+    document.getElementById('diDateRange').textContent = monthLabel(allDates[0]) + ' \u2013 ' + monthLabel(allDates[allDates.length - 1]) +
+      ' (' + new Set(allDates).size + ' months)';
+  }
+
+  // File inventory
+  const fileMeta = [
+    { file: 'domestic_water.json', rows: domestic.length, desc: 'Domestic water (gal), Export Format' },
+    { file: 'irrigation.json', rows: irrigation.length, desc: 'Irrigation water (gal), Export Format' }
+  ];
+  document.getElementById('tblFiles').innerHTML = fileMeta.map(f =>
+    '<tr><td style="text-align:left"><code>' + f.file + '</code></td><td>' + fmt(f.rows) + '</td><td style="text-align:left">' + f.desc + '</td></tr>'
+  ).join('');
+
+  // Run verification
+  const vr = runWaterVerification(domestic, irrigation, totals);
+
+  // Summary badges
+  document.getElementById('dqSummary').innerHTML =
+    '<span class="dq-stat pass">' + vr.passCount + ' Passed</span>' +
+    (vr.warnCount > 0 ? '<span class="dq-stat warn">' + vr.warnCount + ' Warnings</span>' : '') +
+    (vr.failCount > 0 ? '<span class="dq-stat fail">' + vr.failCount + ' Failed</span>' : '') +
+    '<span style="font-size:0.75rem;color:var(--text-light)">' + vr.checks.length + ' checks run at load time</span>';
+
+  // Checks table
+  document.getElementById('dqChecks').innerHTML = vr.checks.map(c =>
+    '<tr><td>' + statusIcon(c.status) + '</td><td>' + c.name + '</td><td style="font-size:0.75rem">' + c.detail + '</td></tr>'
+  ).join('');
+
+  // KPI cross-check table
+  document.getElementById('dqKpi').innerHTML = Object.entries(vr.kpiCheck).map(([name, k]) =>
+    '<tr><td>' + name + '</td>' +
+    '<td>' + fmt(k.rawSum, 0) + ' ' + k.rawUnit + '</td>' +
+    '<td>' + fmt(k.converted, 1) + ' ' + k.convUnit + '</td>' +
+    '<td>' + fmt(k.dashVal, 1) + ' ' + k.convUnit + '</td>' +
+    '<td class="' + (k.match ? 'dq-match' : 'dq-mismatch') + '">' + (k.match ? '\u2713 Match' : '\u2717 Mismatch') + '</td></tr>'
+  ).join('');
+
+  // Per-utility breakdown
+  document.getElementById('dqUtility').innerHTML = Object.entries(vr.utilities).map(([name, u]) =>
+    '<tr><td>' + name + '</td>' +
+    '<td>' + fmt(u.rows) + '</td>' +
+    '<td>' + fmt(u.valid) + '</td>' +
+    '<td>' + (u.naCount > 0 ? '<span style="color:var(--red)">' + u.naCount + '</span>' : '0') + '</td>' +
+    '<td>' + (u.negCount > 0 ? '<span style="color:var(--red)">' + u.negCount + '</span>' : '0') + '</td>' +
+    '<td>' + fmt(u.zeroCount) + '</td>' +
+    '<td>' + u.buildings + '</td>' +
+    '<td>' + u.dateRange + '</td></tr>'
+  ).join('');
+}
+
+// ============================================================
 //  INIT
 // ============================================================
 (async function init() {
@@ -2353,6 +2741,7 @@ window.addEventListener('beforeprint', function() {
 
     G_months = getSortedMonths(domestic, irrigation);
     G_monthLabels = G_months.map(monthLabel);
+    G_years = [...new Set(G_months.map(mk => parseInt(mk.split('-')[0], 10)))].sort((a, b) => a - b);
     G_domByBldg = aggregateByBuilding(domestic, galToKgal);
     G_irrigByBldg = aggregateByBuilding(irrigation, galToKgal);
 
@@ -2373,6 +2762,11 @@ window.addEventListener('beforeprint', function() {
 
     // Render task tracker
     renderTaskTab();
+
+    // Render data info tab
+    const totalDom = Object.values(G_domByBldg).reduce((s, b) => s + b.total, 0);
+    const totalIrrig = Object.values(G_irrigByBldg).reduce((s, b) => s + b.total, 0);
+    renderDataInfo(domestic, irrigation, { dom: totalDom, irrig: totalIrrig });
 
     // Wire up anomaly filter buttons
     document.querySelectorAll('#anomalyFilterBar .filter-btn').forEach(btn => {
