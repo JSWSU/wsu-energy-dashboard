@@ -764,7 +764,24 @@
       </div>
     </div>
 
-    <!-- Section 3: Tab Guide -->
+    <!-- Section 3: Smartsheet Sync -->
+    <div class="card help-section">
+      <h2>Smartsheet Sync (Import / Export)</h2>
+      <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Tasks are synced between this dashboard and Smartsheet via CSV files. Follow this cycle each meeting:</p>
+      <ol class="help-sync-steps">
+        <li>Open Smartsheet and export the task list as a CSV file</li>
+        <li>On the <strong>Task Tracker</strong> tab, click <strong>"Import from Smartsheet"</strong> and select the CSV</li>
+        <li>Review the import summary (e.g., "12 updated, 35 unchanged, 0 new")</li>
+        <li>During the meeting, create new tasks and update existing ones on the dashboard</li>
+        <li>After the meeting, click <strong>"Export to Smartsheet"</strong> to download the updated CSV</li>
+        <li>Open Smartsheet and import the downloaded CSV to sync changes back</li>
+      </ol>
+      <div class="info-box" style="margin-top:0.75rem;">
+        <strong>Important:</strong> Tasks are stored in your browser's local storage. If you clear browser data, tasks will be lost. Always export to CSV after each meeting as a backup.
+      </div>
+    </div>
+
+    <!-- Section 4: Tab Guide -->
     <div class="card help-section">
       <h2>Tab Guide</h2>
       <div class="help-tab-cards">
@@ -835,23 +852,6 @@
           <tr><td><strong>Closed &ndash; Not Resolved</strong></td><td>Issue investigated but no fix needed (e.g., usage explained by occupancy changes, seasonal patterns, or construction)</td></tr>
         </tbody>
       </table>
-    </div>
-
-    <!-- Section 6: Smartsheet Sync -->
-    <div class="card help-section">
-      <h2>Smartsheet Sync (Import / Export)</h2>
-      <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Tasks are synced between this dashboard and Smartsheet via CSV files. Follow this cycle each meeting:</p>
-      <ol class="help-sync-steps">
-        <li>Open Smartsheet and export the task list as a CSV file</li>
-        <li>On the <strong>Task Tracker</strong> tab, click <strong>"Import from Smartsheet"</strong> and select the CSV</li>
-        <li>Review the import summary (e.g., "12 updated, 35 unchanged, 0 new")</li>
-        <li>During the meeting, create new tasks and update existing ones on the dashboard</li>
-        <li>After the meeting, click <strong>"Export to Smartsheet"</strong> to download the updated CSV</li>
-        <li>Open Smartsheet and import the downloaded CSV to sync changes back</li>
-      </ol>
-      <div class="info-box" style="margin-top:0.75rem;">
-        <strong>Important:</strong> Tasks are stored in your browser's local storage. If you clear browser data, tasks will be lost. Always export to CSV after each meeting as a backup.
-      </div>
     </div>
 
     <!-- Section 7: Quick Tips -->
