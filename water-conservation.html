@@ -972,6 +972,10 @@
 <div class="modal-overlay hidden" id="taskModal">
   <div class="modal-card">
     <h2 id="modalTitle">Create Task</h2>
+    <div class="info-box" id="modalPriorNotes" style="display:none; margin-bottom:0.75rem; font-size:0.82rem; max-height:150px; overflow-y:auto;">
+      <strong>Prior Notes:</strong>
+      <div id="modalPriorNotesContent" style="margin-top:0.25rem; white-space:pre-wrap;"></div>
+    </div>
     <input type="hidden" id="modalTaskId">
     <div class="modal-row">
       <div>
@@ -1440,7 +1444,7 @@ function detectWinterIrrigation(byBldg, monthKeys) {
     monthKeys.forEach(mk => {
       if (!isWinterMonth(mk)) return;
       const val = b.months[mk] || 0;
-      if (val > 0) {
+      if (val >= 1) { // Only flag winter irrigation >= 1 kGal
         anomalies.push({
           bldgNo: b.bldgNo,
           bldgName: b.bldgName,
@@ -2284,7 +2288,7 @@ function toggleSiteChart(row) {
         const bold = Math.abs(pct) > 100 ? ' style="font-weight:600"' : '';
         return '<td' + bold + '>' + sign + fmt(pct, 0) + '%</td>';
       }).join('');
-      yoyRow = '<tr style="border-top:2px solid var(--border)"><td style="color:var(--text-light);font-size:0.75rem">YoY ' + currYear + ' vs ' + prevYear + '</td>' +
+      yoyRow = '<tr style="border-top:2px solid var(--border)"><td style="color:var(--text-light);font-size:0.75rem">CY ' + currYear + ' vs PY ' + prevYear + '</td>' +
         yoyCells + '<td></td></tr>';
     }
 
@@ -2478,6 +2482,26 @@ function renderBuildingTab(searchQuery) {
 // ============================================================
 //  MODAL HANDLERS
 // ============================================================
+function showPriorNotes(bldgNo, service) {
+  const box = document.getElementById('modalPriorNotes');
+  const content = document.getElementById('modalPriorNotesContent');
+  const tasks = loadTasks();
+  // Find prior tasks for this building+service, prefer closed tasks (have final notes)
+  const matches = tasks.filter(t => t.bldgNo === bldgNo && (!service || !t.service || t.service.toLowerCase() === service.toLowerCase()));
+  const closed = matches.find(t => t.status.startsWith('Closed'));
+  const prior = closed || matches[0];
+  if (prior && (prior.description || prior.actionNote)) {
+    let html = '';
+    if (prior.description) html += '<div><em>Description:</em> ' + prior.description.replace(/</g, '&lt;') + '</div>';
+    if (prior.actionNote) html += '<div><em>Action Note:</em> ' + prior.actionNote.replace(/</g, '&lt;') + '</div>';
+    if (prior.issueId) html = '<div style="margin-bottom:0.25rem;color:var(--text-light)">From ' + prior.issueId + ' (' + prior.status + ')</div>' + html;
+    content.innerHTML = html;
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
 function openCreateModal(btn) {
   const idx = parseInt(btn.dataset.anomalyIdx, 10);
   const a = G_anomalies[idx];
@@ -2493,6 +2517,7 @@ function openCreateModal(btn) {
   document.getElementById('modalAssigned').value = '';
   document.getElementById('modalDesc').value = buildDefaultDescription(a);
   document.getElementById('modalNote').value = '';
+  showPriorNotes(a.bldgNo, a.service);
   document.getElementById('taskModal').classList.remove('hidden');
 }
 
@@ -2512,6 +2537,7 @@ function openCreateModalForSite(btn) {
   document.getElementById('modalAssigned').value = '';
   document.getElementById('modalDesc').value = '';
   document.getElementById('modalNote').value = '';
+  showPriorNotes(r.bldgNo, r.service);
   document.getElementById('taskModal').classList.remove('hidden');
 }
 
@@ -2530,6 +2556,7 @@ function openEditModal(issueId) {
   document.getElementById('modalAssigned').value = t.assignedTo || '';
   document.getElementById('modalDesc').value = t.description || '';
   document.getElementById('modalNote').value = t.actionNote || '';
+  document.getElementById('modalPriorNotes').style.display = 'none';
   document.getElementById('taskModal').classList.remove('hidden');
 }
 
@@ -2942,9 +2969,13 @@ function renderDataInfo(domestic, irrigation, totals) {
     G_irrigByBldg = aggregateByBuilding(irrigation, galToKgal);
 
     // Detect all anomalies
-    const domSpikes = detectBuildingAnomalies(G_domByBldg, G_months, 'Domestic Water');
-    const irrigSpikes = detectBuildingAnomalies(G_irrigByBldg, G_months, 'Irrigation Water');
-    const winterIrrig = detectWinterIrrigation(G_irrigByBldg, G_months);
+    // Only flag anomalies for the most recent 3 months
+    // Spike detection needs neighbor context, so pass last 5 months (middle 3 get checked)
+    const recentWithContext = G_months.slice(-5);
+    const domSpikes = detectBuildingAnomalies(G_domByBldg, recentWithContext, 'Domestic Water');
+    const irrigSpikes = detectBuildingAnomalies(G_irrigByBldg, recentWithContext, 'Irrigation Water');
+    const recentMonths = G_months.slice(-3);
+    const winterIrrig = detectWinterIrrigation(G_irrigByBldg, recentMonths);
     G_anomalies = [...domSpikes, ...irrigSpikes, ...winterIrrig];
     G_allSiteRows = buildAllSiteRows();
 
