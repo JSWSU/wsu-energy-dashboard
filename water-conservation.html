@@ -1344,7 +1344,7 @@ function lineChart(canvasId, labels, datasets, anomalies) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        legend: { display: datasets.length > 1, position: 'top', reverse: true, labels: { boxWidth: 12, padding: 10 } },
         tooltip: { callbacks: { label: ctx => ctx.parsed.y != null ? ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 1) : null } },
         anomalyCallout: anomalyOpts
       },
@@ -2049,8 +2049,9 @@ function toggleAnomalyChart(row) {
   const [anomalyYear, anomalyMon] = a.month.split('-').map(Number);
   const anomalyCalIdx = anomalyMon - 1;
 
-  // Build one dataset per year
-  const datasets = G_years.map(year => {
+  // Build one dataset per year — oldest first so most recent draws on top
+  const yearsOldestFirst = [...G_years];
+  const datasets = yearsOldestFirst.map(year => {
     const data = getYearMonthData(bldg.months, year);
     const cfg = getYearLineConfig(color, year, G_years);
     const isAnomalyYear = year === anomalyYear;
@@ -2081,12 +2082,12 @@ function toggleAnomalyChart(row) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        legend: { display: true, position: 'top', reverse: true, labels: { boxWidth: 12, padding: 10 } },
         tooltip: {
           callbacks: {
             label: ctx => {
               if (ctx.parsed.y == null) return null;
-              const yr = G_years[ctx.datasetIndex];
+              const yr = yearsOldestFirst[ctx.datasetIndex];
               const isAnomaly = yr === anomalyYear && ctx.dataIndex === anomalyCalIdx;
               return yr + ': ' + fmt(ctx.parsed.y, 1) + ' kGal' + (isAnomaly ? ' \u25C6 ANOMALY' : '');
             }
@@ -2110,7 +2111,8 @@ function toggleAnomalyChart(row) {
       '<th' + (mi === anomalyCalIdx ? ' style="color:var(--red)"' : '') + '>' + lbl + '</th>'
     ).join('') + '<th>Total</th>';
 
-    const yearRows = G_years.map(year => {
+    const yearsDesc = [...G_years].reverse();
+    const yearRows = yearsDesc.map(year => {
       const data = getYearMonthData(bldg.months, year);
       const isAnomalyYear = year === anomalyYear;
       const yearTotal = data.reduce((s, v) => s + (v || 0), 0);
@@ -2123,13 +2125,13 @@ function toggleAnomalyChart(row) {
         '<td style="font-weight:600">' + fmt(yearTotal, 1) + '</td></tr>';
     }).join('');
 
-    // YoY % change row (compare first two complete years)
+    // YoY % change row (compare two most recent complete years)
     let yoyRow = '';
     if (G_years.length > 1) {
-      const prevYear = G_years[0];
-      const currYear = G_years.length > 2 ? G_years[1] : G_years[G_years.length - 1];
-      const prevData = getYearMonthData(bldg.months, prevYear);
+      const currYear = G_years.length > 2 ? G_years[G_years.length - 2] : G_years[G_years.length - 1];
+      const prevYear = G_years.length > 2 ? G_years[G_years.length - 3] : G_years[0];
       const currData = getYearMonthData(bldg.months, currYear);
+      const prevData = getYearMonthData(bldg.months, prevYear);
       const yoyCells = CALENDAR_MONTHS.map((_, mi) => {
         const curr = currData[mi];
         const prev = prevData[mi];
