@@ -1,0 +1,177 @@
+# WSU Design Standards - File Manifest
+# Generated: Mon Feb 23 13:44:12 2026
+
+12 30 00     | standards/wsu/archive/12-30-00-casework-old.md               |    44 lines | archived | -
+12 30 00     | standards/wsu/archive/12-30-00-casework-old.md               |    49 lines | archived | 2021-06-04
+22 05 53     | standards/wsu/archive/22-05-53-identification-for-plumbing-piping-and-equipment-old.md |    97 lines | archived | -
+22 05 53     | standards/wsu/archive/22-05-53-identification-for-plumbing-piping-and-equipment-old.md |   104 lines | archived | 2023-03-06
+23 30 00     | standards/wsu/archive/23-30-00-hvac-air-distribution-2023-03-07.md |   215 lines | archived | 2021-05-17
+23 30 00     | standards/wsu/archive/23-30-00-hvac-air-distribution-2023-03-07.md |   303 lines | archived | 2023-03-07
+23 30 00     | standards/wsu/archive/23-30-00-hvac-air-distribution-2023-03-07.md |   294 lines | archived | 2025-04-01
+-            | standards/wsu/campus-wide/2024-exterior-signage-standards.md |   578 lines | campus-wide | -
+-            | standards/wsu/campus-wide/2025-interior-signage-standards-part1.md |   790 lines | campus-wide | -
+-            | standards/wsu/campus-wide/2025-interior-signage-standards-part2.md |   836 lines | campus-wide | -
+-            | standards/wsu/campus-wide/2025-wsu-design-guidelines.md      |  1090 lines | campus-wide | -
+-            | standards/wsu/campus-wide/final-contextual-aesthetic-booklet.md |   885 lines | campus-wide | -
+02 40 00     | standards/wsu/division-02/02-40-00-demolition-and-structure-moving.md |    45 lines | standard | 1-28-16
+02 82 13     | standards/wsu/division-02/02-82-13-asbestos-abatement.md     |   776 lines | standard | -
+03 30 00     | standards/wsu/division-03/03-30-00-cast-in-place-concrete.md |   163 lines | standard | -
+04 00 00     | standards/wsu/division-04/04-00-00-masonry.md                |    40 lines | standard | 2021-05-06
+05 51 00     | standards/wsu/division-05/05-51-00-metal-stairs.md           |    18 lines | standard | 3-27-15
+07 00 00     | standards/wsu/division-07/07-00-00-roofing.md                |   171 lines | standard | 8-15-18
+07 10 00     | standards/wsu/division-07/07-10-00-waterproofing.md          |    29 lines | standard | 8-15-18
+07 17 00     | standards/wsu/division-07/07-17-00-bentonite-waterproofing.md |    99 lines | standard | -
+07 31 00     | standards/wsu/division-07/07-31-00-shingles-and-shakes.md    |    57 lines | standard | 8-15-18
+07 40 00     | standards/wsu/division-07/07-40-00-metal-roofing-and-siding-panels.md |    48 lines | standard | 8-15-18
+07 50 00     | standards/wsu/division-07/07-50-00-membrane-roofing.md       |    60 lines | standard | 8-15-18
+07 60 00     | standards/wsu/division-07/07-60-00-flashing-and-sheetmetal.md |    26 lines | standard | 8-15-18
+07 70 00     | standards/wsu/division-07/07-70-00-roof-accessories.md       |    88 lines | standard | 8-15-18
+07 71 23     | standards/wsu/division-07/07-71-23-gutters-and-downspouts.md |    45 lines | standard | 8-15-18
+07 84 00     | standards/wsu/division-07/07-84-00-firestopping.md           |    54 lines | standard | -
+08 10 00     | standards/wsu/division-08/08-10-00-doors-and-frames.md       |    40 lines | standard | 2021-05-17
+08 14 00     | standards/wsu/division-08/08-14-00-wood-doors.md             |    18 lines | standard | -
+08 31 00     | standards/wsu/division-08/08-31-00-access-doors-and-panels.md |    30 lines | standard | 6-15-15
+08 51 00     | standards/wsu/division-08/08-51-00-metal-windows.md          |    46 lines | standard | -
+08 70 00     | standards/wsu/division-08/08-70-00-hardware-and-keying.md    |   322 lines | standard | 5-20-16
+08 80 00     | standards/wsu/division-08/08-80-00-glazing.md                |    35 lines | standard | 2021-05-06
+09 21 00     | standards/wsu/division-09/09-21-00-plaster-and-gypsum-board-assemblies.md |    38 lines | standard | -
+09 30 00     | standards/wsu/division-09/09-30-00-ceramic-tile.md           |    29 lines | standard | 2021-06-04
+09 65 00     | standards/wsu/division-09/09-65-00-resilient-flooring.md     |    60 lines | standard | 2021-06-04
+09 66 00     | standards/wsu/division-09/09-66-00-terrazzo-flooring.md      |    25 lines | standard | -
+09 67 16     | standards/wsu/division-09/09-67-16-epoxy-marble-chip-flooring.md |    54 lines | standard | -
+09 68 00     | standards/wsu/division-09/09-68-00-carpeting.md              |    91 lines | standard | 4-15-15
+09 90 00     | standards/wsu/division-09/09-90-00-painting-and-coating.md   |   172 lines | standard | -
+10 21 13     | standards/wsu/division-10/10-21-13-toilet-compartments-and-partitions.md |    41 lines | standard | -
+10 28 13     | standards/wsu/division-10/10-28-13-toilet-accessories.md     |    54 lines | standard | 2021-05-17
+10 44 00     | standards/wsu/division-10/10-44-00-fire-extinguishers-and-cabinets.md |    43 lines | standard | -
+11 53 13     | standards/wsu/division-11/11-53-13-laboratory-fume-hoods.md  |   283 lines | standard | 6-27-18
+12 06 20     | standards/wsu/division-12/12-06-20-window-treatments.md      |    40 lines | standard | 2023-02-20
+12 48 13     | standards/wsu/division-12/12-48-13-entrance-floor-mats-and-frames.md |    37 lines | standard | 2023-02-20
+13 20 81     | standards/wsu/division-13/13-20-81-maintenance-mechanic-rooms.md |    63 lines | standard | 2021-05-17
+13 20 82     | standards/wsu/division-13/13-20-82-custodial-rooms.md        |    84 lines | standard | 2025-02-06
+14 20 00     | standards/wsu/division-14/14-20-00-elevators.md              |   159 lines | standard | -
+21 10 00     | standards/wsu/division-21/21-10-00-water-based-fire-suppression-systems.md |   284 lines | standard | 9-28-16
+22 00 00     | standards/wsu/division-22/22-00-00-plumbing.md               |   314 lines | standard | 2021-07-06
+22 05 29     | standards/wsu/division-22/22-05-29-hangers-and-supports-for-plumbing-piping-and-equipment.md |    27 lines | standard | -
+22 06 10 13  | standards/wsu/division-22/22-06-10-13-plumbing-pumps.md      |    98 lines | standard | 2-4-16
+22 11 00     | standards/wsu/division-22/22-11-00-app-a-wsu-water-system-plan-update-2015-report.md |     8 lines | standard | -
+22 11 00     | standards/wsu/division-22/22-11-00-facility-water-distribution.md |    66 lines | standard | 1-25-16
+22 45 00     | standards/wsu/division-22/22-45-00-emergency-washing-facilities.md |   112 lines | standard | 2-19-18
+23 00 00     | standards/wsu/division-23/23-00-00-heating-ventilating-and-air-conditioning-hvac.md |    97 lines | standard | 2021-05-17
+23 05 53     | standards/wsu/division-23/23-05-53-identification-for-hvac-piping-and-equipment.md |    85 lines | standard | 5-18-16
+23 05 93     | standards/wsu/division-23/23-05-93-testing-adjusting-and-balancing-for-hvac.md |   214 lines | standard | 2021-05-17
+23 22 00     | standards/wsu/division-23/23-22-00-steam-and-condensate-piping-and-pumps.md |   345 lines | standard | 6-23-17
+23 22 00     | standards/wsu/division-23/23-22-00-steam-and-condensate-piping-and-pumps.md |   350 lines | standard | 2025-04-01
+23 61 00     | standards/wsu/division-23/23-61-00-refrigerant-compressors.md |    77 lines | standard | -
+25 11 00     | standards/wsu/division-25/25-11-00-integrated-automation-network-devices-bacnet.md |    81 lines | standard | 2-13-18
+25 50 00     | standards/wsu/division-25/25-50-00-integrated-automation-facility-controls.md |   351 lines | standard | 2025-06-06
+26 00 00     | standards/wsu/division-26/26-00-00-electrical.md             |    60 lines | standard | -
+26 05 13     | standards/wsu/division-26/26-05-13-medium-voltage-cables.md  |   101 lines | standard | -
+26 05 19     | standards/wsu/division-26/26-05-19-electrical-power-conductors-and-cables.md |   109 lines | standard | 2025-05-01
+26 05 23     | standards/wsu/division-26/26-05-23-control-voltage-cables.md |    29 lines | standard | 9-28-16
+26 05 29     | standards/wsu/division-26/26-05-29-hangers-and-supports-for-electrical-systems.md |    39 lines | standard | -
+26 05 33     | standards/wsu/division-26/26-05-33-raceway-boxes-and-electrical-systems.md |    62 lines | standard | 2025-05-01
+26 05 36     | standards/wsu/division-26/26-05-36-cable-trays-for-electrical-systems.md |    34 lines | standard | 3-27-15
+26 05 48     | standards/wsu/division-26/26-05-48-vibration-and-seismic-controls-for-electrical-systems.md |    35 lines | standard | 3-27-15
+26 05 53     | standards/wsu/division-26/26-05-53-identification-for-electrical-systems.md |    89 lines | standard | 3-27-15
+26 05 73     | standards/wsu/division-26/26-05-73-overcurrent-protection-device-coordination-study.md |    92 lines | standard | -
+26 10 00     | standards/wsu/division-26/26-10-00-medium-voltage-electrical-distribution.md |    62 lines | standard | 8-24-15
+26 22 00     | standards/wsu/division-26/26-22-00-low-voltage-transformers.md |   106 lines | standard | 2025-05-01
+26 24 00     | standards/wsu/division-26/26-24-00-switchboards-and-panelboards.md |   152 lines | standard | 2025-05-01
+26 29 23     | standards/wsu/division-26/26-29-23-variable-frequency-motor-controllers.md |    54 lines | standard | -
+26 33 53     | standards/wsu/division-26/26-33-53-static-ups.md             |    39 lines | standard | -
+26 36 00     | standards/wsu/division-26/26-36-00-transfer-switches.md      |    63 lines | standard | -
+26 41 00     | standards/wsu/division-26/26-41-00-facility-lightning-protection.md |    16 lines | standard | -
+26 43 00     | standards/wsu/division-26/26-43-00-surge-protective-devices.md |    17 lines | standard | -
+26 51 00     | standards/wsu/division-26/26-51-00-interior-lighting.md      |    91 lines | standard | -
+26 56 00     | standards/wsu/division-26/26-56-00-final-updated-campus-exterior-lighting-map-2025.md |    94 lines | standard | -
+27 05 00     | standards/wsu/division-27/27-05-00-common-work-results-for-communications.md |   603 lines | standard | -
+27 05 26     | standards/wsu/division-27/27-05-26-grounding-and-bonding-for-communications.md |   131 lines | standard | -
+27 05 33     | standards/wsu/division-27/27-05-33-conduits-and-backboxes-for-communications-systems.md |   465 lines | standard | -
+27 05 36     | standards/wsu/division-27/27-05-36-cable-trays-for-communications-systems.md |   255 lines | standard | -
+27 11 00     | standards/wsu/division-27/27-11-00-communications-equipment-room-fittings.md |   188 lines | standard | -
+27 13 00     | standards/wsu/division-27/27-13-00-communications-backbone-cabling.md |   289 lines | standard | -
+27 15 00     | standards/wsu/division-27/27-15-00-communications-horizontal-cabling.md |   302 lines | standard | -
+27 15 23     | standards/wsu/division-27/27-15-23-optical-fiber-horizontal-cabling.md |   344 lines | standard | -
+27 32 00     | standards/wsu/division-27/27-32-00-telephone-sets.md         |   127 lines | standard | -
+27 41 00     | standards/wsu/division-27/27-41-00-audio-video-systems.md    |  1175 lines | standard | -
+28 31 00     | standards/wsu/division-28/28-31-00-fire-detection-and-alarm.md |   355 lines | standard | 1-8-16
+31 00 00     | standards/wsu/division-31/31-00-00-earthwork.md              |   128 lines | standard | -
+31 23 33     | standards/wsu/division-31/31-23-33-trenching-and-backfilling.md |    44 lines | standard | 3-30-17
+32 12 00     | standards/wsu/division-32/32-12-00-flexible-paving.md        |    85 lines | standard | -
+32 13 13     | standards/wsu/division-32/32-13-13-concrete-paving.md        |    67 lines | standard | -
+32 17 43 26  | standards/wsu/division-32/32-17-43-26-pavement-snow-melting-systems-electric.md |    56 lines | standard | -
+32 17 43 60  | standards/wsu/division-32/32-17-43-60-pavement-snow-melting-systems-hydronic.md |    68 lines | standard | -
+32 80 00     | standards/wsu/division-32/32-80-00-irrigation.md             |   225 lines | standard | 3-24-17
+32 90 00     | standards/wsu/division-32/32-90-00-landscaping.md            |   300 lines | standard | 2021-05-06
+32 92 00     | standards/wsu/division-32/32-92-00-turf-and-grasses.md       |   117 lines | standard | 4-21-17
+32 93 43     | standards/wsu/division-32/32-93-43-app-a-tree-removal-replacement-policy.md |   104 lines | standard | -
+32 93 43     | standards/wsu/division-32/32-93-43-trees.md                  |   150 lines | standard | 2021-05-06
+33 00 01     | standards/wsu/division-33/33-00-01-wsu-metering-standard.md  |   398 lines | standard | 2025-06-26
+33 05 26     | standards/wsu/division-33/33-05-26-utility-identification.md |    63 lines | standard | 3-30-17
+33 10 00     | standards/wsu/division-33/33-10-00-water-utilities.md        |    83 lines | standard | 6-23-17
+33 12 13 13  | standards/wsu/division-33/33-12-13-13-backflow-prevention-assemblies.md |    42 lines | standard | 7-1-15
+33 12 19     | standards/wsu/division-33/33-12-19-water-utility-distribution-fire-hydrants.md |    35 lines | standard | -
+33 30 00     | standards/wsu/division-33/33-30-00-sanitary-sewerage-utilities.md |    19 lines | standard | 3-30-17
+33 40 00     | standards/wsu/division-33/33-40-00-storm-drainage-utilities.md |    83 lines | standard | 3-30-17
+33 46 00     | standards/wsu/division-33/33-46-00-subdrainage.md            |    32 lines | standard | -
+33 60 00     | standards/wsu/division-33/33-60-00-central-cooling-chilled-water.md |   181 lines | standard | 5-10-17
+33 81 26     | standards/wsu/division-33/33-81-26-communications-ducts-manholes-and-handholes.md |   414 lines | standard | -
+33 82 00     | standards/wsu/division-33/33-82-00-communications-distribution.md |   370 lines | standard | -
+40 23 13     | standards/wsu/division-40/40-23-13-deionized-water-process-piping.md |    76 lines | standard | 2021-07-06
+40 41 00     | standards/wsu/division-40/40-41-00-process-piping-and-equipment-heat-tracing.md |    41 lines | standard | 3-27-15
+-            | standards/wsu/supplemental/25-appendix-3-bas-point-naming.md |   120 lines | supplemental | -
+-            | standards/wsu/supplemental/25-appendix-4-standard-operating-procedures.md |   298 lines | supplemental | -
+-            | standards/wsu/supplemental/25-appendix-6-product-requirements.md |   448 lines | supplemental | -
+-            | standards/wsu/supplemental/25-appendix-7-airflow-control.md  |   173 lines | supplemental | -
+-            | standards/wsu/supplemental/27-audio-visual-design-guide-part1.md |   224 lines | supplemental | -
+-            | standards/wsu/supplemental/27-audio-visual-design-guide-part2.md |   292 lines | supplemental | -
+-            | standards/wsu/supplemental/27-audio-visual-design-guide-part3.md |   236 lines | supplemental | -
+-            | standards/wsu/supplemental/27-audio-visual-design-guide-part4.md |   239 lines | supplemental | -
+-            | standards/wsu/supplemental/27-audio-visual-design-guide-part5.md |   266 lines | supplemental | -
+-            | standards/wsu/supplemental/27-audio-visual-design-guide-part6.md |   356 lines | supplemental | -
+-            | standards/wsu/supplemental/27-audio-visual-design-guide-part7.md |   518 lines | supplemental | -
+-            | standards/wsu/supplemental/27-audio-visual-design-guide-part8.md |   210 lines | supplemental | -
+-            | standards/wsu/supplemental/27-audio-visual-design-guide-part9.md |   186 lines | supplemental | -
+-            | standards/wsu/supplemental/27-technology-infrastructure-design-guide.md |   840 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part1.md |   380 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part10.md |   207 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part11.md |   936 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part12.md |   259 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part13.md |   828 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part14.md |   216 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part15.md |   229 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part16.md |   255 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part17.md |   299 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part18.md |   142 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part2.md |   228 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part3.md |   234 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part4.md |   516 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part5.md |   221 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part6.md |   216 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part7.md |   219 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part8.md |   223 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecom-av-construction-guide-part9.md |   945 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part1.md |  1342 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part10.md |    11 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part2.md |  1348 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part3.md |  1348 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part4.md |  1348 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part5.md |  1348 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part6.md |  1348 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part7.md |  1348 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part8.md |  1348 lines | supplemental | -
+-            | standards/wsu/supplemental/27-telecommunications-design-guide-part9.md |  1348 lines | supplemental | -
+23 22 00     | standards/wsu/supplemental/detail-drawings/23-22-00-m1-steam-piping-diagrams.md |   234 lines | detail-drawing | -
+23 22 00     | standards/wsu/supplemental/detail-drawings/23-22-00-m2-steam-piping-schematic.md |    73 lines | detail-drawing | -
+23 83 13     | standards/wsu/supplemental/detail-drawings/23-83-13-heating-cable-schematic.md |    49 lines | detail-drawing | -
+26 56 00     | standards/wsu/supplemental/detail-drawings/26-56-00-exterior-lighting-pole-base.md |    63 lines | detail-drawing | -
+26 56 00     | standards/wsu/supplemental/detail-drawings/26-56-00-exterior-lighting.md |   161 lines | detail-drawing | -
+32 33 13     | standards/wsu/supplemental/detail-drawings/32-33-13-bike-rack.md |   236 lines | detail-drawing | -
+33 01 33     | standards/wsu/supplemental/detail-drawings/33-01-33-energy-metering-diagram.md |    72 lines | detail-drawing | -
+33 05 13     | standards/wsu/supplemental/detail-drawings/33-05-13-standard-manhole.md |    60 lines | detail-drawing | -
+33 41 00     | standards/wsu/supplemental/detail-drawings/33-41-00-storm-drain-pipe.md |    47 lines | detail-drawing | -
+33 60 00     | standards/wsu/supplemental/detail-drawings/33-60-00-chilled-water-schematic.md |    72 lines | detail-drawing | -
+33 71 73     | standards/wsu/supplemental/detail-drawings/33-71-73-electric-meter-diagram.md |    10 lines | detail-drawing | -
+
+# Total: 172 files, 44209 lines
