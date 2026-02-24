@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WSU Review Portal</title>
+<style>
+:root {
+  --primary: #981e32;
+  --primary-dark: #7a1828;
+  --secondary: #5f6b6d;
+  --accent: #c69214;
+  --bg: #f5f5f5;
+  --card-bg: #fff;
+  --text: #2d2d2d;
+  --text-light: #6b7280;
+  --border: #e5e7eb;
+  --green: #059669;
+  --red: #dc2626;
+  --blue: #2563eb;
+  --table-head-bg: #f9fafb;
+  --table-hover: #f9fafb;
+  --info-bg: #f0f9ff;
+  --info-border: #bae6fd;
+  --info-text: #0c4a6e;
+}
+html.dark {
+  --bg: #111827; --card-bg: #1f2937; --text: #e5e7eb; --text-light: #9ca3af;
+  --border: #374151; --green: #34d399; --red: #f87171;
+  --table-head-bg: #1a2332; --table-hover: #253347;
+  --info-bg: #1e293b; --info-border: #334155; --info-text: #7dd3fc;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+}
+/* Auth Gate */
+#authGate {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.auth-card {
+  background: var(--card-bg); border-radius: 16px; padding: 2.5rem; width: 380px;
+  box-shadow: 0 25px 50px rgba(0,0,0,.25); text-align: center;
+}
+.auth-card h2 { color: var(--primary); margin-bottom: .5rem; font-size: 1.4rem; }
+.auth-card p { color: var(--text-light); margin-bottom: 1.5rem; font-size: .85rem; }
+.auth-card input {
+  width: 100%; padding: .75rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+  font-size: .95rem; background: var(--bg); color: var(--text); outline: none;
+  margin-bottom: .75rem;
+}
+.auth-card input:focus { border-color: var(--primary); }
+.auth-card button {
+  width: 100%; padding: .75rem; border: none; border-radius: 8px;
+  background: var(--primary); color: #fff; font-size: .95rem; font-weight: 600;
+  cursor: pointer;
+}
+.auth-card button:hover { background: var(--primary-dark); }
+.auth-error { color: var(--red); font-size: .8rem; margin-top: .5rem; display: none; }
+
+/* Header */
+header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff; padding: 1rem 2rem;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
+}
+.header-text h1 { font-size: 1.5rem; font-weight: 700; }
+.header-text p { font-size: .8rem; opacity: .85; }
+.header-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.header-actions a {
+  color: rgba(255,255,255,.75); text-decoration: none; font-size: .78rem; padding: .3rem .6rem;
+  border: 1px solid rgba(255,255,255,.25); border-radius: 6px;
+}
+.header-actions a:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+/* Dark Mode Toggle */
+.dark-toggle { display: flex; align-items: center; gap: .5rem; }
+.dark-toggle-label { font-size: .78rem; color: rgba(255,255,255,.8); }
+.dark-toggle-switch {
+  width: 40px; height: 22px; border-radius: 11px; border: none;
+  background: rgba(255,255,255,.25); cursor: pointer; position: relative;
+}
+.dark-toggle-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; transition: transform .2s;
+}
+html.dark .dark-toggle-switch { background: var(--accent); }
+html.dark .dark-toggle-switch::after { transform: translateX(18px); }
+
+/* Container & Cards */
+.container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+.card {
+  background: var(--card-bg); border-radius: 12px; padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-bottom: 1.5rem;
+}
+.card h2 { font-size: 1.1rem; color: var(--primary); margin-bottom: 1rem; }
+html.dark .card h2 { color: var(--accent); }
+
+/* Nav Tabs */
+.nav-tabs {
+  display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+  border-bottom: 2px solid var(--border); padding-bottom: .5rem;
+}
+.nav-tab {
+  padding: .5rem 1rem; border: none; background: none; font-size: .85rem;
+  color: var(--text-light); cursor: pointer; border-radius: 6px; font-weight: 500;
+}
+.nav-tab:hover { background: var(--table-hover); color: var(--text); }
+.nav-tab.active { background: var(--primary); color: #fff; }
+.section { display: none; }
+.section.active { display: block; }
+
+/* Info Box */
+.info-box {
+  background: var(--info-bg); border-left: 4px solid var(--info-border);
+  padding: .75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem;
+  font-size: .82rem; color: var(--info-text);
+}
+
+/* Forms */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.form-group { margin-bottom: 1rem; }
+.form-group > label {
+  display: block; font-size: .82rem; font-weight: 600; color: var(--secondary); margin-bottom: .4rem;
+}
+html.dark .form-group > label { color: var(--text-light); }
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group select {
+  width: 100%; padding: .6rem .9rem; border: 2px solid var(--border); border-radius: 8px;
+  font-size: .88rem; background: var(--card-bg); color: var(--text); outline: none;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--primary); }
+
+/* Division Groups */
+.division-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .75rem; }
+.div-group {
+  background: var(--table-head-bg); border-radius: 8px; padding: .75rem 1rem;
+}
+.div-group h4 { font-size: .8rem; font-weight: 700; color: var(--primary); margin-bottom: .4rem; }
+html.dark .div-group h4 { color: var(--accent); }
+.div-group label {
+  display: block; font-size: .78rem; padding: .15rem 0; cursor: pointer; font-weight: 400;
+  color: var(--text);
+}
+.div-group label input { margin-right: .4rem; }
+.div-quick-actions { margin-top: .5rem; display: flex; gap: .5rem; }
+
+/* Upload Zone */
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: 10px; padding: 2rem;
+  text-align: center; cursor: pointer; transition: all .2s;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--primary); background: rgba(152,30,50,.03);
+}
+.upload-zone.has-file { border-color: var(--green); background: rgba(5,150,105,.03); }
+.upload-icon { font-size: 2.5rem; margin-bottom: .5rem; }
+.upload-text { font-size: .85rem; color: var(--text-light); }
+.upload-filename { font-size: .85rem; font-weight: 600; color: var(--green); margin-top: .5rem; }
+
+/* Submit Button */
+.submit-btn {
+  width: 100%; padding: .85rem; border: none; border-radius: 8px;
+  background: var(--primary); color: #fff; font-size: 1rem; font-weight: 600;
+  cursor: pointer; transition: background .2s; margin-top: .5rem;
+}
+.submit-btn:hover { background: var(--primary-dark); }
+.submit-btn:disabled { opacity: .5; cursor: not-allowed; }
+.submit-status { text-align: center; margin-top: .5rem; font-size: .85rem; min-height: 1.2em; }
+
+/* Btn SM */
+.btn-sm {
+  padding: .3rem .7rem; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--card-bg); color: var(--text); font-size: .75rem; cursor: pointer;
+}
+.btn-sm:hover { background: var(--table-hover); }
+
+/* Table */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+th {
+  text-align: left; padding: .6rem .75rem; background: var(--table-head-bg);
+  border-bottom: 2px solid var(--border); font-weight: 600; color: var(--secondary);
+  white-space: nowrap;
+}
+html.dark th { color: var(--text-light); }
+td { padding: .6rem .75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:hover td { background: var(--table-hover); }
+
+/* Job Status Badges */
+.job-status {
+  display: inline-block; padding: .2rem .6rem; border-radius: 10px;
+  font-size: .72rem; font-weight: 600; white-space: nowrap;
+}
+.job-status.processing { background: #fffbeb; color: #92400e; }
+.job-status.complete { background: #ecfdf5; color: #059669; }
+.job-status.failed { background: #fef2f2; color: #dc2626; }
+html.dark .job-status.processing { background: #78350f; color: #fbbf24; }
+html.dark .job-status.complete { background: #064e3b; color: #34d399; }
+html.dark .job-status.failed { background: #7f1d1d; color: #f87171; }
+
+/* Download Links */
+.download-links { display: flex; flex-wrap: wrap; gap: .3rem; }
+.download-links a {
+  font-size: .72rem; color: var(--primary); text-decoration: none;
+  padding: .15rem .5rem; border: 1px solid var(--border); border-radius: 4px;
+}
+.download-links a:hover { background: var(--table-hover); }
+html.dark .download-links a { color: var(--accent); }
+
+/* Help Tab */
+.help-section { margin-bottom: 1.5rem; }
+.help-section h3 { font-size: .95rem; color: var(--primary); margin-bottom: .5rem; }
+html.dark .help-section h3 { color: var(--accent); }
+.help-steps { counter-reset: step; padding-left: 0; list-style: none; }
+.help-step {
+  counter-increment: step; padding: .6rem 0 .6rem 2.5rem; position: relative;
+  border-bottom: 1px solid var(--border); font-size: .82rem;
+}
+.help-step::before {
+  content: counter(step); position: absolute; left: 0; top: .5rem;
+  width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--primary); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700;
+}
+
+/* Footer */
+footer {
+  text-align: center; padding: 1rem; font-size: .75rem; color: var(--text-light);
+  border-top: 1px solid var(--border); margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+  .form-row { grid-template-columns: 1fr; }
+  header { padding: 1rem; }
+  .container { padding: 1rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- Auth Gate -->
+<div id="authGate">
+  <div class="auth-card">
+    <h2>WSU Review Portal</h2>
+    <p>Design Standards Compliance Review</p>
+    <input type="password" id="authPass" placeholder="Enter password" autocomplete="off">
+    <button onclick="checkAuth()">Sign In</button>
+    <div class="auth-error" id="authError">Incorrect password</div>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="header-text">
+    <h1>WSU Review Portal</h1>
+    <p>Design Standards Compliance Review &bull; WSU Facilities Services</p>
+  </div>
+  <div class="header-actions">
+    <a href="index.html">Energy</a>
+    <a href="metering.html">Metering</a>
+    <a href="water-conservation.html">Water</a>
+    <div class="dark-toggle">
+      <span class="dark-toggle-label">Dark</span>
+      <button class="dark-toggle-switch" id="darkToggle" onclick="toggleDark()"></button>
+    </div>
+  </div>
+</header>
+
+<!-- Main Content -->
+<div class="container">
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-tab="submit">Submit Review</button>
+    <button class="nav-tab" data-tab="queue">Review Queue</button>
+    <button class="nav-tab" data-tab="help">How to Use</button>
+  </div>
+
+  <!-- Tab 1: Submit -->
+  <div class="section active" id="sec-submit">
+    <div class="card">
+      <h2>Submit Compliance Review</h2>
+      <form id="reviewForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Project Name *</label>
+            <input type="text" name="projectName" required placeholder="e.g., Smith Hall Renovation">
+          </div>
+          <div class="form-group">
+            <label>PM Email</label>
+            <input type="email" name="pmEmail" placeholder="pm@wsu.edu">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Review Phase *</label>
+            <select name="reviewPhase" required>
+              <option value="">Select phase...</option>
+              <option>50% SD</option><option>95% SD</option>
+              <option>50% DD</option><option>95% DD</option>
+              <option>50% CD</option><option>95% CD</option><option>100% CD</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Construction Type *</label>
+            <select name="constructionType" required>
+              <option value="">Select type...</option>
+              <option>New Construction</option><option>Major Renovation</option>
+              <option>Tenant Improvement</option><option>Addition</option><option>Infrastructure</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Applicable Divisions *</label>
+          <div class="division-groups">
+            <div class="div-group">
+              <h4>Architectural</h4>
+              <label><input type="checkbox" name="div" value="02"> 02 Existing Conditions</label>
+              <label><input type="checkbox" name="div" value="03"> 03 Concrete</label>
+              <label><input type="checkbox" name="div" value="04"> 04 Masonry</label>
+              <label><input type="checkbox" name="div" value="05"> 05 Metals</label>
+              <label><input type="checkbox" name="div" value="07"> 07 Thermal &amp; Moisture</label>
+              <label><input type="checkbox" name="div" value="08"> 08 Openings</label>
+              <label><input type="checkbox" name="div" value="09"> 09 Finishes</label>
+              <label><input type="checkbox" name="div" value="10"> 10 Specialties</label>
+              <label><input type="checkbox" name="div" value="11"> 11 Equipment</label>
+              <label><input type="checkbox" name="div" value="12"> 12 Furnishings</label>
+              <label><input type="checkbox" name="div" value="13"> 13 Special Construction</label>
+              <label><input type="checkbox" name="div" value="14"> 14 Conveying Equipment</label>
+            </div>
+            <div class="div-group">
+              <h4>Mechanical / Plumbing</h4>
+              <label><input type="checkbox" name="div" value="21"> 21 Fire Suppression</label>
+              <label><input type="checkbox" name="div" value="22"> 22 Plumbing</label>
+              <label><input type="checkbox" name="div" value="23"> 23 HVAC</label>
+              <label><input type="checkbox" name="div" value="25"> 25 Integrated Automation</label>
+            </div>
+            <div class="div-group">
+              <h4>Electrical / Comms</h4>
+              <label><input type="checkbox" name="div" value="26"> 26 Electrical</label>
+              <label><input type="checkbox" name="div" value="27"> 27 Communications</label>
+              <label><input type="checkbox" name="div" value="28"> 28 Electronic Safety</label>
+            </div>
+            <div class="div-group">
+              <h4>Civil / Site</h4>
+              <label><input type="checkbox" name="div" value="31"> 31 Earthwork</label>
+              <label><input type="checkbox" name="div" value="32"> 32 Exterior Improvements</label>
+              <label><input type="checkbox" name="div" value="33"> 33 Utilities</label>
+              <label><input type="checkbox" name="div" value="40"> 40 Process Integration</label>
+            </div>
+          </div>
+          <div class="div-quick-actions">
+            <button type="button" class="btn-sm" onclick="checkAllDivs(true)">Select All</button>
+            <button type="button" class="btn-sm" onclick="checkAllDivs(false)">Deselect All</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Construction Plan PDF * (max 100 MB)</label>
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon">&#128196;</div>
+            <div class="upload-text">Drag &amp; drop PDF here, or click to browse</div>
+            <div class="upload-filename" id="uploadFilename"></div>
+            <input type="file" id="pdfFile" accept=".pdf" style="display:none">
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">Submit for Review</button>
+        <div class="submit-status" id="submitStatus"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tab 2: Queue -->
+  <div class="section" id="sec-queue">
+    <div class="card">
+      <h2>Review Queue</h2>
+      <div class="info-box">
+        Reviews typically take 5-15 minutes depending on the number of divisions.
+        This page auto-refreshes every 10 seconds.
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Job ID</th>
+              <th>Project</th>
+              <th>Phase</th>
+              <th>Divisions</th>
+              <th>Submitted</th>
+              <th>Status</th>
+              <th>Downloads</th>
+            </tr>
+          </thead>
+          <tbody id="queueBody">
+            <tr><td colspan="7" style="text-align:center;color:var(--text-light)">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Help -->
+  <div class="section" id="sec-help">
+    <div class="card">
+      <h2>How to Use the Review Portal</h2>
+
+      <div class="help-section">
+        <h3>Submitting a Review</h3>
+        <ol class="help-steps">
+          <li class="help-step">Fill in the project name and select the review phase and construction type.</li>
+          <li class="help-step">Check the CSI divisions that apply to your project. If unsure, select all — the reviewer will skip divisions with no relevant content in the drawings.</li>
+          <li class="help-step">Upload the construction plan PDF. This can be a full drawing set or individual discipline sheets.</li>
+          <li class="help-step">Click <strong>Submit for Review</strong>. You'll be automatically switched to the Review Queue tab.</li>
+          <li class="help-step">Wait for the review to complete (5-15 minutes). The status will change from <em>Processing</em> to <em>Complete</em>.</li>
+          <li class="help-step">Download the report files. The key deliverables are <strong>report-word.md</strong> (full written report) and <strong>report-ppt.md</strong> (16-slide presentation outline).</li>
+        </ol>
+      </div>
+
+      <div class="help-section">
+        <h3>Understanding the Reports</h3>
+        <div class="info-box">
+          Reports are in Markdown format (.md). You can open them in any text editor, or copy-paste the content into Word or PowerPoint.
+        </div>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>report-word.md</strong> — Full compliance report with executive summary, detailed findings by discipline, variance requests, and priority action matrix.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>report-ppt.md</strong> — 16-slide presentation outline matching the WSU review format. One section per slide.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>checklist.md</strong> — Item-by-item checklist showing compliance status for each WSU standard requirement.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>findings.md</strong> — Structured findings log with CSI codes, drawing references, and standard citations.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Status Meanings</h3>
+        <p style="font-size:.82rem"><span class="job-status processing">Processing</span> — Review is running. Claude is reading the PDF and comparing against WSU standards.</p>
+        <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status complete">Complete</span> — Review finished. Download links are available.</p>
+        <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status failed">Failed</span> — Something went wrong. Check the error message for details.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Division Selection Guide</h3>
+        <div class="info-box">
+          Not sure which divisions to select? Here are common project types and their typical divisions:
+        </div>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>Building renovation:</strong> 02, 07, 08, 09, 22, 23, 26, 27</p>
+        <p style="font-size:.82rem;margin-top:.3rem"><strong>New building:</strong> All architectural (02-14) + all MEP (21-28) + civil (31-33)</p>
+        <p style="font-size:.82rem;margin-top:.3rem"><strong>Infrastructure/utilities:</strong> 31, 32, 33, 40</p>
+        <p style="font-size:.82rem;margin-top:.3rem"><strong>HVAC-only project:</strong> 23, 25, 26</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Troubleshooting</h3>
+        <p style="font-size:.82rem"><strong>Review stuck on Processing?</strong> — Reviews typically take 5-15 minutes. If it's been over 30 minutes, check with the system administrator.</p>
+        <p style="font-size:.82rem;margin-top:.4rem"><strong>Review failed?</strong> — The most common cause is an unreadable PDF (scanned images without OCR). Try a different PDF or ensure the PDF has selectable text.</p>
+        <p style="font-size:.82rem;margin-top:.4rem"><strong>Can't connect?</strong> — Make sure you're on the same network as the review server. The URL should be http://[server-ip]:8083/review-portal.html</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  WSU Facilities Services &bull; Design Standards Compliance Review Portal &bull; Prototype
+</footer>
+
+<script>
+// --- Auth Gate ---
+const AUTH_KEY = 'wsuReviewAuth';
+const AUTH_PASS = 'Energy@WSU';
+function checkAuth() {
+  const input = document.getElementById('authPass');
+  if (input.value === AUTH_PASS) {
+    localStorage.setItem(AUTH_KEY, 'ok');
+    document.getElementById('authGate').style.display = 'none';
+  } else {
+    document.getElementById('authError').style.display = 'block';
+    input.value = '';
+    input.focus();
+  }
+}
+if (localStorage.getItem(AUTH_KEY) === 'ok') {
+  document.getElementById('authGate').style.display = 'none';
+}
+document.getElementById('authPass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') checkAuth();
+});
+
+// --- Dark Mode ---
+function toggleDark() {
+  const on = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('wsuDarkMode', on ? 'on' : 'off');
+}
+if (localStorage.getItem('wsuDarkMode') === 'on') {
+  document.documentElement.classList.add('dark');
+}
+
+// --- Tab Navigation ---
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// --- Division Checkboxes ---
+function checkAllDivs(checked) {
+  document.querySelectorAll('input[name="div"]').forEach(cb => cb.checked = checked);
+}
+
+// --- Upload Zone ---
+const zone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('pdfFile');
+const fileLabel = document.getElementById('uploadFilename');
+
+zone.addEventListener('click', () => fileInput.click());
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.toLowerCase().endsWith('.pdf')) {
+    fileInput.files = e.dataTransfer.files;
+    showFile(file);
+  }
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) showFile(fileInput.files[0]);
+});
+function showFile(f) {
+  fileLabel.textContent = f.name + ' (' + (f.size / 1048576).toFixed(1) + ' MB)';
+  zone.classList.add('has-file');
+}
+
+// --- Form Submission ---
+document.getElementById('reviewForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const status = document.getElementById('submitStatus');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+  status.textContent = '';
+  status.style.color = '';
+
+  const form = e.target;
+  const pdf = fileInput.files[0];
+  const checked = form.querySelectorAll('input[name="div"]:checked');
+
+  if (!pdf) {
+    showErr('Please select a PDF file.'); return;
+  }
+  if (checked.length === 0) {
+    showErr('Please select at least one division.'); return;
+  }
+
+  const fd = new FormData();
+  fd.append('projectName', form.projectName.value);
+  fd.append('pmEmail', form.pmEmail.value);
+  fd.append('reviewPhase', form.reviewPhase.value);
+  fd.append('constructionType', form.constructionType.value);
+  fd.append('divisions', Array.from(checked).map(c => c.value).join(','));
+  fd.append('pdf', pdf);
+
+  try {
+    const resp = await fetch('/api/submit', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (resp.ok) {
+      status.textContent = 'Submitted! Job ID: ' + data.id;
+      status.style.color = 'var(--green)';
+      form.reset();
+      fileLabel.textContent = '';
+      zone.classList.remove('has-file');
+      document.querySelector('[data-tab="queue"]').click();
+      refreshQueue();
+    } else {
+      showErr(data.error || 'Unknown error');
+    }
+  } catch (err) {
+    showErr('Network error: ' + err.message);
+  }
+
+  function showErr(msg) {
+    status.textContent = msg;
+    status.style.color = 'var(--red)';
+    btn.disabled = false;
+    btn.textContent = 'Submit for Review';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Submit for Review';
+});
+
+// --- Queue Polling ---
+async function refreshQueue() {
+  try {
+    const resp = await fetch('/api/jobs');
+    const jobs = await resp.json();
+    const tbody = document.getElementById('queueBody');
+
+    if (!jobs.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-light)">No reviews submitted yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = jobs.map(j => {
+      const sc = (j.status || '').toLowerCase();
+      const divs = (j.divisions || []).join(', ');
+      const time = j.submitted ? new Date(j.submitted).toLocaleString() : '-';
+      let dl = '-';
+      if (sc === 'complete' && j.outputFiles && j.outputFiles.length) {
+        dl = '<div class="download-links">' +
+          j.outputFiles.map(f =>
+            '<a href="/api/download/' + j.id + '/' + f + '" target="_blank">' + f + '</a>'
+          ).join('') + '</div>';
+      } else if (sc === 'failed') {
+        dl = '<span style="color:var(--red);font-size:.72rem">' +
+          ((j.error || 'Check logs').substring(0, 120)) + '</span>';
+      }
+      return '<tr>' +
+        '<td style="font-size:.75rem;white-space:nowrap">' + (j.id || '') + '</td>' +
+        '<td>' + (j.projectName || '') + '</td>' +
+        '<td>' + (j.reviewPhase || '') + '</td>' +
+        '<td style="font-size:.75rem">' + divs + '</td>' +
+        '<td style="font-size:.75rem;white-space:nowrap">' + time + '</td>' +
+        '<td><span class="job-status ' + sc + '">' + (j.status || '') + '</span></td>' +
+        '<td>' + dl + '</td></tr>';
+    }).join('');
+  } catch (err) {
+    // Silently retry next cycle
+  }
+}
+refreshQueue();
+setInterval(refreshQueue, 10000);
+</script>
+</body>
+</html>

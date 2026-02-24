@@ -2,3 +2,5 @@
 *.xlsm
 *.xlsx
 ~$*
+reviews/
+review-config.json
