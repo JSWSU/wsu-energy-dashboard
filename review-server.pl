@@ -161,12 +161,14 @@ sub check_job_status {
 
     my $complete = "$REVIEWS_DIR/$job_id/output/COMPLETE";
     my $failed   = "$REVIEWS_DIR/$job_id/output/FAILED";
+    my $job_dir  = "$REVIEWS_DIR/$job_id";
 
     if (-f $complete) {
         $job->{status} = 'Complete';
+        $job->{progress} = 100;
         $job->{completed} = iso_now();
         my @out;
-        if (opendir my $dh, "$REVIEWS_DIR/$job_id/output") {
+        if (opendir my $dh, "$job_dir/output") {
             @out = grep { !/^\./ && $_ ne 'COMPLETE' && $_ ne 'FAILED' && $_ !~ /\.log$/ }
                    readdir $dh;
             closedir $dh;
@@ -176,13 +178,28 @@ sub check_job_status {
     }
     elsif (-f $failed) {
         $job->{status} = 'Failed';
+        $job->{progress} = 0;
         $job->{completed} = iso_now();
         my $err = '';
-        if (open my $fh, '<', "$REVIEWS_DIR/$job_id/output/claude-stderr.log") {
+        if (open my $fh, '<', "$job_dir/output/claude-stderr.log") {
             local $/; $err = <$fh>; close $fh;
         }
         $job->{error} = substr($err, 0, 2000) || 'Unknown error';
         write_job_json($job_id, $job);
+    }
+    else {
+        # Estimate progress from milestone files
+        my $pct = 5;  # Submitted
+        $pct = 15  if -f "$job_dir/extracted.txt" || -f "$job_dir/extracted-layout.txt"
+                    || -f "$job_dir/input.txt";
+        $pct = 30  if -f "$job_dir/output/checklist.md";
+        $pct = 50  if -f "$job_dir/output/findings.md";
+        $pct = 65  if -f "$job_dir/output/notes.md";
+        $pct = 75  if -f "$job_dir/output/report.docx" || -f "$job_dir/output/report-word.md";
+        $pct = 85  if -f "$job_dir/output/report.pptx" || -f "$job_dir/output/report-ppt.md";
+        $pct = 95  if (-f "$job_dir/output/report.docx" || -f "$job_dir/output/report-word.md")
+                    && (-f "$job_dir/output/report.pptx" || -f "$job_dir/output/report-ppt.md");
+        $job->{progress} = $pct;
     }
     return $job;
 }
@@ -206,6 +223,10 @@ sub spawn_review {
         . "Write checklist.md, findings.md, and notes.md to reviews/$job_id/output/. "
         . "Also generate a Word document (report.docx) and a PowerPoint presentation (report.pptx) "
         . "in reviews/$job_id/output/ using python-docx and python-pptx (pip install if needed). "
+        . "CITATION REQUIREMENTS: Every finding MUST include two specific citations: "
+        . "(1) PDF page number where the issue appears (e.g., 'PDF p.12, Sheet E-101'), "
+        . "(2) the WSU standard section number (e.g., 'WSU 26-24-00, Section 3.02.A'). "
+        . "Carry these citations into the Word and PowerPoint reports as well. "
         . "Create reviews/$job_id/output/COMPLETE when all outputs are written. "
         . "If you encounter an error, create reviews/$job_id/output/FAILED with the error description.";
 

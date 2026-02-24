@@ -201,6 +201,18 @@ tr:hover td { background: var(--table-hover); }
 html.dark .job-status.processing { background: #78350f; color: #fbbf24; }
 html.dark .job-status.complete { background: #064e3b; color: #34d399; }
 html.dark .job-status.failed { background: #7f1d1d; color: #f87171; }
+.progress-wrap {
+  height: 6px; background: var(--border); border-radius: 3px;
+  margin-top: .35rem; overflow: hidden;
+}
+.progress-bar {
+  height: 100%; background: var(--accent); border-radius: 3px;
+  transition: width .6s ease;
+}
+.progress-label {
+  font-size: .65rem; color: var(--text-light); margin-top: .15rem;
+  display: block;
+}
 
 /* Download Links */
 .download-links { display: flex; flex-wrap: wrap; gap: .3rem; }
@@ -622,7 +634,8 @@ async function refreshQueue() {
         '<td>' + (j.reviewPhase || '') + '</td>' +
         '<td style="font-size:.75rem">' + divs + '</td>' +
         '<td style="font-size:.75rem;white-space:nowrap">' + time + '</td>' +
-        '<td><span class="job-status ' + sc + '">' + (j.status || '') + '</span></td>' +
+        '<td><span class="job-status ' + sc + '">' + (j.status || '') + '</span>' +
+          (sc === 'processing' && j.progress ? '<div class="progress-wrap"><div class="progress-bar" style="width:' + j.progress + '%"></div></div><span class="progress-label">' + j.progress + '%</span>' : '') + '</td>' +
         '<td>' + dl + '</td></tr>';
     }).join('');
   } catch (err) {
