@@ -306,9 +306,9 @@ _[Outline the path forward after this review.]_
 
 _[Attach or insert the completed CHECKLIST-TEMPLATE.md for this project. The checklist contains the item-by-item evaluation of every reviewed requirement.]_
 
-See: `checklist.md`
+See: `checklist.txt`
 
-_Non-compliant items in the checklist reference their Finding number (F-###) for cross-document traceability. Use F-### to look up the same finding in this Word report, the Excel workbook (report.xlsx), or findings.md._
+_Non-compliant items in the checklist reference their Finding number (F-###) for cross-document traceability. Use F-### to look up the same finding in this Word report, the Excel workbook (report.xlsx), or findings.txt._
 
 ---
 

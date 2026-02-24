@@ -201,18 +201,37 @@ tr:hover td { background: var(--table-hover); }
 html.dark .job-status.processing { background: #78350f; color: #fbbf24; }
 html.dark .job-status.complete { background: #064e3b; color: #34d399; }
 html.dark .job-status.failed { background: #7f1d1d; color: #f87171; }
-.progress-wrap {
-  height: 6px; background: var(--border); border-radius: 3px;
-  margin-top: .35rem; overflow: hidden;
+/* Domino's-style stepped progress tracker */
+.tracker { display: flex; align-items: flex-start; margin-top: .5rem; min-width: 320px; }
+.tracker-step { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 1; }
+.tracker-circle {
+  width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: .6rem; font-weight: 700; flex-shrink: 0;
+  transition: all .4s ease;
 }
-.progress-bar {
-  height: 100%; background: var(--accent); border-radius: 3px;
-  transition: width .6s ease;
+.tracker-circle.completed { background: var(--primary); color: #fff; }
+.tracker-circle.active {
+  background: var(--accent); color: #fff;
+  animation: tracker-pulse 1.5s ease-in-out infinite;
 }
-.progress-label {
-  font-size: .65rem; color: var(--text-light); margin-top: .15rem;
-  display: block;
+.tracker-circle.pending { background: transparent; border: 2px solid var(--border); color: var(--text-light); }
+.tracker-label {
+  font-size: .55rem; color: var(--text-light); margin-top: .2rem;
+  white-space: nowrap; text-align: center;
 }
+.tracker-label.completed, .tracker-label.active { color: var(--text); font-weight: 600; }
+.tracker-line {
+  flex: 1; height: 3px; background: var(--border); min-width: 12px;
+  margin-top: 10px; margin-left: -1px; margin-right: -1px;
+}
+.tracker-line.completed { background: var(--primary); }
+.tracker-line.half { background: linear-gradient(to right, var(--accent) 50%, var(--border) 50%); }
+@keyframes tracker-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(198, 146, 20, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(198, 146, 20, 0); }
+}
+html.dark .tracker-circle.pending { border-color: var(--border); }
+html.dark .tracker-label.completed, html.dark .tracker-label.active { color: var(--text); }
 
 /* Download Links */
 .download-links { display: flex; flex-wrap: wrap; gap: .3rem; }
@@ -402,7 +421,7 @@ footer {
               <th>Phase</th>
               <th>Divisions</th>
               <th>Submitted</th>
-              <th>Status</th>
+              <th style="min-width:340px">Status</th>
               <th>Downloads</th>
             </tr>
           </thead>
@@ -438,8 +457,8 @@ footer {
         </div>
         <p style="font-size:.82rem;margin-top:.5rem"><strong>report.docx</strong> — Word document with executive summary, detailed findings by discipline, variance requests, priority action matrix, and next steps. The full narrative review report.</p>
         <p style="font-size:.82rem;margin-top:.5rem"><strong>report.xlsx</strong> — Excel workbook with 5 tabs: Summary (executive overview, prints to one page), Findings (sortable/filterable), Checklist (all requirements), Variances (items needing WSU approval), and Notes (methodology).</p>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>checklist.md</strong> — Plain-text checklist showing compliance status for each WSU standard requirement.</p>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>findings.md</strong> — Plain-text findings log with CSI codes, drawing references, and standard citations.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>checklist.txt</strong> — Plain-text checklist showing compliance status for each WSU standard requirement.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>findings.txt</strong> — Plain-text findings log with CSI codes, drawing references, and standard citations.</p>
       </div>
 
       <div class="help-section">
@@ -616,6 +635,45 @@ function progressDesc(pct) {
   return pct + '%';
 }
 
+// --- Domino's-style stepped tracker ---
+function buildTracker(pct) {
+  const steps = [
+    {at: 5,   label: 'Submitted'},
+    {at: 15,  label: 'Scanning'},
+    {at: 30,  label: 'Checklist'},
+    {at: 50,  label: 'Findings'},
+    {at: 65,  label: 'Notes'},
+    {at: 75,  label: 'Word'},
+    {at: 85,  label: 'Excel'},
+    {at: 100, label: 'Complete'}
+  ];
+  let html = '<div class="tracker">';
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    let state;
+    if (pct >= s.at) {
+      state = (i < steps.length - 1 && pct < steps[i + 1].at) ? 'active' : 'completed';
+      if (i === steps.length - 1 && pct >= s.at) state = 'completed';
+    } else {
+      state = 'pending';
+    }
+    html += '<div class="tracker-step">';
+    html += '<div class="tracker-circle ' + state + '">';
+    html += state === 'completed' ? '\u2713' : (state === 'active' ? '\u25CF' : '');
+    html += '</div>';
+    html += '<div class="tracker-label ' + state + '">' + s.label + '</div>';
+    html += '</div>';
+    if (i < steps.length - 1) {
+      let lineState = 'pending';
+      if (pct >= steps[i + 1].at) lineState = 'completed';
+      else if (pct >= s.at) lineState = 'half';
+      html += '<div class="tracker-line ' + lineState + '"></div>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
 // --- Queue Polling ---
 async function refreshQueue() {
   try {
@@ -649,7 +707,8 @@ async function refreshQueue() {
         '<td style="font-size:.75rem">' + divs + '</td>' +
         '<td style="font-size:.75rem;white-space:nowrap">' + time + '</td>' +
         '<td><span class="job-status ' + sc + '">' + (j.status || '') + '</span>' +
-          (sc === 'processing' && j.progress ? '<div class="progress-wrap"><div class="progress-bar" style="width:' + j.progress + '%"></div></div><span class="progress-label">' + (j.progressLabel || progressDesc(j.progress)) + '</span>' : '') + '</td>' +
+          (sc === 'processing' && j.progress ? buildTracker(j.progress) : '') +
+          (sc === 'complete' ? buildTracker(100) : '') + '</td>' +
         '<td>' + dl + '</td></tr>';
     }).join('');
   } catch (err) {

@@ -261,16 +261,16 @@ sub check_job_status {
         my $in_synthesis = -f "$job_dir/output/synthesis-stdout.log";
         if ($in_synthesis || ($done == $expected && $expected > 0)) {
             $pct = 15 unless $pct > 15;
-            $pct = 30  if -f "$job_dir/output/checklist.md";
-            $pct = 50  if -f "$job_dir/output/findings.md";
-            $pct = 65  if -f "$job_dir/output/notes.md";
+            $pct = 30  if -f "$job_dir/output/checklist.txt";
+            $pct = 50  if -f "$job_dir/output/findings.txt";
+            $pct = 65  if -f "$job_dir/output/notes.txt";
             $pct = 75  if -f "$job_dir/output/report.docx";
             $pct = 85  if -f "$job_dir/output/report.xlsx";
             $pct = 95  if -f "$job_dir/output/report.xlsx"
                         && -f "$job_dir/output/report.docx"
-                        && -f "$job_dir/output/notes.md"
-                        && -f "$job_dir/output/findings.md"
-                        && -f "$job_dir/output/checklist.md";
+                        && -f "$job_dir/output/notes.txt"
+                        && -f "$job_dir/output/findings.txt"
+                        && -f "$job_dir/output/checklist.txt";
         }
 
         $job->{progress} = $pct;
@@ -456,9 +456,9 @@ sub spawn_review {
         $s .= "  - standards/CHECKLIST-TEMPLATE.md\n\n";
 
         $s .= "Generate these files in reviews/$job_id/output/:\n";
-        $s .= "  (a) checklist.md — filled checklist template, one row per requirement across all disciplines\n";
-        $s .= "  (b) findings.md — all findings with sequential F-numbers (F-001, F-002, ...) sorted by severity then division\n";
-        $s .= "  (c) notes.md — methodology notes, drawing inventory, applicability determinations\n";
+        $s .= "  (a) checklist.txt — filled checklist template, one row per requirement across all disciplines\n";
+        $s .= "  (b) findings.txt — all findings with sequential F-numbers (F-001, F-002, ...) sorted by severity then division\n";
+        $s .= "  (c) notes.txt — methodology notes, drawing inventory, applicability determinations\n";
         $s .= "  (d) report.docx — Word document using python-docx (pip install if needed), following REPORT-TEMPLATE-WORD exactly\n";
         $s .= "  (e) report.xlsx — Excel workbook using openpyxl (pip install if needed), following REPORT-TEMPLATE-EXCEL exactly\n";
         $s .= "      The Summary sheet MUST be configured to print on one 8.5x11 landscape page:\n";
@@ -472,16 +472,16 @@ sub spawn_review {
 
         $s .= "FINDING INDEX (critical — enables cross-document traceability):\n";
         $s .= "- Every non-compliant finding gets one F-number (F-001, F-002, ...) assigned once, sorted by severity desc then division asc\n";
-        $s .= "- findings.md: F-### is the primary key, one entry per finding\n";
+        $s .= "- findings.txt: F-### is the primary key, one entry per finding\n";
         $s .= "- report.docx Sections 5 & 6: same F-### in heading of each finding\n";
         $s .= "- report.xlsx Findings sheet: F-### in column A, one row per finding\n";
         $s .= "- report.xlsx Checklist sheet: 'Finding Ref' column links [D]/[O]/[X] rows to their F-###\n";
         $s .= "- report.xlsx Variances sheet: 'Finding Ref' column links V-## to F-###\n";
         $s .= "- report.docx Section 7: variance items reference their F-###\n";
-        $s .= "- checklist.md: non-compliant items include their F-### in the Notes column\n";
+        $s .= "- checklist.txt: non-compliant items include their F-### in the Notes column\n";
         $s .= "- Total finding count, severity breakdown, and F-numbers must be identical across ALL files\n\n";
         $s .= "RULES:\n";
-        $s .= "- Every checklist row in checklist.md must also appear in the Excel Checklist sheet\n";
+        $s .= "- Every checklist row in checklist.txt must also appear in the Excel Checklist sheet\n";
         $s .= "- Preserve original PDF and standard citations exactly as the discipline reviewers wrote them\n";
         $s .= "- Severity: Critical = life safety or code violation; Major = significant WSU standard non-compliance; Minor = best-practice deviation\n";
         $s .= "- If any step fails, create reviews/$job_id/output/FAILED with a description of the error\n";

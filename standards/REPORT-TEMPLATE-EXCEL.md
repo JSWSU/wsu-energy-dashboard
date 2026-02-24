@@ -227,5 +227,5 @@ The F-### index is the master key for cross-document traceability. If you look u
 - Every finding in Excel Findings sheet must appear in Word Section 6 (detailed findings)
 - Variance items (V-##) must match between Excel Variances sheet and Word Section 7
 - Checklist sheet "Finding Ref" column links non-compliant items to their F-###
-- checklist.md non-compliant items include F-### in Notes column (for traceability)
+- checklist.txt non-compliant items include F-### in Notes column (for traceability)
 - The Word report provides narrative context; the Excel workbook provides sortable/filterable data
