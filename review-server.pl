@@ -274,6 +274,21 @@ sub check_job_status {
         }
 
         $job->{progress} = $pct;
+
+        # Stall detection: find newest file mtime in output/
+        my $newest_mtime = 0;
+        if (opendir my $dh2, "$job_dir/output") {
+            for my $f (readdir $dh2) {
+                next if $f =~ /^\./;
+                my $mt = (stat "$job_dir/output/$f")[9] || 0;
+                $newest_mtime = $mt if $mt > $newest_mtime;
+            }
+            closedir $dh2;
+        }
+        if ($newest_mtime > 0) {
+            my $idle = int((time() - $newest_mtime) / 60);
+            $job->{stalledMinutes} = $idle if $idle >= 10;
+        }
     }
     return $job;
 }
