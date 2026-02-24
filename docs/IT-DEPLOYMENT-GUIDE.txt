@@ -1,0 +1,465 @@
+WSU DESIGN STANDARDS COMPLIANCE REVIEW PORTAL
+IT DEPLOYMENT GUIDE
+===================================================
+Prepared: 2026-02-24
+Author:   John Slagboom, WSU Facilities Services
+Status:   Working prototype on local workstation
+
+
+1. WHAT THIS IS
+---------------------------------------------------
+
+An internal web portal that automates WSU design standards compliance
+reviews for construction projects. Project Managers upload construction
+plan PDFs through a browser interface and receive compliance review
+reports comparing the drawings against 177 WSU design standard documents
+covering CSI Divisions 02-40.
+
+The system produces five deliverables per review:
+  - Compliance checklist (pass/fail per standard requirement)
+  - Detailed findings report with citations
+  - Word document (.docx) formatted for distribution
+  - PowerPoint presentation (.pptx) for review meetings
+  - Reviewer notes and methodology documentation
+
+Each finding includes the PDF page number where the issue appears
+and the specific WSU standard section number being cited.
+
+Reviews that currently take a PM 40+ hours of manual cross-referencing
+are completed in 15-30 minutes depending on project size and number
+of divisions selected.
+
+
+2. HOW IT WORKS TODAY (PROTOTYPE)
+---------------------------------------------------
+
+The prototype runs entirely on one workstation (John Slagboom's PC)
+using the following components:
+
+  COMPONENT              TECHNOLOGY              LOCATION
+  ---------------------------------------------------------------
+  Web frontend           Single HTML file        review-portal.html
+  HTTP server            Perl script             review-server.pl
+  AI engine              Claude Code CLI         Anthropic subscription
+  Standards knowledge    177 Markdown files      standards/ directory
+  Review skills          42 skill definitions    ~/.claude/skills/
+  Report generation      Python (docx/pptx)      pip packages
+
+Data flow:
+
+  1. PM opens http://[workstation-ip]:8083/review-portal.html
+  2. PM enters project info, selects CSI divisions, uploads PDF
+  3. Perl server saves PDF and job metadata to reviews/ directory
+  4. Server pre-concatenates all standard files per discipline group
+     into reviews/{id}/combined/combined-{group}.md
+  5. Server writes per-discipline prompt files (prompt-{group}.txt)
+     and a synthesis prompt (prompt-synthesis.txt)
+  6. Server spawns a bash script that launches PARALLEL Claude CLIs:
+     Phase 1 — One Claude CLI per discipline (Sonnet model, fast):
+       - Each reads the PDF + its combined standards file
+       - Each writes discipline-{group}-findings.md to output/
+       - All run simultaneously as background processes
+     Phase 2 — One Claude CLI for synthesis (default model):
+       - Reads all discipline findings files
+       - Generates checklist.md, findings.md, notes.md
+       - Generates report.xlsx (Excel workbook with 5 tabs)
+       - Creates COMPLETE sentinel file
+  7. Reports appear in the portal for download (15-30 minutes)
+
+Current limitations:
+  - Only accessible on the local network when John's PC is on
+  - Uses John's personal Claude Pro subscription ($20/month)
+  - Single-threaded: one review at a time
+  - No HTTPS (plain HTTP only)
+  - Simple password authentication (shared password, no user accounts)
+  - No backup or redundancy
+
+
+3. SYSTEM ARCHITECTURE
+---------------------------------------------------
+
+3.1  WEB SERVER (review-server.pl)
+
+  Language:     Perl 5 (core modules only, no CPAN dependencies)
+  Port:         8083 (configurable via command line)
+  Binding:      0.0.0.0 (all interfaces)
+  Max upload:   100 MB
+  Connections:  Single-threaded, listen queue of 5
+  Static files: Serves HTML, CSS, JS, images from project root
+
+  API endpoints:
+    POST /api/submit              Upload PDF + project metadata
+    GET  /api/jobs                List all review jobs (JSON)
+    GET  /api/jobs/{id}           Single job status + progress
+    GET  /api/download/{id}/{f}   Download a report file
+
+  Perl modules used (all ship with Perl):
+    IO::Socket::INET, JSON::PP, File::Path, File::Basename, Cwd
+
+3.2  WEB FRONTEND (review-portal.html)
+
+  Single self-contained HTML file (no build step, no framework)
+  Authentication: shared password stored in browser localStorage
+  Auto-polls job status every 10 seconds
+  Dark mode support, responsive layout
+  Matches existing WSU Facilities Services dashboard styling
+
+3.3  AI ENGINE (Claude Code CLI)
+
+  Product:      Claude Code by Anthropic (command-line tool)
+  Version:      2.1.50 (installed per-user on Windows)
+  Invocation:   claude -p "prompt" --model sonnet --dangerously-skip-permissions
+  Mode:         Non-interactive, single-shot (-p flag)
+  Auth:         Tied to logged-in Anthropic account
+
+  Parallel CLI discipline review architecture:
+    The server launches SEPARATE Claude CLI processes — one per discipline
+    group — running in parallel as background processes. This is a two-phase
+    bash script (run-review.sh):
+
+    Phase 1 — Discipline Scans (parallel, Sonnet model for speed):
+      Each CLI process gets its own prompt file and pre-concatenated
+      standards file. 7 possible discipline groups:
+
+        1. Architectural (Div 02-14)      5. Electrical (Div 26)
+        2. Fire Protection (Div 21, 28)   6. Communications (Div 27)
+        3. Plumbing (Div 22)              7. Civil/Site (Div 31-33, 40)
+        4. HVAC/Controls (Div 23, 25)
+
+      Each CLI process receives:
+        - Its own prompt: reviews/{id}/prompt-{group}.txt
+        - The uploaded PDF (reads directly)
+        - A pre-concatenated standards file: combined/combined-{group}.md
+          (all standard files for its divisions merged into one file)
+        - Instructions to evaluate EVERY requirement in EVERY standard
+        - Citation requirements (PDF page + WSU standard section)
+
+      Each writes: reviews/{id}/output/discipline-{group}-findings.md
+
+    Phase 2 — Synthesis (single CLI, default model for quality):
+      After all Phase 1 CLIs complete (bash "wait" command), one CLI
+      reads all discipline findings and generates final reports.
+
+  Key optimization: Pre-concatenated standards
+    Instead of each CLI reading 10-20 individual standard files (one Read
+    tool call per file), the server merges all standards for a discipline
+    group into a single combined file at submission time. This eliminates
+    tool-call overhead and speeds up the reading phase.
+
+  Model tiering:
+    Phase 1 uses --model sonnet (faster, cheaper) for mechanical
+    requirement checking. Phase 2 uses the default model (stronger)
+    for synthesis and report generation where judgment matters.
+
+  Per-job files:
+    reviews/{id}/prompt-{group}.txt        Per-discipline prompts
+    reviews/{id}/prompt-synthesis.txt       Synthesis prompt
+    reviews/{id}/prompt.txt                Combined debug view of all prompts
+    reviews/{id}/combined/combined-{group}.md  Pre-concatenated standards
+    reviews/{id}/output/discipline-{group}-findings.md  Intermediate findings
+    reviews/{id}/output/{group}-stdout.log  Per-discipline Claude output
+    reviews/{id}/output/synthesis-stdout.log  Synthesis Claude output
+    reviews/{id}/output/progress.log       Phase tracking
+
+  Claude also has access to:
+    - 177 WSU standard files in standards/ directory
+    - 42 skill definitions that encode review methodology per division
+    - Report templates (Word, PowerPoint, checklist formats)
+
+3.4  STANDARDS KNOWLEDGE BASE
+
+  Location:     standards/ directory (93 MB total)
+  Index:        standards/INDEX.md (master lookup table)
+  Organization: CSI Division structure (02 through 40)
+  Content:      WSU Facilities Services Design Standards, June 2025
+  Format:       Markdown files, one per CSI section
+  Count:        177 standard files + supplemental guides + templates
+
+  Subdirectories:
+    standards/wsu/division-XX/     Per-division standard files
+    standards/wsu/supplemental/    Multi-part guides (telecom, AV)
+    standards/wsu/detail-drawings/ Steam piping, drain systems
+    standards/wsu/campus-wide/     Aesthetics, design guidelines
+
+3.5  REVIEW SKILLS (42 skill definitions)
+
+  Location:     ~/.claude/skills/ directory (user-level, not in repo)
+  Format:       Markdown files (SKILL.md) defining review methodology
+  Purpose:      Tell Claude HOW to review each division
+  Coverage:     One orchestrator skill + per-division review skills
+  Content:      Standard file listings, checklist instructions, severity
+                criteria, and WSU-specific requirements per CSI code
+
+  Note: Skills are user-level Claude configuration, not project files.
+  They live at C:\Users\{user}\.claude\skills\ on Windows or
+  ~/.claude/skills/ on Linux. Each skill is a subdirectory containing
+  a SKILL.md file. To transfer to a server, copy the entire
+  ~/.claude/skills/ directory.
+
+3.6  PYTHON DEPENDENCIES
+
+  Required packages (auto-installed by Claude if missing):
+    openpyxl        Excel workbook generation (.xlsx)
+
+3.7  DIRECTORY STRUCTURE PER JOB
+
+  reviews/{job-id}/
+    input.pdf               Uploaded construction plan
+    job.json                Job metadata and status (includes expectedGroups)
+    prompt-{group}.txt      Per-discipline prompts (one per active group)
+    prompt-synthesis.txt    Synthesis prompt for Phase 2
+    prompt.txt              Combined debug view of all prompts
+    run-review.sh           Multi-phase bash script (parallel CLIs + synthesis)
+    combined/
+      combined-{group}.md   Pre-concatenated standards per discipline
+    output/
+      discipline-{group}-findings.md  } Per-discipline intermediate findings
+      ...                             } (one per active group)
+      {group}-stdout.log              } Per-discipline Claude output
+      {group}-stderr.log              } and error logs
+      synthesis-stdout.log            Synthesis phase output
+      synthesis-stderr.log            Synthesis phase errors
+      progress.log                    Phase tracking (Phase 1 / Phase 2)
+      checklist.md          Compliance checklist (synthesis output)
+      findings.md           All findings consolidated with F-numbers
+      notes.md              Reviewer notes and methodology
+      report.xlsx           Excel workbook (Summary, Findings, Checklist, Variances, Notes)
+      COMPLETE              Signal file (review finished)
+      FAILED                Signal file (review errored)
+
+
+4. WHAT WOULD NEED TO CHANGE FOR SERVER HOSTING
+---------------------------------------------------
+
+To move this from John's workstation to a server accessible across
+the department (or campus), the following changes are required.
+
+4.1  SERVER INFRASTRUCTURE
+
+  Minimum requirements:
+    - Linux VM (Ubuntu 22.04+ or RHEL 8+) or Windows Server
+    - 4 CPU cores, 8 GB RAM, 50 GB storage
+    - Python 3.8+ with pip
+    - Perl 5.14+ (ships with most Linux distros)
+    - Outbound HTTPS access to Anthropic API servers
+    - Inbound access on one port (e.g., 443 with reverse proxy)
+
+  Recommended:
+    - Docker container for consistent deployment
+    - NGINX or Apache reverse proxy with TLS termination
+    - Process supervisor (systemd, PM2, or Docker restart policy)
+    - Shared storage or backup for reviews/ directory
+
+4.2  AI ENGINE — TWO OPTIONS
+
+  OPTION A: Claude API (Recommended for production)
+  -------------------------------------------------
+  Replace the Claude Code CLI with direct Anthropic API calls.
+  This is the standard approach for server-hosted AI applications.
+
+  What changes:
+    - Rewrite the spawn mechanism in review-server.pl (or rewrite
+      the server in Python) to call the Anthropic Messages API
+    - Send the PDF content + standards + prompt as API messages
+    - Receive structured response, write output files
+    - No Claude Code CLI installation needed on server
+
+  Requirements:
+    - Anthropic API key (organization-level, not personal)
+    - API billing account with Anthropic
+
+  Pricing (as of Feb 2026):
+    Claude Sonnet 4.5:  $3/M input tokens, $15/M output tokens
+    Claude Opus 4.6:    $5/M input tokens, $25/M output tokens
+
+  Estimated cost per review:
+    A typical 50-page construction PDF review processes roughly
+    500K-2M input tokens (PDF + standards) and generates 50K-200K
+    output tokens (reports). Estimated $5-$30 per review using
+    Sonnet, $10-$60 using Opus. Actual cost depends on PDF size
+    and number of divisions reviewed.
+
+  At 10 reviews per month: roughly $50-$300/month in API costs.
+
+  Advantages:
+    - No dependency on any individual's subscription
+    - Scalable (multiple concurrent reviews)
+    - Organizational billing and usage tracking
+    - API keys are manageable IT credentials
+    - 50% discount available for batch (non-urgent) processing
+
+  OPTION B: Claude Code CLI on Server
+  ------------------------------------
+  Install Claude Code on the server and run it the same way
+  the prototype does today.
+
+  What changes:
+    - Install Claude Code CLI on the server
+    - Authenticate with an Anthropic account (Max plan recommended)
+    - Transfer standards/ directory and ~/.claude/skills/ definitions
+    - Update hardcoded paths in review-server.pl
+    - Set up process supervision
+
+  Requirements:
+    - Claude Pro ($20/mo) or Max ($100-$200/mo) subscription
+    - Subscription tied to a service account email
+    - Node.js runtime (Claude Code dependency)
+    - Git (Claude Code dependency)
+
+  Advantages:
+    - Minimal code changes from current prototype
+    - Skills and knowledge base work as-is
+    - Lower entry cost for low volume
+
+  Disadvantages:
+    - Subscription tied to one account (single point of failure)
+    - Claude Code is designed for interactive development, not
+      headless server operation — may have stability issues
+    - Harder to monitor and manage at scale
+    - --dangerously-skip-permissions flag required
+
+  OPTION C: AWS Bedrock / Google Vertex AI
+  -----------------------------------------
+  Run Claude models through a cloud provider's managed AI service.
+
+  What changes:
+    - Rewrite the AI integration to use AWS Bedrock API or
+      Google Vertex AI API instead of Anthropic directly
+    - Cloud provider handles model hosting and scaling
+
+  Advantages:
+    - Integrates with existing WSU cloud infrastructure
+    - Enterprise billing, compliance, and access controls
+    - No direct relationship with Anthropic needed
+
+  Disadvantages:
+    - More complex integration
+    - Cloud provider markup on API pricing
+    - Requires AWS or GCP account with Bedrock/Vertex access
+
+4.3  AUTHENTICATION AND SECURITY
+
+  Current state: Single shared password in browser JavaScript.
+  This is NOT suitable for production.
+
+  Recommended changes:
+    - Integrate with WSU SSO (Shibboleth/SAML) or Azure AD
+    - Or at minimum: individual user accounts with hashed passwords
+    - HTTPS required (TLS certificate via WSU PKI or Let's Encrypt)
+    - Rate limiting on /api/submit to prevent abuse
+    - Input validation on uploaded PDFs (file type, size, malware scan)
+    - Review output access restricted to submitter and admins
+
+4.4  STANDARDS KNOWLEDGE BASE MAINTENANCE
+
+  The 177 standard files need periodic updates when WSU publishes
+  new design standards. Current process:
+
+    1. Obtain updated standards from WSU Facilities Services
+    2. Convert to Markdown format (existing tools in standards/tools/)
+    3. Update INDEX.md with new file entries
+    4. Update ~/.claude/skills/ definitions if review criteria change
+    5. Deploy updated files to server
+
+  This is a content management task, not an IT task, but IT should
+  be aware that the standards/ directory will need periodic updates
+  (typically annually or when WSU publishes revisions).
+
+
+5. MIGRATION PATH (RECOMMENDED)
+---------------------------------------------------
+
+Phase 1: Immediate (Current State)
+  - Prototype runs on John's workstation
+  - 2-3 PMs use it for demonstration/testing
+  - Validate review quality and usefulness
+
+Phase 2: Department Server (1-2 months)
+  - Provision a Linux VM on WSU infrastructure
+  - Install using Option B (Claude Code CLI) for fastest migration
+  - Set up HTTPS via reverse proxy
+  - Basic authentication (shared password is acceptable for small team)
+  - Service account for Claude subscription
+
+Phase 3: Production (3-6 months)
+  - Rewrite AI integration to use Anthropic API (Option A)
+  - Integrate with WSU SSO
+  - Add concurrent review support
+  - Add email notifications on review completion
+  - Organizational API billing
+  - Backup and monitoring
+
+
+6. FILES TO TRANSFER TO SERVER
+---------------------------------------------------
+
+These files constitute the complete application:
+
+  CORE APPLICATION (4 files):
+    review-portal.html          Web frontend
+    review-server.pl            HTTP server and API
+    review-watcher.pl           Smartsheet integration (optional)
+    review-config.json          Configuration template
+
+  CHART LIBRARY (shared with dashboards):
+    chart.umd.min.js            Chart.js v4.4.7
+
+  STANDARDS KNOWLEDGE BASE (93 MB):
+    standards/                  Entire directory (177+ files)
+
+  REVIEW SKILLS (42 skill definitions):
+    ~/.claude/skills/           Entire directory (user-level, not in repo)
+
+  The reviews/ directory is runtime data (job outputs) and does
+  not need to be transferred — it will be created automatically.
+
+
+7. NETWORK REQUIREMENTS
+---------------------------------------------------
+
+  INBOUND:
+    TCP port 8083 (or 443 behind reverse proxy)
+    From: WSU internal network (or VPN)
+    To: Server hosting the portal
+
+  OUTBOUND:
+    HTTPS (443) to api.anthropic.com (Claude API)
+    HTTPS (443) to api.smartsheet.com (optional, if using watcher)
+    HTTPS (443) to pypi.org (one-time, for pip install)
+
+  No inbound access from the public internet is required.
+
+
+8. COST SUMMARY
+---------------------------------------------------
+
+  CURRENT (PROTOTYPE):
+    Claude Pro subscription:    $20/month (John's personal account)
+    Infrastructure:             $0 (runs on existing workstation)
+    Total:                      $20/month
+
+  PHASE 2 (DEPARTMENT SERVER, OPTION B):
+    Claude Max subscription:    $100-200/month (service account)
+    Linux VM:                   WSU internal allocation or ~$50/month
+    Total:                      $150-250/month
+
+  PHASE 3 (PRODUCTION, OPTION A):
+    Anthropic API usage:        ~$50-300/month (10 reviews/month)
+    Linux VM:                   WSU internal allocation or ~$50/month
+    Total:                      $100-350/month (scales with usage)
+
+  For context: One PM spending 40 hours on a manual compliance review
+  at $50/hour = $2,000 per review. At 10 reviews/month, the manual
+  cost is $20,000/month versus $100-350/month for the automated system.
+
+
+9. CONTACT
+---------------------------------------------------
+
+  John Slagboom
+  WSU Facilities Services
+  john.slagboom@wsu.edu
+
+  GitHub Repository:
+  github.com/JSWSU/wsu-energy-dashboard
+  (Contains all application code, standards, and skills)

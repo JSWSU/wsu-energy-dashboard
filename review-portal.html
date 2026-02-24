@@ -390,7 +390,7 @@ footer {
     <div class="card">
       <h2>Review Queue</h2>
       <div class="info-box">
-        Reviews typically take 5-15 minutes depending on the number of divisions.
+        Reviews typically take 15-30 minutes depending on the number of divisions.
         This page auto-refreshes every 10 seconds.
       </div>
       <div class="table-wrap">
@@ -426,20 +426,20 @@ footer {
           <li class="help-step">Check the CSI divisions that apply to your project. If unsure, select all — the reviewer will skip divisions with no relevant content in the drawings.</li>
           <li class="help-step">Upload the construction plan PDF. This can be a full drawing set or individual discipline sheets.</li>
           <li class="help-step">Click <strong>Submit for Review</strong>. You'll be automatically switched to the Review Queue tab.</li>
-          <li class="help-step">Wait for the review to complete (5-15 minutes). The status will change from <em>Processing</em> to <em>Complete</em>.</li>
-          <li class="help-step">Download the report files. The key deliverables are <strong>report-word.md</strong> (full written report) and <strong>report-ppt.md</strong> (16-slide presentation outline).</li>
+          <li class="help-step">Wait for the review to complete (15-30 minutes). The status will change from <em>Processing</em> to <em>Complete</em>.</li>
+          <li class="help-step">Download <strong>report.docx</strong> (narrative report) and <strong>report.xlsx</strong> (structured data). Both use matching finding numbers and support each other.</li>
         </ol>
       </div>
 
       <div class="help-section">
         <h3>Understanding the Reports</h3>
         <div class="info-box">
-          Reports are in Markdown format (.md). You can open them in any text editor, or copy-paste the content into Word or PowerPoint.
+          Two companion deliverables: <strong>report.docx</strong> (narrative Word report) and <strong>report.xlsx</strong> (structured Excel workbook). Finding numbers (F-001, F-002, ...) match exactly between both files. Print the Excel Summary tab for meetings — it fits on one 8.5x11" landscape page.
         </div>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>report-word.md</strong> — Full compliance report with executive summary, detailed findings by discipline, variance requests, and priority action matrix.</p>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>report-ppt.md</strong> — 16-slide presentation outline matching the WSU review format. One section per slide.</p>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>checklist.md</strong> — Item-by-item checklist showing compliance status for each WSU standard requirement.</p>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>findings.md</strong> — Structured findings log with CSI codes, drawing references, and standard citations.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>report.docx</strong> — Word document with executive summary, detailed findings by discipline, variance requests, priority action matrix, and next steps. The full narrative review report.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>report.xlsx</strong> — Excel workbook with 5 tabs: Summary (executive overview, prints to one page), Findings (sortable/filterable), Checklist (all requirements), Variances (items needing WSU approval), and Notes (methodology).</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>checklist.md</strong> — Plain-text checklist showing compliance status for each WSU standard requirement.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>findings.md</strong> — Plain-text findings log with CSI codes, drawing references, and standard citations.</p>
       </div>
 
       <div class="help-section">
@@ -462,7 +462,7 @@ footer {
 
       <div class="help-section">
         <h3>Troubleshooting</h3>
-        <p style="font-size:.82rem"><strong>Review stuck on Processing?</strong> — Reviews typically take 5-15 minutes. If it's been over 30 minutes, check with the system administrator.</p>
+        <p style="font-size:.82rem"><strong>Review stuck on Processing?</strong> — Reviews typically take 15-30 minutes. If it's been over 60 minutes, check with the system administrator.</p>
         <p style="font-size:.82rem;margin-top:.4rem"><strong>Review failed?</strong> — The most common cause is an unreadable PDF (scanned images without OCR). Try a different PDF or ensure the PDF has selectable text.</p>
         <p style="font-size:.82rem;margin-top:.4rem"><strong>Can't connect?</strong> — Make sure you're on the same network as the review server. The URL should be http://[server-ip]:8083/review-portal.html</p>
       </div>
@@ -602,6 +602,20 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
   btn.textContent = 'Submit for Review';
 });
 
+// --- Progress descriptions ---
+function progressDesc(pct) {
+  if (pct >= 100) return 'Complete';
+  if (pct >= 95)  return 'All outputs done — finalizing...';
+  if (pct >= 85)  return 'Excel report generated...';
+  if (pct >= 75)  return 'Word report generated...';
+  if (pct >= 65)  return 'Notes generated...';
+  if (pct >= 50)  return 'Findings generated...';
+  if (pct >= 30)  return 'Checklist generated...';
+  if (pct >= 15)  return 'Reviewing standards vs drawings...';
+  if (pct >= 5)   return 'Job submitted — starting review...';
+  return pct + '%';
+}
+
 // --- Queue Polling ---
 async function refreshQueue() {
   try {
@@ -635,7 +649,7 @@ async function refreshQueue() {
         '<td style="font-size:.75rem">' + divs + '</td>' +
         '<td style="font-size:.75rem;white-space:nowrap">' + time + '</td>' +
         '<td><span class="job-status ' + sc + '">' + (j.status || '') + '</span>' +
-          (sc === 'processing' && j.progress ? '<div class="progress-wrap"><div class="progress-bar" style="width:' + j.progress + '%"></div></div><span class="progress-label">' + j.progress + '%</span>' : '') + '</td>' +
+          (sc === 'processing' && j.progress ? '<div class="progress-wrap"><div class="progress-bar" style="width:' + j.progress + '%"></div></div><span class="progress-label">' + (j.progressLabel || progressDesc(j.progress)) + '</span>' : '') + '</td>' +
         '<td>' + dl + '</td></tr>';
     }).join('');
   } catch (err) {

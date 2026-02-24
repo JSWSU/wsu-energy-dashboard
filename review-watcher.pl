@@ -228,43 +228,268 @@ sub upload_reports {
 
 # --- Spawn Claude review ----------------------------------------------------
 
+sub list_standards_for_divs {
+    my @divs = @_;
+    my @files;
+    for my $d (@divs) {
+        my $dir = "$ROOT/standards/wsu/division-$d";
+        if (opendir my $dh, $dir) {
+            push @files, map { "standards/wsu/division-$d/$_" }
+                         grep { /\.md$/ } readdir $dh;
+            closedir $dh;
+        }
+    }
+    return sort @files;
+}
+
+sub build_combined_standards {
+    my ($job_dir, $group) = @_;
+    my $outdir = "$job_dir/combined";
+    make_path($outdir) unless -d $outdir;
+
+    my @files = list_standards_for_divs(@{$group->{divs}});
+    push @files, grep { -f "$ROOT/$_" } @{$group->{supp}};
+    @files = sort @files;
+
+    my $outfile = "$outdir/combined-$group->{key}.md";
+    open my $fh, '>', $outfile or return '';
+    print $fh "# Combined WSU Standards: $group->{name}\n";
+    print $fh "# Total files: " . scalar(@files) . "\n\n";
+
+    for my $f (@files) {
+        my $path = "$ROOT/$f";
+        if (open my $sfh, '<', $path) {
+            print $fh "\n" . ("=" x 60) . "\n";
+            print $fh "# SOURCE: $f\n";
+            print $fh ("=" x 60) . "\n\n";
+            local $/;
+            my $content = <$sfh>;
+            print $fh $content;
+            close $sfh;
+        }
+    }
+    close $fh;
+    return $outfile;
+}
+
 sub spawn_review {
     my ($job_id, $job) = @_;
-    my $output_dir = "$REVIEWS_DIR/$job_id/output";
+    my $job_dir    = "$REVIEWS_DIR/$job_id";
+    my $output_dir = "$job_dir/output";
     make_path($output_dir) unless -d $output_dir;
 
     my $claude = $job->{claude_path};
-    my $divs = join(', ', @{$job->{divisions} || []});
 
-    my $prompt = "Process compliance review job $job_id. "
-        . "Read the PDF at reviews/$job_id/input.pdf. "
-        . "Project: $job->{projectName}. "
-        . "Divisions: $divs. "
-        . "Phase: $job->{reviewPhase}. "
-        . "Construction type: $job->{constructionType}. "
-        . "Follow the wsu-compliance-review workflow. "
-        . "Read standards/INDEX.md first. "
-        . "Write all outputs (checklist.md, findings.md, report-word.md, report-ppt.md, notes.md) "
-        . "to reviews/$job_id/output/. "
-        . "Create reviews/$job_id/output/COMPLETE when all outputs are written. "
-        . "If you encounter an error, create reviews/$job_id/output/FAILED with the error description.";
+    # --- Discipline group definitions ---
+    my @ALL_GROUPS = (
+        { key => 'architectural',    name => 'Architectural / Structure / Envelope / Finishes',
+          divs => [qw(02 03 04 05 07 08 09 10 11 12 13 14)],
+          desc => 'architectural, structural, envelope, roofing, doors/windows, finishes, specialties, and equipment sheets',
+          supp => [] },
+        { key => 'fire-protection',  name => 'Fire Protection and Security',
+          divs => [qw(21 28)],
+          desc => 'fire suppression, fire alarm, and electronic safety sheets',
+          supp => [] },
+        { key => 'plumbing',         name => 'Plumbing',
+          divs => [qw(22)],
+          desc => 'plumbing plans, fixture schedules, and domestic water sheets',
+          supp => [] },
+        { key => 'hvac-controls',    name => 'HVAC and Building Automation',
+          divs => [qw(23 25)],
+          desc => 'mechanical plans, HVAC equipment schedules, piping diagrams, and BAS/controls sequences',
+          supp => [
+              'standards/wsu/supplemental/detail-drawings/23-22-00-m1-steam-piping-diagrams.md',
+              'standards/wsu/supplemental/detail-drawings/23-22-00-m2-steam-piping-schematic.md',
+              'standards/wsu/supplemental/detail-drawings/23-83-13-heating-cable-schematic.md',
+              'standards/wsu/supplemental/25-appendix-3-bas-point-naming.md',
+              'standards/wsu/supplemental/25-appendix-4-standard-operating-procedures.md',
+              'standards/wsu/supplemental/25-appendix-6-product-requirements.md',
+              'standards/wsu/supplemental/25-appendix-7-airflow-control.md',
+          ] },
+        { key => 'electrical',       name => 'Electrical',
+          divs => [qw(26)],
+          desc => 'electrical plans, panel schedules, one-line diagrams, lighting plans, and power distribution sheets',
+          supp => [
+              'standards/wsu/supplemental/detail-drawings/26-56-00-exterior-lighting.md',
+              'standards/wsu/supplemental/detail-drawings/26-56-00-exterior-lighting-pole-base.md',
+          ] },
+        { key => 'communications',   name => 'Communications and Technology',
+          divs => [qw(27)],
+          desc => 'telecommunications, data infrastructure, audio-visual, and technology system sheets',
+          supp => [ 'standards/wsu/supplemental/27-technology-infrastructure-design-guide.md' ] },
+        { key => 'civil-site',       name => 'Civil, Site, and Utilities',
+          divs => [qw(31 32 33 40)],
+          desc => 'civil, earthwork, exterior improvements, utilities, metering, and process integration sheets',
+          supp => [
+              'standards/wsu/supplemental/detail-drawings/32-33-13-bike-rack.md',
+              'standards/wsu/supplemental/detail-drawings/33-01-33-energy-metering-diagram.md',
+              'standards/wsu/supplemental/detail-drawings/33-05-13-standard-manhole.md',
+              'standards/wsu/supplemental/detail-drawings/33-41-00-storm-drain-pipe.md',
+              'standards/wsu/supplemental/detail-drawings/33-60-00-chilled-water-schematic.md',
+              'standards/wsu/supplemental/detail-drawings/33-71-73-electric-meter-diagram.md',
+          ] },
+    );
 
-    # Escape single quotes for shell
-    $prompt =~ s/'/'\\''/g;
+    # Filter to groups containing user-selected divisions
+    my %selected = map { $_ => 1 } @{$job->{divisions} || []};
+    my @active;
+    for my $g (@ALL_GROUPS) {
+        my @match = grep { $selected{$_} } @{$g->{divs}};
+        if (@match) {
+            push @active, { %$g, active_divs => \@match };
+        }
+    }
+    $job->{expectedGroups} = scalar @active;
+    write_job_json($job_id, $job);
 
-    # Build command — use cd to set working directory, spawn in background
-    my $stdout_log = "$output_dir/claude-stdout.log";
-    my $stderr_log = "$output_dir/claude-stderr.log";
+    # --- Build pre-concatenated standards per discipline ---
+    for my $grp (@active) {
+        build_combined_standards($job_dir, $grp);
+    }
 
-    my $cmd = qq{unset CLAUDECODE && export CLAUDE_CODE_GIT_BASH_PATH='C:\\Users\\john.slagboom\\AppData\\Local\\Programs\\Git\\bin\\bash.exe' && cd "$ROOT" && "$claude" -p '$prompt' }
-        . qq{--dangerously-skip-permissions }
-        . qq{--output-format text }
-        . qq{> "$stdout_log" }
-        . qq{2> "$stderr_log" }
-        . qq{&};
+    # --- Write per-discipline prompt files (Phase 1) ---
+    my $common_header = "Project: $job->{projectName}\n"
+        . "Phase: $job->{reviewPhase}\n"
+        . "Construction type: $job->{constructionType}\n\n";
 
-    print "  Spawning Claude for job $job_id...\n";
-    system($cmd);
+    for my $grp (@active) {
+        my $divs_str = join(', ', @{$grp->{active_divs}});
+        my $combined_file = "reviews/$job_id/combined/combined-$grp->{key}.md";
+
+        my $p = "You are reviewing construction drawings for WSU design standards compliance.\n";
+        $p .= $common_header;
+        $p .= "DISCIPLINE: $grp->{name} (Divisions $divs_str)\n";
+        $p .= "Focus on: $grp->{desc}\n\n";
+        $p .= "INSTRUCTIONS:\n";
+        $p .= "1. Read the PDF at reviews/$job_id/input.pdf.\n";
+        $p .= "   Focus on sheets relevant to this discipline but review the full drawing set for context.\n";
+        $p .= "2. Read the combined standards file at $combined_file.\n";
+        $p .= "   This file contains ALL WSU standards for this discipline — read it IN ITS ENTIRETY.\n";
+        $p .= "3. For EVERY numbered requirement, clause, and sub-clause in the standards:\n";
+        $p .= "   - Locate the relevant drawing sheet(s) in the PDF\n";
+        $p .= "   - Assign status: [C] Compliant, [D] Deviation, [O] Omission, [X] Concern\n";
+        $p .= "4. Write your findings to reviews/$job_id/output/discipline-$grp->{key}-findings.md\n\n";
+        $p .= "OUTPUT FORMAT:\n";
+        $p .= "Begin with a summary table, then list every non-compliant finding as:\n";
+        $p .= "  ### F-$grp->{key}-NNN: Title\n";
+        $p .= "  - Division: XX\n";
+        $p .= "  - CSI Code: XX XX XX\n";
+        $p .= "  - Severity: Critical / Major / Minor\n";
+        $p .= "  - Status: [D] / [O] / [X]\n";
+        $p .= "  - PDF Reference: (page and sheet number)\n";
+        $p .= "  - Standard Reference: (WSU standard section number)\n";
+        $p .= "  - Issue: (detailed description)\n";
+        $p .= "  - Required Action: (what must change)\n\n";
+        $p .= "RULES:\n";
+        $p .= "- Every finding MUST have both a PDF citation AND a WSU standard section citation.\n";
+        $p .= "- Severity: Critical = life safety/code; Major = significant non-compliance; Minor = best-practice.\n";
+        $p .= "- Be thorough — check EVERY requirement. Depth over speed.\n";
+
+        my $pfile = "$job_dir/prompt-$grp->{key}.txt";
+        open my $pf, '>', $pfile or next;
+        print $pf $p;
+        close $pf;
+    }
+
+    # --- Write synthesis prompt (Phase 2) ---
+    {
+        my $s = "You are synthesizing a WSU Design Standards compliance review.\n";
+        $s .= $common_header;
+        $s .= "The discipline-level reviews have been completed by parallel reviewers.\n";
+        $s .= "Read ALL of these discipline findings files:\n";
+        for my $grp (@active) {
+            $s .= "  - reviews/$job_id/output/discipline-$grp->{key}-findings.md\n";
+        }
+        $s .= "\nRead the report templates:\n";
+        $s .= "  - standards/REPORT-TEMPLATE-WORD.md\n";
+        $s .= "  - standards/REPORT-TEMPLATE-EXCEL.md\n";
+        $s .= "  - standards/CHECKLIST-TEMPLATE.md\n\n";
+        $s .= "Generate these files in reviews/$job_id/output/:\n";
+        $s .= "  (a) checklist.md\n  (b) findings.md (F-001, F-002, ... sorted by severity then division)\n";
+        $s .= "  (c) notes.md\n";
+        $s .= "  (d) report.docx — Word document using python-docx (pip install if needed), following REPORT-TEMPLATE-WORD exactly\n";
+        $s .= "  (e) report.xlsx — Excel workbook using openpyxl (pip install if needed), following REPORT-TEMPLATE-EXCEL exactly\n";
+        $s .= "      Summary sheet MUST print on one 8.5x11 landscape page (fitToPage, fitToWidth=1, fitToHeight=1)\n";
+        $s .= "  (f) COMPLETE sentinel\n\n";
+        $s .= "FINDING INDEX (critical — enables cross-document traceability):\n";
+        $s .= "- Every non-compliant finding gets one F-number (F-001, F-002, ...) assigned once, sorted by severity desc then division asc\n";
+        $s .= "- findings.md: F-### is the primary key, one entry per finding\n";
+        $s .= "- report.docx Sections 5 & 6: same F-### in heading of each finding\n";
+        $s .= "- report.xlsx Findings sheet: F-### in column A, one row per finding\n";
+        $s .= "- report.xlsx Checklist sheet: 'Finding Ref' column links [D]/[O]/[X] rows to their F-###\n";
+        $s .= "- report.xlsx Variances sheet: 'Finding Ref' column links V-## to F-###\n";
+        $s .= "- report.docx Section 7: variance items reference their F-###\n";
+        $s .= "- checklist.md: non-compliant items include their F-### in the Notes column\n";
+        $s .= "- Total finding count, severity breakdown, and F-numbers must be identical across ALL files\n\n";
+        $s .= "RULES:\n";
+        $s .= "- Preserve original PDF and standard citations exactly\n";
+        $s .= "- Severity: Critical = life safety or code violation; Major = significant non-compliance; Minor = best-practice deviation\n";
+        $s .= "- If any step fails, create FAILED with error description\n";
+
+        open my $sf, '>', "$job_dir/prompt-synthesis.txt" or do { warn "Cannot write synthesis prompt: $!\n"; return; };
+        print $sf $s;
+        close $sf;
+    }
+
+    # --- Write multi-phase bash script ---
+    my $script = "$job_dir/run-review.sh";
+    open my $fh, '>', $script or do { warn "Cannot write $script: $!\n"; return; };
+
+    print $fh "#!/bin/bash\n";
+    print $fh "# Multi-phase parallel review: $job_id\n";
+    print $fh "unset CLAUDECODE\n";
+    print $fh "export CLAUDE_CODE_GIT_BASH_PATH='C:\\Users\\john.slagboom\\AppData\\Local\\Programs\\Git\\bin\\bash.exe'\n";
+    print $fh "cd \"$ROOT\"\n\n";
+
+    # Phase 1: parallel discipline CLIs
+    print $fh "echo \"Phase 1: Launching " . scalar(@active) . " discipline scans...\" > \"$output_dir/progress.log\"\n\n";
+
+    for my $grp (@active) {
+        my $pfile  = "$job_dir/prompt-$grp->{key}.txt";
+        my $stdout = "$output_dir/$grp->{key}-stdout.log";
+        my $stderr = "$output_dir/$grp->{key}-stderr.log";
+
+        (my $var_key = uc($grp->{key})) =~ s/-/_/g;  # bash-safe var name
+        print $fh "PROMPT_${var_key}=\$(cat \"$pfile\")\n";
+        print $fh "\"$claude\" -p \"\$PROMPT_${var_key}\" \\\n";
+        print $fh "  --model sonnet \\\n";
+        print $fh "  --dangerously-skip-permissions \\\n";
+        print $fh "  --output-format text \\\n";
+        print $fh "  > \"$stdout\" \\\n";
+        print $fh "  2> \"$stderr\" &\n\n";
+    }
+
+    print $fh "wait\n";
+    print $fh "echo \"Phase 1 complete.\" >> \"$output_dir/progress.log\"\n\n";
+
+    # Check for failures
+    print $fh "FOUND=0\n";
+    print $fh "for f in \"$output_dir\"/discipline-*-findings.md; do\n";
+    print $fh "  [ -f \"\$f\" ] && FOUND=\$((FOUND + 1))\n";
+    print $fh "done\n";
+    print $fh "if [ \"\$FOUND\" -eq 0 ]; then\n";
+    print $fh "  echo \"No discipline findings produced.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n\n";
+
+    # Phase 2: synthesis
+    print $fh "echo \"Phase 2: Synthesizing reports...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "SYNTH_PROMPT=\$(cat \"$job_dir/prompt-synthesis.txt\")\n";
+    print $fh "\"$claude\" -p \"\$SYNTH_PROMPT\" \\\n";
+    print $fh "  --dangerously-skip-permissions \\\n";
+    print $fh "  --output-format text \\\n";
+    print $fh "  > \"$output_dir/synthesis-stdout.log\" \\\n";
+    print $fh "  2> \"$output_dir/synthesis-stderr.log\"\n\n";
+    print $fh "echo \"Review complete.\" >> \"$output_dir/progress.log\"\n";
+
+    close $fh;
+    chmod 0755, $script;
+
+    my $group_names = join(', ', map { $_->{name} } @active);
+    print "  Spawning parallel review for job $job_id...\n";
+    print "  Architecture: " . scalar(@active) . " parallel CLIs (Sonnet) + synthesis\n";
+    print "  Groups: $group_names\n";
+    system(qq{bash "$script" &});
 }
 
 # --- Job JSON helpers -------------------------------------------------------

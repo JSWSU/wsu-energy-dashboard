@@ -1,0 +1,77 @@
+CLAUDE CODE — QUICK START & RECOVERY MANUAL
+=============================================
+John Slagboom | WSU Facilities Services | 2026-02-24
+
+START CLAUDE IN GIT BASH
+------------------------
+ONE-TIME SETUP (run once — persists across all future sessions):
+  Open Git Bash, paste these two lines and press Enter after each:
+  echo 'export CLAUDE_CODE_GIT_BASH_PATH="C:\Users\john.slagboom\AppData\Local\Programs\Git\bin\bash.exe"' >> ~/.bashrc
+  echo 'alias claude="/c/Users/john.slagboom/AppData/Roaming/Claude/claude-code/2.1.49/claude.exe"' >> ~/.bashrc
+  Then reload:  source ~/.bashrc       Verify:  claude --version
+
+EVERY TIME (after reboot / new Git Bash window):
+  1. Open Git Bash        Start menu > type "Git Bash" > Enter
+  2. Navigate             cd /c/Users/john.slagboom/Desktop/Git
+  3. Launch               claude
+  4. If auth error        claude /login   (then retry step 3)
+
+RESUME AFTER CRASH / RESTART
+-----------------------------
+Claude does NOT remember previous conversations. Start Claude, then:
+  Option A:  Type /resume to see recent conversations and continue one
+  Option B:  Paste REVIEW-PORTAL-QUICKSTART.txt into chat to re-orient Claude
+  Option C:  Describe what you were working on (Claude reads CLAUDE.md automatically)
+
+Key files Claude reads on startup:
+  Global instructions   C:\Users\john.slagboom\.claude\CLAUDE.md
+  Session transcripts   C:\Users\john.slagboom\.claude\projects\   (JSONL files)
+  Saved plans           C:\Users\john.slagboom\.claude\plans\
+
+START THE REVIEW PORTAL SERVER
+------------------------------
+  1. cd /c/Users/john.slagboom/Desktop/Git
+  2. perl review-server.pl 8083
+  3. Browser: http://localhost:8083/review-portal.html
+
+KEY PATHS — REVIEW PORTAL
+--------------------------
+Project folder        C:\Users\john.slagboom\Desktop\Git
+Server                review-server.pl
+Watcher               review-watcher.pl
+Portal UI             review-portal.html
+IT Deployment Guide   docs\IT-DEPLOYMENT-GUIDE.txt
+Quickstart            REVIEW-PORTAL-QUICKSTART.txt
+Standards             standards\  (177 files, INDEX.md)
+Report template       standards\REPORT-TEMPLATE-EXCEL.md
+Job outputs           reviews\[jobid]\output\
+Skills (42 defs)      C:\Users\john.slagboom\.claude\skills\
+Claude instructions   C:\Users\john.slagboom\.claude\CLAUDE.md
+
+KEY PATHS — ENERGY DASHBOARDS
+------------------------------
+Energy Cost           index.html              data.json (VBA export)
+Metering              metering.html           data\  (7 JSON files)
+Water Conservation    water-conservation.html
+Chart.js              chart.umd.min.js
+Docs                  docs\ARCHITECTURE.txt           docs\METERING-*.txt (3)
+                      docs\OPERATIONS-RUNBOOK.txt     docs\WATER-CONSERVATION-*.txt (3)
+                      docs\TROUBLESHOOTING.txt        docs\DATA-DICTIONARY.txt
+                      docs\VBA-REFERENCE.txt
+
+GITHUB & LIVE URLS
+------------------
+Repo       github.com/JSWSU/wsu-energy-dashboard
+Energy     jswsu.github.io/wsu-energy-dashboard/
+Metering   jswsu.github.io/wsu-energy-dashboard/metering.html
+Water      jswsu.github.io/wsu-energy-dashboard/water-conservation.html
+Password   Energy@WSU
+
+TROUBLESHOOTING
+---------------
+"command not found"    Run the one-time alias setup at the top of this doc.
+                       If Claude updated, check for the new version folder:
+                       ls /c/Users/john.slagboom/AppData/Roaming/Claude/claude-code/
+                       Then edit ~/.bashrc and update the version number.
+"Port 8083 in use"     Use a different port: perl review-server.pl 8084
+"No context"           Type /resume, or paste REVIEW-PORTAL-QUICKSTART.txt

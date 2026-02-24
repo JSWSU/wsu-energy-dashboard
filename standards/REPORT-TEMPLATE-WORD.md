@@ -308,6 +308,8 @@ _[Attach or insert the completed CHECKLIST-TEMPLATE.md for this project. The che
 
 See: `checklist.md`
 
+_Non-compliant items in the checklist reference their Finding number (F-###) for cross-document traceability. Use F-### to look up the same finding in this Word report, the Excel workbook (report.xlsx), or findings.md._
+
 ---
 
 ## Appendix B: Standards Referenced
@@ -329,4 +331,4 @@ _[List all standards, codes, and guidelines referenced during this review.]_
 
 ---
 
-_End of report template. Copy this file into the project folder and fill in for each review. Ensure all findings are synchronized with the PowerPoint presentation (REPORT-TEMPLATE-PPT.md) and the checklist (CHECKLIST-TEMPLATE.md)._
+_End of report template. Ensure all findings are synchronized with the Excel workbook (report.xlsx) and the checklist (CHECKLIST-TEMPLATE.md). Finding numbers (F-###) must match between Word and Excel exactly._

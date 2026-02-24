@@ -1,0 +1,117 @@
+WSU COMPLIANCE REVIEW PORTAL — MORNING STARTUP
+================================================
+Date: 2026-02-24  |  All code on GitHub  |  Nothing is lost
+
+
+START THE SERVER (do this first)
+--------------------------------
+1. Open Git Bash         Start menu > type "Git Bash" > Enter
+2. Navigate              cd /c/Users/john.slagboom/Desktop/Git
+3. Start server          perl review-server.pl 8083
+4. Open browser          http://localhost:8083/review-portal.html
+
+
+TEST A REVIEW (use a small PDF, under 10 pages)
+------------------------------------------------
+1. Click "Submit Review" tab
+2. Enter project name, select divisions, upload PDF, hit Submit
+3. Click "Review Queue" tab — auto-refreshes every 10 seconds
+4. Wait for status: Processing --> Complete (15-30 min)
+5. Download outputs: report.xlsx (main deliverable), checklist.md, findings.md
+
+Verify in Git Bash window:
+  [ ] "Spawning parallel review for job ..." appears
+  [ ] "Architecture: N parallel CLIs (Sonnet) + synthesis" appears
+  [ ] "Groups: Electrical, Fire Protection, ..." lists active disciplines
+
+
+HOW THE PARALLEL ARCHITECTURE WORKS
+-------------------------------------
+The portal launches SEPARATE Claude CLI processes — one per discipline group:
+  1. Architectural (Div 02-14)      5. Electrical (Div 26)
+  2. Fire Protection (Div 21, 28)   6. Communications (Div 27)
+  3. Plumbing (Div 22)              7. Civil/Site (Div 31-33, 40)
+  4. HVAC/Controls (Div 23, 25)
+
+Phase 1 — Discipline Scans (parallel, Sonnet model for speed):
+  Each Claude CLI process reads the PDF + a pre-concatenated standards file
+  for its discipline and evaluates EVERY requirement. All run simultaneously.
+
+Phase 2 — Synthesis (single CLI, default model for quality):
+  After all discipline scans finish, one Claude CLI reads all the findings
+  and generates the final reports (.docx, .pptx, checklist, etc.).
+
+Per-job directory structure:
+  reviews/[jobid]/
+    prompt-electrical.txt           Per-discipline prompt
+    prompt-hvac-controls.txt        (one per active group)
+    prompt-synthesis.txt            Synthesis prompt
+    combined/
+      combined-electrical.md        Pre-concatenated standards
+      combined-hvac-controls.md     (one per active group)
+    output/
+      discipline-electrical-findings.md     Phase 1 outputs
+      discipline-hvac-controls-findings.md
+      electrical-stdout.log                 Per-discipline Claude output
+      electrical-stderr.log
+      synthesis-stdout.log                  Phase 2 Claude output
+      synthesis-stderr.log
+      checklist.md, findings.md, notes.md   Final synthesis outputs
+      report.xlsx
+      COMPLETE                              Sentinel (review finished)
+      progress.log                          Phase tracking
+
+
+DEBUGGING A REVIEW
+-------------------
+Check the prompts that were sent to Claude:
+  cat reviews/[jobid]/prompt-electrical.txt    (discipline prompt)
+  cat reviews/[jobid]/prompt-synthesis.txt     (synthesis prompt)
+  cat reviews/[jobid]/prompt.txt               (combined debug view)
+
+Check per-discipline intermediate outputs:
+  ls reviews/[jobid]/output/discipline-*-findings.md
+
+Check Claude logs per discipline:
+  cat reviews/[jobid]/output/electrical-stderr.log
+  cat reviews/[jobid]/output/synthesis-stderr.log
+
+Check which phase is running:
+  cat reviews/[jobid]/output/progress.log
+
+Run the review script manually:
+  bash reviews/[jobid]/run-review.sh
+
+
+TROUBLESHOOTING
+---------------
+"Cannot find Claude CLI"
+  > In Git Bash:  export CLAUDE_CODE_GIT_BASH_PATH="C:\Users\john.slagboom\AppData\Local\Programs\Git\bin\bash.exe"
+  > Then:         claude /login
+  > Then restart: perl review-server.pl 8083
+
+"Cannot bind to port 8083"
+  > Use a different port:  perl review-server.pl 8084
+  > Browser:  http://localhost:8084/review-portal.html
+
+Server starts but Claude doesn't spawn
+  > Run the script manually:  bash reviews/[jobid]/run-review.sh
+  > Check errors:  cat reviews/[jobid]/output/electrical-stderr.log
+
+Phase 1 finishes but Phase 2 (synthesis) fails
+  > Check synthesis errors:  cat reviews/[jobid]/output/synthesis-stderr.log
+  > Discipline findings exist?  ls reviews/[jobid]/output/discipline-*-findings.md
+
+Need to start fresh
+  > rm -rf reviews/*
+  > Resubmit
+
+
+WHAT'S WHERE
+------------
+GitHub repo     github.com/JSWSU/wsu-energy-dashboard   (everything pushed)
+Project folder  C:\Users\john.slagboom\Desktop\Git
+Claude CLI      %APPDATA%\Claude\claude-code
+Job outputs     Desktop\Git\reviews\[jobid]\output\
+Standards       Desktop\Git\standards\  (177 files, INDEX.md)
+Skills          C:\Users\john.slagboom\.claude\skills\  (42 definitions)
