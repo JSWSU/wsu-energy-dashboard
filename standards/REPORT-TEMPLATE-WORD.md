@@ -1,10 +1,12 @@
 # WSU Design Standards Compliance Review Report
 
+**For Claude agents:** Use python-docx to generate `report.docx` following both the structure below and the styling guide at the end of this file. The document must look professional and print-ready.
+
 ---
 
 ## 1. Cover Page
 
----
+The cover page should be visually distinct — centered text with generous vertical spacing.
 
 **WASHINGTON STATE UNIVERSITY**
 **Facilities Services — Design Standards Compliance Review**
@@ -17,7 +19,7 @@
 **Drawing Set Date:** _[Enter date of drawing set reviewed]_
 **Review Date:** _[Enter review date]_
 
-**Prepared by:** _[Reviewer name and title]_
+**Prepared by:** WSU Facilities Services — Automated Compliance Review
 **Department:** WSU Facilities Services
 
 ---
@@ -328,6 +330,155 @@ _[List all standards, codes, and guidelines referenced during this review.]_
 | ASHRAE 90.1 — Energy Standard | _[Year]_ | _[As applicable]_ |
 | Washington State Energy Code | _[Year]_ | _[As applicable]_ |
 | _[Additional standards as applicable]_ | _[Version]_ | _[Sections]_ |
+
+---
+
+---
+
+## python-docx Styling Guide (REQUIRED)
+
+Generate report.docx using `python-docx` with the following professional formatting. pip install python-docx if needed.
+
+### Document Setup
+```python
+from docx import Document
+from docx.shared import Inches, Pt, Cm, RGBColor, Emu
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.section import WD_ORIENT
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
+
+doc = Document()
+
+# Page setup: Letter, portrait, professional margins
+section = doc.sections[0]
+section.page_width = Inches(8.5)
+section.page_height = Inches(11)
+section.top_margin = Inches(1.0)
+section.bottom_margin = Inches(0.75)
+section.left_margin = Inches(1.0)
+section.right_margin = Inches(1.0)
+```
+
+### Color Palette
+```python
+WSU_CRIMSON = RGBColor(0x98, 0x1E, 0x32)   # #981E32
+WSU_GRAY    = RGBColor(0x5F, 0x6B, 0x6D)    # #5F6B6D
+DARK_GRAY   = RGBColor(0x37, 0x41, 0x51)    # #374151
+WHITE       = RGBColor(0xFF, 0xFF, 0xFF)
+BLACK       = RGBColor(0x00, 0x00, 0x00)
+LIGHT_RED   = RGBColor(0xFE, 0xE2, 0xE2)    # Critical
+LIGHT_ORANGE = RGBColor(0xFE, 0xF3, 0xC7)   # Major
+LIGHT_YELLOW = RGBColor(0xFE, 0xF9, 0xC3)   # Minor
+LIGHT_GREEN = RGBColor(0xDC, 0xFC, 0xE7)    # Compliant
+LIGHT_BLUE  = RGBColor(0xEF, 0xF6, 0xFF)    # Total rows
+```
+
+### Font Standards
+- **Body text:** Calibri, 10pt, BLACK
+- **Section headings (Heading 1):** Calibri, 16pt, bold, WSU_CRIMSON, space before 18pt, space after 6pt
+- **Subsection headings (Heading 2):** Calibri, 13pt, bold, DARK_GRAY, space before 14pt, space after 4pt
+- **Finding headings (Heading 3):** Calibri, 11pt, bold, BLACK, space before 10pt, space after 3pt
+- **Table text:** Calibri, 9pt
+- **Table headers:** Calibri, 9pt, bold, WHITE on DARK_GRAY background
+
+### Paragraph Formatting
+```python
+# Apply to all body paragraphs:
+paragraph.paragraph_format.space_after = Pt(6)
+paragraph.paragraph_format.line_spacing = 1.15
+
+# Modify built-in styles for consistency:
+style = doc.styles['Normal']
+style.font.name = 'Calibri'
+style.font.size = Pt(10)
+style.font.color.rgb = BLACK
+
+for level, size, color in [('Heading 1', 16, WSU_CRIMSON),
+                            ('Heading 2', 13, DARK_GRAY),
+                            ('Heading 3', 11, BLACK)]:
+    s = doc.styles[level]
+    s.font.name = 'Calibri'
+    s.font.size = Pt(size)
+    s.font.color.rgb = color
+    s.font.bold = True
+```
+
+### Cover Page
+- Center all text vertically (add ~3 inches of blank space before title)
+- "WASHINGTON STATE UNIVERSITY" — Calibri 24pt bold, WSU_CRIMSON, centered
+- "Facilities Services" — Calibri 14pt, WSU_GRAY, centered
+- "Design Standards Compliance Review" — Calibri 18pt bold, DARK_GRAY, centered
+- Add a 4-inch horizontal line (WSU_CRIMSON) between title block and project info
+- Project info fields: Calibri 12pt, left-aligned in a 2-column table with no borders
+- Add page break after cover page
+
+### Table Formatting
+```python
+def format_table(table):
+    """Apply professional formatting to a table."""
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    # Header row: dark background, white text, bold
+    for cell in table.rows[0].cells:
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        for run in cell.paragraphs[0].runs:
+            run.font.bold = True
+            run.font.color.rgb = WHITE
+            run.font.size = Pt(9)
+        shading = OxmlElement('w:shd')
+        shading.set(qn('w:fill'), '374151')
+        cell._tc.get_or_add_tcPr().append(shading)
+    # Body rows: 9pt, centered numbers
+    for row in table.rows[1:]:
+        for cell in row.cells:
+            for para in cell.paragraphs:
+                for run in para.runs:
+                    run.font.size = Pt(9)
+                    run.font.name = 'Calibri'
+```
+
+### Severity Color Coding
+Apply background shading to finding entries and table rows based on severity:
+- Critical → LIGHT_RED background
+- Major → LIGHT_ORANGE background
+- Minor → LIGHT_YELLOW background
+- Compliant → LIGHT_GREEN background (checklist tables only)
+
+### Header and Footer
+```python
+# Add to each section:
+header = section.header
+header_para = header.paragraphs[0]
+header_para.text = "WSU Design Standards Compliance Review — [Project Name]"
+header_para.style.font.size = Pt(8)
+header_para.style.font.color.rgb = WSU_GRAY
+header_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+footer = section.footer
+footer_para = footer.paragraphs[0]
+footer_para.text = "WSU Facilities Services — Confidential"
+footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+footer_para.style.font.size = Pt(8)
+# Page numbers: add field code for page number in right-aligned run
+```
+
+### Section Breaks
+- Page break before each major section (Sections 1-10)
+- No page break between individual findings within a section
+
+### Findings Layout
+Each finding should use a compact card-like layout:
+- Finding heading: "F-### — Title" as Heading 3
+- Metadata fields (Division, CSI, Severity, Status) in a tight 2-column table, no borders
+- Description and Required Action as normal paragraphs below the metadata
+
+### Professional Touches
+- Add a thin WSU crimson horizontal rule between major sections
+- Use consistent paragraph spacing (6pt after body, 0pt after list items)
+- Right-align all numeric columns in tables
+- Bold the TOTAL row in all summary tables
+- Use alternating row shading (white / very light gray #F9FAFB) on tables with 5+ rows
 
 ---
 

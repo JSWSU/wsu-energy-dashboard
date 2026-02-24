@@ -428,7 +428,17 @@ sub spawn_review {
         $s .= "RULES:\n";
         $s .= "- Preserve original PDF and standard citations exactly\n";
         $s .= "- Severity: Critical = life safety or code violation; Major = significant non-compliance; Minor = best-practice deviation\n";
-        $s .= "- If any step fails, create FAILED with error description\n";
+        $s .= "- If any step fails, create FAILED with error description\n\n";
+
+        $s .= "NUMBER VALIDATION (you MUST verify before writing COMPLETE):\n";
+        $s .= "- 'Total Non-Compliant' in severity table = Critical + Major + Minor (NOT total requirements)\n";
+        $s .= "- Severity table total MUST equal Findings sheet row count (data rows only)\n";
+        $s .= "- Discipline table: per row, Total Req. = Compliant + Deviations + Omissions + Concerns\n";
+        $s .= "- Discipline table TOTAL Deviations + Omissions + Concerns = Severity table Total Non-Compliant\n";
+        $s .= "- Severity % = count / Total Non-Compliant * 100, must sum to 100%\n";
+        $s .= "- Priority Actions: Immediate count = Critical, CD Phase = Major, 100% CD = Minor\n";
+        $s .= "- Cross-check: count F-### entries in findings.txt must equal severity total must equal Findings sheet rows\n";
+        $s .= "- If any numbers don't balance, FIX THEM before creating COMPLETE\n";
 
         open my $sf, '>', "$job_dir/prompt-synthesis.txt" or do { warn "Cannot write synthesis prompt: $!\n"; return; };
         print $sf $s;

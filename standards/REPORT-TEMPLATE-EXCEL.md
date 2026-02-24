@@ -62,13 +62,16 @@ ws.oddFooter.right.text = "Page &P"
 - B10: "FINDINGS BY SEVERITY" (bold, 11pt, WSU crimson)
 - Table at B11:D14:
 
-| Severity | Count | % of Total |
-|----------|-------|-----------|
+| Severity | Count | % of Findings |
+|----------|-------|--------------|
 | Critical | N | N% |
 | Major | N | N% |
 | Minor | N | N% |
-| **Total Findings** | **N** | |
+| **Total Non-Compliant** | **N** | **100%** |
 
+- "Count" = number of non-compliant findings at that severity level
+- "% of Findings" = Count / Total Non-Compliant * 100
+- "Total Non-Compliant" MUST equal Critical + Major + Minor (simple addition)
 - Critical row: red fill (#FEE2E2)
 - Major row: orange fill (#FEF3C7)
 - Minor row: yellow fill (#FEF9C3)
@@ -79,15 +82,32 @@ ws.oddFooter.right.text = "Page &P"
 - B16: "FINDINGS BY DISCIPLINE" (bold, 11pt, WSU crimson)
 - Table at B17:I24 (or however many divisions):
 
-| Division | Description | Total | Compliant | Deviations | Omissions | Concerns | Compliance % |
-|----------|------------|-------|-----------|------------|-----------|----------|-------------|
+| Division | Description | Total Req. | Compliant | Deviations | Omissions | Concerns | Compliance % |
+|----------|------------|-----------|-----------|------------|-----------|----------|-------------|
 | 26 | Electrical | N | N | N | N | N | N% |
 | 23 | HVAC | N | N | N | N | N | N% |
 | ... | | | | | | | |
 | **TOTAL** | | **N** | **N** | **N** | **N** | **N** | **N%** |
 
+- "Total Req." = total requirements evaluated for that division
+- Per-row validation: Compliant + Deviations + Omissions + Concerns = Total Req.
+- Compliance % = Compliant / Total Req. * 100
+- TOTAL row sums each column
 - Total row: bold, light blue fill (#EFF6FF)
 - Header row: dark gray fill (#374151), white text
+
+### CRITICAL MATH VALIDATION
+
+These numbers MUST be consistent across tables:
+
+1. Severity table "Total Non-Compliant" = Discipline table (TOTAL Deviations + TOTAL Omissions + TOTAL Concerns)
+2. Executive Summary "[N]% of requirements are compliant" = Discipline table TOTAL Compliance %
+3. Executive Summary "[N] critical findings" = Severity table Critical count
+4. Discipline table TOTAL row = sum of each column above it
+5. Per discipline row: Total Req. = Compliant + Deviations + Omissions + Concerns
+6. Severity percentages sum to 100%
+7. The Findings sheet row count (data rows only) = Severity table "Total Non-Compliant"
+8. Priority Actions finding counts: Immediate = Critical count, CD Phase = Major count, 100% CD = Minor count
 
 **Row 26-33: Top Critical Findings**
 - B26: "TOP CRITICAL FINDINGS" (bold, 11pt, WSU crimson)
