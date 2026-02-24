@@ -206,20 +206,36 @@ sub spawn_review {
         . "Create reviews/$job_id/output/COMPLETE when all outputs are written. "
         . "If you encounter an error, create reviews/$job_id/output/FAILED with the error description.";
 
+    # Escape single quotes for bash script
     $prompt =~ s/'/'\\''/g;
 
+    my $job_dir    = "$REVIEWS_DIR/$job_id";
     my $stdout_log = "$output_dir/claude-stdout.log";
     my $stderr_log = "$output_dir/claude-stderr.log";
+    my $script     = "$job_dir/run-review.sh";
 
-    my $cmd = qq{unset CLAUDECODE && export CLAUDE_CODE_GIT_BASH_PATH='C:\\Users\\john.slagboom\\AppData\\Local\\Programs\\Git\\bin\\bash.exe' && cd "$ROOT" && "$CLAUDE_PATH" -p '$prompt' }
-        . qq{--dangerously-skip-permissions }
-        . qq{--output-format text }
-        . qq{> "$stdout_log" }
-        . qq{2> "$stderr_log" }
-        . qq{&};
+    # Write a shell wrapper script — avoids MSYS Perl system() parsing issues
+    open my $fh, '>', $script or do {
+        warn "Cannot write $script: $!\n";
+        return;
+    };
+    print $fh <<BASH;
+#!/bin/bash
+unset CLAUDECODE
+export CLAUDE_CODE_GIT_BASH_PATH='C:\\Users\\john.slagboom\\AppData\\Local\\Programs\\Git\\bin\\bash.exe'
+cd "$ROOT"
+"$CLAUDE_PATH" -p '$prompt' \\
+  --dangerously-skip-permissions \\
+  --output-format text \\
+  > "$stdout_log" \\
+  2> "$stderr_log"
+BASH
+    close $fh;
+    chmod 0755, $script;
 
     print "[" . localtime() . "] Spawning Claude for job $job_id\n";
-    system($cmd);
+    print "  Script: $script\n";
+    system(qq{bash "$script" &});
 }
 
 # --- Request handler --------------------------------------------------------
