@@ -404,7 +404,8 @@ sub spawn_review {
         $p .= "3. For EVERY numbered requirement, clause, and sub-clause in the standards:\n";
         $p .= "   - Locate the relevant drawing sheet(s) in the PDF\n";
         $p .= "   - Assign status: [C] Compliant, [D] Deviation, [O] Omission, [X] Concern\n";
-        $p .= "4. Write your findings to reviews/$job_id/output/discipline-$grp->{key}-findings.md\n\n";
+        $p .= "4. Write ALL findings to a SINGLE file: reviews/$job_id/output/discipline-$grp->{key}-findings.md\n";
+        $p .= "   CRITICAL: Use exactly this filename. Do NOT split into multiple files. One file, all divisions.\n\n";
 
         $p .= "OUTPUT FORMAT:\n";
         $p .= "Begin with a summary table:\n";
