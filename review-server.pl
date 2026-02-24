@@ -45,6 +45,8 @@ my %mime = (
     gif  => 'image/gif',       svg  => 'image/svg+xml',
     ico  => 'image/x-icon',    txt  => 'text/plain',
     md   => 'text/markdown',   pdf  => 'application/pdf',
+    docx => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    pptx => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 );
 
 my $srv = IO::Socket::INET->new(
@@ -201,8 +203,9 @@ sub spawn_review {
         . "Construction type: $job->{constructionType}. "
         . "Follow the wsu-compliance-review workflow. "
         . "Read standards/INDEX.md first. "
-        . "Write all outputs (checklist.md, findings.md, report-word.md, report-ppt.md, notes.md) "
-        . "to reviews/$job_id/output/. "
+        . "Write checklist.md, findings.md, and notes.md to reviews/$job_id/output/. "
+        . "Also generate a Word document (report.docx) and a PowerPoint presentation (report.pptx) "
+        . "in reviews/$job_id/output/ using python-docx and python-pptx (pip install if needed). "
         . "Create reviews/$job_id/output/COMPLETE when all outputs are written. "
         . "If you encounter an error, create reviews/$job_id/output/FAILED with the error description.";
 
