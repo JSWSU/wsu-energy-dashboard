@@ -203,10 +203,14 @@ sub download_row_pdf {
 
 sub upload_reports {
     my ($http, $token, $sheet_id, $row_id, $output_dir) = @_;
+    # Only upload final deliverables (not intermediate discipline files, scripts, etc.)
+    my @deliverables = qw(
+        checklist.txt findings.txt notes.txt
+        checklist.md  findings.md  notes.md
+        report.docx report.xlsx
+    );
     my @uploaded;
-    opendir my $dh, $output_dir or return @uploaded;
-    while (my $f = readdir $dh) {
-        next if $f =~ /^\./ || $f eq 'COMPLETE' || $f eq 'FAILED' || $f =~ /\.log$/;
+    for my $f (@deliverables) {
         my $path = "$output_dir/$f";
         next unless -f $path;
         open my $fh, '<:raw', $path or next;
@@ -222,7 +226,6 @@ sub upload_reports {
             print "    Failed to upload $f: $resp->{status}\n";
         }
     }
-    closedir $dh;
     return @uploaded;
 }
 

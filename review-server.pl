@@ -213,13 +213,15 @@ sub check_job_status {
         $job->{status} = 'Complete';
         $job->{progress} = 100;
         $job->{completed} = iso_now();
-        my @out;
-        if (opendir my $dh, "$job_dir/output") {
-            @out = grep { !/^\./ && $_ ne 'COMPLETE' && $_ ne 'FAILED' && $_ !~ /\.log$/ }
-                   readdir $dh;
-            closedir $dh;
-        }
-        $job->{outputFiles} = [sort @out];
+        # Only list final deliverables (not intermediate discipline files, scripts, etc.)
+        # Supports both old (.md) and new (.txt) naming for backward compatibility
+        my @deliverables = qw(
+            checklist.txt findings.txt notes.txt
+            checklist.md  findings.md  notes.md
+            report.docx report.xlsx
+        );
+        my @out = grep { -f "$job_dir/output/$_" } @deliverables;
+        $job->{outputFiles} = \@out;
         write_job_json($job_id, $job);
     }
     elsif (-f $failed) {
