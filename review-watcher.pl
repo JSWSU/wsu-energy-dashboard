@@ -285,9 +285,13 @@ sub spawn_review {
 
     # --- Discipline group definitions ---
     my @ALL_GROUPS = (
-        { key => 'architectural',    name => 'Architectural / Structure / Envelope / Finishes',
-          divs => [qw(02 03 04 05 07 08 09 10 11 12 13 14)],
-          desc => 'architectural, structural, envelope, roofing, doors/windows, finishes, specialties, and equipment sheets',
+        { key => 'arch-structure',   name => 'Architectural — Structure & Envelope',
+          divs => [qw(02 03 04 05 07 08)],
+          desc => 'demolition, concrete, masonry, metals, roofing, waterproofing, and openings sheets',
+          supp => [] },
+        { key => 'arch-finishes',    name => 'Architectural — Finishes & Equipment',
+          divs => [qw(09 10 11 12 13 14)],
+          desc => 'finishes, specialties, equipment, furnishings, special construction, and conveying sheets',
           supp => [] },
         { key => 'fire-protection',  name => 'Fire Protection and Security',
           divs => [qw(21 28)],
@@ -371,21 +375,46 @@ sub spawn_review {
         $p .= "3. For EVERY numbered requirement, clause, and sub-clause in the standards:\n";
         $p .= "   - Locate the relevant drawing sheet(s) in the PDF\n";
         $p .= "   - Assign status: [C] Compliant, [D] Deviation, [O] Omission, [X] Concern\n";
-        $p .= "4. Write ALL findings to a SINGLE file: reviews/$job_id/output/discipline-$grp->{key}-findings.md\n";
+        $p .= "4. Write a SINGLE JSON file to: reviews/$job_id/output/discipline-$grp->{key}-findings.json\n";
         $p .= "   CRITICAL: Use exactly this filename. Do NOT split into multiple files. One file, all divisions.\n\n";
+
+        my $divs_json = join(', ', map { "\"$_\"" } @{$grp->{active_divs}});
+
         $p .= "OUTPUT FORMAT:\n";
-        $p .= "Begin with a summary table, then list every non-compliant finding as:\n";
-        $p .= "  ### F-$grp->{key}-NNN: Title\n";
-        $p .= "  - Division: XX\n";
-        $p .= "  - CSI Code: XX XX XX\n";
-        $p .= "  - Severity: Critical / Major / Minor\n";
-        $p .= "  - Status: [D] / [O] / [X]\n";
-        $p .= "  - PDF Reference: (page and sheet number)\n";
-        $p .= "  - Standard Reference: (WSU standard section number)\n";
-        $p .= "  - Issue: (detailed description)\n";
-        $p .= "  - Required Action: (what must change)\n\n";
+        $p .= "Write a single valid JSON file matching this exact schema:\n";
+        $p .= "{\n";
+        $p .= "  \"discipline\": \"$grp->{key}\",\n";
+        $p .= "  \"divisions_reviewed\": [$divs_json],\n";
+        $p .= "  \"summary\": {\n";
+        $p .= "    \"total_requirements\": N,\n";
+        $p .= "    \"compliant\": N,\n";
+        $p .= "    \"deviations\": N,\n";
+        $p .= "    \"omissions\": N,\n";
+        $p .= "    \"concerns\": N\n";
+        $p .= "  },\n";
+        $p .= "  \"requirements\": [\n";
+        $p .= "    {\n";
+        $p .= "      \"division\": \"XX\",\n";
+        $p .= "      \"csi_code\": \"XX XX XX\",\n";
+        $p .= "      \"requirement\": \"Description of standard requirement\",\n";
+        $p .= "      \"status\": \"C|D|O|X\",\n";
+        $p .= "      \"severity\": \"Critical|Major|Minor|null\",\n";
+        $p .= "      \"finding_id\": \"F-$grp->{key}-NNN or null\",\n";
+        $p .= "      \"pdf_reference\": \"Page N (Sheet-ID)\",\n";
+        $p .= "      \"standard_reference\": \"WSU section citation\",\n";
+        $p .= "      \"issue\": \"Description or null\",\n";
+        $p .= "      \"required_action\": \"Action or null\",\n";
+        $p .= "      \"drawing_sheet\": \"Sheet reference or null\",\n";
+        $p .= "      \"notes\": \"\"\n";
+        $p .= "    }\n";
+        $p .= "  ]\n";
+        $p .= "}\n\n";
+        $p .= "CRITICAL: Output MUST be valid JSON. Include ALL requirements (both compliant and non-compliant).\n";
+        $p .= "For compliant requirements: status=\"C\", severity=null, finding_id=null, issue=null, required_action=null.\n";
+        $p .= "Summary counts MUST match: total_requirements = compliant + deviations + omissions + concerns.\n\n";
+
         $p .= "RULES:\n";
-        $p .= "- Every finding MUST have both a PDF citation AND a WSU standard section citation.\n";
+        $p .= "- Every non-compliant finding MUST have both a PDF citation AND a WSU standard section citation.\n";
         $p .= "- Severity: Critical = life safety/code; Major = significant non-compliance; Minor = best-practice.\n";
         $p .= "- Be thorough — check EVERY requirement. Depth over speed.\n";
 
@@ -396,74 +425,129 @@ sub spawn_review {
     }
 
     # --- Write synthesis prompt (Phase 2) ---
+    # Synthesis ONLY merges JSON → review-data.json (no report generation)
     {
         my $s = "You are synthesizing a WSU Design Standards compliance review.\n";
         $s .= $common_header;
-        $s .= "The discipline-level reviews have been completed by parallel reviewers.\n";
-        $s .= "Read ALL of these discipline findings files:\n";
-        for my $grp (@active) {
-            $s .= "  - reviews/$job_id/output/discipline-$grp->{key}-findings.md\n";
-        }
-        $s .= "\nRead the report templates:\n";
-        $s .= "  - standards/REPORT-TEMPLATE-WORD.md\n";
-        $s .= "  - standards/REPORT-TEMPLATE-EXCEL.md\n";
-        $s .= "  - standards/CHECKLIST-TEMPLATE.md\n\n";
-        $s .= "Generate these files in reviews/$job_id/output/:\n";
-        $s .= "  (a) checklist.txt\n  (b) findings.txt (F-001, F-002, ... sorted by severity then division)\n";
-        $s .= "  (c) notes.txt\n";
-        $s .= "  (d) report.docx — Word document using python-docx (pip install if needed), following REPORT-TEMPLATE-WORD exactly\n";
-        $s .= "  (e) report.xlsx — Excel workbook using openpyxl (pip install if needed), following REPORT-TEMPLATE-EXCEL exactly\n";
-        $s .= "      Summary sheet MUST print on one 8.5x11 landscape page (fitToPage, fitToWidth=1, fitToHeight=1)\n";
-        $s .= "  (f) COMPLETE sentinel\n\n";
-        $s .= "FINDING INDEX (critical — enables cross-document traceability):\n";
-        $s .= "- Every non-compliant finding gets one F-number (F-001, F-002, ...) assigned once, sorted by severity desc then division asc\n";
-        $s .= "- findings.txt: F-### is the primary key, one entry per finding\n";
-        $s .= "- report.docx Sections 5 & 6: same F-### in heading of each finding\n";
-        $s .= "- report.xlsx Findings sheet: F-### in column A, one row per finding\n";
-        $s .= "- report.xlsx Checklist sheet: 'Finding Ref' column links [D]/[O]/[X] rows to their F-###\n";
-        $s .= "- report.xlsx Variances sheet: 'Finding Ref' column links V-## to F-###\n";
-        $s .= "- report.docx Section 7: variance items reference their F-###\n";
-        $s .= "- checklist.txt: non-compliant items include their F-### in the Notes column\n";
-        $s .= "- Total finding count, severity breakdown, and F-numbers must be identical across ALL files\n\n";
-        $s .= "RULES:\n";
-        $s .= "- Preserve original PDF and standard citations exactly\n";
-        $s .= "- Severity: Critical = life safety or code violation; Major = significant non-compliance; Minor = best-practice deviation\n";
-        $s .= "- If any step fails, create FAILED with error description\n\n";
 
-        $s .= "NUMBER VALIDATION (you MUST verify before writing COMPLETE):\n";
-        $s .= "- 'Total Non-Compliant' in severity table = Critical + Major + Minor (NOT total requirements)\n";
-        $s .= "- Severity table total MUST equal Findings sheet row count (data rows only)\n";
-        $s .= "- Discipline table: per row, Total Req. = Compliant + Deviations + Omissions + Concerns\n";
-        $s .= "- Discipline table TOTAL Deviations + Omissions + Concerns = Severity table Total Non-Compliant\n";
-        $s .= "- Severity % = count / Total Non-Compliant * 100, must sum to 100%\n";
-        $s .= "- Priority Actions: Immediate count = Critical, CD Phase = Major, 100% CD = Minor\n";
-        $s .= "- Cross-check: count F-### entries in findings.txt must equal severity total must equal Findings sheet rows\n";
-        $s .= "- If any numbers don't balance, FIX THEM before creating COMPLETE\n";
+        $s .= "The discipline-level reviews have been completed by parallel reviewers.\n";
+        $s .= "Read ALL of these discipline findings JSON files:\n";
+        for my $grp (@active) {
+            $s .= "  - reviews/$job_id/output/discipline-$grp->{key}-findings.json\n";
+        }
+        $s .= "\n";
+
+        $s .= "Your ONLY task is to produce: reviews/$job_id/output/review-data.json\n";
+        $s .= "This file merges all discipline findings into one structured JSON for local report generation.\n";
+        $s .= "Do NOT generate Word docs, Excel files, or text files. Just produce the single JSON.\n\n";
+
+        $s .= "OUTPUT SCHEMA (review-data.json):\n";
+        $s .= "{\n";
+        $s .= "  \"project\": {\n";
+        $s .= "    \"name\": \"$job->{projectName}\",\n";
+        $s .= "    \"phase\": \"$job->{reviewPhase}\",\n";
+        $s .= "    \"constructionType\": \"$job->{constructionType}\",\n";
+        $s .= "    \"reviewDate\": \"YYYY-MM-DD\"\n";
+        $s .= "  },\n";
+        $s .= "  \"disciplines\": [\n";
+        $s .= "    {\n";
+        $s .= "      \"key\": \"discipline-key\",\n";
+        $s .= "      \"name\": \"Discipline Name\",\n";
+        $s .= "      \"divisions_reviewed\": [\"XX\", ...],\n";
+        $s .= "      \"summary\": { \"total_requirements\": N, \"compliant\": N, \"deviations\": N, \"omissions\": N, \"concerns\": N }\n";
+        $s .= "    }\n";
+        $s .= "  ],\n";
+        $s .= "  \"findings\": [\n";
+        $s .= "    {\n";
+        $s .= "      \"id\": \"F-001\",\n";
+        $s .= "      \"discipline\": \"discipline-key\",\n";
+        $s .= "      \"division\": \"XX\",\n";
+        $s .= "      \"csi_code\": \"XX XX XX\",\n";
+        $s .= "      \"title\": \"Short title\",\n";
+        $s .= "      \"severity\": \"Critical|Major|Minor\",\n";
+        $s .= "      \"status\": \"D|O|X\",\n";
+        $s .= "      \"pdf_reference\": \"Page N (Sheet-ID)\",\n";
+        $s .= "      \"standard_reference\": \"WSU section citation\",\n";
+        $s .= "      \"issue\": \"Detailed description\",\n";
+        $s .= "      \"required_action\": \"What must change\"\n";
+        $s .= "    }\n";
+        $s .= "  ],\n";
+        $s .= "  \"requirements\": [\n";
+        $s .= "    {\n";
+        $s .= "      \"division\": \"XX\",\n";
+        $s .= "      \"csi_code\": \"XX XX XX\",\n";
+        $s .= "      \"requirement\": \"Requirement description\",\n";
+        $s .= "      \"status\": \"C|D|O|X\",\n";
+        $s .= "      \"finding_ref\": \"F-001 or null\",\n";
+        $s .= "      \"drawing_sheet\": \"Sheet ref or null\",\n";
+        $s .= "      \"notes\": \"\"\n";
+        $s .= "    }\n";
+        $s .= "  ],\n";
+        $s .= "  \"variances\": [...],\n";
+        $s .= "  \"narratives\": {\n";
+        $s .= "    \"executive_summary\": \"2-3 paragraph overview...\",\n";
+        $s .= "    \"methodology\": \"How the review was conducted...\",\n";
+        $s .= "    \"drawing_inventory\": \"List of sheets reviewed...\",\n";
+        $s .= "    \"applicability_notes\": \"N/A determinations...\",\n";
+        $s .= "    \"limitations\": \"Review exclusions...\"\n";
+        $s .= "  }\n";
+        $s .= "}\n\n";
+
+        $s .= "RULES:\n";
+        $s .= "- Renumber findings sequentially: F-001, F-002, ... sorted by severity desc then division asc\n";
+        $s .= "- Update finding_ref in requirements to match new F-numbers\n";
+        $s .= "- ALL [D] Deviation findings become variance candidates\n";
+        $s .= "- Preserve ALL original PDF and standard citations exactly\n";
+        $s .= "- Copy discipline summary objects directly from input JSON files\n";
+        $s .= "- Include ALL requirements (compliant and non-compliant)\n";
+        $s .= "- Write narrative sections (executive_summary, methodology, etc.)\n";
+        $s .= "- Output MUST be valid JSON\n";
+        $s .= "- If any step fails, create FAILED with error description\n";
 
         open my $sf, '>', "$job_dir/prompt-synthesis.txt" or do { warn "Cannot write synthesis prompt: $!\n"; return; };
         print $sf $s;
         close $sf;
     }
 
-    # --- Write multi-phase bash script ---
+    # --- Write 3-phase bash script ---
+    my $expected_count = scalar @active;
     my $script = "$job_dir/run-review.sh";
     open my $fh, '>', $script or do { warn "Cannot write $script: $!\n"; return; };
 
     print $fh "#!/bin/bash\n";
-    print $fh "# Multi-phase parallel review: $job_id\n";
+    print $fh "# 3-phase parallel review: $job_id\n";
     print $fh "unset CLAUDECODE\n";
     print $fh "export CLAUDE_CODE_GIT_BASH_PATH='C:\\Users\\john.slagboom\\AppData\\Local\\Programs\\Git\\bin\\bash.exe'\n";
     print $fh "cd \"$ROOT\"\n\n";
 
+    # Python discovery
+    print $fh "# --- Python discovery ---\n";
+    print $fh "PYTHON=\"\"\n";
+    print $fh "for p in \\\n";
+    print $fh "  \"/c/Users/\$USER/AppData/Local/Programs/Python/Python313/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$USER/AppData/Local/Programs/Python/Python312/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$USER/AppData/Local/Programs/Python/Python311/python.exe\" \\\n";
+    print $fh "  \"/c/Python313/python.exe\" \"/c/Python312/python.exe\" \\\n";
+    print $fh "  \"\$(command -v python3 2>/dev/null)\" \\\n";
+    print $fh "  \"\$(command -v python 2>/dev/null)\" \\\n";
+    print $fh "  \"\$(command -v py 2>/dev/null)\"; do\n";
+    print $fh "  [ -n \"\$p\" ] && [ -x \"\$p\" ] && { PYTHON=\"\$p\"; break; }\n";
+    print $fh "done\n";
+    print $fh "if [ -z \"\$PYTHON\" ]; then\n";
+    print $fh "  echo \"ERROR: Python not found\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "\"\$PYTHON\" -m pip install --quiet openpyxl python-docx 2>/dev/null\n\n";
+
     # Phase 1: parallel discipline CLIs
-    print $fh "echo \"Phase 1: Launching " . scalar(@active) . " discipline scans...\" > \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 1: Launching $expected_count discipline scans...\" > \"$output_dir/progress.log\"\n\n";
 
     for my $grp (@active) {
         my $pfile  = "$job_dir/prompt-$grp->{key}.txt";
         my $stdout = "$output_dir/$grp->{key}-stdout.log";
         my $stderr = "$output_dir/$grp->{key}-stderr.log";
 
-        (my $var_key = uc($grp->{key})) =~ s/-/_/g;  # bash-safe var name
+        (my $var_key = uc($grp->{key})) =~ s/-/_/g;
         print $fh "PROMPT_${var_key}=\$(cat \"$pfile\")\n";
         print $fh "\"$claude\" -p \"\$PROMPT_${var_key}\" \\\n";
         print $fh "  --model sonnet \\\n";
@@ -476,32 +560,47 @@ sub spawn_review {
     print $fh "wait\n";
     print $fh "echo \"Phase 1 complete.\" >> \"$output_dir/progress.log\"\n\n";
 
-    # Check for failures
+    # Validate Phase 1
     print $fh "FOUND=0\n";
-    print $fh "for f in \"$output_dir\"/discipline-*-findings.md; do\n";
+    print $fh "for f in \"$output_dir\"/discipline-*-findings.json; do\n";
     print $fh "  [ -f \"\$f\" ] && FOUND=\$((FOUND + 1))\n";
     print $fh "done\n";
-    print $fh "if [ \"\$FOUND\" -eq 0 ]; then\n";
-    print $fh "  echo \"No discipline findings produced.\" > \"$output_dir/FAILED\"\n";
+    print $fh "if [ \"\$FOUND\" -lt 1 ]; then\n";
+    print $fh "  echo \"No discipline findings JSON produced.\" > \"$output_dir/FAILED\"\n";
     print $fh "  exit 1\n";
     print $fh "fi\n\n";
 
-    # Phase 2: synthesis
-    print $fh "echo \"Phase 2: Synthesizing reports...\" >> \"$output_dir/progress.log\"\n";
+    # Phase 2: synthesis -> review-data.json
+    print $fh "echo \"Phase 2: Synthesizing...\" >> \"$output_dir/progress.log\"\n";
     print $fh "SYNTH_PROMPT=\$(cat \"$job_dir/prompt-synthesis.txt\")\n";
     print $fh "\"$claude\" -p \"\$SYNTH_PROMPT\" \\\n";
     print $fh "  --dangerously-skip-permissions \\\n";
     print $fh "  --output-format text \\\n";
     print $fh "  > \"$output_dir/synthesis-stdout.log\" \\\n";
     print $fh "  2> \"$output_dir/synthesis-stderr.log\"\n\n";
-    print $fh "echo \"Review complete.\" >> \"$output_dir/progress.log\"\n";
+
+    print $fh "if [ ! -f \"$output_dir/review-data.json\" ]; then\n";
+    print $fh "  echo \"Synthesis did not produce review-data.json\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "echo \"Phase 2 complete.\" >> \"$output_dir/progress.log\"\n\n";
+
+    # Phase 3: local report generation
+    print $fh "echo \"Phase 3: Generating reports...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "\"\$PYTHON\" \"$ROOT/generate_reports.py\" \"$output_dir/review-data.json\"\n";
+    print $fh "PYEXIT=\$?\n";
+    print $fh "if [ \"\$PYEXIT\" -ne 0 ]; then\n";
+    print $fh "  [ ! -f \"$output_dir/FAILED\" ] && echo \"generate_reports.py exit code \$PYEXIT\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n\n";
+    print $fh "echo \"Pipeline complete.\" >> \"$output_dir/progress.log\"\n";
 
     close $fh;
     chmod 0755, $script;
 
     my $group_names = join(', ', map { $_->{name} } @active);
-    print "  Spawning parallel review for job $job_id...\n";
-    print "  Architecture: " . scalar(@active) . " parallel CLIs (Sonnet) + synthesis\n";
+    print "  Spawning 3-phase pipeline for job $job_id...\n";
+    print "  Phase 1: $expected_count CLIs -> JSON | Phase 2: Synthesis | Phase 3: Local Python\n";
     print "  Groups: $group_names\n";
     system(qq{bash "$script" &});
 }

@@ -417,7 +417,7 @@ footer {
     <div class="card">
       <h2>Review Queue</h2>
       <div class="info-box">
-        Reviews typically take 15-30 minutes depending on the number of divisions.
+        Reviews typically take 15-20 minutes depending on the number of divisions.
         This page auto-refreshes every 10 seconds.
       </div>
       <div class="table-wrap">
@@ -633,12 +633,11 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
 function buildTracker(pct, stalled) {
   const steps = [
     {at: 5,   label: 'Submitted'},
-    {at: 15,  label: 'Scanning'},
-    {at: 30,  label: 'Checklist'},
-    {at: 50,  label: 'Findings'},
-    {at: 65,  label: 'Notes'},
-    {at: 75,  label: 'Word'},
-    {at: 85,  label: 'Excel'},
+    {at: 12,  label: 'Scanned'},
+    {at: 15,  label: 'Synthesis'},
+    {at: 50,  label: 'Merged'},
+    {at: 70,  label: 'Reports'},
+    {at: 90,  label: 'Validated'},
     {at: 100, label: 'Complete'}
   ];
   // Map pct to visual bar width (0-100%)
