@@ -9,9 +9,10 @@ use strict;
 use warnings;
 use IO::Socket::INET;
 use JSON::PP;
-use File::Path qw(make_path);
+use File::Path qw(make_path remove_tree);
 use File::Basename;
 use Cwd 'abs_path';
+use Net::SMTP;
 
 my $port = $ARGV[0] || 8083;
 my $ROOT = dirname(abs_path($0));
@@ -199,6 +200,112 @@ sub build_combined_standards {
     return $outfile;
 }
 
+# --- Email notification -----------------------------------------------------
+
+my $_email_cfg;   # cached config
+
+sub load_email_config {
+    return $_email_cfg if $_email_cfg;
+    my $path = "$ROOT/email-config.json";
+    return undef unless -f $path;
+    open my $fh, '<', $path or do { warn "[EMAIL] Cannot read $path: $!\n"; return undef; };
+    local $/;
+    my $json = <$fh>;
+    close $fh;
+    $_email_cfg = eval { decode_json($json) };
+    if ($@) { warn "[EMAIL] Invalid JSON in $path: $@\n"; $_email_cfg = undef; }
+    return $_email_cfg;
+}
+
+sub send_completion_email {
+    my ($job_id, $job) = @_;
+
+    # Guard: already sent
+    return if $job->{emailSent};
+
+    # Guard: no email address provided
+    my $to = $job->{pmEmail} || '';
+    $to =~ s/^\s+|\s+$//g;
+    return unless $to =~ /.+\@.+/;
+
+    # Guard: config disabled or missing
+    my $cfg = load_email_config();
+    return unless $cfg && $cfg->{enabled};
+
+    my $project  = $job->{projectName} || 'Unnamed Project';
+    my $phase    = $job->{reviewPhase} || '';
+    my $portal   = $cfg->{portal_url} || 'http://localhost:8083/review-portal.html';
+    my @files    = @{$job->{outputFiles} || []};
+    my $file_list = join("\n", map { "  - $_" } @files) || '  (none)';
+
+    my $subject  = "Review Complete: $project" . ($phase ? " ($phase)" : '');
+    my $from_name = $cfg->{from_name} || 'WSU Review Portal';
+    my $from_addr = $cfg->{from_address} || $cfg->{smtp_user};
+    my $reply_to  = $cfg->{reply_to} || $from_addr;
+
+    my $body = "Hello,\n\n"
+        . "The compliance review for your project is complete.\n\n"
+        . "  Project:  $project\n"
+        . "  Phase:    $phase\n"
+        . "  Job ID:   $job_id\n\n"
+        . "Deliverables ready for download:\n$file_list\n\n"
+        . "Download your reports from the Review Portal:\n"
+        . "  $portal\n\n"
+        . "Navigate to the Review Queue tab and look for Job ID $job_id.\n\n"
+        . "---\n"
+        . "WSU Facilities Services\n"
+        . "Design Standards Compliance Review Portal\n";
+
+    eval {
+        my $smtp = Net::SMTP->new(
+            $cfg->{smtp_host},
+            Port    => $cfg->{smtp_port} || 587,
+            Timeout => 30,
+            Debug   => 0,
+        ) or die "Cannot connect to $cfg->{smtp_host}:$cfg->{smtp_port}: $@\n";
+
+        if ($cfg->{smtp_starttls}) {
+            $smtp->starttls() or die "STARTTLS failed: " . $smtp->message() . "\n";
+        }
+
+        if ($cfg->{smtp_user}) {
+            $smtp->auth($cfg->{smtp_user}, $cfg->{smtp_pass})
+                or die "SMTP auth failed: " . $smtp->message() . "\n";
+        }
+
+        $smtp->mail($from_addr) or die "MAIL FROM failed: " . $smtp->message() . "\n";
+        $smtp->to($to)          or die "RCPT TO failed: " . $smtp->message() . "\n";
+
+        $smtp->data()            or die "DATA failed: " . $smtp->message() . "\n";
+        $smtp->datasend("From: $from_name <$from_addr>\r\n");
+        $smtp->datasend("To: $to\r\n");
+        $smtp->datasend("Reply-To: $reply_to\r\n");
+        $smtp->datasend("Subject: $subject\r\n");
+        $smtp->datasend("MIME-Version: 1.0\r\n");
+        $smtp->datasend("Content-Type: text/plain; charset=UTF-8\r\n");
+        $smtp->datasend("\r\n");
+        $smtp->datasend($body);
+        $smtp->dataend()         or die "DATA END failed: " . $smtp->message() . "\n";
+
+        $smtp->quit();
+    };
+
+    if ($@) {
+        my $err = "$@";
+        chomp $err;
+        warn "[EMAIL] Failed for job $job_id ($to): $err\n";
+        $job->{emailError} = $err;
+        write_job_json($job_id, $job);
+        return;
+    }
+
+    $job->{emailSent} = JSON::PP::true;
+    $job->{emailSentAt} = iso_now();
+    delete $job->{emailError};
+    write_job_json($job_id, $job);
+    print "[EMAIL] Sent completion notification for job $job_id to $to\n";
+}
+
 sub check_job_status {
     my ($job_id) = @_;
     my $job = read_job_json($job_id);
@@ -223,22 +330,65 @@ sub check_job_status {
         my @out = grep { -f "$job_dir/output/$_" } @deliverables;
         $job->{outputFiles} = \@out;
         write_job_json($job_id, $job);
+        send_completion_email($job_id, $job);
     }
     elsif (-f $failed) {
         $job->{status} = 'Failed';
         $job->{progress} = 0;
         $job->{completed} = iso_now();
+
+        # Read primary error from FAILED file
         my $err = '';
-        if (open my $fh, '<', "$job_dir/output/claude-stderr.log") {
+        if (open my $fh, '<', $failed) {
             local $/; $err = <$fh>; close $fh;
         }
-        $job->{error} = substr($err, 0, 2000) || 'Unknown error';
+        $job->{error} = $err || 'Unknown error';
+
+        # Scan for non-empty stderr log files
+        my @error_logs;
+        if (opendir my $dh, "$job_dir/output") {
+            for my $f (sort readdir $dh) {
+                next unless $f =~ /-stderr\.log$/;
+                my $path = "$job_dir/output/$f";
+                if (-f $path && -s $path) {
+                    push @error_logs, $f;
+                }
+            }
+            closedir $dh;
+        }
+        $job->{errorLogs} = \@error_logs if @error_logs;
+
+        # Determine failed phase by checking which outputs exist
+        my $has_findings = 0;
+        if (opendir my $dh, "$job_dir/output") {
+            $has_findings = scalar grep { /^discipline-.*-findings\.json$/ } readdir $dh;
+            closedir $dh;
+        }
+        my $has_review_data = -f "$job_dir/output/review-data.json";
+        my $has_reports = -f "$job_dir/output/report.docx";
+
+        if (!$has_findings) {
+            $job->{failedPhase} = 'Phase 1 (discipline scanning)';
+            $job->{completedPhases} = [];
+        } elsif (!$has_review_data) {
+            $job->{failedPhase} = 'Phase 2 (synthesis)';
+            $job->{completedPhases} = ['Phase 1: Discipline scanning'];
+        } elsif (!$has_reports) {
+            $job->{failedPhase} = 'Phase 3 (report generation)';
+            $job->{completedPhases} = ['Phase 1: Discipline scanning', 'Phase 2: Synthesis'];
+        } else {
+            $job->{failedPhase} = 'Finalization';
+            $job->{completedPhases} = ['Phase 1: Discipline scanning', 'Phase 2: Synthesis', 'Phase 3: Report generation'];
+        }
+
         write_job_json($job_id, $job);
     }
     else {
         # 3-phase progress milestones:
         # Phase 1: discipline scans (5% -> 12%)
         #   5%  = Job submitted
+        #   7%  = stdout logs exist (CLIs launched, scanning)
+        #  7-12 = partial discipline findings arriving
         #  12%  = All discipline JSON files exist
         # Phase 2: synthesis (15% -> 50%)
         #  15%  = synthesis-stdout.log exists (synthesis started)
@@ -253,18 +403,28 @@ sub check_job_status {
         # 100%  = COMPLETE
 
         my $pct = 5;
+        my $detail = '';
         my $expected = $job->{expectedGroups} || 0;
 
         # Phase 1: discipline scans (5% to 12%)
         my $done = 0;
+        my $scanning = 0;
         if ($expected > 0 && opendir my $dh, "$job_dir/output") {
-            $done = scalar grep { /^discipline-.*-findings\.json$/ } readdir $dh;
+            my @files = readdir $dh;
             closedir $dh;
-            if ($done > 0 && $done >= $expected) {
+            $done = scalar grep { /^discipline-.*-findings\.json$/ } @files;
+            # Count stdout logs (excluding synthesis) as early "scanning started" signal
+            $scanning = scalar grep { /-stdout\.log$/ && !/^synthesis-/ } @files;
+
+            if ($done >= $expected) {
                 $pct = 12;
+                $detail = "All $expected disciplines scanned";
             } elsif ($done > 0) {
-                # Partial progress within Phase 1
-                $pct = 5 + int(7 * $done / $expected);
+                $pct = 7 + int(5 * $done / $expected);
+                $detail = "Scanning: $done of $expected disciplines complete";
+            } elsif ($scanning > 0) {
+                $pct = 7;
+                $detail = "Scanning $expected disciplines...";
             }
         }
 
@@ -272,27 +432,73 @@ sub check_job_status {
         my $in_synthesis = -f "$job_dir/output/synthesis-stdout.log";
         if ($in_synthesis || ($done >= $expected && $expected > 0)) {
             $pct = 15 unless $pct > 15;
-            $pct = 50  if -f "$job_dir/output/review-data.json";
+            $detail = "Synthesizing findings...";
+            if (-f "$job_dir/output/review-data.json") {
+                $pct = 50;
+                $detail = "Review data merged";
+            }
         }
 
         # Phase 3: local report generation (60% to 95%)
         if (-f "$job_dir/output/review-data.json") {
             $pct = 50 unless $pct > 50;
-            $pct = 60  if -f "$job_dir/output/report.docx";
-            $pct = 70  if -f "$job_dir/output/report.xlsx";
-            $pct = 80  if -f "$job_dir/output/checklist.txt";
-            $pct = 85  if -f "$job_dir/output/findings.txt";
-            $pct = 90  if -f "$job_dir/output/notes.txt";
-            $pct = 95  if -f "$job_dir/output/report.xlsx"
-                        && -f "$job_dir/output/report.docx"
-                        && -f "$job_dir/output/notes.txt"
-                        && -f "$job_dir/output/findings.txt"
-                        && -f "$job_dir/output/checklist.txt";
+            $detail = "Generating reports..." unless $pct > 50;
+            if (-f "$job_dir/output/report.docx") {
+                $pct = 60; $detail = "Generating reports...";
+            }
+            if (-f "$job_dir/output/report.xlsx") {
+                $pct = 70; $detail = "Generating reports...";
+            }
+            if (-f "$job_dir/output/checklist.txt") {
+                $pct = 80; $detail = "Generating reports...";
+            }
+            if (-f "$job_dir/output/findings.txt") {
+                $pct = 85; $detail = "Validating...";
+            }
+            if (-f "$job_dir/output/notes.txt") {
+                $pct = 90; $detail = "Finalizing...";
+            }
+            if (-f "$job_dir/output/report.xlsx"
+                && -f "$job_dir/output/report.docx"
+                && -f "$job_dir/output/notes.txt"
+                && -f "$job_dir/output/findings.txt"
+                && -f "$job_dir/output/checklist.txt") {
+                $pct = 95; $detail = "Finalizing...";
+            }
         }
 
         $job->{progress} = $pct;
+        $job->{progressDetail} = $detail if $detail;
 
-        # Stall detection: find newest file mtime in output/
+        # Per-discipline status
+        if ($job->{disciplineGroups} && ref($job->{disciplineGroups}) eq 'ARRAY') {
+            my @disc_status;
+            for my $grp (@{$job->{disciplineGroups}}) {
+                my $key = $grp->{key};
+                my $findings_file = "$job_dir/output/discipline-$key-findings.json";
+                my $stdout_file   = "$job_dir/output/$key-stdout.log";
+                my $status = 'pending';
+                my $completed_at;
+                if (-f $findings_file) {
+                    $status = 'complete';
+                    $completed_at = (stat $findings_file)[9];
+                } elsif (-f $stdout_file) {
+                    $status = 'scanning';
+                }
+                my $entry = { key => $key, name => $grp->{name}, status => $status };
+                $entry->{completedAt} = $completed_at if $completed_at;
+                push @disc_status, $entry;
+            }
+            $job->{disciplineStatus} = \@disc_status;
+        }
+
+        # Elapsed time
+        $job->{elapsedSeconds} = time() - $job->{submittedEpoch} if $job->{submittedEpoch};
+
+        # Phase-aware stall detection + auto-fail
+        # Phase 1 (pct < 15): stall 45min, auto-fail 60min
+        # Phase 2 (pct 15-49): stall 30min, auto-fail 45min
+        # Phase 3 (pct >= 50): stall 15min, auto-fail 30min
         my $newest_mtime = 0;
         if (opendir my $dh2, "$job_dir/output") {
             for my $f (readdir $dh2) {
@@ -304,7 +510,34 @@ sub check_job_status {
         }
         if ($newest_mtime > 0) {
             my $idle = int((time() - $newest_mtime) / 60);
-            $job->{stalledMinutes} = $idle if $idle >= 10;
+            my ($stall_thresh, $fail_thresh, $phase_name);
+            if ($pct < 15) {
+                $stall_thresh = 45; $fail_thresh = 60;
+                $phase_name = 'Phase 1 (discipline scanning)';
+            } elsif ($pct < 50) {
+                $stall_thresh = 30; $fail_thresh = 45;
+                $phase_name = 'Phase 2 (synthesis)';
+            } else {
+                $stall_thresh = 15; $fail_thresh = 30;
+                $phase_name = 'Phase 3 (report generation)';
+            }
+
+            if ($idle >= $fail_thresh) {
+                # Auto-fail: write descriptive FAILED file
+                my $fail_msg = "AUTO-FAIL: Stalled in $phase_name for $idle minutes "
+                    . "(threshold: ${fail_thresh}min). Last file activity: "
+                    . scalar(localtime($newest_mtime));
+                open my $ff, '>', "$job_dir/output/FAILED" or warn "Cannot write FAILED: $!\n";
+                if ($ff) { print $ff $fail_msg; close $ff; }
+                $job->{status} = 'Failed';
+                $job->{error} = $fail_msg;
+                $job->{failedPhase} = $phase_name;
+                $job->{completed} = iso_now();
+                write_job_json($job_id, $job);
+            } elsif ($idle >= $stall_thresh) {
+                $job->{stalledMinutes} = $idle;
+                $job->{stalledPhase} = $phase_name;
+            }
         }
     }
     return $job;
@@ -411,8 +644,10 @@ sub spawn_review {
         }
     }
 
-    # Store expected group count for progress tracking
+    # Store expected group count and discipline metadata for progress tracking
     $job->{expectedGroups} = scalar @active;
+    $job->{disciplineGroups} = [ map { { key => $_->{key}, name => $_->{name} } } @active ];
+    $job->{submittedEpoch} = time();
     write_job_json($job_id, $job);
 
     # --- Build pre-concatenated standards per discipline ---
@@ -493,103 +728,18 @@ sub spawn_review {
         close $pf;
     }
 
-    # --- Write synthesis prompt (Phase 2) ---
-    # Synthesis ONLY merges JSON → review-data.json (no report generation)
+    # --- Write executive summary prompt (Phase 2b) ---
+    # Phase 2a is now Python (synthesize.py). Phase 2b uses Haiku for the exec summary.
     {
-        my $s = "You are synthesizing a WSU Design Standards compliance review.\n";
-        $s .= $common_header;
+        my $s = "Read the file synthesis-stats.txt in the current directory.\n";
+        $s .= "Write a 2-3 paragraph executive summary for this WSU Design Standards compliance review.\n";
+        $s .= "Be professional and succinct. Address the project manager directly.\n";
+        $s .= "Cover: overall scope, key findings by severity, compliance percentage, and recommended next steps.\n";
+        $s .= "Do NOT repeat every finding — direct the reader to the full report for details.\n";
+        $s .= "Output ONLY the executive summary text, no JSON, no headings, no markdown.\n";
 
-        $s .= "The discipline-level reviews have been completed by parallel reviewers.\n";
-        $s .= "Read ALL of these discipline findings JSON files:\n";
-        for my $grp (@active) {
-            $s .= "  - reviews/$job_id/output/discipline-$grp->{key}-findings.json\n";
-        }
-        $s .= "\n";
-
-        $s .= "Your ONLY task is to produce: reviews/$job_id/output/review-data.json\n";
-        $s .= "This file merges all discipline findings into one structured JSON for local report generation.\n";
-        $s .= "Do NOT generate Word docs, Excel files, or text files. Just produce the single JSON.\n\n";
-
-        $s .= "OUTPUT SCHEMA (review-data.json):\n";
-        $s .= "{\n";
-        $s .= "  \"project\": {\n";
-        $s .= "    \"name\": \"$job->{projectName}\",\n";
-        $s .= "    \"phase\": \"$job->{reviewPhase}\",\n";
-        $s .= "    \"constructionType\": \"$job->{constructionType}\",\n";
-        $s .= "    \"reviewDate\": \"YYYY-MM-DD\"\n";
-        $s .= "  },\n";
-        $s .= "  \"disciplines\": [\n";
-        $s .= "    {\n";
-        $s .= "      \"key\": \"discipline-key\",\n";
-        $s .= "      \"name\": \"Discipline Name\",\n";
-        $s .= "      \"divisions_reviewed\": [\"XX\", ...],\n";
-        $s .= "      \"summary\": { \"total_requirements\": N, \"compliant\": N, \"deviations\": N, \"omissions\": N, \"concerns\": N }\n";
-        $s .= "    }\n";
-        $s .= "  ],\n";
-        $s .= "  \"findings\": [\n";
-        $s .= "    {\n";
-        $s .= "      \"id\": \"F-001\",\n";
-        $s .= "      \"discipline\": \"discipline-key\",\n";
-        $s .= "      \"division\": \"XX\",\n";
-        $s .= "      \"csi_code\": \"XX XX XX\",\n";
-        $s .= "      \"title\": \"Short title\",\n";
-        $s .= "      \"severity\": \"Critical|Major|Minor\",\n";
-        $s .= "      \"status\": \"D|O|X\",\n";
-        $s .= "      \"pdf_reference\": \"Page N (Sheet-ID)\",\n";
-        $s .= "      \"standard_reference\": \"WSU section citation\",\n";
-        $s .= "      \"issue\": \"Detailed description\",\n";
-        $s .= "      \"required_action\": \"What must change\"\n";
-        $s .= "    }\n";
-        $s .= "  ],\n";
-        $s .= "  \"requirements\": [\n";
-        $s .= "    {\n";
-        $s .= "      \"division\": \"XX\",\n";
-        $s .= "      \"csi_code\": \"XX XX XX\",\n";
-        $s .= "      \"requirement\": \"Requirement description\",\n";
-        $s .= "      \"status\": \"C|D|O|X\",\n";
-        $s .= "      \"finding_ref\": \"F-001 or null\",\n";
-        $s .= "      \"drawing_sheet\": \"Sheet ref or null\",\n";
-        $s .= "      \"notes\": \"\"\n";
-        $s .= "    }\n";
-        $s .= "  ],\n";
-        $s .= "  \"variances\": [\n";
-        $s .= "    {\n";
-        $s .= "      \"id\": \"V-01\",\n";
-        $s .= "      \"finding_ref\": \"F-001\",\n";
-        $s .= "      \"division\": \"XX\",\n";
-        $s .= "      \"csi_code\": \"XX XX XX\",\n";
-        $s .= "      \"description\": \"Description of variance\",\n";
-        $s .= "      \"justification\": \"Why variance may be acceptable\",\n";
-        $s .= "      \"approval_status\": \"Pending\"\n";
-        $s .= "    }\n";
-        $s .= "  ],\n";
-        $s .= "  \"narratives\": {\n";
-        $s .= "    \"executive_summary\": \"2-3 paragraph overview...\",\n";
-        $s .= "    \"methodology\": \"How the review was conducted...\",\n";
-        $s .= "    \"drawing_inventory\": \"List of sheets reviewed...\",\n";
-        $s .= "    \"applicability_notes\": \"N/A determinations...\",\n";
-        $s .= "    \"limitations\": \"Review exclusions...\"\n";
-        $s .= "  }\n";
-        $s .= "}\n\n";
-
-        $s .= "RULES:\n";
-        $s .= "- Renumber findings sequentially: F-001, F-002, ... sorted by severity desc (Critical first) then division asc\n";
-        $s .= "- Update finding_ref in requirements to match new F-numbers\n";
-        $s .= "- ALL [D] Deviation findings become variance candidates (add to variances array)\n";
-        $s .= "- Preserve ALL original PDF and standard citations exactly as the discipline reviewers wrote them\n";
-        $s .= "- Copy discipline summary objects directly from input JSON files\n";
-        $s .= "- Include ALL requirements (compliant and non-compliant) from all disciplines\n";
-        $s .= "- Severity: Critical = life safety/code; Major = significant non-compliance; Minor = best-practice\n";
-        $s .= "- Write executive_summary narrative: 2-3 paragraphs covering scope, key findings, overall compliance %\n";
-        $s .= "- Write methodology: how review was conducted (automated review against WSU design standards)\n";
-        $s .= "- Write drawing_inventory: list sheets mentioned in discipline reviews\n";
-        $s .= "- Write applicability_notes: any N/A determinations from discipline reviews\n";
-        $s .= "- Write limitations: what could not be reviewed (e.g., specifications not available)\n";
-        $s .= "- Output MUST be valid JSON\n";
-        $s .= "- If any step fails, create reviews/$job_id/output/FAILED with error description\n";
-
-        my $sfile = "$job_dir/prompt-synthesis.txt";
-        open my $sf, '>', $sfile or do { warn "Cannot write synthesis prompt: $!\n"; return; };
+        my $sfile = "$job_dir/prompt-exec-summary.txt";
+        open my $sf, '>', $sfile or do { warn "Cannot write exec summary prompt: $!\n"; return; };
         print $sf $s;
         close $sf;
     }
@@ -600,7 +750,8 @@ sub spawn_review {
         if ($dbg) {
             print $dbg "=== 3-PHASE PIPELINE ARCHITECTURE ===\n";
             print $dbg "Phase 1: " . scalar(@active) . " parallel Claude CLIs (Sonnet) -> JSON findings\n";
-            print $dbg "Phase 2: 1 Claude CLI (default model) -> review-data.json\n";
+            print $dbg "Phase 2a: Python synthesize.py -> review-data.json (zero tokens)\n";
+            print $dbg "Phase 2b: Claude CLI (Haiku) -> executive-summary.txt\n";
             print $dbg "Phase 3: Local Python (generate_reports.py) -> .docx + .xlsx + .txt\n\n";
             for my $grp (@active) {
                 print $dbg "--- prompt-$grp->{key}.txt ---\n";
@@ -609,8 +760,8 @@ sub spawn_review {
                 }
                 print $dbg "\n\n";
             }
-            print $dbg "--- prompt-synthesis.txt ---\n";
-            if (open my $rf, '<', "$job_dir/prompt-synthesis.txt") {
+            print $dbg "--- prompt-exec-summary.txt (Phase 2b) ---\n";
+            if (open my $rf, '<', "$job_dir/prompt-exec-summary.txt") {
                 local $/; my $c = <$rf>; print $dbg $c; close $rf;
             }
             print $dbg "\n\n--- Phase 3 ---\n";
@@ -630,20 +781,22 @@ sub spawn_review {
     # Script header
     print $fh "#!/bin/bash\n";
     print $fh "# 3-phase parallel review: $job_id\n";
-    print $fh "# Phase 1: $expected_count parallel discipline scans (Sonnet) -> JSON\n";
-    print $fh "# Phase 2: Synthesis -> review-data.json\n";
-    print $fh "# Phase 3: Local Python -> .docx + .xlsx + .txt (zero tokens)\n\n";
+    print $fh "# Phase 1:  $expected_count parallel discipline scans (Sonnet) -> JSON\n";
+    print $fh "# Phase 2a: Python synthesis -> review-data.json (zero tokens)\n";
+    print $fh "# Phase 2b: Claude Haiku -> executive-summary.txt\n";
+    print $fh "# Phase 3:  Local Python -> .docx + .xlsx + .txt (zero tokens)\n\n";
     print $fh "unset CLAUDECODE\n";
     print $fh "export CLAUDE_CODE_GIT_BASH_PATH='C:\\Users\\john.slagboom\\AppData\\Local\\Programs\\Git\\bin\\bash.exe'\n";
     print $fh "cd \"$ROOT\"\n\n";
 
     # Python discovery (Step 7)
     print $fh "# --- Python discovery ---\n";
+    print $fh "PYUSER=\"\${USERNAME:-\$USER}\"\n";
     print $fh "PYTHON=\"\"\n";
     print $fh "for p in \\\n";
-    print $fh "  \"/c/Users/\$USER/AppData/Local/Programs/Python/Python313/python.exe\" \\\n";
-    print $fh "  \"/c/Users/\$USER/AppData/Local/Programs/Python/Python312/python.exe\" \\\n";
-    print $fh "  \"/c/Users/\$USER/AppData/Local/Programs/Python/Python311/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python313/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python312/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python311/python.exe\" \\\n";
     print $fh "  \"/c/Python313/python.exe\" \"/c/Python312/python.exe\" \\\n";
     print $fh "  \"\$(command -v python3 2>/dev/null)\" \\\n";
     print $fh "  \"\$(command -v python 2>/dev/null)\" \\\n";
@@ -695,24 +848,37 @@ sub spawn_review {
     print $fh "  exit 1\n";
     print $fh "fi\n\n";
 
-    # Phase 2: synthesis -> review-data.json
-    print $fh "# === PHASE 2: Synthesis -> review-data.json ===\n";
-    print $fh "echo \"Phase 2: Synthesizing...\" >> \"$output_dir/progress.log\"\n";
-    my $synth_prompt = "$job_dir/prompt-synthesis.txt";
+    # Phase 2a: Python synthesis (JSON merge + renumber, zero tokens)
+    print $fh "# === PHASE 2a: Python synthesis -> review-data.json ===\n";
+    print $fh "echo \"Phase 2a: Synthesizing (Python)...\" >> \"$output_dir/progress.log\"\n";
     my $synth_stdout = "$output_dir/synthesis-stdout.log";
     my $synth_stderr = "$output_dir/synthesis-stderr.log";
-    print $fh "SYNTH_PROMPT=\$(cat \"$synth_prompt\")\n";
-    print $fh "\"$CLAUDE_PATH\" -p \"\$SYNTH_PROMPT\" \\\n";
-    print $fh "  --dangerously-skip-permissions \\\n";
-    print $fh "  --output-format text \\\n";
+    print $fh "\"\$PYTHON\" \"$ROOT/synthesize.py\" \"$output_dir\" \\\n";
     print $fh "  > \"$synth_stdout\" \\\n";
     print $fh "  2> \"$synth_stderr\"\n\n";
 
     print $fh "if [ ! -f \"$output_dir/review-data.json\" ]; then\n";
-    print $fh "  echo \"ERROR: Synthesis did not produce review-data.json\" > \"$output_dir/FAILED\"\n";
+    print $fh "  echo \"ERROR: synthesize.py did not produce review-data.json. Check synthesis-stderr.log\" > \"$output_dir/FAILED\"\n";
     print $fh "  exit 1\n";
     print $fh "fi\n";
-    print $fh "echo \"Phase 2 complete: review-data.json produced.\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 2a complete: review-data.json produced.\" >> \"$output_dir/progress.log\"\n\n";
+
+    # Phase 2b: Claude executive summary (Haiku, small + fast)
+    my $exec_prompt = "$job_dir/prompt-exec-summary.txt";
+    my $exec_stdout = "$output_dir/executive-summary.txt";
+    my $exec_stderr = "$output_dir/summary-stderr.log";
+    print $fh "# === PHASE 2b: Claude executive summary (Haiku) ===\n";
+    print $fh "echo \"Phase 2b: Generating executive summary...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "EXEC_PROMPT=\$(cat \"$exec_prompt\")\n";
+    print $fh "cd \"$output_dir\"\n";
+    print $fh "\"$CLAUDE_PATH\" -p \"\$EXEC_PROMPT\" \\\n";
+    print $fh "  --model haiku \\\n";
+    print $fh "  --dangerously-skip-permissions \\\n";
+    print $fh "  --output-format text \\\n";
+    print $fh "  > \"$exec_stdout\" \\\n";
+    print $fh "  2> \"$exec_stderr\"\n";
+    print $fh "cd \"$ROOT\"\n";
+    print $fh "echo \"Phase 2b complete.\" >> \"$output_dir/progress.log\"\n\n";
 
     # Phase 3: local Python report generation
     print $fh "# === PHASE 3: Local report generation (zero tokens) ===\n";
@@ -733,12 +899,26 @@ sub spawn_review {
 
     my $group_names = join(', ', map { $_->{name} } @active);
     print "[" . localtime() . "] Spawning 3-phase pipeline for job $job_id\n";
-    print "  Phase 1: " . scalar(@active) . " parallel CLIs (Sonnet) -> JSON\n";
-    print "  Phase 2: Synthesis -> review-data.json\n";
-    print "  Phase 3: Local Python -> reports\n";
+    print "  Phase 1:  " . scalar(@active) . " parallel CLIs (Sonnet) -> JSON\n";
+    print "  Phase 2a: Python synthesis -> review-data.json\n";
+    print "  Phase 2b: Claude Haiku -> executive-summary.txt\n";
+    print "  Phase 3:  Local Python -> reports\n";
     print "  Groups: $group_names\n";
     print "  Script: $script\n";
-    system(qq{bash "$script" &});
+    # Write a tiny launcher that nohup's the main script in background.
+    # MSYS Perl's system() goes through cmd.exe which doesn't support &,
+    # so we create a launcher script that bash can run and background properly.
+    (my $script_bash = $script) =~ s{\\}{/}g;
+    my $launcher = "$job_dir/launch.sh";
+    open my $lfh, '>', $launcher or do {
+        warn "Cannot write launcher: $!\n";
+        return;
+    };
+    print $lfh "#!/bin/bash\n";
+    print $lfh "nohup bash \"$script_bash\" > /dev/null 2>&1 &\n";
+    close $lfh;
+    chmod 0755, $launcher;
+    system("bash \"$launcher\"");
 }
 
 # --- Request handler --------------------------------------------------------
@@ -748,7 +928,7 @@ while (my $c = $srv->accept) {
 
     # Read request line
     my $req_line = <$c>;
-    next unless $req_line && $req_line =~ m{^(GET|POST|OPTIONS)\s+(/\S*)\s+HTTP};
+    next unless $req_line && $req_line =~ m{^(GET|POST|DELETE|OPTIONS)\s+(/\S*)\s+HTTP};
     my ($method, $path) = ($1, $2);
     $path =~ s/\?.*//;  # strip query string
 
@@ -766,7 +946,7 @@ while (my $c = $srv->accept) {
     if ($method eq 'OPTIONS') {
         print $c "HTTP/1.0 204 No Content\r\n"
             . "Access-Control-Allow-Origin: *\r\n"
-            . "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+            . "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n"
             . "Access-Control-Allow-Headers: Content-Type\r\n"
             . "\r\n";
         close $c;
@@ -855,19 +1035,38 @@ while (my $c = $srv->accept) {
         next;
     }
 
-    # GET /api/jobs — list all jobs
+    # GET /api/jobs — list all jobs (wrapped with stats)
     if ($method eq 'GET' && $path eq '/api/jobs') {
         my @jobs;
+        my $total_bytes = 0;
         if (opendir my $dh, $REVIEWS_DIR) {
             while (my $dir = readdir $dh) {
                 next if $dir =~ /^\./;
                 my $j = check_job_status($dir);
-                push @jobs, $j if $j;
+                if ($j) {
+                    push @jobs, $j;
+                    # Sum file sizes (2 levels: job dir + output/ + combined/)
+                    my $job_path = "$REVIEWS_DIR/$dir";
+                    for my $subdir ($job_path, "$job_path/output", "$job_path/combined") {
+                        if (opendir my $sdh, $subdir) {
+                            for my $f (readdir $sdh) {
+                                next if $f =~ /^\./;
+                                my $sz = (stat "$subdir/$f")[7] || 0;
+                                $total_bytes += $sz;
+                            }
+                            closedir $sdh;
+                        }
+                    }
+                }
             }
             closedir $dh;
         }
         @jobs = sort { ($b->{submitted} || '') cmp ($a->{submitted} || '') } @jobs;
-        send_json($c, 200, \@jobs);
+        send_json($c, 200, {
+            jobs       => \@jobs,
+            totalJobs  => scalar @jobs,
+            totalBytes => $total_bytes,
+        });
         close $c;
         next;
     }
@@ -878,6 +1077,21 @@ while (my $c = $srv->accept) {
         my $j = check_job_status($id);
         if ($j) {
             send_json($c, 200, $j);
+        } else {
+            send_json($c, 404, { error => 'Job not found' });
+        }
+        close $c;
+        next;
+    }
+
+    # DELETE /api/jobs/{id} — delete a job and all its files
+    if ($method eq 'DELETE' && $path =~ m{^/api/jobs/([a-zA-Z0-9_-]+)$}) {
+        my $id = $1;
+        my $job_dir = "$REVIEWS_DIR/$id";
+        if (-f "$job_dir/job.json") {
+            remove_tree($job_dir);
+            print "[" . localtime() . "] Deleted job $id\n";
+            send_json($c, 200, { deleted => $id });
         } else {
             send_json($c, 404, { error => 'Job not found' });
         }
@@ -901,6 +1115,30 @@ while (my $c = $srv->accept) {
             send_response($c, 200, $ct, $data);
         } else {
             send_json($c, 404, { error => 'File not found' });
+        }
+        close $c;
+        next;
+    }
+
+    # GET /api/logs/{id}/{filename} — serve log/txt files from output dir
+    if ($method eq 'GET' && $path =~ m{^/api/logs/([a-zA-Z0-9_-]+)/([a-zA-Z0-9._-]+)$}) {
+        my ($id, $filename) = ($1, $2);
+        $filename =~ s/[^a-zA-Z0-9._-]//g;  # sanitize
+        # Restrict to .log and .txt files only (security)
+        if ($filename !~ /\.(log|txt)$/) {
+            send_json($c, 400, { error => 'Only .log and .txt files can be downloaded' });
+            close $c; next;
+        }
+        my $file = "$REVIEWS_DIR/$id/output/$filename";
+        if (-f $file) {
+            open my $fh, '<:raw', $file or do {
+                send_json($c, 500, { error => 'Cannot read file' });
+                close $c; next;
+            };
+            local $/; my $data = <$fh>; close $fh;
+            send_response($c, 200, 'text/plain', $data);
+        } else {
+            send_json($c, 404, { error => 'Log file not found' });
         }
         close $c;
         next;

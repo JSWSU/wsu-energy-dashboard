@@ -201,6 +201,13 @@ tr:hover td { background: var(--table-hover); }
 html.dark .job-status.processing { background: #78350f; color: #fbbf24; }
 html.dark .job-status.complete { background: #064e3b; color: #34d399; }
 html.dark .job-status.failed { background: #7f1d1d; color: #f87171; }
+/* Email status icon */
+.email-icon {
+  display: inline-block; margin-left: .4rem; font-size: .72rem; cursor: default;
+  vertical-align: middle;
+}
+.email-icon.sent { color: var(--green); }
+.email-icon.error { color: var(--red); }
 /* Progress bar tracker */
 .tracker { position: relative; margin-top: .5rem; min-width: 320px; }
 .tracker-bar {
@@ -240,6 +247,87 @@ html.dark .job-status.failed { background: #7f1d1d; color: #f87171; }
 .tracker-stall::before { content: '\u26A0'; }
 html.dark .tracker-bar { background: #374151; }
 html.dark .tracker-check.pending { color: var(--text-light); }
+.tracker-detail {
+  text-align: center; font-size: .62rem; font-style: italic;
+  color: var(--text-light); margin-top: .25rem;
+}
+
+/* Discipline Progress */
+.disc-toggle {
+  font-size: .65rem; color: var(--primary); cursor: pointer; user-select: none;
+  margin-top: .3rem; display: inline-flex; align-items: center; gap: .25rem;
+}
+html.dark .disc-toggle { color: var(--accent); }
+.disc-toggle:hover { text-decoration: underline; }
+.disc-toggle::before { content: '\25B6'; font-size: .5rem; transition: transform .2s; display: inline-block; }
+.disc-toggle.open::before { transform: rotate(90deg); }
+.disc-detail { display: none; margin-top: .3rem; padding: .4rem .6rem; background: var(--table-head-bg); border-radius: 6px; }
+.disc-detail.open { display: block; }
+.disc-item { display: flex; align-items: center; gap: .4rem; font-size: .65rem; padding: .15rem 0; }
+.disc-icon { width: 14px; height: 14px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: .55rem; font-weight: 700; flex-shrink: 0; }
+.disc-icon.complete { background: var(--green); color: #fff; }
+.disc-icon.scanning { background: var(--accent); color: #fff; animation: pulse 1.5s infinite; }
+.disc-icon.pending { background: var(--border); color: var(--text-light); }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+.disc-name { color: var(--text); }
+.disc-time { color: var(--text-light); font-size: .6rem; margin-left: auto; }
+.elapsed-time { font-size: .62rem; color: var(--text-light); margin-top: .2rem; }
+
+/* Failed job detail */
+.fail-phase { font-size: .7rem; color: var(--red); font-weight: 600; margin-top: .3rem; }
+.fail-completed { font-size: .65rem; color: var(--green); margin-top: .2rem; }
+.fail-completed span::before { content: '\2713 '; }
+.error-preview { font-size: .65rem; color: var(--text-light); margin-top: .3rem; max-height: 2.4em; overflow: hidden; }
+.error-toggle {
+  font-size: .62rem; color: var(--primary); cursor: pointer; margin-top: .2rem;
+  user-select: none;
+}
+html.dark .error-toggle { color: var(--accent); }
+.error-toggle:hover { text-decoration: underline; }
+.error-full {
+  display: none; font-family: monospace; font-size: .65rem; white-space: pre-wrap;
+  max-height: 200px; overflow-y: auto; background: var(--table-head-bg); border-radius: 4px;
+  padding: .5rem; margin-top: .3rem; color: var(--text);
+}
+.error-full.open { display: block; }
+.log-links { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .3rem; }
+.log-links a {
+  font-size: .62rem; color: var(--primary); text-decoration: none;
+  padding: .1rem .4rem; border: 1px solid var(--border); border-radius: 4px;
+}
+.log-links a:hover { background: var(--table-hover); }
+html.dark .log-links a { color: var(--accent); }
+
+/* Queue Controls */
+.queue-controls {
+  display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; flex-wrap: wrap;
+}
+.queue-search {
+  flex: 1; min-width: 180px; padding: .5rem .75rem; border: 2px solid var(--border);
+  border-radius: 8px; font-size: .82rem; background: var(--card-bg); color: var(--text); outline: none;
+}
+.queue-search:focus { border-color: var(--primary); }
+.filter-bar { display: flex; gap: .35rem; flex-wrap: wrap; }
+.filter-btn {
+  padding: .3rem .7rem; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--card-bg); color: var(--text-light); font-size: .72rem; cursor: pointer;
+  font-weight: 500; transition: all .15s;
+}
+.filter-btn:hover { background: var(--table-hover); color: var(--text); }
+.filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+html.dark .filter-btn.active { background: var(--accent); color: #1f2937; border-color: var(--accent); }
+.btn-delete {
+  padding: .2rem .45rem; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--card-bg); color: var(--text-light); font-size: .7rem; cursor: pointer;
+  line-height: 1;
+}
+.btn-delete:hover { background: #fef2f2; color: var(--red); border-color: var(--red); }
+html.dark .btn-delete:hover { background: #7f1d1d; color: #f87171; border-color: #f87171; }
+.queue-footer {
+  margin-top: .75rem; padding: .5rem .75rem; background: var(--table-head-bg);
+  border-radius: 6px; font-size: .72rem; color: var(--text-light);
+  display: flex; gap: 1rem; flex-wrap: wrap;
+}
 
 /* Download Links */
 .download-links { display: flex; flex-wrap: wrap; gap: .3rem; }
@@ -420,6 +508,15 @@ footer {
         Reviews typically take 15-20 minutes depending on the number of divisions.
         This page auto-refreshes every 10 seconds.
       </div>
+      <div class="queue-controls">
+        <input type="text" class="queue-search" id="queueSearch" placeholder="Search by project name or job ID..." oninput="applyQueueFilters()">
+        <div class="filter-bar">
+          <button class="filter-btn active" onclick="setStatusFilter('all', this)">All</button>
+          <button class="filter-btn" onclick="setStatusFilter('processing', this)">Processing</button>
+          <button class="filter-btn" onclick="setStatusFilter('complete', this)">Complete</button>
+          <button class="filter-btn" onclick="setStatusFilter('failed', this)">Failed</button>
+        </div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -431,13 +528,15 @@ footer {
               <th>Submitted</th>
               <th style="min-width:340px">Status</th>
               <th>Downloads</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="queueBody">
-            <tr><td colspan="7" style="text-align:center;color:var(--text-light)">Loading...</td></tr>
+            <tr><td colspan="8" style="text-align:center;color:var(--text-light)">Loading...</td></tr>
           </tbody>
         </table>
       </div>
+      <div class="queue-footer" id="queueFooter"></div>
     </div>
   </div>
 
@@ -629,19 +728,48 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
   btn.textContent = 'Submit for Review';
 });
 
+// --- Elapsed time formatter ---
+function fmtElapsed(seconds) {
+  if (!seconds || seconds < 0) return '';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return h + 'h ' + m + 'm';
+  if (m > 0) return m + 'm ' + s + 's';
+  return s + 's';
+}
+
+// --- Discipline progress detail ---
+function buildDiscDetail(job) {
+  if (!job.disciplineStatus || !job.disciplineStatus.length) return '';
+  const id = 'disc-' + job.id;
+  let html = '<div class="disc-toggle" onclick="this.classList.toggle(\'open\');document.getElementById(\'' + id + '\').classList.toggle(\'open\')">Show disciplines</div>';
+  html += '<div class="disc-detail" id="' + id + '">';
+  for (const d of job.disciplineStatus) {
+    const icon = d.status === 'complete' ? '\u2713' : d.status === 'scanning' ? '\u2026' : '\u2022';
+    const time = d.completedAt ? new Date(d.completedAt * 1000).toLocaleTimeString() : '';
+    html += '<div class="disc-item">';
+    html += '<span class="disc-icon ' + d.status + '">' + icon + '</span>';
+    html += '<span class="disc-name">' + (d.name || d.key) + '</span>';
+    if (time) html += '<span class="disc-time">' + time + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 // --- Progress bar tracker ---
-function buildTracker(pct, stalled) {
+function buildTracker(pct, stalled, detail, stalledPhase) {
   const steps = [
     {at: 5,   label: 'Submitted'},
+    {at: 7,   label: 'Scanning'},
     {at: 12,  label: 'Scanned'},
-    {at: 15,  label: 'Synthesis'},
+    {at: 15,  label: 'Synthesizing'},
     {at: 50,  label: 'Merged'},
-    {at: 70,  label: 'Reports'},
-    {at: 90,  label: 'Validated'},
+    {at: 70,  label: 'Generating'},
+    {at: 90,  label: 'Finalizing'},
     {at: 100, label: 'Complete'}
   ];
-  // Map pct to visual bar width (0-100%)
-  // First step (Submitted at 5) maps to ~6%, last (Complete at 100) maps to 100%
   const barPct = Math.min(100, Math.max(0, pct));
   const fillClass = pct >= 100 ? ' complete' : (stalled ? ' stalled' : '');
   let html = '<div class="tracker">';
@@ -660,50 +788,143 @@ function buildTracker(pct, stalled) {
     html += '</div>';
   }
   html += '</div>';
+  if (detail) {
+    html += '<div class="tracker-detail">' + detail + '</div>';
+  }
   if (stalled) {
-    html += '<div class="tracker-stall">Stalled — no progress for ' + stalled + ' min</div>';
+    const phaseInfo = stalledPhase ? ' in ' + stalledPhase : '';
+    html += '<div class="tracker-stall">Stalled' + phaseInfo + ' — no progress for ' + stalled + ' min</div>';
   }
   html += '</div>';
   return html;
+}
+
+// --- Queue state ---
+let queueData = [];
+let statusFilter = 'all';
+let queueStats = { totalJobs: 0, totalBytes: 0 };
+
+function fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+  return (n / 1073741824).toFixed(2) + ' GB';
+}
+
+function setStatusFilter(filter, btn) {
+  statusFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyQueueFilters();
+}
+
+function applyQueueFilters() {
+  const search = (document.getElementById('queueSearch').value || '').toLowerCase();
+  const filtered = queueData.filter(j => {
+    if (statusFilter !== 'all' && (j.status || '').toLowerCase() !== statusFilter) return false;
+    if (search) {
+      const name = (j.projectName || '').toLowerCase();
+      const id = (j.id || '').toLowerCase();
+      if (!name.includes(search) && !id.includes(search)) return false;
+    }
+    return true;
+  });
+  renderQueue(filtered);
+}
+
+async function deleteJob(jobId, name) {
+  if (!confirm('Delete job ' + jobId + (name ? ' (' + name + ')' : '') + '?\n\nThis permanently removes all files.')) return;
+  try {
+    const resp = await fetch('/api/jobs/' + jobId, { method: 'DELETE' });
+    if (resp.ok) refreshQueue();
+  } catch (err) { /* retry next cycle */ }
+}
+
+function renderQueue(jobs) {
+  const tbody = document.getElementById('queueBody');
+  if (!jobs.length) {
+    const msg = queueData.length ? 'No matching reviews.' : 'No reviews submitted yet.';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-light)">' + msg + '</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = jobs.map(j => {
+    const sc = (j.status || '').toLowerCase();
+    const divs = (j.divisions || []).join(', ');
+    const time = j.submitted ? new Date(j.submitted).toLocaleString() : '-';
+    let dl = '-';
+    if (sc === 'complete' && j.outputFiles && j.outputFiles.length) {
+      dl = '<div class="download-links">' +
+        j.outputFiles.map(f =>
+          '<a href="/api/download/' + j.id + '/' + f + '" target="_blank">' + f + '</a>'
+        ).join('') + '</div>';
+    } else if (sc === 'failed') {
+      const errId = 'err-' + j.id;
+      let failHtml = '';
+      if (j.failedPhase) {
+        failHtml += '<div class="fail-phase">Failed in ' + j.failedPhase + '</div>';
+      }
+      if (j.completedPhases && j.completedPhases.length) {
+        failHtml += '<div class="fail-completed">' +
+          j.completedPhases.map(p => '<span>' + p + '</span>').join('<br>') + '</div>';
+      }
+      const shortErr = (j.error || 'Check logs').substring(0, 150);
+      failHtml += '<div class="error-preview">' + shortErr.replace(/</g,'&lt;') + '</div>';
+      failHtml += '<div class="error-toggle" onclick="document.getElementById(\'' + errId + '\').classList.toggle(\'open\');this.textContent=this.textContent===\'Show full error\'?\'Hide error\':\'Show full error\'">Show full error</div>';
+      failHtml += '<div class="error-full" id="' + errId + '">' + (j.error || '').replace(/</g,'&lt;') + '</div>';
+      if (j.errorLogs && j.errorLogs.length) {
+        failHtml += '<div class="log-links">' +
+          j.errorLogs.map(f => '<a href="/api/logs/' + j.id + '/' + f + '" target="_blank">' + f + '</a>').join('') +
+          '</div>';
+      }
+      dl = failHtml;
+    }
+    const delBtn = '<button class="btn-delete" onclick="deleteJob(\'' + j.id + '\',\'' +
+      (j.projectName || '').replace(/'/g,"\\'") + '\')" title="Delete job">\uD83D\uDDD1</button>';
+    return '<tr>' +
+      '<td style="font-size:.75rem;white-space:nowrap">' + (j.id || '') + '</td>' +
+      '<td>' + (j.projectName || '') + '</td>' +
+      '<td>' + (j.reviewPhase || '') + '</td>' +
+      '<td style="font-size:.75rem">' + divs + '</td>' +
+      '<td style="font-size:.75rem;white-space:nowrap">' + time + '</td>' +
+      '<td><span class="job-status ' + sc + '">' + (j.status || '') + '</span>' +
+        (j.emailSent ? '<span class="email-icon sent" title="Email sent ' + (j.emailSentAt || '') + '">&#9993;</span>'
+         : j.emailError ? '<span class="email-icon error" title="Email failed: ' + j.emailError.replace(/"/g,'&quot;') + '">&#9993;</span>'
+         : '') +
+        (sc === 'processing' && j.progress ? buildTracker(j.progress, j.stalledMinutes, j.progressDetail, j.stalledPhase) +
+          (j.elapsedSeconds ? '<div class="elapsed-time">Elapsed: ' + fmtElapsed(j.elapsedSeconds) + '</div>' : '') +
+          buildDiscDetail(j) : '') +
+        (sc === 'complete' ? buildTracker(100) : '') + '</td>' +
+      '<td>' + dl + '</td>' +
+      '<td>' + delBtn + '</td></tr>';
+  }).join('');
 }
 
 // --- Queue Polling ---
 async function refreshQueue() {
   try {
     const resp = await fetch('/api/jobs');
-    const jobs = await resp.json();
-    const tbody = document.getElementById('queueBody');
-
-    if (!jobs.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-light)">No reviews submitted yet.</td></tr>';
-      return;
+    const result = await resp.json();
+    // Backward compat: handle both array and {jobs, totalJobs, totalBytes}
+    queueData = Array.isArray(result) ? result : (result.jobs || []);
+    queueStats = {
+      totalJobs: result.totalJobs || queueData.length,
+      totalBytes: result.totalBytes || 0,
+    };
+    // Update footer
+    const footer = document.getElementById('queueFooter');
+    if (footer) {
+      const proc = queueData.filter(j => (j.status||'').toLowerCase() === 'processing').length;
+      const comp = queueData.filter(j => (j.status||'').toLowerCase() === 'complete').length;
+      const fail = queueData.filter(j => (j.status||'').toLowerCase() === 'failed').length;
+      footer.innerHTML =
+        '<span>Total: ' + queueStats.totalJobs + ' jobs</span>' +
+        '<span>Processing: ' + proc + '</span>' +
+        '<span>Complete: ' + comp + '</span>' +
+        '<span>Failed: ' + fail + '</span>' +
+        (queueStats.totalBytes ? '<span>Disk: ' + fmtBytes(queueStats.totalBytes) + '</span>' : '');
     }
-
-    tbody.innerHTML = jobs.map(j => {
-      const sc = (j.status || '').toLowerCase();
-      const divs = (j.divisions || []).join(', ');
-      const time = j.submitted ? new Date(j.submitted).toLocaleString() : '-';
-      let dl = '-';
-      if (sc === 'complete' && j.outputFiles && j.outputFiles.length) {
-        dl = '<div class="download-links">' +
-          j.outputFiles.map(f =>
-            '<a href="/api/download/' + j.id + '/' + f + '" target="_blank">' + f + '</a>'
-          ).join('') + '</div>';
-      } else if (sc === 'failed') {
-        dl = '<span style="color:var(--red);font-size:.72rem">' +
-          ((j.error || 'Check logs').substring(0, 120)) + '</span>';
-      }
-      return '<tr>' +
-        '<td style="font-size:.75rem;white-space:nowrap">' + (j.id || '') + '</td>' +
-        '<td>' + (j.projectName || '') + '</td>' +
-        '<td>' + (j.reviewPhase || '') + '</td>' +
-        '<td style="font-size:.75rem">' + divs + '</td>' +
-        '<td style="font-size:.75rem;white-space:nowrap">' + time + '</td>' +
-        '<td><span class="job-status ' + sc + '">' + (j.status || '') + '</span>' +
-          (sc === 'processing' && j.progress ? buildTracker(j.progress, j.stalledMinutes) : '') +
-          (sc === 'complete' ? buildTracker(100) : '') + '</td>' +
-        '<td>' + dl + '</td></tr>';
-    }).join('');
+    applyQueueFilters();
   } catch (err) {
     // Silently retry next cycle
   }

@@ -104,11 +104,14 @@ def validate(data, findings):
 
     # Count findings by severity
     sev_counts = {"Critical": 0, "Major": 0, "Minor": 0}
-    for f in findings:
+    for i, f in enumerate(findings):
         s = f.get("severity", "")
         if s in sev_counts:
             sev_counts[s] += 1
-    total_nc = sum(sev_counts.values())
+        elif s:
+            errors.append(f"Finding {f.get('id','?')}: unknown severity '{s}'")
+        else:
+            errors.append(f"Finding {f.get('id','?')}: missing severity")
 
     # Count non-compliant from discipline summaries
     disc_nc = 0
@@ -129,15 +132,18 @@ def validate(data, findings):
                 f"= {row_c+row_d+row_o+row_x} != Total({row_total})"
             )
 
-    # Severity total = findings count
-    if total_nc != len(findings):
-        errors.append(f"Severity total ({total_nc}) != findings count ({len(findings)})")
+    # Findings must have at least 1 entry
+    if len(findings) == 0:
+        errors.append("No findings in findings array")
 
-    # Discipline non-compliant = severity total
-    if disc_nc != total_nc:
-        errors.append(f"Discipline non-compliant ({disc_nc}) != severity total ({total_nc})")
+    # Findings cannot exceed discipline non-compliant total
+    if len(findings) > disc_nc and disc_nc > 0:
+        errors.append(
+            f"Findings count ({len(findings)}) exceeds discipline "
+            f"non-compliant total ({disc_nc})"
+        )
 
-    # Requirements list count should match disc_total_req
+    # Requirements list count should match disc_total_req (if provided)
     req_count = len(data.get("requirements", []))
     if req_count > 0 and req_count != disc_total_req:
         errors.append(f"Requirements list ({req_count}) != discipline total ({disc_total_req})")
@@ -907,7 +913,7 @@ def generate_docx(data, findings, output_dir):
                 t.rows[0].cells[c].text = h
             for i, f in enumerate(pf, 1):
                 vals = [f["id"], f.get("division", ""),
-                        (f.get("title", "") or f.get("issue", ""))[:60], sev_level]
+                        (f.get("title") or f.get("issue") or "")[:60], sev_level]
                 for c, v in enumerate(vals):
                     t.rows[i].cells[c].text = v
             format_table(t)
@@ -982,6 +988,15 @@ def main():
     print(f"Reading: {json_path}")
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # Override executive_summary from executive-summary.txt if present
+    summary_file = os.path.join(output_dir, "executive-summary.txt")
+    if os.path.isfile(summary_file):
+        with open(summary_file, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+            if text and text != "PLACEHOLDER":
+                data.setdefault("narratives", {})["executive_summary"] = text
+                print(f"  Using executive summary from {summary_file}")
 
     # Sort findings by severity then division
     findings = sorted(data.get("findings", []), key=sev_sort_key)

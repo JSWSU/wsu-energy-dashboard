@@ -14,6 +14,7 @@ use JSON::PP;
 use File::Path qw(make_path);
 use File::Basename;
 use Cwd 'abs_path';
+use Net::SMTP;
 
 my $ROOT = dirname(abs_path($0));
 my $CONFIG_FILE = "$ROOT/review-config.json";
@@ -522,11 +523,12 @@ sub spawn_review {
 
     # Python discovery
     print $fh "# --- Python discovery ---\n";
+    print $fh "PYUSER=\"\${USERNAME:-\$USER}\"\n";
     print $fh "PYTHON=\"\"\n";
     print $fh "for p in \\\n";
-    print $fh "  \"/c/Users/\$USER/AppData/Local/Programs/Python/Python313/python.exe\" \\\n";
-    print $fh "  \"/c/Users/\$USER/AppData/Local/Programs/Python/Python312/python.exe\" \\\n";
-    print $fh "  \"/c/Users/\$USER/AppData/Local/Programs/Python/Python311/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python313/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python312/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python311/python.exe\" \\\n";
     print $fh "  \"/c/Python313/python.exe\" \"/c/Python312/python.exe\" \\\n";
     print $fh "  \"\$(command -v python3 2>/dev/null)\" \\\n";
     print $fh "  \"\$(command -v python 2>/dev/null)\" \\\n";
@@ -602,7 +604,19 @@ sub spawn_review {
     print "  Spawning 3-phase pipeline for job $job_id...\n";
     print "  Phase 1: $expected_count CLIs -> JSON | Phase 2: Synthesis | Phase 3: Local Python\n";
     print "  Groups: $group_names\n";
-    system(qq{bash "$script" &});
+    # Write a tiny launcher that nohup's the main script in background.
+    # MSYS Perl's system() goes through cmd.exe which doesn't support &.
+    (my $script_bash = $script) =~ s{\\}{/}g;
+    my $launcher = "$job_dir/launch.sh";
+    open my $lfh, '>', $launcher or do {
+        warn "Cannot write launcher: $!\n";
+        return;
+    };
+    print $lfh "#!/bin/bash\n";
+    print $lfh "nohup bash \"$script_bash\" > /dev/null 2>&1 &\n";
+    close $lfh;
+    chmod 0755, $launcher;
+    system("bash \"$launcher\"");
 }
 
 # --- Job JSON helpers -------------------------------------------------------
@@ -624,6 +638,112 @@ sub read_job_json {
     my $json = <$fh>;
     close $fh;
     return decode_json($json);
+}
+
+# --- Email notification -----------------------------------------------------
+
+my $_email_cfg;   # cached config
+
+sub load_email_config {
+    return $_email_cfg if $_email_cfg;
+    my $path = "$ROOT/email-config.json";
+    return undef unless -f $path;
+    open my $fh, '<', $path or do { warn "[EMAIL] Cannot read $path: $!\n"; return undef; };
+    local $/;
+    my $json = <$fh>;
+    close $fh;
+    $_email_cfg = eval { decode_json($json) };
+    if ($@) { warn "[EMAIL] Invalid JSON in $path: $@\n"; $_email_cfg = undef; }
+    return $_email_cfg;
+}
+
+sub send_completion_email {
+    my ($job_id, $job) = @_;
+
+    # Guard: already sent
+    return if $job->{emailSent};
+
+    # Guard: no email address provided
+    my $to = $job->{pmEmail} || '';
+    $to =~ s/^\s+|\s+$//g;
+    return unless $to =~ /.+\@.+/;
+
+    # Guard: config disabled or missing
+    my $cfg = load_email_config();
+    return unless $cfg && $cfg->{enabled};
+
+    my $project  = $job->{projectName} || 'Unnamed Project';
+    my $phase    = $job->{reviewPhase} || '';
+    my $portal   = $cfg->{portal_url} || 'http://localhost:8083/review-portal.html';
+    my @files    = @{$job->{outputFiles} || []};
+    my $file_list = join("\n", map { "  - $_" } @files) || '  (none)';
+
+    my $subject  = "Review Complete: $project" . ($phase ? " ($phase)" : '');
+    my $from_name = $cfg->{from_name} || 'WSU Review Portal';
+    my $from_addr = $cfg->{from_address} || $cfg->{smtp_user};
+    my $reply_to  = $cfg->{reply_to} || $from_addr;
+
+    my $body = "Hello,\n\n"
+        . "The compliance review for your project is complete.\n\n"
+        . "  Project:  $project\n"
+        . "  Phase:    $phase\n"
+        . "  Job ID:   $job_id\n\n"
+        . "Deliverables ready for download:\n$file_list\n\n"
+        . "Download your reports from the Review Portal:\n"
+        . "  $portal\n\n"
+        . "Navigate to the Review Queue tab and look for Job ID $job_id.\n\n"
+        . "---\n"
+        . "WSU Facilities Services\n"
+        . "Design Standards Compliance Review Portal\n";
+
+    eval {
+        my $smtp = Net::SMTP->new(
+            $cfg->{smtp_host},
+            Port    => $cfg->{smtp_port} || 587,
+            Timeout => 30,
+            Debug   => 0,
+        ) or die "Cannot connect to $cfg->{smtp_host}:$cfg->{smtp_port}: $@\n";
+
+        if ($cfg->{smtp_starttls}) {
+            $smtp->starttls() or die "STARTTLS failed: " . $smtp->message() . "\n";
+        }
+
+        if ($cfg->{smtp_user}) {
+            $smtp->auth($cfg->{smtp_user}, $cfg->{smtp_pass})
+                or die "SMTP auth failed: " . $smtp->message() . "\n";
+        }
+
+        $smtp->mail($from_addr) or die "MAIL FROM failed: " . $smtp->message() . "\n";
+        $smtp->to($to)          or die "RCPT TO failed: " . $smtp->message() . "\n";
+
+        $smtp->data()            or die "DATA failed: " . $smtp->message() . "\n";
+        $smtp->datasend("From: $from_name <$from_addr>\r\n");
+        $smtp->datasend("To: $to\r\n");
+        $smtp->datasend("Reply-To: $reply_to\r\n");
+        $smtp->datasend("Subject: $subject\r\n");
+        $smtp->datasend("MIME-Version: 1.0\r\n");
+        $smtp->datasend("Content-Type: text/plain; charset=UTF-8\r\n");
+        $smtp->datasend("\r\n");
+        $smtp->datasend($body);
+        $smtp->dataend()         or die "DATA END failed: " . $smtp->message() . "\n";
+
+        $smtp->quit();
+    };
+
+    if ($@) {
+        my $err = "$@";
+        chomp $err;
+        warn "[EMAIL] Failed for job $job_id ($to): $err\n";
+        $job->{emailError} = $err;
+        write_job_json($job_id, $job);
+        return;
+    }
+
+    $job->{emailSent} = JSON::PP::true;
+    $job->{emailSentAt} = iso_now();
+    delete $job->{emailError};
+    write_job_json($job_id, $job);
+    print "[EMAIL] Sent completion notification for job $job_id to $to\n";
 }
 
 # --- Poll cycle -------------------------------------------------------------
@@ -679,6 +799,7 @@ sub poll_cycle {
                 $job->{completed} = iso_now();
                 $job->{outputFiles} = \@uploaded;
                 write_job_json($dir, $job);
+                send_completion_email($dir, $job);
             }
             elsif (-f $failed_file) {
                 print "  Job $dir: FAILED\n";
