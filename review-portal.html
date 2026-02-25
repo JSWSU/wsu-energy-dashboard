@@ -711,6 +711,12 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
       zone.classList.remove('has-file');
       document.querySelector('[data-tab="queue"]').click();
       refreshQueue();
+    } else if (resp.status === 409) {
+      showErr(data.error || 'A review is already running. Please wait for it to complete.');
+      if (data.runningJob) {
+        document.querySelector('[data-tab="queue"]').click();
+        refreshQueue();
+      }
     } else {
       showErr(data.error || 'Unknown error');
     }

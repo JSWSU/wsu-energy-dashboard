@@ -421,10 +421,10 @@ sub check_job_status {
                 $detail = "All $expected disciplines scanned";
             } elsif ($done > 0) {
                 $pct = 7 + int(5 * $done / $expected);
-                $detail = "Scanning: $done of $expected disciplines complete";
+                $detail = "Scanning: $done of $expected disciplines complete (waves of 3)";
             } elsif ($scanning > 0) {
                 $pct = 7;
-                $detail = "Scanning $expected disciplines...";
+                $detail = "Scanning $expected disciplines in waves...";
             }
         }
 
@@ -810,31 +810,68 @@ sub spawn_review {
     print $fh "echo \"Using Python: \$PYTHON\"\n";
     print $fh "\"\$PYTHON\" -m pip install --quiet openpyxl python-docx 2>/dev/null\n\n";
 
-    # Phase 1: parallel discipline CLIs
-    print $fh "# === PHASE 1: Parallel discipline scans ($expected_count CLIs) ===\n";
-    print $fh "echo \"Phase 1: Launching $expected_count discipline scans...\" > \"$output_dir/progress.log\"\n\n";
+    # Phase 1: batched wave discipline CLIs (MAX_PARALLEL=3 to prevent RAM exhaustion)
+    # Smart ordering: interleave slow disciplines (large standards) with fast ones
+    # so each wave finishes around the same time.
+    my %wave_priority = (
+        'communications' => 1,   # Wave 1 - slow (399KB standards)
+        'plumbing'       => 1,   # Wave 1 - fast (49KB)
+        'fire-protection' => 1,  # Wave 1 - fast (57KB)
+        'civil-site'     => 2,   # Wave 2 - slow (281KB)
+        'arch-finishes'  => 2,   # Wave 2 - fast (91KB)
+        'electrical'     => 2,   # Wave 2 - medium (100KB)
+        'hvac-controls'  => 3,   # Wave 3 - medium (196KB)
+        'arch-structure'  => 3,  # Wave 3 - medium (163KB)
+    );
+    my $MAX_PARALLEL = 3;
 
-    for my $grp (@active) {
-        my $pfile   = "$job_dir/prompt-$grp->{key}.txt";
-        my $stdout  = "$output_dir/$grp->{key}-stdout.log";
-        my $stderr  = "$output_dir/$grp->{key}-stderr.log";
+    # Sort @active into waves based on priority (unrecognized keys go to last wave)
+    my @sorted = sort { ($wave_priority{$a->{key}} || 99) <=> ($wave_priority{$b->{key}} || 99) } @active;
 
-        (my $var_key = uc($grp->{key})) =~ s/-/_/g;  # bash-safe var name
-        print $fh "# Discipline: $grp->{name}\n";
-        print $fh "echo \"Launching: $grp->{name}...\"\n";
-        print $fh "PROMPT_${var_key}=\$(cat \"$pfile\")\n";
-        print $fh "\"$CLAUDE_PATH\" -p \"\$PROMPT_${var_key}\" \\\n";
-        print $fh "  --model sonnet \\\n";
-        print $fh "  --dangerously-skip-permissions \\\n";
-        print $fh "  --output-format text \\\n";
-        print $fh "  > \"$stdout\" \\\n";
-        print $fh "  2> \"$stderr\" &\n\n";
+    # Chunk into waves of MAX_PARALLEL
+    my @waves;
+    while (@sorted) {
+        push @waves, [ splice @sorted, 0, $MAX_PARALLEL ];
+    }
+    my $num_waves = scalar @waves;
+
+    print $fh "# === PHASE 1: Batched discipline scans ($expected_count CLIs in $num_waves waves of $MAX_PARALLEL max) ===\n";
+    print $fh "echo \"Phase 1: Launching $expected_count discipline scans in $num_waves waves (max $MAX_PARALLEL parallel)...\" > \"$output_dir/progress.log\"\n\n";
+
+    for my $wi (0 .. $#waves) {
+        my $wave = $waves[$wi];
+        my $wave_num = $wi + 1;
+        my $wave_count = scalar @$wave;
+        my $wave_names = join(', ', map { $_->{name} } @$wave);
+
+        print $fh "# --- Wave $wave_num of $num_waves ($wave_count disciplines: $wave_names) ---\n";
+        print $fh "echo \"Wave $wave_num/$num_waves: Launching $wave_count disciplines...\"\n";
+        print $fh "echo \"Wave $wave_num/$num_waves: $wave_names\" >> \"$output_dir/progress.log\"\n\n";
+
+        for my $grp (@$wave) {
+            my $pfile   = "$job_dir/prompt-$grp->{key}.txt";
+            my $stdout  = "$output_dir/$grp->{key}-stdout.log";
+            my $stderr  = "$output_dir/$grp->{key}-stderr.log";
+
+            (my $var_key = uc($grp->{key})) =~ s/-/_/g;  # bash-safe var name
+            print $fh "# Discipline: $grp->{name}\n";
+            print $fh "echo \"  Launching: $grp->{name}...\"\n";
+            print $fh "PROMPT_${var_key}=\$(cat \"$pfile\")\n";
+            print $fh "\"$CLAUDE_PATH\" -p \"\$PROMPT_${var_key}\" \\\n";
+            print $fh "  --model sonnet \\\n";
+            print $fh "  --dangerously-skip-permissions \\\n";
+            print $fh "  --output-format text \\\n";
+            print $fh "  > \"$stdout\" \\\n";
+            print $fh "  2> \"$stderr\" &\n\n";
+        }
+
+        print $fh "# Wait for wave $wave_num to complete\n";
+        print $fh "echo \"Waiting for wave $wave_num ($wave_count disciplines)...\"\n";
+        print $fh "wait\n";
+        print $fh "echo \"Wave $wave_num/$num_waves complete.\" >> \"$output_dir/progress.log\"\n\n";
     }
 
-    print $fh "# Wait for all discipline scans to complete\n";
-    print $fh "echo \"Waiting for all $expected_count discipline scans...\"\n";
-    print $fh "wait\n";
-    print $fh "echo \"Phase 1 complete.\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 1 complete ($expected_count disciplines in $num_waves waves).\" >> \"$output_dir/progress.log\"\n\n";
 
     # Validate Phase 1 output
     print $fh "# Validate Phase 1 output\n";
@@ -899,7 +936,7 @@ sub spawn_review {
 
     my $group_names = join(', ', map { $_->{name} } @active);
     print "[" . localtime() . "] Spawning 3-phase pipeline for job $job_id\n";
-    print "  Phase 1:  " . scalar(@active) . " parallel CLIs (Sonnet) -> JSON\n";
+    print "  Phase 1:  " . scalar(@active) . " CLIs in " . scalar(@waves) . " waves of $MAX_PARALLEL max (Sonnet) -> JSON\n";
     print "  Phase 2a: Python synthesis -> review-data.json\n";
     print "  Phase 2b: Claude Haiku -> executive-summary.txt\n";
     print "  Phase 3:  Local Python -> reports\n";
@@ -1000,6 +1037,30 @@ while (my $c = $srv->accept) {
         if (lc($pdf->{filename}) !~ /\.pdf$/) {
             send_json($c, 400, { error => 'File must be a PDF' });
             close $c; next;
+        }
+
+        # Concurrent job guard: prevent submitting while another review is running
+        {
+            my $running_id;
+            if (opendir my $dh, $REVIEWS_DIR) {
+                while (my $dir = readdir $dh) {
+                    next if $dir =~ /^\./;
+                    my $existing = read_job_json($dir);
+                    if ($existing && ($existing->{status} || '') eq 'Processing') {
+                        $running_id = $dir;
+                        last;
+                    }
+                }
+                closedir $dh;
+            }
+            if ($running_id) {
+                send_json($c, 409, {
+                    error => "A review is already running (job $running_id). Please wait for it to complete before submitting another.",
+                    runningJob => $running_id,
+                });
+                close $c;
+                next;
+            }
         }
 
         my $job_id = make_job_id();
