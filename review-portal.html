@@ -353,6 +353,14 @@ html.dark .help-section h3 { color: var(--accent); }
   display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700;
 }
 
+/* Connection banner */
+.conn-banner {
+  display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 900;
+  background: var(--red); color: #fff; text-align: center;
+  padding: .5rem 1rem; font-size: .82rem; font-weight: 600;
+}
+.conn-banner.visible { display: block; }
+
 /* Footer */
 footer {
   text-align: center; padding: 1rem; font-size: .75rem; color: var(--text-light);
@@ -596,6 +604,8 @@ footer {
   </div>
 </div>
 
+<div class="conn-banner" id="connBanner">Server unreachable &mdash; retrying automatically...</div>
+
 <footer>
   WSU Facilities Services &bull; Design Standards Compliance Review Portal &bull; Prototype
 </footer>
@@ -640,6 +650,14 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
   });
 });
+
+// --- HTML escape (XSS prevention) ---
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
 
 // --- Division Checkboxes ---
 function checkAllDivs(checked) {
@@ -687,6 +705,10 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
 
   if (!pdf) {
     showErr('Please select a PDF file.'); return;
+  }
+  if (pdf.size > 100 * 1024 * 1024) {
+    showErr('PDF file is too large (' + (pdf.size / 1048576).toFixed(1) + ' MB). Maximum is 100 MB.');
+    return;
   }
   if (checked.length === 0) {
     showErr('Please select at least one division.'); return;
@@ -756,7 +778,7 @@ function buildDiscDetail(job) {
     const time = d.completedAt ? new Date(d.completedAt * 1000).toLocaleTimeString() : '';
     html += '<div class="disc-item">';
     html += '<span class="disc-icon ' + d.status + '">' + icon + '</span>';
-    html += '<span class="disc-name">' + (d.name || d.key) + '</span>';
+    html += '<span class="disc-name">' + esc(d.name || d.key) + '</span>';
     if (time) html += '<span class="disc-time">' + time + '</span>';
     html += '</div>';
   }
@@ -795,10 +817,10 @@ function buildTracker(pct, stalled, detail, stalledPhase) {
   }
   html += '</div>';
   if (detail) {
-    html += '<div class="tracker-detail">' + detail + '</div>';
+    html += '<div class="tracker-detail">' + esc(detail) + '</div>';
   }
   if (stalled) {
-    const phaseInfo = stalledPhase ? ' in ' + stalledPhase : '';
+    const phaseInfo = stalledPhase ? ' in ' + esc(stalledPhase) : '';
     html += '<div class="tracker-stall">Stalled' + phaseInfo + ' — no progress for ' + stalled + ' min</div>';
   }
   html += '</div>';
@@ -862,40 +884,40 @@ function renderQueue(jobs) {
     if (sc === 'complete' && j.outputFiles && j.outputFiles.length) {
       dl = '<div class="download-links">' +
         j.outputFiles.map(f =>
-          '<a href="/api/download/' + j.id + '/' + f + '" target="_blank">' + f + '</a>'
+          '<a href="/api/download/' + esc(j.id) + '/' + esc(f) + '" target="_blank">' + esc(f) + '</a>'
         ).join('') + '</div>';
     } else if (sc === 'failed') {
       const errId = 'err-' + j.id;
       let failHtml = '';
       if (j.failedPhase) {
-        failHtml += '<div class="fail-phase">Failed in ' + j.failedPhase + '</div>';
+        failHtml += '<div class="fail-phase">Failed in ' + esc(j.failedPhase) + '</div>';
       }
       if (j.completedPhases && j.completedPhases.length) {
         failHtml += '<div class="fail-completed">' +
-          j.completedPhases.map(p => '<span>' + p + '</span>').join('<br>') + '</div>';
+          j.completedPhases.map(p => '<span>' + esc(p) + '</span>').join('<br>') + '</div>';
       }
       const shortErr = (j.error || 'Check logs').substring(0, 150);
-      failHtml += '<div class="error-preview">' + shortErr.replace(/</g,'&lt;') + '</div>';
+      failHtml += '<div class="error-preview">' + esc(shortErr) + '</div>';
       failHtml += '<div class="error-toggle" onclick="document.getElementById(\'' + errId + '\').classList.toggle(\'open\');this.textContent=this.textContent===\'Show full error\'?\'Hide error\':\'Show full error\'">Show full error</div>';
-      failHtml += '<div class="error-full" id="' + errId + '">' + (j.error || '').replace(/</g,'&lt;') + '</div>';
+      failHtml += '<div class="error-full" id="' + errId + '">' + esc(j.error) + '</div>';
       if (j.errorLogs && j.errorLogs.length) {
         failHtml += '<div class="log-links">' +
-          j.errorLogs.map(f => '<a href="/api/logs/' + j.id + '/' + f + '" target="_blank">' + f + '</a>').join('') +
+          j.errorLogs.map(f => '<a href="/api/logs/' + esc(j.id) + '/' + esc(f) + '" target="_blank">' + esc(f) + '</a>').join('') +
           '</div>';
       }
       dl = failHtml;
     }
-    const delBtn = '<button class="btn-delete" onclick="deleteJob(\'' + j.id + '\',\'' +
-      (j.projectName || '').replace(/'/g,"\\'") + '\')" title="Delete job">\uD83D\uDDD1</button>';
+    const delBtn = '<button class="btn-delete" onclick="deleteJob(\'' + esc(j.id) + '\',\'' +
+      esc((j.projectName || '').replace(/'/g,'')) + '\')" title="Delete job">\uD83D\uDDD1</button>';
     return '<tr>' +
-      '<td style="font-size:.75rem;white-space:nowrap">' + (j.id || '') + '</td>' +
-      '<td>' + (j.projectName || '') + '</td>' +
-      '<td>' + (j.reviewPhase || '') + '</td>' +
-      '<td style="font-size:.75rem">' + divs + '</td>' +
+      '<td style="font-size:.75rem;white-space:nowrap">' + esc(j.id) + '</td>' +
+      '<td>' + esc(j.projectName) + '</td>' +
+      '<td>' + esc(j.reviewPhase) + '</td>' +
+      '<td style="font-size:.75rem">' + esc(divs) + '</td>' +
       '<td style="font-size:.75rem;white-space:nowrap">' + time + '</td>' +
-      '<td><span class="job-status ' + sc + '">' + (j.status || '') + '</span>' +
-        (j.emailSent ? '<span class="email-icon sent" title="Email sent ' + (j.emailSentAt || '') + '">&#9993;</span>'
-         : j.emailError ? '<span class="email-icon error" title="Email failed: ' + j.emailError.replace(/"/g,'&quot;') + '">&#9993;</span>'
+      '<td><span class="job-status ' + sc + '">' + esc(j.status) + '</span>' +
+        (j.emailSent ? '<span class="email-icon sent" title="Email sent ' + esc(j.emailSentAt) + '">&#9993;</span>'
+         : j.emailError ? '<span class="email-icon error" title="Email failed: ' + esc(j.emailError) + '">&#9993;</span>'
          : '') +
         (sc === 'processing' && j.progress ? buildTracker(j.progress, j.stalledMinutes, j.progressDetail, j.stalledPhase) +
           (j.elapsedSeconds ? '<div class="elapsed-time">Elapsed: ' + fmtElapsed(j.elapsedSeconds) + '</div>' : '') +
@@ -907,7 +929,9 @@ function renderQueue(jobs) {
 }
 
 // --- Queue Polling ---
+let pollFailures = 0;
 async function refreshQueue() {
+  const banner = document.getElementById('connBanner');
   try {
     const resp = await fetch('/api/jobs');
     const result = await resp.json();
@@ -930,9 +954,14 @@ async function refreshQueue() {
         '<span>Failed: ' + fail + '</span>' +
         (queueStats.totalBytes ? '<span>Disk: ' + fmtBytes(queueStats.totalBytes) + '</span>' : '');
     }
+    pollFailures = 0;
+    if (banner) banner.classList.remove('visible');
     applyQueueFilters();
   } catch (err) {
-    // Silently retry next cycle
+    pollFailures++;
+    if (pollFailures >= 3 && banner) {
+      banner.classList.add('visible');
+    }
   }
 }
 refreshQueue();

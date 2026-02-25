@@ -158,19 +158,33 @@ sub detect_phase {
 # --- Process liveness ---
 
 sub has_active_processes {
-    # Check if relevant processes are running.
-    # On Windows we can't easily tie processes to specific jobs,
-    # so we use a conservative heuristic: if any claude.exe or
-    # python.exe is running, assume a pipeline might be active.
+    my ($job_id) = @_;
+
+    # Job-specific detection: check PID file written by run-review.sh
+    if ($job_id) {
+        my $pidfile = "$REVIEWS_DIR/$job_id/output/pipeline.pid";
+        if (-f $pidfile) {
+            open my $fh, '<', $pidfile or goto FALLBACK;
+            my $pid = <$fh>;
+            chomp $pid if defined $pid;
+            close $fh;
+            if ($pid && $pid =~ /^\d+$/) {
+                # Check if that specific PID is still alive
+                my $check = `tasklist /FI "PID eq $pid" /FO CSV 2>nul`;
+                return 1 if $check =~ /"\Q$pid\E"/;
+                # PID is dead — pipeline finished or crashed
+                return 0;
+            }
+        }
+    }
+
+    FALLBACK:
+    # Fallback: global heuristic (backward compatibility for jobs without PID file)
     my $claude_out = `tasklist /FI "IMAGENAME eq claude.exe" /FO CSV 2>nul`;
     my $python_out = `tasklist /FI "IMAGENAME eq python.exe" /FO CSV 2>nul`;
-    my $bash_out   = `tasklist /FI "IMAGENAME eq bash.exe" /FO CSV 2>nul`;
 
     my $claude_running = ($claude_out =~ /claude\.exe/i)  ? 1 : 0;
     my $python_running = ($python_out =~ /python\.exe/i)  ? 1 : 0;
-    # bash.exe is common on Windows (Git Bash shell), so only count it
-    # if claude or python are also absent — a lone bash.exe is likely
-    # the user's terminal, not a pipeline script.
 
     return ($claude_running || $python_running);
 }
@@ -208,25 +222,47 @@ sub is_phase3_failure {
     my ($outdir) = @_;
     my $failed = "$outdir/FAILED";
     return 0 unless -f $failed;
+
+    # If review-data.json exists, it's necessarily a Phase 3 failure
+    # (Phases 1 & 2 completed successfully to produce it)
+    return 1 if -f "$outdir/review-data.json" && -s "$outdir/review-data.json";
+
+    # Fallback: check FAILED file content for Phase 3 keywords
     open my $fh, '<', $failed or return 0;
     local $/;
     my $content = <$fh>;
     close $fh;
-    # Check if the FAILED file mentions Python/report generation
+
+    # Exclude if explicitly a Phase 1 or Phase 2 failure
+    return 0 if $content =~ /Phase 1/i;
+    return 0 if $content =~ /Phase 2/i;
+    return 0 if $content =~ /No discipline findings/i;
+    return 0 if $content =~ /synthesize\.py/i;
+
+    # Match known Phase 3 patterns (Python/report generation)
     return 1 if $content =~ /generate_reports\.py/i;
     return 1 if $content =~ /REPORT GENERATION FAILED/i;
     return 1 if $content =~ /NUMBER VALIDATION FAILED/i;
     return 1 if $content =~ /openpyxl/i;
     return 1 if $content =~ /python-docx/i;
+    return 1 if $content =~ /Traceback/i;
+    return 1 if $content =~ /ModuleNotFoundError/i;
+    return 1 if $content =~ /ImportError/i;
+    return 1 if $content =~ /PermissionError/i;
+    return 1 if $content =~ /FileNotFoundError/i;
     return 0;
 }
 
 sub recover_phase3 {
     my ($job_id, $outdir) = @_;
 
-    # Check retry count
+    # Increment retry count FIRST — ensures counter advances even if validation fails,
+    # preventing infinite retry loops on permanently bad data
+    increment_retry_count($job_id);
     my $retries = read_retry_count($job_id);
-    if ($retries >= $MAX_PY_RETRIES) {
+
+    # Check retry count
+    if ($retries > $MAX_PY_RETRIES) {
         write_file("$outdir/FAILED",
             "Recovery daemon: Phase 3 failed after $MAX_PY_RETRIES retries. "
             . "Check review-data.json manually or re-submit.");
@@ -281,9 +317,8 @@ sub recover_phase3 {
     }
 
     # Re-run Phase 3
-    increment_retry_count($job_id);
     log_action($job_id, "RETRY",
-        "Re-running Phase 3 (attempt " . ($retries + 1) . "/$MAX_PY_RETRIES) using $python");
+        "Re-running Phase 3 (attempt $retries/$MAX_PY_RETRIES) using $python");
 
     # Normalize paths for bash
     (my $py_bash = $python) =~ s{\\}{/}g;
@@ -310,7 +345,7 @@ sub analyze_and_recover {
 
     # Check for Phase 3 FAILED that we can retry
     if ($phase == 3 && -f "$outdir/FAILED" && is_phase3_failure($outdir)) {
-        my $has_procs = has_active_processes();
+        my $has_procs = has_active_processes($job_id);
         if (!$has_procs) {
             log_action($job_id, "DETECTED",
                 "Phase 3 failure detected (idle ${idle}min), attempting recovery");
@@ -322,7 +357,7 @@ sub analyze_and_recover {
     # Not stalled yet? Skip.
     return if $idle < $STALL_THRESHOLD;
 
-    my $has_procs = has_active_processes();
+    my $has_procs = has_active_processes($job_id);
 
     # If processes are running and we're under the dead threshold, give more time
     return if $has_procs && $idle < $DEAD_THRESHOLD;

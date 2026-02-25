@@ -8,6 +8,7 @@
 use strict;
 use warnings;
 use IO::Socket::INET;
+use IO::Select;
 use JSON::PP;
 use File::Path qw(make_path remove_tree);
 use File::Basename;
@@ -94,9 +95,15 @@ sub send_json {
 }
 
 sub read_exact {
-    my ($sock, $len) = @_;
+    my ($sock, $len, $timeout) = @_;
+    $timeout ||= 120;  # default 120s for body reads
+    my $sel = IO::Select->new($sock);
     my $buf = '';
     while (length($buf) < $len) {
+        unless ($sel->can_read($timeout)) {
+            warn "[TIMEOUT] read_exact timed out after ${timeout}s with " . length($buf) . "/$len bytes\n";
+            last;
+        }
         my $n = read($sock, my $chunk, $len - length($buf));
         last unless $n;
         $buf .= $chunk;
@@ -139,9 +146,12 @@ sub parse_multipart {
 sub write_job_json {
     my ($job_id, $job) = @_;
     my $path = "$REVIEWS_DIR/$job_id/job.json";
-    open my $fh, '>', $path or return;
+    my $tmp  = "$path.tmp";
+    open my $fh, '>', $tmp or return;
     print $fh JSON::PP->new->pretty->canonical->encode($job);
     close $fh;
+    unlink $path if -f $path;  # Windows rename() cannot overwrite
+    rename $tmp, $path;
 }
 
 sub read_job_json {
@@ -786,8 +796,25 @@ sub spawn_review {
     print $fh "# Phase 2b: Claude Haiku -> executive-summary.txt\n";
     print $fh "# Phase 3:  Local Python -> .docx + .xlsx + .txt (zero tokens)\n\n";
     print $fh "unset CLAUDECODE\n";
-    print $fh "export CLAUDE_CODE_GIT_BASH_PATH='C:\\Users\\john.slagboom\\AppData\\Local\\Programs\\Git\\bin\\bash.exe'\n";
+
+    # Dynamic Git Bash discovery for CLAUDE_CODE_GIT_BASH_PATH
+    print $fh "GIT_BASH=\"\"\n";
+    print $fh "for candidate in \\\n";
+    print $fh "  \"\$PROGRAMFILES/Git/bin/bash.exe\" \\\n";
+    print $fh "  \"/c/Program Files/Git/bin/bash.exe\" \\\n";
+    print $fh "  \"\$LOCALAPPDATA/Programs/Git/bin/bash.exe\" \\\n";
+    print $fh "  \"/c/Users/\$USERNAME/AppData/Local/Programs/Git/bin/bash.exe\"; do\n";
+    print $fh "  [ -f \"\$candidate\" ] && { GIT_BASH=\"\$candidate\"; break; }\n";
+    print $fh "done\n";
+    print $fh "if [ -n \"\$GIT_BASH\" ]; then\n";
+    # Claude CLI on Windows needs backslash path for GIT_BASH
+    print $fh "  export CLAUDE_CODE_GIT_BASH_PATH=\"\$GIT_BASH\"\n";
+    print $fh "fi\n\n";
+
     print $fh "cd \"$ROOT\"\n\n";
+
+    # Write PID file for recovery daemon's job-specific process detection
+    print $fh "echo \$\$ > \"$output_dir/pipeline.pid\"\n\n";
 
     # Orphan cleanup function: Claude CLIs with --dangerously-skip-permissions can
     # spawn child processes (e.g. pdfplumber) that survive after the parent exits.
@@ -880,6 +907,7 @@ sub spawn_review {
             print $fh "PROMPT_${var_key}=\$(cat \"$pfile\")\n";
             print $fh "\"$CLAUDE_PATH\" -p \"\$PROMPT_${var_key}\" \\\n";
             print $fh "  --model sonnet \\\n";
+            print $fh "  --allowedTools Read Write \\\n";
             print $fh "  --dangerously-skip-permissions \\\n";
             print $fh "  --output-format text \\\n";
             print $fh "  > \"$stdout\" \\\n";
@@ -933,6 +961,7 @@ sub spawn_review {
     print $fh "cd \"$output_dir\"\n";
     print $fh "\"$CLAUDE_PATH\" -p \"\$EXEC_PROMPT\" \\\n";
     print $fh "  --model haiku \\\n";
+    print $fh "  --allowedTools Read Write \\\n";
     print $fh "  --dangerously-skip-permissions \\\n";
     print $fh "  --output-format text \\\n";
     print $fh "  > \"$exec_stdout\" \\\n";
@@ -986,20 +1015,38 @@ sub spawn_review {
 while (my $c = $srv->accept) {
     binmode $c;
 
+    # 30-second timeout for initial request read (prevents dead connections from blocking)
+    my $sel = IO::Select->new($c);
+    unless ($sel->can_read(30)) {
+        close $c;
+        next;
+    }
+
     # Read request line
     my $req_line = <$c>;
     next unless $req_line && $req_line =~ m{^(GET|POST|DELETE|OPTIONS)\s+(/\S*)\s+HTTP};
     my ($method, $path) = ($1, $2);
     $path =~ s/\?.*//;  # strip query string
 
-    # Read all headers
+    # Read all headers (with 30s timeout to prevent slowloris)
     my %headers;
-    while (my $hdr = <$c>) {
+    my $header_ok = 1;
+    while (1) {
+        unless ($sel->can_read(30)) {
+            $header_ok = 0;
+            last;
+        }
+        my $hdr = <$c>;
+        unless (defined $hdr) { $header_ok = 0; last; }
         $hdr =~ s/\r?\n$//;
         last if $hdr eq '';
         if ($hdr =~ /^([^:]+):\s*(.*)/) {
             $headers{lc $1} = $2;
         }
+    }
+    unless ($header_ok) {
+        close $c;
+        next;
     }
 
     # CORS preflight
