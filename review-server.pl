@@ -789,6 +789,26 @@ sub spawn_review {
     print $fh "export CLAUDE_CODE_GIT_BASH_PATH='C:\\Users\\john.slagboom\\AppData\\Local\\Programs\\Git\\bin\\bash.exe'\n";
     print $fh "cd \"$ROOT\"\n\n";
 
+    # Orphan cleanup function: Claude CLIs with --dangerously-skip-permissions can
+    # spawn child processes (e.g. pdfplumber) that survive after the parent exits.
+    # This function kills any orphaned python.exe children spawned by our CLIs.
+    print $fh "# --- Orphan process cleanup ---\n";
+    print $fh "# Claude CLI can spawn python/pdfplumber subprocesses that outlive the parent.\n";
+    print $fh "# Track PIDs per wave and kill stragglers after wait completes.\n";
+    print $fh "WAVE_PIDS=\"\"\n";
+    print $fh "cleanup_wave() {\n";
+    print $fh "  for pid in \$WAVE_PIDS; do\n";
+    print $fh "    # Kill the process tree rooted at each background PID\n";
+    print $fh "    if kill -0 \$pid 2>/dev/null; then\n";
+    print $fh "      echo \"Cleaning up orphaned process tree for PID \$pid\"\n";
+    print $fh "      # Get all descendants via procps or taskkill\n";
+    print $fh "      taskkill //PID \$pid //T //F > /dev/null 2>&1\n";
+    print $fh "    fi\n";
+    print $fh "  done\n";
+    print $fh "  WAVE_PIDS=\"\"\n";
+    print $fh "}\n";
+    print $fh "trap 'cleanup_wave' EXIT\n\n";
+
     # Python discovery (Step 7)
     print $fh "# --- Python discovery ---\n";
     print $fh "PYUSER=\"\${USERNAME:-\$USER}\"\n";
@@ -845,6 +865,7 @@ sub spawn_review {
         my $wave_names = join(', ', map { $_->{name} } @$wave);
 
         print $fh "# --- Wave $wave_num of $num_waves ($wave_count disciplines: $wave_names) ---\n";
+        print $fh "WAVE_PIDS=\"\"\n";
         print $fh "echo \"Wave $wave_num/$num_waves: Launching $wave_count disciplines...\"\n";
         print $fh "echo \"Wave $wave_num/$num_waves: $wave_names\" >> \"$output_dir/progress.log\"\n\n";
 
@@ -862,12 +883,14 @@ sub spawn_review {
             print $fh "  --dangerously-skip-permissions \\\n";
             print $fh "  --output-format text \\\n";
             print $fh "  > \"$stdout\" \\\n";
-            print $fh "  2> \"$stderr\" &\n\n";
+            print $fh "  2> \"$stderr\" &\n";
+            print $fh "WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n\n";
         }
 
-        print $fh "# Wait for wave $wave_num to complete\n";
+        print $fh "# Wait for wave $wave_num to complete, then kill orphaned children\n";
         print $fh "echo \"Waiting for wave $wave_num ($wave_count disciplines)...\"\n";
         print $fh "wait\n";
+        print $fh "cleanup_wave\n";
         print $fh "echo \"Wave $wave_num/$num_waves complete.\" >> \"$output_dir/progress.log\"\n\n";
     }
 
