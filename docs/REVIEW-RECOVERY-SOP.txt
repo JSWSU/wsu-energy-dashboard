@@ -1,0 +1,298 @@
+COMPLIANCE REVIEW RECOVERY DAEMON -- STANDARD OPERATING PROCEDURE
+==================================================================
+
+How to start, monitor, and troubleshoot the review-recovery.pl daemon.
+This daemon watches for stalled compliance review jobs and automatically
+recovers them without spending API tokens.
+
+
+OVERVIEW
+--------
+
+What it does:
+  Polls the reviews/ folder every 2 minutes looking for stuck "Processing"
+  jobs. When it finds one, it determines which pipeline phase stalled and
+  takes the appropriate recovery action -- primarily re-running the local
+  Python report generator (Phase 3) which costs zero API tokens.
+
+When to run it:
+  Any time the review server (review-server.pl) is running and accepting
+  review submissions. Start it alongside the server in a separate window.
+
+What it needs:
+  - Perl (comes with Git for Windows)
+  - Python 3.11+ with openpyxl and python-docx packages
+  - The generate_reports.py script in the repo root
+
+
+PREREQUISITES
+-------------
+
+Before starting the daemon, confirm:
+
+[ ] Python is installed
+    Test: Open Command Prompt, run: python --version
+    Expected: Python 3.11 or higher
+
+[ ] Required Python packages are installed
+    Test: python -c "import openpyxl; import docx; print('OK')"
+    Expected: OK
+
+[ ] generate_reports.py exists in the repo root
+    Location: C:\Users\john.slagboom\Desktop\Git\generate_reports.py
+
+[ ] The reviews/ folder exists
+    Created automatically by review-server.pl on first submission
+
+
+STARTING THE DAEMON
+-------------------
+
+1. Open a NEW Git Bash window (separate from the review server)
+
+2. Navigate to the repo:
+     cd /c/Users/john.slagboom/Desktop/Git
+
+3. Start the daemon:
+     perl review-recovery.pl
+
+4. You should see startup output like:
+
+     ==================================================
+       WSU Review Recovery Daemon
+     ==================================================
+       Reviews:     C:/Users/john.slagboom/Desktop/Git/reviews
+       Log file:    C:/Users/john.slagboom/Desktop/Git/recovery.log
+       Poll:        every 120s
+       Stall:       15min
+       Dead:        30min
+       Max retries: 3
+       Python:      C:/Users/john.slagboom/AppData/Local/Programs/.../python.exe
+
+5. Leave this window open. The daemon runs continuously until stopped.
+
+Note: Startup order does not matter. The daemon is independent of
+review-server.pl and can be started before, after, or without it.
+
+
+STOPPING THE DAEMON
+-------------------
+
+Press Ctrl+C in the Git Bash window where it is running.
+
+
+WHAT THE DAEMON DOES (AND DOES NOT DO)
+---------------------------------------
+
+AUTOMATIC RECOVERY (zero API tokens):
+
+  Phase 3 never ran
+    Symptom:  review-data.json exists but no report.docx, report.xlsx, etc.
+    Action:   Re-runs generate_reports.py automatically.
+
+  Phase 3 crashed
+    Symptom:  FAILED file mentions generate_reports.py, openpyxl, or
+              python-docx.
+    Action:   Deletes FAILED, cleans up partial files, re-runs Python.
+              Will retry up to 3 times before giving up.
+
+  Phase 3 partial output
+    Symptom:  review-data.json exists, some deliverables written but
+              not all 5, no COMPLETE sentinel.
+    Action:   Deletes partial files and re-runs Python from scratch.
+
+  Zero-byte output files
+    Symptom:  discipline-*-findings.json or review-data.json is 0 bytes.
+    Action:   Deletes the empty file and logs a warning.
+
+FLAGGING ONLY (requires manual re-submission):
+
+  Phase 1/2 stalled (no processes, idle 30+ minutes)
+    Symptom:  Job stuck in Phase 1 or 2 with no claude.exe running.
+    Action:   Writes FAILED with message: "Re-submit through portal."
+              The job will show as Failed in the portal.
+
+HANDS OFF (actively running pipelines):
+
+  If claude.exe or python.exe processes are detected, the daemon assumes
+  the pipeline is still working and does not interfere -- even if idle
+  time exceeds the stall threshold. Only after the dead threshold (30 min)
+  AND no processes running will it take action.
+
+
+CONFIGURATION
+-------------
+
+Settings are at the top of review-recovery.pl (lines 22-25):
+
+  POLL_INTERVAL    120 seconds     How often to scan for stuck jobs.
+  STALL_THRESHOLD   15 minutes     Minimum idle time before considering
+                                   a job stalled.
+  DEAD_THRESHOLD    30 minutes     Idle time + no processes = declare dead.
+  MAX_PY_RETRIES     3             Max Phase 3 re-runs per job before
+                                   giving up and writing FAILED.
+
+To change a setting, edit the value in review-recovery.pl and restart
+the daemon. No other changes needed.
+
+
+READING THE LOG
+---------------
+
+All actions are logged to:
+  C:\Users\john.slagboom\Desktop\Git\recovery.log
+
+Log format:
+  [TIMESTAMP] [JOB_ID] [TAG] Message
+
+Example entries:
+
+  [2026-02-26T08:15:32] [SYSTEM] [START] Recovery daemon started
+  [2026-02-26T08:17:01] [20260226-081200] [DETECTED] Phase 3 stalled (idle 18min, no sentinel), attempting recovery
+  [2026-02-26T08:17:01] [20260226-081200] [CLEANED] Deleted partial: report.docx
+  [2026-02-26T08:17:01] [20260226-081200] [RETRY] Re-running Phase 3 (attempt 1/3) using C:/.../python.exe
+  [2026-02-26T08:19:05] [20260226-094500] [DEAD] Phase 1 (discipline scans) dead -- no processes, idle 35min. Wrote FAILED.
+  [2026-02-26T08:21:00] [20260226-081200] [EXHAUSTED] Phase 3 retries exhausted (3/3)
+
+Tags and their meaning:
+
+  START       Daemon started
+  DETECTED    Stalled or failed job found
+  RETRY       Re-running Phase 3 (shows attempt number)
+  CLEANED     Deleted a 0-byte or partial file
+  DEAD        Job declared dead (Phase 1/2 stall, wrote FAILED)
+  EXHAUSTED   Phase 3 retry limit reached
+  BAD_JSON    review-data.json is corrupt or invalid
+  NO_PYTHON   Python not found on system
+  ERROR       Unexpected error during scan
+
+
+FILES CREATED BY THE DAEMON
+----------------------------
+
+Per job (inside reviews/{job_id}/output/):
+
+  recovery-retries.txt     Tracks how many times Phase 3 has been retried.
+                           Contains a single integer (e.g., "2").
+
+  recovery-stdout.log      Stdout/stderr from recovery Phase 3 runs.
+                           Useful for debugging why Python failed.
+
+  FAILED                   Written when a job is unrecoverable.
+                           Contains a description of what went wrong.
+
+  COMPLETE                 Written by generate_reports.py (not the daemon
+                           directly) when Phase 3 succeeds after recovery.
+
+Global:
+
+  recovery.log             Append-only log file in the repo root.
+                           Safe to delete if it gets too large.
+
+Note: recovery-retries.txt and recovery-stdout.log do NOT appear in
+the portal downloads -- they are excluded from the deliverables whitelist.
+
+
+HOW IT INTERACTS WITH OTHER TOOLS
+----------------------------------
+
+  review-server.pl
+    The daemon only READS job.json (never writes it). The server writes
+    job.json. Both can write FAILED, but the daemon only writes FAILED
+    for dead jobs (no processes + 30 min idle) or exhausted retries.
+    No conflicts.
+
+  review-watcher.pl (Smartsheet integration)
+    Same relationship as review-server.pl. The daemon monitors the same
+    reviews/ folder. No conflicts.
+
+  review-portal.html
+    The portal polls the server API, which reads job.json and checks for
+    sentinels. When the daemon writes COMPLETE (via Python) or FAILED,
+    the server picks it up on the next poll and the portal reflects the
+    new status automatically. No special integration needed.
+
+  generate_reports.py
+    The daemon calls this script for Phase 3 recovery. The script reads
+    review-data.json and produces the 5 deliverables + COMPLETE sentinel.
+    If validation fails, it writes FAILED with details.
+
+
+TROUBLESHOOTING
+---------------
+
+SYMPTOM: Daemon says "Python: NOT FOUND" at startup.
+  CAUSE: Python is not installed or not in a location the daemon checks.
+  FIX:   Install Python 3.11+ from python.org. The daemon searches:
+           C:/Users/{user}/AppData/Local/Programs/Python/Python31X/python.exe
+           C:/Python31X/python.exe
+           PATH (via "where python")
+         After installing, restart the daemon.
+
+SYMPTOM: Daemon retries Phase 3 but it keeps failing.
+  CAUSE: review-data.json has validation errors (numbers don't balance).
+  FIX:   Check recovery-stdout.log in the job's output/ folder for the
+         specific validation error. If the data is fundamentally wrong,
+         re-submit the review through the portal.
+
+SYMPTOM: Job shows "Failed" but I think it should have recovered.
+  CAUSE: Could be retry limit reached, corrupt JSON, or Phase 1/2 failure.
+  FIX:   1. Check recovery.log for the job ID to see what the daemon tried.
+         2. Check the FAILED file in reviews/{job_id}/output/ for details.
+         3. If Phase 3 exhausted retries, delete recovery-retries.txt and
+            FAILED to let the daemon try again (up to 3 more times).
+         4. If Phase 1/2 failure, re-submit through the portal.
+
+SYMPTOM: Daemon is running but not recovering a stuck job.
+  CAUSE: A claude.exe or python.exe process is running, so the daemon
+         is waiting (it won't interfere with active pipelines).
+  FIX:   Check Task Manager for stale claude.exe processes. If they are
+         genuinely stuck (no output growth for 30+ minutes), kill them
+         manually. The daemon will pick up the job on its next scan.
+
+SYMPTOM: recovery.log is getting very large.
+  CAUSE: Normal accumulation over time.
+  FIX:   Safe to delete recovery.log while the daemon is running.
+         It will create a new one on the next log entry.
+
+SYMPTOM: Daemon crashed or Git Bash window was closed.
+  CAUSE: Ctrl+C, window close, or system restart.
+  FIX:   Just restart it: perl review-recovery.pl
+         It will immediately scan all jobs and pick up where it left off.
+         No state is lost -- retry counts are stored in per-job files.
+
+
+DAILY STARTUP CHECKLIST
+------------------------
+
+After a full computer restart, start these in any order:
+
+  Window 1 -- Review Server:
+    cd /c/Users/john.slagboom/Desktop/Git
+    perl review-server.pl
+
+  Window 2 -- Recovery Daemon:
+    cd /c/Users/john.slagboom/Desktop/Git
+    perl review-recovery.pl
+
+Both windows must stay open. The server handles submissions and status
+polling. The daemon handles stall detection and recovery.
+
+
+MANUAL PHASE 3 RE-RUN
+-----------------------
+
+If you need to manually re-run Phase 3 for a specific job without
+waiting for the daemon:
+
+  1. Open Git Bash
+  2. Run:
+       "C:/Users/john.slagboom/AppData/Local/Programs/Python/Python313/python.exe" \
+         "C:/Users/john.slagboom/Desktop/Git/generate_reports.py" \
+         "C:/Users/john.slagboom/Desktop/Git/reviews/{JOB_ID}/output/review-data.json"
+  3. Replace {JOB_ID} with the actual job ID (e.g., 20260226-081200)
+  4. Check the output/ folder for deliverables and COMPLETE/FAILED
+
+This is exactly what the daemon does automatically. Running it manually
+is useful for debugging or when you don't want to wait for the next
+poll cycle.
