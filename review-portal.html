@@ -1019,7 +1019,13 @@ function renderQueue(jobs) {
         (sc === 'processing' && j.progress ? buildTracker(j.progress, j.stalledMinutes, j.progressDetail, j.stalledPhase) +
           (j.elapsedSeconds ? '<div class="elapsed-time">Elapsed: ' + fmtElapsed(j.elapsedSeconds) + '</div>' : '') +
           buildDiscDetail(j) : '') +
-        (sc === 'complete' ? buildTracker(100) : '') + '</td>' +
+        (sc === 'complete' ? buildTracker(100) : '') +
+        ((sc === 'complete' || sc === 'failed') && j.durationSeconds ? (function() {
+          var s = '<div style="font-size:.75rem;color:var(--text-light);margin-top:.25rem">Duration: ' + fmtElapsed(j.durationSeconds);
+          if (j.pdfSizeBytes) { s += ' &middot; PDF: ' + (j.pdfSizeBytes / 1048576).toFixed(1) + ' MB'; }
+          s += '</div>';
+          return s;
+        })() : '') + '</td>' +
       '<td>' + dl + '</td>' +
       '<td>' + delBtn + '</td></tr>';
   }).join('');

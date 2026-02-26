@@ -330,6 +330,7 @@ sub check_job_status {
         $job->{status} = 'Complete';
         $job->{progress} = 100;
         $job->{completed} = iso_now();
+        $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
         # Only list final deliverables (not intermediate discipline files, scripts, etc.)
         # Supports both old (.md) and new (.txt) naming for backward compatibility
         my @deliverables = qw(
@@ -346,6 +347,7 @@ sub check_job_status {
         $job->{status} = 'Failed';
         $job->{progress} = 0;
         $job->{completed} = iso_now();
+        $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
 
         # Read primary error from FAILED file
         my $err = '';
@@ -543,6 +545,7 @@ sub check_job_status {
                 $job->{error} = $fail_msg;
                 $job->{failedPhase} = $phase_name;
                 $job->{completed} = iso_now();
+                $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
                 write_job_json($job_id, $job);
             } elsif ($idle >= $stall_thresh) {
                 $job->{stalledMinutes} = $idle;
@@ -1156,6 +1159,7 @@ while (my $c = $srv->accept) {
         close $fh;
 
         my @divs = map { s/^\s+|\s+$//gr } split(/,/, $divs_str);
+        my $pdf_size = -s "$job_dir/input.pdf";
         my $job = {
             id               => $job_id,
             projectName      => $project,
@@ -1165,8 +1169,10 @@ while (my $c = $srv->accept) {
             divisions        => \@divs,
             status           => 'Processing',
             submitted        => iso_now(),
+            submittedEpoch   => time(),
             completed        => undef,
             pdfFilename      => $pdf->{filename},
+            pdfSizeBytes     => $pdf_size,
         };
         write_job_json($job_id, $job);
         spawn_review($job_id, $job);
