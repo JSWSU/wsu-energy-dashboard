@@ -418,7 +418,7 @@ sub check_job_status {
         my $detail = '';
         my $expected = $job->{expectedGroups} || 0;
 
-        # Phase 1: discipline scans (5% to 12%)
+        # Phase 1: discipline scans (7% to 80%) — longest phase, gets most of the bar
         my $done = 0;
         my $scanning = 0;
         if ($expected > 0 && opendir my $dh, "$job_dir/output") {
@@ -429,10 +429,10 @@ sub check_job_status {
             $scanning = scalar grep { /-stdout\.log$/ && !/^synthesis-/ } @files;
 
             if ($done >= $expected) {
-                $pct = 12;
+                $pct = 80;
                 $detail = "All $expected disciplines scanned";
             } elsif ($done > 0) {
-                $pct = 7 + int(5 * $done / $expected);
+                $pct = 7 + int(73 * $done / $expected);
                 $detail = "Scanning: $done of $expected disciplines complete";
             } elsif ($scanning > 0) {
                 $pct = 7;
@@ -440,42 +440,42 @@ sub check_job_status {
             }
         }
 
-        # Phase 2: synthesis (15% to 50%)
+        # Phase 2: synthesis (82% to 90%)
         my $in_synthesis = -f "$job_dir/output/synthesis-stdout.log";
         if ($in_synthesis || ($done >= $expected && $expected > 0)) {
-            $pct = 15 unless $pct > 15;
+            $pct = 82 unless $pct > 82;
             $detail = "Synthesizing findings...";
             if (-f "$job_dir/output/review-data.json") {
-                $pct = 50;
+                $pct = 90;
                 $detail = "Review data merged";
             }
         }
 
-        # Phase 3: local report generation (60% to 95%)
+        # Phase 3: local report generation (92% to 98%)
         if (-f "$job_dir/output/review-data.json") {
-            $pct = 50 unless $pct > 50;
-            $detail = "Generating reports..." unless $pct > 50;
+            $pct = 90 unless $pct > 90;
+            $detail = "Generating reports..." unless $pct > 90;
             if (-f "$job_dir/output/report.docx") {
-                $pct = 60; $detail = "Generating reports...";
+                $pct = 92; $detail = "Generating reports...";
             }
             if (-f "$job_dir/output/report.xlsx") {
-                $pct = 70; $detail = "Generating reports...";
+                $pct = 94; $detail = "Generating reports...";
             }
             if (-f "$job_dir/output/checklist.txt") {
-                $pct = 80; $detail = "Generating reports...";
+                $pct = 96; $detail = "Generating reports...";
             }
             if (-f "$job_dir/output/findings.txt") {
-                $pct = 85; $detail = "Validating...";
+                $pct = 98; $detail = "Finalizing...";
             }
             if (-f "$job_dir/output/notes.txt") {
-                $pct = 90; $detail = "Finalizing...";
+                $pct = 99; $detail = "Finalizing...";
             }
             if (-f "$job_dir/output/report.xlsx"
                 && -f "$job_dir/output/report.docx"
                 && -f "$job_dir/output/notes.txt"
                 && -f "$job_dir/output/findings.txt"
                 && -f "$job_dir/output/checklist.txt") {
-                $pct = 95; $detail = "Finalizing...";
+                $pct = 99; $detail = "Finalizing...";
             }
         }
 
