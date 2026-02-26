@@ -142,6 +142,7 @@ Route                              Method  Purpose
 ---                                ---     ---
 /api/submit                        POST    Multipart upload (PDF + form fields)
 /api/jobs                          GET     List all jobs with status
+/api/jobs/:id                      GET     Get individual job status
 /api/jobs/:id                      DELETE  Remove job and all files
 /api/download/:id/:file            GET     Download output file
 /api/logs/:id/:file                GET     Download log file

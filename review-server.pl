@@ -396,22 +396,21 @@ sub check_job_status {
         write_job_json($job_id, $job);
     }
     else {
-        # 3-phase progress milestones:
-        # Phase 1: discipline scans (5% -> 12%)
+        # Progress milestones (Phase 1 gets most of the bar since it's ~36 min):
+        # Phase 1: discipline scans (5% -> 80%)
         #   5%  = Job submitted
         #   7%  = stdout logs exist (CLIs launched, scanning)
-        #  7-12 = partial discipline findings arriving
-        #  12%  = All discipline JSON files exist
-        # Phase 2: synthesis (15% -> 50%)
-        #  15%  = synthesis-stdout.log exists (synthesis started)
-        #  50%  = review-data.json exists
-        # Phase 3: local generation (60% -> 95%)
-        #  60%  = report.docx exists
-        #  70%  = report.xlsx exists
-        #  80%  = checklist.txt exists
-        #  85%  = findings.txt exists
-        #  90%  = notes.txt exists
-        #  95%  = all 5 deliverables exist
+        #  7-80 = proportional to disciplines completed (73% range / N disciplines)
+        #  80%  = All discipline JSON files exist
+        # Phase 2: synthesis (82% -> 90%)
+        #  82%  = synthesis started
+        #  90%  = review-data.json exists
+        # Phase 3: local generation (92% -> 99%)
+        #  92%  = report.docx exists
+        #  94%  = report.xlsx exists
+        #  96%  = checklist.txt exists
+        #  98%  = findings.txt exists
+        #  99%  = notes.txt / all deliverables exist
         # 100%  = COMPLETE
 
         my $pct = 5;
@@ -508,9 +507,9 @@ sub check_job_status {
         $job->{elapsedSeconds} = time() - $job->{submittedEpoch} if $job->{submittedEpoch};
 
         # Phase-aware stall detection + auto-fail
-        # Phase 1 (pct < 15): stall 45min, auto-fail 60min
-        # Phase 2 (pct 15-49): stall 30min, auto-fail 45min
-        # Phase 3 (pct >= 50): stall 15min, auto-fail 30min
+        # Phase 1 (pct < 82): stall 45min, auto-fail 60min
+        # Phase 2 (pct 82-91): stall 30min, auto-fail 45min
+        # Phase 3 (pct >= 92): stall 15min, auto-fail 30min
         my $newest_mtime = 0;
         if (opendir my $dh2, "$job_dir/output") {
             for my $f (readdir $dh2) {
@@ -523,10 +522,10 @@ sub check_job_status {
         if ($newest_mtime > 0) {
             my $idle = int((time() - $newest_mtime) / 60);
             my ($stall_thresh, $fail_thresh, $phase_name);
-            if ($pct < 15) {
+            if ($pct < 82) {
                 $stall_thresh = 45; $fail_thresh = 60;
                 $phase_name = 'Phase 1 (discipline scanning)';
-            } elsif ($pct < 50) {
+            } elsif ($pct < 92) {
                 $stall_thresh = 30; $fail_thresh = 45;
                 $phase_name = 'Phase 2 (synthesis)';
             } else {
@@ -660,7 +659,6 @@ sub spawn_review {
     # Store expected group count and discipline metadata for progress tracking
     $job->{expectedGroups} = scalar @active;
     $job->{disciplineGroups} = [ map { { key => $_->{key}, name => $_->{name} } } @active ];
-    $job->{submittedEpoch} = time();
     write_job_json($job_id, $job);
 
     # --- Build pre-concatenated standards per discipline ---
@@ -957,20 +955,19 @@ sub spawn_review {
     print $fh "  fi\n";
     print $fh "  echo \"Repairing malformed JSON: \$(basename \$jf)\"\n";
     print $fh "  \"\$PYTHON\" - \"\$jf\" <<'PYEOF'\n";
-    print $fh "import re, json, sys\n";
-    print $fh "with open(sys.argv[1], 'r') as f:\n";
-    print $fh "    text = f.read()\n";
-    print $fh "# Fix unescaped inch marks: digit(s) followed by \" then non-JSON-delimiter\n";
-    print $fh "# e.g., 5'-0\" from  ->  5'-0 in. from\n";
-    print $fh "fixed = re.sub(r\"(\\d)\\\"(\\s)\", r\"\\1 in.\\2\", text)\n";
-    print $fh "fixed = re.sub(r\"(\\d)\\\"([,}])\", r'\\1 in.\"\\2', fixed)\n";
-    print $fh "try:\n";
-    print $fh "    json.loads(fixed)\n";
-    print $fh "    with open(sys.argv[1], 'w') as f:\n";
-    print $fh "        f.write(fixed)\n";
-    print $fh "    print('  Repaired successfully')\n";
-    print $fh "except json.JSONDecodeError as e:\n";
-    print $fh "    print(f'  Could not auto-repair: {e}', file=sys.stderr)\n";
+    print $fh 'import re, json, sys' . "\n";
+    print $fh 'with open(sys.argv[1], "r") as f:' . "\n";
+    print $fh '    text = f.read()' . "\n";
+    print $fh '# Fix unescaped inch marks: digit(s) followed by " then whitespace or JSON delimiter' . "\n";
+    print $fh 'fixed = re.sub(r\'(\d)"(\s)\', r\'\\1 in.\\2\', text)' . "\n";
+    print $fh 'fixed = re.sub(r\'(\d)"([,}])\', r\'\\1 in."\\2\', fixed)' . "\n";
+    print $fh 'try:' . "\n";
+    print $fh '    json.loads(fixed)' . "\n";
+    print $fh '    with open(sys.argv[1], "w") as f:' . "\n";
+    print $fh '        f.write(fixed)' . "\n";
+    print $fh '    print("  Repaired successfully")' . "\n";
+    print $fh 'except json.JSONDecodeError as e:' . "\n";
+    print $fh '    print(f"  Could not auto-repair: {e}", file=sys.stderr)' . "\n";
     print $fh "PYEOF\n";
     print $fh "done\n\n";
 
