@@ -324,6 +324,20 @@ html.dark .error-toggle { color: var(--accent); }
   padding: .5rem; margin-top: .3rem; color: var(--text);
 }
 .error-full.open { display: block; }
+.submit-status.has-error {
+  background: #fef2f2; border-left: 3px solid var(--red); padding: .5rem .75rem;
+  border-radius: 0 6px 6px 0; text-align: left; font-size: .82rem;
+}
+html.dark .submit-status.has-error { background: #7f1d1d; }
+.submit-status.has-error::before { content: '\26A0 '; font-weight: 700; }
+.stalled-row td { background: rgba(251,191,36,.06) !important; }
+html.dark .stalled-row td { background: rgba(251,191,36,.08) !important; }
+.stalled-badge {
+  display: inline-block; padding: .1rem .4rem; border-radius: 8px;
+  font-size: .62rem; font-weight: 600; margin-left: .4rem;
+  background: #fffbeb; color: #92400e;
+}
+html.dark .stalled-badge { background: #78350f; color: #fbbf24; }
 .log-links { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .3rem; }
 .log-links a {
   font-size: .62rem; color: var(--primary); text-decoration: none;
@@ -794,6 +808,7 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
     const data = await resp.json();
     if (resp.ok) {
       status.textContent = 'Submitted! Job ID: ' + data.id;
+      status.className = 'submit-status';
       status.style.color = 'var(--green)';
       form.reset();
       fileLabel.textContent = '';
@@ -815,6 +830,7 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
 
   function showErr(msg) {
     status.textContent = msg;
+    status.className = 'submit-status has-error';
     status.style.color = 'var(--red)';
     btn.disabled = false;
     btn.classList.remove('loading');
