@@ -807,7 +807,8 @@ sub spawn_review {
     print $fh "  [ -f \"\$candidate\" ] && { GIT_BASH=\"\$candidate\"; break; }\n";
     print $fh "done\n";
     print $fh "if [ -n \"\$GIT_BASH\" ]; then\n";
-    # Claude CLI on Windows needs backslash path for GIT_BASH
+    # Claude CLI on Windows needs a clean Windows path (no mixed separators)
+    print $fh "  GIT_BASH=\$(cygpath -w \"\$GIT_BASH\" 2>/dev/null || echo \"\$GIT_BASH\")\n";
     print $fh "  export CLAUDE_CODE_GIT_BASH_PATH=\"\$GIT_BASH\"\n";
     print $fh "fi\n\n";
 
