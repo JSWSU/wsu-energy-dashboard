@@ -81,20 +81,12 @@ sub send_response {
     my $status = $code == 200 ? 'OK' : $code == 201 ? 'Created' : $code == 204 ? 'No Content'
         : $code == 400 ? 'Bad Request' : $code == 404 ? 'Not Found'
         : $code == 413 ? 'Payload Too Large' : $code == 500 ? 'Internal Server Error' : 'Error';
-    my $output = "HTTP/1.0 $code $status\r\n"
+    print $c "HTTP/1.0 $code $status\r\n"
         . "Content-Type: $ct\r\n"
         . "Content-Length: " . length($body) . "\r\n"
-        . "Connection: close\r\n"
         . "Access-Control-Allow-Origin: *\r\n"
         . "\r\n"
         . $body;
-    my $off = 0;
-    my $len = length($output);
-    while ($off < $len) {
-        my $written = syswrite($c, $output, $len - $off, $off);
-        last unless defined $written && $written > 0;
-        $off += $written;
-    }
 }
 
 sub send_json {
@@ -1022,7 +1014,6 @@ sub spawn_review {
 
 while (my $c = $srv->accept) {
     binmode $c;
-    my $prev = select $c; $| = 1; select $prev;
 
     # 30-second timeout for initial request read (prevents dead connections from blocking)
     my $sel = IO::Select->new($c);
@@ -1037,14 +1028,10 @@ while (my $c = $srv->accept) {
     my ($method, $path) = ($1, $2);
     $path =~ s/\?.*//;  # strip query string
 
-    # Read all headers (with 30s timeout to prevent slowloris)
+    # Read all headers
     my %headers;
     my $header_ok = 1;
     while (1) {
-        unless ($sel->can_read(30)) {
-            $header_ok = 0;
-            last;
-        }
         my $hdr = <$c>;
         unless (defined $hdr) { $header_ok = 0; last; }
         $hdr =~ s/\r?\n$//;
@@ -1057,7 +1044,6 @@ while (my $c = $srv->accept) {
         close $c;
         next;
     }
-
     # CORS preflight
     if ($method eq 'OPTIONS') {
         print $c "HTTP/1.0 204 No Content\r\n"
@@ -1307,6 +1293,5 @@ while (my $c = $srv->accept) {
         send_response($c, 405, 'text/plain', 'Method not allowed');
     }
 
-    shutdown($c, 1);  # signal end-of-data to browser
     close $c;
 }
