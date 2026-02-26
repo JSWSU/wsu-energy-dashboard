@@ -431,10 +431,10 @@ sub check_job_status {
                 $detail = "All $expected disciplines scanned";
             } elsif ($done > 0) {
                 $pct = 7 + int(5 * $done / $expected);
-                $detail = "Scanning: $done of $expected disciplines complete (waves of 3)";
+                $detail = "Scanning: $done of $expected disciplines complete";
             } elsif ($scanning > 0) {
                 $pct = 7;
-                $detail = "Scanning $expected disciplines in waves...";
+                $detail = "Scanning $expected disciplines...";
             }
         }
 
@@ -873,9 +873,8 @@ sub spawn_review {
     print $fh "fi\n";
     print $fh "echo \"Phase 0 complete.\" >> \"$output_dir/progress.log\"\n\n";
 
-    # Phase 1: batched wave discipline CLIs (MAX_PARALLEL=3 to prevent RAM exhaustion)
-    # Smart ordering: interleave slow disciplines (large standards) with fast ones
-    # so each wave finishes around the same time.
+    # Phase 1: parallel discipline CLIs (all 8 run simultaneously — API-bound, not CPU-bound)
+    # Wave priority kept for ordering; with MAX_PARALLEL=8, all fit in a single wave.
     my %wave_priority = (
         'communications' => 1,   # Wave 1 - slow (399KB standards)
         'plumbing'       => 1,   # Wave 1 - fast (49KB)
@@ -886,7 +885,7 @@ sub spawn_review {
         'hvac-controls'  => 3,   # Wave 3 - medium (196KB)
         'arch-structure'  => 3,  # Wave 3 - medium (163KB)
     );
-    my $MAX_PARALLEL = 3;
+    my $MAX_PARALLEL = 8;  # all disciplines run simultaneously (API-bound, not CPU-bound)
 
     # Sort @active into waves based on priority (unrecognized keys go to last wave)
     my @sorted = sort { ($wave_priority{$a->{key}} || 99) <=> ($wave_priority{$b->{key}} || 99) } @active;
@@ -898,8 +897,8 @@ sub spawn_review {
     }
     my $num_waves = scalar @waves;
 
-    print $fh "# === PHASE 1: Batched discipline scans ($expected_count CLIs in $num_waves waves of $MAX_PARALLEL max) ===\n";
-    print $fh "echo \"Phase 1: Launching $expected_count discipline scans in $num_waves waves (max $MAX_PARALLEL parallel)...\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "# === PHASE 1: $expected_count parallel discipline scans ===\n";
+    print $fh "echo \"Phase 1: Launching $expected_count discipline scans (all parallel)...\" >> \"$output_dir/progress.log\"\n\n";
 
     for my $wi (0 .. $#waves) {
         my $wave = $waves[$wi];
@@ -907,10 +906,10 @@ sub spawn_review {
         my $wave_count = scalar @$wave;
         my $wave_names = join(', ', map { $_->{name} } @$wave);
 
-        print $fh "# --- Wave $wave_num of $num_waves ($wave_count disciplines: $wave_names) ---\n";
+        print $fh "# --- Batch $wave_num of $num_waves ($wave_count disciplines: $wave_names) ---\n";
         print $fh "WAVE_PIDS=\"\"\n";
-        print $fh "echo \"Wave $wave_num/$num_waves: Launching $wave_count disciplines...\"\n";
-        print $fh "echo \"Wave $wave_num/$num_waves: $wave_names\" >> \"$output_dir/progress.log\"\n\n";
+        print $fh "echo \"Launching $wave_count disciplines: $wave_names\"\n";
+        print $fh "echo \"Launching: $wave_names\" >> \"$output_dir/progress.log\"\n\n";
 
         for my $grp (@$wave) {
             my $pfile   = "$job_dir/prompt-$grp->{key}.txt";
@@ -931,14 +930,14 @@ sub spawn_review {
             print $fh "WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n\n";
         }
 
-        print $fh "# Wait for wave $wave_num to complete, then kill orphaned children\n";
-        print $fh "echo \"Waiting for wave $wave_num ($wave_count disciplines)...\"\n";
+        print $fh "# Wait for batch $wave_num to complete, then kill orphaned children\n";
+        print $fh "echo \"Waiting for $wave_count disciplines...\"\n";
         print $fh "wait\n";
         print $fh "cleanup_wave\n";
-        print $fh "echo \"Wave $wave_num/$num_waves complete.\" >> \"$output_dir/progress.log\"\n\n";
+        print $fh "echo \"Batch $wave_num/$num_waves complete.\" >> \"$output_dir/progress.log\"\n\n";
     }
 
-    print $fh "echo \"Phase 1 complete ($expected_count disciplines in $num_waves waves).\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 1 complete ($expected_count disciplines).\" >> \"$output_dir/progress.log\"\n\n";
 
     # Validate Phase 1 output
     print $fh "# Validate Phase 1 output\n";
@@ -1004,7 +1003,7 @@ sub spawn_review {
 
     my $group_names = join(', ', map { $_->{name} } @active);
     print "[" . localtime() . "] Spawning pipeline for job $job_id\n";
-    print "  Phase 1:  " . scalar(@active) . " CLIs in " . scalar(@waves) . " waves of $MAX_PARALLEL max (Sonnet) -> JSON\n";
+    print "  Phase 1:  " . scalar(@active) . " CLIs, all parallel (Sonnet) -> JSON\n";
     print "  Phase 2a: Python synthesis -> review-data.json\n";
     print "  Phase 2b: Claude Haiku -> executive-summary.txt\n";
     print "  Phase 3:  Local Python -> reports\n";
