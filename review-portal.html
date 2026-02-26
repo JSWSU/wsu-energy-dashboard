@@ -269,6 +269,16 @@ html.dark .disc-toggle { color: var(--accent); }
 .disc-icon.scanning { background: var(--accent); color: #fff; animation: pulse 1.5s infinite; }
 .disc-icon.pending { background: var(--border); color: var(--text-light); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite;
+  vertical-align: middle; margin-right: .4rem;
+}
+.spinner.dark { border-color: rgba(0,0,0,.15); border-top-color: var(--primary); }
+.submit-btn.loading { display: flex; align-items: center; justify-content: center; gap: .4rem; }
+.auth-card button:disabled { opacity: .6; cursor: not-allowed; }
+.queue-loading { display: flex; align-items: center; justify-content: center; gap: .5rem; color: var(--text-light); padding: 2rem 0; }
 .disc-name { color: var(--text); }
 .disc-time { color: var(--text-light); font-size: .6rem; margin-left: auto; }
 .elapsed-time { font-size: .62rem; color: var(--text-light); margin-top: .2rem; }
@@ -627,6 +637,8 @@ const AUTH_KEY = 'wsuReviewAuth';
 const AUTH_PASS = 'Energy@WSU';
 function checkAuth() {
   const input = document.getElementById('authPass');
+  const btn = document.querySelector('.auth-card button');
+  btn.disabled = true;
   if (input.value === AUTH_PASS) {
     localStorage.setItem(AUTH_KEY, 'ok');
     document.getElementById('authGate').style.display = 'none';
@@ -634,6 +646,7 @@ function checkAuth() {
     document.getElementById('authError').style.display = 'block';
     input.value = '';
     input.focus();
+    btn.disabled = false;
   }
 }
 if (localStorage.getItem(AUTH_KEY) === 'ok') {
@@ -706,7 +719,8 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
   const btn = document.getElementById('submitBtn');
   const status = document.getElementById('submitStatus');
   btn.disabled = true;
-  btn.textContent = 'Submitting...';
+  btn.classList.add('loading');
+  btn.innerHTML = '<span class="spinner"></span>Submitting...';
   status.textContent = '';
   status.style.color = '';
 
@@ -761,9 +775,11 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
     status.textContent = msg;
     status.style.color = 'var(--red)';
     btn.disabled = false;
+    btn.classList.remove('loading');
     btn.textContent = 'Submit for Review';
   }
   btn.disabled = false;
+  btn.classList.remove('loading');
   btn.textContent = 'Submit for Review';
 });
 
