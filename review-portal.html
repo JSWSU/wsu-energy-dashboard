@@ -813,6 +813,8 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
       form.reset();
       fileLabel.textContent = '';
       zone.classList.remove('has-file');
+      updateDivCount();
+      document.getElementById('uploadMessage').className = 'upload-message';
       document.querySelector('[data-tab="queue"]').click();
       refreshQueue();
     } else if (resp.status === 409) {
