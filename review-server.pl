@@ -729,6 +729,10 @@ sub spawn_review {
         $p .= "  ]\n";
         $p .= "}\n\n";
         $p .= "CRITICAL: Output MUST be valid JSON. Include ALL requirements (both compliant and non-compliant).\n";
+        $p .= "CRITICAL: Properly escape all double quotes inside JSON string values.\n";
+        $p .= "   Architectural measurements must NOT contain unescaped quotes.\n";
+        $p .= "   WRONG: \"5'-0\\\" from wall\"   CORRECT: \"5 ft-0 in. from wall\"\n";
+        $p .= "   WRONG: \"3/4\\\" pipe\"         CORRECT: \"3/4 in. pipe\"\n";
         $p .= "For compliant requirements: status=\"C\", severity=null, finding_id=null, issue=null, required_action=null.\n";
         $p .= "Summary counts MUST match: total_requirements = compliant + deviations + omissions + concerns.\n\n";
 
@@ -941,6 +945,33 @@ sub spawn_review {
     }
 
     print $fh "echo \"Phase 1 complete ($expected_count disciplines).\" >> \"$output_dir/progress.log\"\n\n";
+
+    # JSON sanitization: fix unescaped quotes in measurement strings
+    print $fh "# --- Post-process: fix common JSON errors ---\n";
+    print $fh "echo \"Sanitizing JSON output...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "for jf in \"$output_dir\"/discipline-*-findings.json; do\n";
+    print $fh "  [ -f \"\$jf\" ] || continue\n";
+    print $fh "  if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
+    print $fh "    continue\n";
+    print $fh "  fi\n";
+    print $fh "  echo \"Repairing malformed JSON: \$(basename \$jf)\"\n";
+    print $fh "  \"\$PYTHON\" - \"\$jf\" <<'PYEOF'\n";
+    print $fh "import re, json, sys\n";
+    print $fh "with open(sys.argv[1], 'r') as f:\n";
+    print $fh "    text = f.read()\n";
+    print $fh "# Fix unescaped inch marks: digit(s) followed by \" then non-JSON-delimiter\n";
+    print $fh "# e.g., 5'-0\" from  ->  5'-0 in. from\n";
+    print $fh "fixed = re.sub(r\"(\\d)\\\"(\\s)\", r\"\\1 in.\\2\", text)\n";
+    print $fh "fixed = re.sub(r\"(\\d)\\\"([,}])\", r'\\1 in.\"\\2', fixed)\n";
+    print $fh "try:\n";
+    print $fh "    json.loads(fixed)\n";
+    print $fh "    with open(sys.argv[1], 'w') as f:\n";
+    print $fh "        f.write(fixed)\n";
+    print $fh "    print('  Repaired successfully')\n";
+    print $fh "except json.JSONDecodeError as e:\n";
+    print $fh "    print(f'  Could not auto-repair: {e}', file=sys.stderr)\n";
+    print $fh "PYEOF\n";
+    print $fh "done\n\n";
 
     # Validate Phase 1 output
     print $fh "# Validate Phase 1 output\n";
