@@ -884,7 +884,22 @@ function buildTracker(pct, stalled, detail, stalledPhase) {
     {at: 99,  label: 'Finalizing'},
     {at: 100, label: 'Complete'}
   ];
-  const barPct = Math.min(100, Math.max(0, pct));
+  // Map raw pct to visual position so bar fill aligns with evenly-spaced milestones
+  var barPct;
+  if (pct <= steps[0].at) { barPct = 0; }
+  else if (pct >= steps[steps.length - 1].at) { barPct = 100; }
+  else {
+    barPct = 0;
+    for (var si = 0; si < steps.length - 1; si++) {
+      if (pct >= steps[si].at && pct <= steps[si + 1].at) {
+        var frac = (pct - steps[si].at) / (steps[si + 1].at - steps[si].at);
+        var visStart = (si / (steps.length - 1)) * 100;
+        var visEnd = ((si + 1) / (steps.length - 1)) * 100;
+        barPct = visStart + frac * (visEnd - visStart);
+        break;
+      }
+    }
+  }
   const fillClass = pct >= 100 ? ' complete' : (stalled ? ' stalled' : '');
   let html = '<div class="tracker">';
   html += '<div class="tracker-bar">';
@@ -1087,7 +1102,9 @@ async function refreshQueue() {
     pollInterval = POLL_BASE;
     if (banner) banner.classList.remove('visible');
 
-    if (changed) applyQueueFilters();
+    // Always re-render if any job is processing (elapsedSeconds changes each poll)
+    var hasProcessing = newData.some(function(j) { return (j.status||'').toLowerCase() === 'processing'; });
+    if (changed || hasProcessing) applyQueueFilters();
   } catch (err) {
     pollFailures++;
     pollInterval = Math.min(POLL_MAX, POLL_BASE * Math.pow(1.5, pollFailures));

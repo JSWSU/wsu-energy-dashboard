@@ -39,6 +39,7 @@ SEVERITY_NORMALIZE = {
     'low': 'Minor', 'minor': 'Minor',
     'medium': 'Major', 'moderate': 'Major', 'major': 'Major',
     'high': 'Critical', 'critical': 'Critical',
+    'n/a': None, 'na': None, 'not applicable': None, 'none': None,
 }
 
 SEVERITY_ORDER = {'Critical': 0, 'Major': 1, 'Minor': 2}
@@ -62,6 +63,59 @@ def extract_discipline_key(filepath):
     return m.group(1) if m else None
 
 
+def normalize_item_fields(item):
+    """Map variant field names to canonical schema. Handles all known Claude output variants."""
+    # Field name aliases: canonical_name -> [alternate names]
+    ALIASES = {
+        'issue':              ['description', 'issue_description', 'finding_description'],
+        'required_action':    ['recommendation', 'action', 'corrective_action', 'action_required'],
+        'standard_reference': ['standard_citation', 'standard', 'reference'],
+        'finding_id':         ['id', 'finding_number'],
+        'requirement':        ['requirement_text', 'req_text', 'title'],
+        'pdf_reference':      ['drawing_reference', 'page_reference', 'sheet_reference'],
+        'drawing_sheet':      ['sheet', 'drawing'],
+        'notes':              ['note', 'comment', 'remarks'],
+    }
+
+    for canonical, alts in ALIASES.items():
+        if canonical not in item or item[canonical] is None:
+            for alt in alts:
+                if alt in item and item[alt] is not None:
+                    item[canonical] = item[alt]
+                    break
+
+    # Normalize bracketed status: "[X]" -> "X", "[O]" -> "O"
+    st = item.get('status', '')
+    if isinstance(st, str) and st.startswith('[') and st.endswith(']'):
+        item['status'] = st[1:-1]
+
+    return item
+
+
+def normalize_discipline_data(data):
+    """Normalize top-level structure: accept 'findings' as alias for 'requirements'."""
+    # If 'requirements' is missing/empty but 'findings' has items, use 'findings'
+    reqs = data.get('requirements', [])
+    findings = data.get('findings', [])
+
+    if not reqs and findings:
+        data['requirements'] = findings
+        print(f"      (mapped 'findings' -> 'requirements': {len(findings)} items)")
+
+    # Normalize divisions_reviewed aliases
+    if 'divisions_reviewed' not in data:
+        for alt in ('csi_divisions_reviewed', 'divisions', 'divs'):
+            if alt in data and data[alt]:
+                data['divisions_reviewed'] = data[alt]
+                break
+
+    # Normalize each requirement item's field names
+    for item in data.get('requirements', []):
+        normalize_item_fields(item)
+
+    return data
+
+
 def load_discipline(filepath):
     """Read + parse one discipline JSON file. Returns (key, data) or (None, None)."""
     key = extract_discipline_key(filepath)
@@ -75,6 +129,9 @@ def load_discipline(filepath):
     except (json.JSONDecodeError, OSError) as e:
         print(f"ERROR: Cannot read {filepath}: {e}", file=sys.stderr)
         return None, None
+
+    # Normalize schema variants before returning
+    normalize_discipline_data(data)
 
     return key, data
 
@@ -113,9 +170,9 @@ def normalize_severity(raw_severity):
     """Normalize severity string. Returns 'Critical', 'Major', 'Minor', or None."""
     if not raw_severity or raw_severity == 'null':
         return None
-    normalized = SEVERITY_NORMALIZE.get(raw_severity.lower().strip())
-    if normalized:
-        return normalized
+    key = raw_severity.lower().strip()
+    if key in SEVERITY_NORMALIZE:
+        return SEVERITY_NORMALIZE[key]  # may be None for 'n/a'
     # If already correct case
     if raw_severity in SEVERITY_ORDER:
         return raw_severity
@@ -428,6 +485,23 @@ def write_synthesis_stats(output_dir, data):
         lines.append(f"  {name}: {t} requirements, {pct} compliant, "
                      f"{s.get('deviations',0)}D / {s.get('omissions',0)}O / {s.get('concerns',0)}X")
 
+    # Missing / failed disciplines
+    missing = data.get('missingDisciplines', [])
+    empty = data.get('emptyDisciplines', [])
+    if missing or empty:
+        lines.append('')
+        lines.append('INCOMPLETE REVIEW WARNING:')
+        if missing:
+            lines.append(f"  {len(missing)} discipline(s) failed to produce any results:")
+            for md in missing:
+                lines.append(f"    - {md['name']}")
+        if empty:
+            lines.append(f"  {len(empty)} discipline(s) produced empty results (0 requirements):")
+            for ed in empty:
+                lines.append(f"    - {ed['name']}")
+        lines.append("  The compliance statistics above reflect ONLY the disciplines that produced results.")
+        lines.append("  This review is INCOMPLETE — the missing disciplines were not evaluated.")
+
     if sev['Critical'] > 0:
         lines.append('')
         lines.append('CRITICAL FINDINGS:')
@@ -519,6 +593,37 @@ def main():
             },
         })
 
+    # Detect missing disciplines (expected from job.json but no JSON file produced)
+    expected_groups = job.get('disciplineGroups', [])
+    loaded_keys = {key for key, _ in all_disciplines}
+    missing_disciplines = []
+    for grp in expected_groups:
+        gk = grp.get('key', '')
+        if gk and gk not in loaded_keys:
+            missing_disciplines.append({
+                'key': gk,
+                'name': grp.get('name', DISCIPLINE_META.get(gk, gk)),
+                'reason': 'No findings file produced (discipline scan failed)',
+            })
+    # Also flag disciplines that loaded but had 0 requirements
+    empty_disciplines = []
+    for disc_key, disc_data in all_disciplines:
+        if len(disc_data.get('requirements', [])) == 0:
+            empty_disciplines.append({
+                'key': disc_key,
+                'name': DISCIPLINE_META.get(disc_key, disc_key),
+                'reason': 'Findings file exists but contains 0 requirements',
+            })
+
+    if missing_disciplines:
+        print(f"  WARNING: {len(missing_disciplines)} disciplines missing:")
+        for md in missing_disciplines:
+            print(f"    - {md['name']}: {md['reason']}")
+    if empty_disciplines:
+        print(f"  WARNING: {len(empty_disciplines)} disciplines empty:")
+        for ed in empty_disciplines:
+            print(f"    - {ed['name']}: {ed['reason']}")
+
     # Merge findings
     print("  Merging findings...")
     findings, requirements, id_map, variances = merge_findings(all_disciplines)
@@ -540,6 +645,8 @@ def main():
         'requirements': requirements,
         'variances': variances,
         'narratives': narratives,
+        'missingDisciplines': missing_disciplines,
+        'emptyDisciplines': empty_disciplines,
     }
 
     # Validate
