@@ -666,6 +666,7 @@ sub spawn_review {
     }
 
     # --- Write per-discipline prompt files (Phase 1) ---
+    my $job_rel = "reviews/$job_id";
     my $common_header = "Project: $job->{projectName}\n"
         . "Phase: $job->{reviewPhase}\n"
         . "Construction type: $job->{constructionType}\n\n";
@@ -681,8 +682,10 @@ sub spawn_review {
         $p .= "Focus on: $grp->{desc}\n\n";
 
         $p .= "INSTRUCTIONS:\n";
-        $p .= "1. Read the PDF at reviews/$job_id/input.pdf.\n";
-        $p .= "   Focus on sheets relevant to this discipline but review the full drawing set for context.\n";
+        $p .= "1. Read the extracted page text files in $job_rel/pages/.\n";
+        $p .= "   Start by reading $job_rel/pages/manifest.txt for the page list.\n";
+        $p .= "   Focus on pages relevant to this discipline but review all pages for context.\n";
+        $p .= "   These are pre-extracted text from the construction drawings PDF.\n";
         $p .= "2. Read the combined standards file at $combined_file.\n";
         $p .= "   This file contains ALL WSU standards for this discipline — read it IN ITS ENTIRETY.\n";
         $p .= "3. For EVERY numbered requirement, clause, and sub-clause in the standards:\n";
@@ -758,7 +761,8 @@ sub spawn_review {
     {
         open my $dbg, '>', "$job_dir/prompt.txt" or warn "Cannot write prompt.txt: $!\n";
         if ($dbg) {
-            print $dbg "=== 3-PHASE PIPELINE ARCHITECTURE ===\n";
+            print $dbg "=== PIPELINE ARCHITECTURE ===\n";
+            print $dbg "Phase 0: PDF text extraction (one-time, pdfplumber)\n";
             print $dbg "Phase 1: " . scalar(@active) . " parallel Claude CLIs (Sonnet) -> JSON findings\n";
             print $dbg "Phase 2a: Python synthesize.py -> review-data.json (zero tokens)\n";
             print $dbg "Phase 2b: Claude CLI (Haiku) -> executive-summary.txt\n";
@@ -780,7 +784,7 @@ sub spawn_review {
         }
     }
 
-    # --- Write 3-phase bash script ---
+    # --- Write review bash script ---
     my $script = "$job_dir/run-review.sh";
     my $expected_count = scalar @active;
     open my $fh, '>', $script or do {
@@ -790,7 +794,8 @@ sub spawn_review {
 
     # Script header
     print $fh "#!/bin/bash\n";
-    print $fh "# 3-phase parallel review: $job_id\n";
+    print $fh "# Multi-phase parallel review: $job_id\n";
+    print $fh "# Phase 0:  PDF text extraction (one-time, pdfplumber)\n";
     print $fh "# Phase 1:  $expected_count parallel discipline scans (Sonnet) -> JSON\n";
     print $fh "# Phase 2a: Python synthesis -> review-data.json (zero tokens)\n";
     print $fh "# Phase 2b: Claude Haiku -> executive-summary.txt\n";
@@ -856,7 +861,17 @@ sub spawn_review {
     print $fh "  exit 1\n";
     print $fh "fi\n";
     print $fh "echo \"Using Python: \$PYTHON\"\n";
-    print $fh "\"\$PYTHON\" -m pip install --quiet openpyxl python-docx 2>/dev/null\n\n";
+    print $fh "\"\$PYTHON\" -m pip install --quiet openpyxl python-docx pdfplumber 2>/dev/null\n\n";
+
+    # Phase 0: One-time PDF text extraction
+    print $fh "# === PHASE 0: One-time PDF text extraction ===\n";
+    print $fh "echo \"Phase 0: Extracting PDF text...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "\"\$PYTHON\" \"$ROOT/extract_pdf.py\" \"$job_dir/input.pdf\" \"$job_dir/pages\"\n";
+    print $fh "if [ \$? -ne 0 ]; then\n";
+    print $fh "  echo \"ERROR: extract_pdf.py failed. Check that pdfplumber is installed.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "echo \"Phase 0 complete.\" >> \"$output_dir/progress.log\"\n\n";
 
     # Phase 1: batched wave discipline CLIs (MAX_PARALLEL=3 to prevent RAM exhaustion)
     # Smart ordering: interleave slow disciplines (large standards) with fast ones
@@ -884,7 +899,7 @@ sub spawn_review {
     my $num_waves = scalar @waves;
 
     print $fh "# === PHASE 1: Batched discipline scans ($expected_count CLIs in $num_waves waves of $MAX_PARALLEL max) ===\n";
-    print $fh "echo \"Phase 1: Launching $expected_count discipline scans in $num_waves waves (max $MAX_PARALLEL parallel)...\" > \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 1: Launching $expected_count discipline scans in $num_waves waves (max $MAX_PARALLEL parallel)...\" >> \"$output_dir/progress.log\"\n\n";
 
     for my $wi (0 .. $#waves) {
         my $wave = $waves[$wi];
@@ -988,7 +1003,7 @@ sub spawn_review {
     chmod 0755, $script;
 
     my $group_names = join(', ', map { $_->{name} } @active);
-    print "[" . localtime() . "] Spawning 3-phase pipeline for job $job_id\n";
+    print "[" . localtime() . "] Spawning pipeline for job $job_id\n";
     print "  Phase 1:  " . scalar(@active) . " CLIs in " . scalar(@waves) . " waves of $MAX_PARALLEL max (Sonnet) -> JSON\n";
     print "  Phase 2a: Python synthesis -> review-data.json\n";
     print "  Phase 2b: Claude Haiku -> executive-summary.txt\n";
