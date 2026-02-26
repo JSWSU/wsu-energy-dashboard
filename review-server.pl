@@ -823,6 +823,8 @@ sub spawn_review {
     print $fh "  export CLAUDE_CODE_GIT_BASH_PATH=\"\$GIT_BASH\"\n";
     print $fh "fi\n\n";
 
+    print $fh "export CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000\n\n";
+
     print $fh "cd \"$ROOT\"\n\n";
 
     # Write PID file for recovery daemon's job-specific process detection
@@ -917,12 +919,14 @@ sub spawn_review {
         print $fh "echo \"Launching $wave_count disciplines: $wave_names\"\n";
         print $fh "echo \"Launching: $wave_names\" >> \"$output_dir/progress.log\"\n\n";
 
+        my $wave_size = scalar @$wave;
+        my $grp_idx = 0;
         for my $grp (@$wave) {
             my $pfile   = "$job_dir/prompt-$grp->{key}.txt";
             my $stdout  = "$output_dir/$grp->{key}-stdout.log";
             my $stderr  = "$output_dir/$grp->{key}-stderr.log";
 
-            (my $var_key = uc($grp->{key})) =~ s/-/_/g;  # bash-safe var name
+            (my $var_key = uc($grp->{key})) =~ s/-/_/g;
             print $fh "# Discipline: $grp->{name}\n";
             print $fh "echo \"  Launching: $grp->{name}...\"\n";
             print $fh "PROMPT_${var_key}=\$(cat \"$pfile\")\n";
@@ -933,7 +937,13 @@ sub spawn_review {
             print $fh "  --output-format text \\\n";
             print $fh "  > \"$stdout\" \\\n";
             print $fh "  2> \"$stderr\" &\n";
-            print $fh "WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n\n";
+            print $fh "WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n";
+            $grp_idx++;
+            # Stagger launches to avoid API rate limiting
+            if ($grp_idx < $wave_size) {
+                print $fh "sleep 3\n";
+            }
+            print $fh "\n";
         }
 
         print $fh "# Wait for batch $wave_num to complete, then kill orphaned children\n";
@@ -993,12 +1003,14 @@ sub spawn_review {
 
     print $fh "if [ -n \"\$MISSING\" ]; then\n";
     print $fh "  echo \"Retrying failed disciplines:\$MISSING\" >> \"$output_dir/progress.log\"\n";
-    print $fh "  STILL_MISSING=\"\"\n";
-    print $fh "  for key in \$MISSING; do\n";
-    print $fh "    RETRY_OK=0\n";
-    print $fh "    for attempt in 1 2 3; do\n";
-    print $fh "      echo \"  Retry \$attempt/3 for \$key...\"\n";
-    print $fh "      [ \"\$attempt\" -gt 1 ] && sleep 10\n";
+    print $fh "  for attempt in 1 2 3; do\n";
+    print $fh "    [ -z \"\$MISSING\" ] && break\n";
+    print $fh "    echo \"  Retry attempt \$attempt/3 for:\$MISSING\"\n";
+    print $fh "    echo \"  Retry attempt \$attempt/3 for:\$MISSING\" >> \"$output_dir/progress.log\"\n";
+    print $fh "    [ \"\$attempt\" -gt 1 ] && sleep 10\n";
+    print $fh "    WAVE_PIDS=\"\"\n";
+    # Launch all missing disciplines in parallel
+    print $fh "    for key in \$MISSING; do\n";
     print $fh "      PROMPT_VAR=\$(cat \"$job_dir/prompt-\${key}.txt\")\n";
     print $fh "      \"$CLAUDE_PATH\" -p \"\$PROMPT_VAR\" \\\n";
     print $fh "        --model sonnet \\\n";
@@ -1006,29 +1018,39 @@ sub spawn_review {
     print $fh "        --dangerously-skip-permissions \\\n";
     print $fh "        --output-format text \\\n";
     print $fh "        > \"$output_dir/\${key}-retry-stdout.log\" \\\n";
-    print $fh "        2> \"$output_dir/\${key}-retry-stderr.log\"\n";
+    print $fh "        2> \"$output_dir/\${key}-retry-stderr.log\" &\n";
+    print $fh "      WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n";
+    print $fh "      sleep 3\n";
+    print $fh "    done\n";
+    print $fh "    wait\n";
+    print $fh "    cleanup_wave\n";
+    # Check which succeeded
+    print $fh "    STILL_MISSING=\"\"\n";
+    print $fh "    for key in \$MISSING; do\n";
     print $fh "      jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
     print $fh "      if [ -f \"\$jf\" ]; then\n";
     print $fh "        if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
     print $fh "          FOUND=\$((FOUND + 1))\n";
-    print $fh "          RETRY_OK=1\n";
     print $fh "          echo \"  Retry \$attempt succeeded for \$key\" >> \"$output_dir/progress.log\"\n";
     print $fh "          echo \"  Retry \$attempt succeeded for \$key\"\n";
-    print $fh "          break\n";
     print $fh "        else\n";
     print $fh "          echo \"  Retry \$attempt: invalid JSON for \$key\"\n";
     print $fh "          rm \"\$jf\"\n";
+    print $fh "          STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
     print $fh "        fi\n";
     print $fh "      else\n";
     print $fh "        echo \"  Retry \$attempt: no output for \$key\"\n";
+    print $fh "        STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
     print $fh "      fi\n";
     print $fh "    done\n";
-    print $fh "    if [ \"\$RETRY_OK\" -eq 0 ]; then\n";
-    print $fh "      echo \"  FAILED: \$key after 3 retries\" >> \"$output_dir/progress.log\"\n";
-    print $fh "      STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
-    print $fh "    fi\n";
+    print $fh "    MISSING=\"\$STILL_MISSING\"\n";
     print $fh "  done\n";
-    print $fh "  MISSING=\"\$STILL_MISSING\"\n";
+    # Report any still-missing after all retries
+    print $fh "  if [ -n \"\$MISSING\" ]; then\n";
+    print $fh "    for key in \$MISSING; do\n";
+    print $fh "      echo \"  FAILED: \$key after 3 retries\" >> \"$output_dir/progress.log\"\n";
+    print $fh "    done\n";
+    print $fh "  fi\n";
     print $fh "fi\n\n";
 
     print $fh "echo \"Phase 1 produced \$FOUND of $expected_count valid findings files.\" >> \"$output_dir/progress.log\"\n";
