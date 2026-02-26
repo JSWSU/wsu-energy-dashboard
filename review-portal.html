@@ -273,6 +273,15 @@ html.dark .disc-toggle { color: var(--accent); }
 .disc-time { color: var(--text-light); font-size: .6rem; margin-left: auto; }
 .elapsed-time { font-size: .62rem; color: var(--text-light); margin-top: .2rem; }
 
+/* Refresh indicator */
+.refresh-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green); margin-left: .5rem; vertical-align: middle;
+  opacity: 0; transition: opacity .3s;
+}
+.refresh-dot.flash { opacity: 1; }
+.last-refreshed { font-size: .7rem; color: var(--text-light); margin-left: auto; }
+
 /* Failed job detail */
 .fail-phase { font-size: .7rem; color: var(--red); font-weight: 600; margin-top: .3rem; }
 .fail-completed { font-size: .65rem; color: var(--green); margin-top: .2rem; }
@@ -359,7 +368,7 @@ html.dark .help-section h3 { color: var(--accent); }
   background: var(--red); color: #fff; text-align: center;
   padding: .5rem 1rem; font-size: .82rem; font-weight: 600;
 }
-.conn-banner.visible { display: block; }
+.conn-banner.visible { display: flex; justify-content: center; align-items: center; gap: .5rem; }
 
 /* Footer */
 footer {
@@ -513,10 +522,10 @@ footer {
   <!-- Tab 2: Queue -->
   <div class="section" id="sec-queue">
     <div class="card">
-      <h2>Review Queue</h2>
+      <h2>Review Queue<span class="refresh-dot" id="refreshDot"></span></h2>
       <div class="info-box">
         Reviews typically take 15-20 minutes depending on the number of divisions.
-        This page auto-refreshes every 10 seconds.
+        Queue auto-refreshes when this tab is visible. Pauses when you switch away.
       </div>
       <div class="queue-controls">
         <input type="text" class="queue-search" id="queueSearch" placeholder="Search by project name or job ID..." oninput="applyQueueFilters()">
@@ -542,7 +551,7 @@ footer {
             </tr>
           </thead>
           <tbody id="queueBody">
-            <tr><td colspan="8" style="text-align:center;color:var(--text-light)">Loading...</td></tr>
+            <tr><td colspan="8"><div class="queue-loading"><span class="spinner dark"></span>Loading queue...</div></td></tr>
           </tbody>
         </table>
       </div>
@@ -833,6 +842,13 @@ function buildTracker(pct, stalled, detail, stalledPhase) {
 let queueData = [];
 let statusFilter = 'all';
 let queueStats = { totalJobs: 0, totalBytes: 0 };
+let lastDataHash = '';
+let pollTimer = null;
+let pollInterval = 10000;
+const POLL_BASE = 10000;
+const POLL_MAX = 60000;
+let pollFailures = 0;
+let lastRefreshTime = 0;
 
 function fmtBytes(n) {
   if (n < 1024) return n + ' B';
@@ -880,6 +896,8 @@ function renderQueue(jobs) {
 
   tbody.innerHTML = jobs.map(j => {
     const sc = (j.status || '').toLowerCase();
+    const isStalled = sc === 'processing' && j.stalledMinutes;
+    const rowCls = isStalled ? ' class="stalled-row"' : '';
     const divs = (j.divisions || []).join(', ');
     const time = j.submitted ? new Date(j.submitted).toLocaleString() : '-';
     let dl = '-';
@@ -911,13 +929,14 @@ function renderQueue(jobs) {
     }
     const delBtn = '<button class="btn-delete" onclick="deleteJob(\'' + esc(j.id) + '\',\'' +
       esc((j.projectName || '').replace(/'/g,'')) + '\')" title="Delete job">\uD83D\uDDD1</button>';
-    return '<tr>' +
+    return '<tr' + rowCls + '>' +
       '<td style="font-size:.75rem;white-space:nowrap">' + esc(j.id) + '</td>' +
       '<td>' + esc(j.projectName) + '</td>' +
       '<td>' + esc(j.reviewPhase) + '</td>' +
       '<td style="font-size:.75rem">' + esc(divs) + '</td>' +
       '<td style="font-size:.75rem;white-space:nowrap">' + time + '</td>' +
       '<td><span class="job-status ' + sc + '">' + esc(j.status) + '</span>' +
+        (isStalled ? '<span class="stalled-badge">Stalled</span>' : '') +
         (j.emailSent ? '<span class="email-icon sent" title="Email sent ' + esc(j.emailSentAt) + '">&#9993;</span>'
          : j.emailError ? '<span class="email-icon error" title="Email failed: ' + esc(j.emailError) + '">&#9993;</span>'
          : '') +
@@ -930,20 +949,39 @@ function renderQueue(jobs) {
   }).join('');
 }
 
-// --- Queue Polling ---
-let pollFailures = 0;
+// --- Smart Polling ---
+
+function hashData(data) {
+  return JSON.stringify(data.map(j => j.id + '|' + j.status + '|' + (j.progress||0) + '|' + (j.stalledMinutes||0)));
+}
+
+function updateLastRefreshed() {
+  const el = document.getElementById('lastRefreshed');
+  if (!el || !lastRefreshTime) return;
+  const ago = Math.round((Date.now() - lastRefreshTime) / 1000);
+  if (ago < 5) el.textContent = 'Updated just now';
+  else if (ago < 60) el.textContent = 'Updated ' + ago + 's ago';
+  else el.textContent = 'Updated ' + Math.floor(ago / 60) + 'm ago';
+}
+
 async function refreshQueue() {
   const banner = document.getElementById('connBanner');
+  const dot = document.getElementById('refreshDot');
   try {
     const resp = await fetch('/api/jobs');
     const result = await resp.json();
-    // Backward compat: handle both array and {jobs, totalJobs, totalBytes}
-    queueData = Array.isArray(result) ? result : (result.jobs || []);
+    const newData = Array.isArray(result) ? result : (result.jobs || []);
     queueStats = {
-      totalJobs: result.totalJobs || queueData.length,
+      totalJobs: result.totalJobs || newData.length,
       totalBytes: result.totalBytes || 0,
     };
-    // Update footer
+
+    const newHash = hashData(newData);
+    const changed = newHash !== lastDataHash;
+    queueData = newData;
+    lastDataHash = newHash;
+    lastRefreshTime = Date.now();
+
     const footer = document.getElementById('queueFooter');
     if (footer) {
       const proc = queueData.filter(j => (j.status||'').toLowerCase() === 'processing').length;
@@ -954,20 +992,47 @@ async function refreshQueue() {
         '<span>Processing: ' + proc + '</span>' +
         '<span>Complete: ' + comp + '</span>' +
         '<span>Failed: ' + fail + '</span>' +
-        (queueStats.totalBytes ? '<span>Disk: ' + fmtBytes(queueStats.totalBytes) + '</span>' : '');
+        (queueStats.totalBytes ? '<span>Disk: ' + fmtBytes(queueStats.totalBytes) + '</span>' : '') +
+        '<span class="last-refreshed" id="lastRefreshed"></span>';
     }
+    updateLastRefreshed();
+
+    if (changed && dot) {
+      dot.classList.add('flash');
+      setTimeout(() => dot.classList.remove('flash'), 800);
+    }
+
     pollFailures = 0;
+    pollInterval = POLL_BASE;
     if (banner) banner.classList.remove('visible');
-    applyQueueFilters();
+
+    if (changed) applyQueueFilters();
   } catch (err) {
     pollFailures++;
-    if (pollFailures >= 3 && banner) {
+    pollInterval = Math.min(POLL_MAX, POLL_BASE * Math.pow(1.5, pollFailures));
+    if (pollFailures >= 2 && banner) {
+      banner.textContent = 'Server unreachable \u2014 retry ' + pollFailures + ' (next attempt in ' + Math.round(pollInterval / 1000) + 's)';
       banner.classList.add('visible');
     }
   }
+  schedulePoll();
 }
+
+function schedulePoll() {
+  if (pollTimer) clearTimeout(pollTimer);
+  pollTimer = setTimeout(refreshQueue, pollInterval);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  } else {
+    refreshQueue();
+  }
+});
+
+setInterval(updateLastRefreshed, 5000);
 refreshQueue();
-setInterval(refreshQueue, 10000);
 </script>
 </body>
 </html>
