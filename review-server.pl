@@ -794,6 +794,7 @@ sub spawn_review {
     # --- Write review bash script ---
     my $script = "$job_dir/run-review.sh";
     my $expected_count = scalar @active;
+    my $discipline_keys_str = join(' ', map { $_->{key} } @active);
     open my $fh, '>', $script or do {
         warn "Cannot write $script: $!\n";
         return;
@@ -973,15 +974,56 @@ sub spawn_review {
     print $fh "PYEOF\n";
     print $fh "done\n\n";
 
-    # Validate Phase 1 output
-    print $fh "# Validate Phase 1 output\n";
+    # Validate Phase 1 output and retry failed disciplines
+    print $fh "# === Validate and retry failed disciplines ===\n";
     print $fh "FOUND=0\n";
-    print $fh "for f in \"$output_dir\"/discipline-*-findings.json; do\n";
-    print $fh "  [ -f \"\$f\" ] && FOUND=\$((FOUND + 1))\n";
-    print $fh "done\n";
-    print $fh "echo \"Phase 1 produced \$FOUND of $expected_count findings files.\"\n";
+    print $fh "MISSING=\"\"\n";
+    print $fh "for key in $discipline_keys_str; do\n";
+    print $fh "  jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
+    print $fh "  if [ -f \"\$jf\" ]; then\n";
+    print $fh "    if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
+    print $fh "      FOUND=\$((FOUND + 1))\n";
+    print $fh "    else\n";
+    print $fh "      echo \"Invalid JSON for \$key after sanitization — will retry\"\n";
+    print $fh "      rm \"\$jf\"\n";
+    print $fh "      MISSING=\"\$MISSING \$key\"\n";
+    print $fh "    fi\n";
+    print $fh "  else\n";
+    print $fh "    echo \"Missing output for \$key — will retry\"\n";
+    print $fh "    MISSING=\"\$MISSING \$key\"\n";
+    print $fh "  fi\n";
+    print $fh "done\n\n";
+
+    print $fh "if [ -n \"\$MISSING\" ]; then\n";
+    print $fh "  echo \"Retrying failed disciplines:\$MISSING\" >> \"$output_dir/progress.log\"\n";
+    print $fh "  for key in \$MISSING; do\n";
+    print $fh "    echo \"  Retrying: \$key...\"\n";
+    print $fh "    PROMPT_VAR=\$(cat \"$job_dir/prompt-\${key}.txt\")\n";
+    print $fh "    \"$CLAUDE_PATH\" -p \"\$PROMPT_VAR\" \\\n";
+    print $fh "      --model sonnet \\\n";
+    print $fh "      --allowedTools Read Write \\\n";
+    print $fh "      --dangerously-skip-permissions \\\n";
+    print $fh "      --output-format text \\\n";
+    print $fh "      > \"$output_dir/\${key}-retry-stdout.log\" \\\n";
+    print $fh "      2> \"$output_dir/\${key}-retry-stderr.log\"\n";
+    print $fh "    # Check retry result\n";
+    print $fh "    jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
+    print $fh "    if [ -f \"\$jf\" ]; then\n";
+    print $fh "      if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
+    print $fh "        FOUND=\$((FOUND + 1))\n";
+    print $fh "        echo \"  Retry succeeded for \$key\"\n";
+    print $fh "      else\n";
+    print $fh "        echo \"  Retry still produced invalid JSON for \$key\"\n";
+    print $fh "      fi\n";
+    print $fh "    else\n";
+    print $fh "      echo \"  Retry produced no output for \$key\"\n";
+    print $fh "    fi\n";
+    print $fh "  done\n";
+    print $fh "fi\n\n";
+
+    print $fh "echo \"Phase 1 produced \$FOUND of $expected_count valid findings files.\"\n";
     print $fh "if [ \"\$FOUND\" -lt 1 ]; then\n";
-    print $fh "  echo \"ERROR: No discipline findings JSON files produced. Check stderr logs.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  echo \"ERROR: No valid discipline findings produced. Check stderr logs.\" > \"$output_dir/FAILED\"\n";
     print $fh "  exit 1\n";
     print $fh "fi\n\n";
 
