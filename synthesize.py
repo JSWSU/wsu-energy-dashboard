@@ -89,7 +89,24 @@ def normalize_item_fields(item):
     if isinstance(st, str) and st.startswith('[') and st.endswith(']'):
         item['status'] = st[1:-1]
 
+    # Fix double-encoded UTF-8 in text fields
+    for field in ('issue', 'required_action', 'standard_reference', 'requirement', 'notes'):
+        val = item.get(field)
+        if val:
+            item[field] = fix_double_encoding(val)
+
     return item
+
+
+def fix_double_encoding(text):
+    """Fix double-encoded UTF-8 (e.g., Â§ -> §, â€" -> —)."""
+    if not isinstance(text, str):
+        return text
+    try:
+        # Detect double-encoding: encode as latin-1 then decode as UTF-8
+        return text.encode('latin-1').decode('utf-8')
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return text  # not double-encoded, return as-is
 
 
 def normalize_discipline_data(data):
@@ -544,7 +561,7 @@ def main():
     files = discover_discipline_files(output_dir)
     if not files:
         err = 'No discipline findings files found'
-        with open(os.path.join(output_dir, 'FAILED'), 'w') as fh:
+        with open(os.path.join(output_dir, 'FAILED'), 'w', encoding='utf-8') as fh:
             fh.write(err)
         sys.exit(1)
 
@@ -562,7 +579,7 @@ def main():
 
     if not all_disciplines:
         err = 'No valid discipline files could be loaded'
-        with open(os.path.join(output_dir, 'FAILED'), 'w') as fh:
+        with open(os.path.join(output_dir, 'FAILED'), 'w', encoding='utf-8') as fh:
             fh.write(err)
         sys.exit(1)
 
