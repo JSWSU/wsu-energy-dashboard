@@ -1,0 +1,176 @@
+WSU COMPLIANCE REVIEW TOOL — PRODUCTION MIGRATION GUIDE
+=========================================================
+
+PURPOSE
+-------
+This document maps the current prototype architecture to a
+production-ready deployment for WSU IT integration as a
+password-protected page on a public website.
+
+
+CURRENT PROTOTYPE ARCHITECTURE
+-------------------------------
+Component             Technology       Purpose
+---                   ---              ---
+Server                Perl (HTTP)      Serves frontend + API routes
+Frontend              Single HTML      Job submission + queue + results
+Pipeline Script       Bash             Orchestrates multi-phase review
+Phase 0 (Extraction)  Python           One-time PDF text extraction (pdfplumber)
+Phase 1 (Scanning)    Claude CLI       8 parallel discipline scans via Sonnet
+Phase 2a (Synthesis)  Python           Deterministic JSON merge (zero tokens)
+Phase 2b (Summary)    Claude CLI       Executive summary via Haiku
+Phase 3 (Reports)     Python           .docx + .xlsx + .txt generation
+Status Checker        Perl             Polls filesystem for job updates
+
+
+PRODUCTION TARGET ARCHITECTURE
+------------------------------
+Component             Technology              Migration Path
+---                   ---                     ---
+Web Server            nginx + Node.js/Django  Replace Perl HTTP server
+Frontend              Same HTML (or React)    Minimal changes needed
+Authentication        WSU SSO / OAuth         Replace hardcoded password
+Database              PostgreSQL              Replace job.json files
+Job Queue             Redis + Celery/BullMQ   Replace bash script orchestration
+API Integration       Anthropic HTTP API      Replace Claude CLI with direct API calls
+File Storage          S3-compatible or NFS    Replace local filesystem
+PDF Extraction        Same Python script      No change needed
+Synthesis             Same Python script      No change needed
+Report Generation     Same Python script      No change needed
+
+
+MIGRATION STEPS (RECOMMENDED ORDER)
+------------------------------------
+
+Step 1: Replace Claude CLI with Direct API Calls
+  WHY:  Eliminates CLI installation requirement, removes pdfplumber
+        subprocess spawning, enables streaming progress.
+  HOW:  Use Anthropic's HTTP API (or Python SDK) directly.
+        Send extracted page text as content in the API request.
+        Each discipline scan = one API call to claude-sonnet.
+        Executive summary = one API call to claude-haiku.
+  NOTE: The discipline prompts (prompt-*.txt) transfer directly
+        as the "user" message in the API call. No rewriting needed.
+
+Step 2: Replace Perl Server with Standard Web Framework
+  WHY:  IT teams are more familiar with Node.js/Django/Flask.
+  HOW:  Port the API routes from review-server.pl:
+        - POST /api/submit (multipart upload)
+        - GET  /api/jobs (job listing)
+        - GET  /api/jobs/:id/download/:file (file download)
+        - DELETE /api/jobs/:id (cleanup)
+        The route logic is straightforward HTTP CRUD.
+  NOTE: The frontend HTML can be served as a static file
+        by nginx. Only the API needs a backend framework.
+
+Step 3: Add Proper Authentication
+  WHY:  Hardcoded password is not production-ready.
+  HOW:  Integrate WSU's existing SSO/CAS system or OAuth.
+        The frontend auth gate (id="authGate") can be replaced
+        with a server-side session check.
+
+Step 4: Replace Filesystem with Database + Object Storage
+  WHY:  job.json files don't scale; file locks are fragile.
+  HOW:  PostgreSQL table for job metadata (replaces job.json).
+        S3-compatible storage for PDFs and output files.
+        The synthesize.py and generate_reports.py scripts
+        read/write local files — wrap them with download-from-S3
+        and upload-to-S3 steps.
+
+Step 5: Replace Bash Orchestration with Job Queue
+  WHY:  Bash scripts can't retry, scale, or distribute.
+  HOW:  Celery (Python) or BullMQ (Node.js) for job management.
+        Each discipline scan = one queued task.
+        Phase transitions = task chaining/workflow.
+        Built-in retry, timeout, and progress reporting.
+
+
+COMPONENTS THAT TRANSFER DIRECTLY
+----------------------------------
+These require zero or minimal changes for production:
+
+1. Discipline Prompts (prompt-*.txt templates)
+   The prompt text is the core IP. It transfers directly as
+   API request content regardless of infrastructure.
+
+2. synthesize.py
+   Pure Python, reads JSON files, writes JSON file. No network
+   dependencies. Just needs input/output paths configured.
+
+3. generate_reports.py
+   Pure Python, reads review-data.json, writes .docx/.xlsx/.txt.
+   Uses openpyxl and python-docx (standard libraries).
+
+4. extract_pdf.py
+   Pure Python, reads PDF, writes text files. Uses pdfplumber.
+
+5. Frontend HTML/CSS/JS
+   The review-portal.html is self-contained. The API endpoints
+   it calls (/api/submit, /api/jobs, etc.) have the same
+   interface regardless of backend technology.
+
+6. WSU Design Standards Skills
+   The compliance standards are stored as Claude Code skills
+   (wsu-div-* files). These transfer as prompt content for
+   the API calls. They are the institutional knowledge base.
+
+
+SECURITY CONSIDERATIONS
+------------------------
+- PDF uploads must be size-limited (current: 100 MB max)
+- API rate limiting on /api/submit (one concurrent job)
+- Output files should be access-controlled per user/session
+- Claude API key must be server-side only (never in frontend)
+- Sanitize all user inputs (project name, email, etc.)
+- The current XSS escaping in review-portal.html should be
+  preserved in any frontend rewrite
+
+
+RESOURCE REQUIREMENTS (PRODUCTION)
+-----------------------------------
+- 2-4 CPU cores (Python + API calls are I/O bound)
+- 4 GB RAM minimum (PDF extraction peak)
+- 10 GB disk for active jobs (cleaned up after download)
+- Anthropic API key with sufficient token budget
+- Estimated cost per review: ~$2-5 in API tokens (8 Sonnet
+  calls + 1 Haiku call, ~50K input tokens each)
+
+
+CURRENT API ROUTES (FOR PORTING)
+---------------------------------
+Route                              Method  Purpose
+---                                ---     ---
+/api/submit                        POST    Multipart upload (PDF + form fields)
+/api/jobs                          GET     List all jobs with status
+/api/jobs/:id                      DELETE  Remove job and all files
+/api/download/:id/:file            GET     Download output file
+/api/logs/:id/:file                GET     Download log file
+/                                  GET     Serve review-portal.html
+/*                                 GET     Serve static files
+
+
+CURRENT JOB.JSON SCHEMA (FOR DATABASE TABLE)
+----------------------------------------------
+Field                Type        Notes
+---                  ---         ---
+id                   string      Job ID (YYYYMMDD-HHMMSS format)
+projectName          string      User-provided project name
+reviewPhase          string      e.g., "50% DD", "100% CD"
+constructionType     string      e.g., "New Construction"
+email                string      Notification email (optional)
+divisions            array       List of division numbers
+status               string      Processing | Complete | Failed
+submitted            string      ISO timestamp
+submittedEpoch       integer     Unix timestamp (for duration calc)
+completed            string      ISO timestamp (null if processing)
+durationSeconds      integer     Total run time in seconds
+pdfFilename          string      Original uploaded filename
+pdfSizeBytes         integer     PDF file size in bytes
+progress             integer     0-100 percent complete
+progressDetail       string      Human-readable status message
+disciplineGroups     array       Discipline scan configuration
+disciplineStatus     array       Per-discipline completion status
+expectedGroups       integer     Number of disciplines to scan
+error                string      Error message (if failed)
+failedPhase          string      Which phase failed
+stalledMinutes       integer     Minutes since last progress
