@@ -163,6 +163,62 @@ html.dark .div-count.zero { background: #374151; }
 html.dark .upload-message.warn { background: #78350f; color: #fbbf24; }
 html.dark .upload-message.error { background: #7f1d1d; color: #f87171; }
 
+/* Analysis results panel */
+.analysis-panel { margin-top: 1.5rem; display: none; }
+.analysis-panel.visible { display: block; }
+.analysis-header { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+.analysis-header h3 { margin: 0; color: var(--primary); }
+.analysis-confidence {
+  font-size: .7rem; padding: .2rem .5rem; border-radius: 10px; font-weight: 600;
+}
+.analysis-confidence.high { background: #ecfdf5; color: #059669; }
+.analysis-confidence.medium { background: #fffbeb; color: #92400e; }
+.analysis-confidence.low { background: #fef2f2; color: #dc2626; }
+html.dark .analysis-confidence.high { background: #064e3b; color: #34d399; }
+html.dark .analysis-confidence.medium { background: #78350f; color: #fbbf24; }
+html.dark .analysis-confidence.low { background: #7f1d1d; color: #f87171; }
+.analysis-summary {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: .75rem; margin-bottom: 1rem;
+}
+.analysis-stat {
+  background: var(--info-bg); border: 1px solid var(--info-border);
+  border-radius: 8px; padding: .6rem .8rem; text-align: center;
+}
+.analysis-stat .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
+.analysis-stat .stat-label { font-size: .72rem; color: var(--text-light); }
+.analysis-disciplines {
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1rem;
+}
+.analysis-disc-row {
+  display: flex; align-items: center; padding: .6rem .8rem; gap: .75rem;
+  border-bottom: 1px solid var(--border); transition: background .15s;
+}
+.analysis-disc-row:last-child { border-bottom: none; }
+.analysis-disc-row:hover { background: var(--table-hover); }
+.analysis-disc-row input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; }
+.analysis-disc-name { font-weight: 600; flex: 1; }
+.analysis-disc-pages {
+  font-size: .75rem; color: var(--text-light); white-space: nowrap;
+}
+.analysis-disc-sheets {
+  font-size: .7rem; color: var(--blue); max-width: 200px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.analysis-disc-divs {
+  font-size: .7rem; color: var(--text-light);
+}
+.confirm-btn {
+  width: 100%; padding: .85rem; border: none; border-radius: 8px;
+  background: var(--green); color: #fff; font-size: 1rem; font-weight: 600;
+  cursor: pointer; transition: background .2s; margin-top: .5rem;
+}
+.confirm-btn:hover { background: #047857; }
+.confirm-btn:disabled { opacity: .5; cursor: not-allowed; }
+.analysis-note {
+  font-size: .78rem; color: var(--text-light); margin-top: .5rem; text-align: center;
+}
+
 /* Upload Zone */
 .upload-zone {
   border: 2px dashed var(--border); border-radius: 10px; padding: 2rem;
@@ -216,6 +272,10 @@ tr:hover td { background: var(--table-hover); }
 html.dark .job-status.processing { background: #78350f; color: #fbbf24; }
 html.dark .job-status.complete { background: #064e3b; color: #34d399; }
 html.dark .job-status.failed { background: #7f1d1d; color: #f87171; }
+.job-status.analyzing { background: #eff6ff; color: #2563eb; }
+.job-status.awaiting { background: #fefce8; color: #a16207; }
+html.dark .job-status.analyzing { background: #1e3a5f; color: #60a5fa; }
+html.dark .job-status.awaiting { background: #422006; color: #fbbf24; }
 /* Email status icon */
 .email-icon {
   display: inline-block; margin-left: .4rem; font-size: .72rem; cursor: default;
@@ -497,50 +557,7 @@ footer {
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Applicable Divisions * <span class="div-count zero" id="divCount">0</span></label>
-          <div class="division-groups">
-            <div class="div-group">
-              <h4>Architectural</h4>
-              <label><input type="checkbox" name="div" value="02"> 02 Existing Conditions</label>
-              <label><input type="checkbox" name="div" value="03"> 03 Concrete</label>
-              <label><input type="checkbox" name="div" value="04"> 04 Masonry</label>
-              <label><input type="checkbox" name="div" value="05"> 05 Metals</label>
-              <label><input type="checkbox" name="div" value="07"> 07 Thermal &amp; Moisture</label>
-              <label><input type="checkbox" name="div" value="08"> 08 Openings</label>
-              <label><input type="checkbox" name="div" value="09"> 09 Finishes</label>
-              <label><input type="checkbox" name="div" value="10"> 10 Specialties</label>
-              <label><input type="checkbox" name="div" value="11"> 11 Equipment</label>
-              <label><input type="checkbox" name="div" value="12"> 12 Furnishings</label>
-              <label><input type="checkbox" name="div" value="13"> 13 Special Construction</label>
-              <label><input type="checkbox" name="div" value="14"> 14 Conveying Equipment</label>
-            </div>
-            <div class="div-group">
-              <h4>Mechanical / Plumbing</h4>
-              <label><input type="checkbox" name="div" value="21"> 21 Fire Suppression</label>
-              <label><input type="checkbox" name="div" value="22"> 22 Plumbing</label>
-              <label><input type="checkbox" name="div" value="23"> 23 HVAC</label>
-              <label><input type="checkbox" name="div" value="25"> 25 Integrated Automation</label>
-            </div>
-            <div class="div-group">
-              <h4>Electrical / Comms</h4>
-              <label><input type="checkbox" name="div" value="26"> 26 Electrical</label>
-              <label><input type="checkbox" name="div" value="27"> 27 Communications</label>
-              <label><input type="checkbox" name="div" value="28"> 28 Electronic Safety</label>
-            </div>
-            <div class="div-group">
-              <h4>Civil / Site</h4>
-              <label><input type="checkbox" name="div" value="31"> 31 Earthwork</label>
-              <label><input type="checkbox" name="div" value="32"> 32 Exterior Improvements</label>
-              <label><input type="checkbox" name="div" value="33"> 33 Utilities</label>
-              <label><input type="checkbox" name="div" value="40"> 40 Process Integration</label>
-            </div>
-          </div>
-          <div class="div-quick-actions">
-            <button type="button" class="btn-sm" onclick="checkAllDivs(true)">Select All</button>
-            <button type="button" class="btn-sm" onclick="checkAllDivs(false)">Deselect All</button>
-          </div>
-        </div>
+        <!-- Division selection moved to analysis results panel below -->
 
         <div class="form-group">
           <label>Construction Plan PDF * (max 100 MB)</label>
@@ -553,8 +570,42 @@ footer {
           <div class="upload-message" id="uploadMessage"></div>
         </div>
 
-        <button type="submit" class="submit-btn" id="submitBtn">Submit for Review</button>
+        <button type="submit" class="submit-btn" id="submitBtn">Analyze PDF</button>
         <div class="submit-status" id="submitStatus"></div>
+
+        <!-- Analysis Results Panel (hidden until analysis completes) -->
+        <div class="analysis-panel" id="analysisPanel">
+          <div class="analysis-header">
+            <h3>PDF Analysis Results</h3>
+            <span class="analysis-confidence" id="analysisConfidence"></span>
+          </div>
+
+          <div class="analysis-summary" id="analysisSummary"></div>
+
+          <div style="margin-bottom:.75rem">
+            <label style="font-weight:600">Recommended Disciplines
+              <span class="div-count" id="discCount">0</span>
+            </label>
+            <div style="font-size:.78rem;color:var(--text-light);margin-bottom:.5rem">
+              Uncheck disciplines you don't need. Check additional ones if needed.
+            </div>
+          </div>
+
+          <div class="analysis-disciplines" id="analysisDisciplines"></div>
+
+          <div class="div-quick-actions" style="margin-bottom:.5rem">
+            <button type="button" class="btn-sm" onclick="selectAllDiscs(true)">Select All</button>
+            <button type="button" class="btn-sm" onclick="selectAllDiscs(false)">Deselect All</button>
+          </div>
+
+          <button type="button" class="confirm-btn" id="confirmBtn" onclick="confirmReview()">
+            Start Full Review
+          </button>
+          <div class="analysis-note">
+            Review will only scan selected disciplines. Fewer disciplines = faster review.
+          </div>
+          <div class="submit-status" id="confirmStatus"></div>
+        </div>
       </form>
     </div>
   </div>
@@ -571,6 +622,8 @@ footer {
         <input type="text" class="queue-search" id="queueSearch" placeholder="Search by project name or job ID..." oninput="applyQueueFilters()">
         <div class="filter-bar">
           <button class="filter-btn active" onclick="setStatusFilter('all', this)">All</button>
+          <button class="filter-btn" onclick="setStatusFilter('analyzing', this)">Analyzing</button>
+          <button class="filter-btn" onclick="setStatusFilter('awaiting', this)">Awaiting</button>
           <button class="filter-btn" onclick="setStatusFilter('processing', this)">Processing</button>
           <button class="filter-btn" onclick="setStatusFilter('complete', this)">Complete</button>
           <button class="filter-btn" onclick="setStatusFilter('failed', this)">Failed</button>
@@ -607,12 +660,12 @@ footer {
       <div class="help-section">
         <h3>Submitting a Review</h3>
         <ol class="help-steps">
-          <li class="help-step">Fill in the project name and select the review phase and construction type.</li>
-          <li class="help-step">Check the CSI divisions that apply to your project. If unsure, select all — the reviewer will skip divisions with no relevant content in the drawings.</li>
+          <li class="help-step">Fill in project name, review phase, and construction type.</li>
           <li class="help-step">Upload the construction plan PDF. This can be a full drawing set or individual discipline sheets.</li>
-          <li class="help-step">Click <strong>Submit for Review</strong>. You'll be automatically switched to the Review Queue tab.</li>
-          <li class="help-step">Wait for the review to complete (15-30 minutes). The status will change from <em>Processing</em> to <em>Complete</em>.</li>
-          <li class="help-step">Download <strong>report.docx</strong> (narrative report) and <strong>report.xlsx</strong> (structured data). Both use matching finding numbers and support each other.</li>
+          <li class="help-step">Click <strong>Analyze PDF</strong> — the system extracts text and classifies pages by discipline.</li>
+          <li class="help-step">Review the analysis results — recommended disciplines are pre-checked based on detected sheet types.</li>
+          <li class="help-step">Adjust discipline selections if needed, then click <strong>Start Full Review</strong>.</li>
+          <li class="help-step">Wait for the review to complete (15-30 minutes). Download reports when done.</li>
         </ol>
       </div>
 
@@ -629,7 +682,9 @@ footer {
 
       <div class="help-section">
         <h3>Status Meanings</h3>
-        <p style="font-size:.82rem"><span class="job-status processing">Processing</span> — Review is running. Claude is reading the PDF and comparing against WSU standards.</p>
+        <p style="font-size:.82rem"><span class="job-status analyzing">Analyzing</span> — PDF is being extracted and pages classified by discipline.</p>
+        <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status awaiting">Awaiting Confirmation</span> — Analysis complete. Click "View Analysis" to review recommendations and start the full review.</p>
+        <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status processing">Processing</span> — Review is running. Claude is reading the PDF and comparing against WSU standards.</p>
         <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status complete">Complete</span> — Review finished. Download links are available.</p>
         <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status failed">Failed</span> — Something went wrong. Check the error message for details.</p>
       </div>
@@ -713,23 +768,6 @@ function esc(s) {
   return d.innerHTML;
 }
 
-// --- Division Checkboxes ---
-function checkAllDivs(checked) {
-  document.querySelectorAll('input[name="div"]').forEach(cb => cb.checked = checked);
-}
-function updateDivCount() {
-  const n = document.querySelectorAll('input[name="div"]:checked').length;
-  const el = document.getElementById('divCount');
-  el.textContent = n;
-  el.classList.toggle('zero', n === 0);
-}
-document.querySelectorAll('input[name="div"]').forEach(cb =>
-  cb.addEventListener('change', updateDivCount)
-);
-const origCheckAll = checkAllDivs;
-checkAllDivs = function(checked) { origCheckAll(checked); updateDivCount(); };
-updateDivCount();
-
 // --- Upload Zone ---
 const zone = document.getElementById('uploadZone');
 const fileInput = document.getElementById('pdfFile');
@@ -769,66 +807,22 @@ function showFile(f) {
   }
 }
 
-// --- Form Submission ---
+// --- Submission & Analysis Flow ---
+let currentAnalysisJobId = null;
+let analysisPoller = null;
+
 document.getElementById('reviewForm').addEventListener('submit', async e => {
   e.preventDefault();
+  const form = e.target;
   const btn = document.getElementById('submitBtn');
   const status = document.getElementById('submitStatus');
+  const pdf = document.getElementById('pdfFile').files[0];
+
   btn.disabled = true;
   btn.classList.add('loading');
-  btn.innerHTML = '<span class="spinner"></span>Submitting...';
+  btn.innerHTML = '<span class="spinner"></span>Uploading & Analyzing...';
   status.textContent = '';
-  status.style.color = '';
-
-  const form = e.target;
-  const pdf = fileInput.files[0];
-  const checked = form.querySelectorAll('input[name="div"]:checked');
-
-  if (!pdf) {
-    showErr('Please select a PDF file.'); return;
-  }
-  if (pdf.size > 100 * 1024 * 1024) {
-    showErr('PDF file is too large (' + (pdf.size / 1048576).toFixed(1) + ' MB). Maximum is 100 MB.');
-    return;
-  }
-  if (checked.length === 0) {
-    showErr('Please select at least one division.'); return;
-  }
-
-  const fd = new FormData();
-  fd.append('projectName', form.projectName.value);
-  fd.append('pmEmail', form.pmEmail.value);
-  fd.append('reviewPhase', form.reviewPhase.value);
-  fd.append('constructionType', form.constructionType.value);
-  fd.append('divisions', Array.from(checked).map(c => c.value).join(','));
-  fd.append('pdf', pdf);
-
-  try {
-    const resp = await fetch('/api/submit', { method: 'POST', body: fd });
-    const data = await resp.json();
-    if (resp.ok) {
-      status.textContent = 'Submitted! Job ID: ' + data.id;
-      status.className = 'submit-status';
-      status.style.color = 'var(--green)';
-      form.reset();
-      fileLabel.textContent = '';
-      zone.classList.remove('has-file');
-      updateDivCount();
-      document.getElementById('uploadMessage').className = 'upload-message';
-      document.querySelector('[data-tab="queue"]').click();
-      refreshQueue();
-    } else if (resp.status === 409) {
-      showErr(data.error || 'A review is already running. Please wait for it to complete.');
-      if (data.runningJob) {
-        document.querySelector('[data-tab="queue"]').click();
-        refreshQueue();
-      }
-    } else {
-      showErr(data.error || 'Unknown error');
-    }
-  } catch (err) {
-    showErr('Network error: ' + err.message);
-  }
+  status.className = 'submit-status';
 
   function showErr(msg) {
     status.textContent = msg;
@@ -836,12 +830,222 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
     status.style.color = 'var(--red)';
     btn.disabled = false;
     btn.classList.remove('loading');
-    btn.textContent = 'Submit for Review';
+    btn.textContent = 'Analyze PDF';
   }
+
+  if (!pdf) { showErr('Please select a PDF file.'); return; }
+  if (pdf.size > 100 * 1024 * 1024) {
+    showErr('PDF too large (' + (pdf.size/1048576).toFixed(1) + ' MB). Maximum is 100 MB.');
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('projectName', form.projectName.value);
+  fd.append('pmEmail', form.pmEmail.value);
+  fd.append('reviewPhase', form.reviewPhase.value);
+  fd.append('constructionType', form.constructionType.value);
+  fd.append('divisions', '');  // empty — filled after analysis
+  fd.append('pdf', pdf);
+
+  try {
+    const resp = await fetch('/api/submit', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (resp.ok) {
+      currentAnalysisJobId = data.id;
+      status.textContent = 'Analyzing PDF... (this takes 1-7 minutes depending on size)';
+      status.className = 'submit-status';
+      status.style.color = 'var(--blue)';
+      // Start polling for analysis completion
+      pollAnalysis(data.id);
+    } else if (resp.status === 409) {
+      showErr(data.error || 'A review is already running.');
+    } else {
+      showErr(data.error || 'Submission failed');
+    }
+  } catch (err) {
+    showErr('Network error: ' + err.message);
+  }
+});
+
+function pollAnalysis(jobId) {
+  if (analysisPoller) clearInterval(analysisPoller);
+  analysisPoller = setInterval(async () => {
+    try {
+      const resp = await fetch('/api/analysis/' + jobId);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.status === 'Awaiting Confirmation') {
+          clearInterval(analysisPoller);
+          analysisPoller = null;
+          showAnalysisResults(jobId, data.analysis);
+        }
+      } else if (resp.status === 404) {
+        // Analysis not ready yet — check if job failed
+        const jobResp = await fetch('/api/jobs');
+        if (jobResp.ok) {
+          const jobData = await jobResp.json();
+          const jobs = Array.isArray(jobData) ? jobData : (jobData.jobs || []);
+          const job = jobs.find(j => j.id === jobId);
+          if (job && job.status === 'Failed') {
+            clearInterval(analysisPoller);
+            analysisPoller = null;
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            btn.textContent = 'Analyze PDF';
+            const status = document.getElementById('submitStatus');
+            status.textContent = 'Analysis failed: ' + (job.error || 'Unknown error');
+            status.className = 'submit-status has-error';
+            status.style.color = 'var(--red)';
+          }
+        }
+      }
+    } catch (err) { /* retry next cycle */ }
+  }, 3000);
+}
+
+// Discipline group metadata (matches server @ALL_GROUPS)
+const DISC_GROUPS = {
+  'arch-structure':  { name: 'Architectural — Structure & Envelope', divs: ['02','03','04','05','07','08'] },
+  'arch-finishes':   { name: 'Architectural — Finishes & Equipment', divs: ['09','10','11','12','13','14'] },
+  'fire-protection': { name: 'Fire Protection and Security',        divs: ['21','28'] },
+  'plumbing':        { name: 'Plumbing',                            divs: ['22'] },
+  'hvac-controls':   { name: 'HVAC and Building Automation',        divs: ['23','25'] },
+  'electrical':      { name: 'Electrical',                          divs: ['26'] },
+  'communications':  { name: 'Communications and Technology',       divs: ['27'] },
+  'civil-site':      { name: 'Civil, Site, and Utilities',          divs: ['31','32','33','40'] },
+};
+
+function showAnalysisResults(jobId, analysis) {
+  const btn = document.getElementById('submitBtn');
   btn.disabled = false;
   btn.classList.remove('loading');
-  btn.textContent = 'Submit for Review';
-});
+  btn.textContent = 'Analyze PDF';
+  btn.style.display = 'none'; // hide after analysis
+
+  const status = document.getElementById('submitStatus');
+  status.textContent = '';
+  status.className = 'submit-status';
+
+  const panel = document.getElementById('analysisPanel');
+  panel.classList.add('visible');
+
+  // Confidence badge
+  const confEl = document.getElementById('analysisConfidence');
+  confEl.textContent = (analysis.confidence || 'unknown') + ' confidence';
+  confEl.className = 'analysis-confidence ' + (analysis.confidence || 'low');
+
+  // Summary stats
+  const sumEl = document.getElementById('analysisSummary');
+  const nDisc = Object.keys(analysis.recommended_disciplines || {}).length;
+  const nDivs = (analysis.recommended_divisions || []).length;
+  const nUnclass = analysis.unclassified_count || 0;
+  sumEl.innerHTML =
+    '<div class="analysis-stat"><div class="stat-value">' + analysis.total_pages + '</div><div class="stat-label">Total Pages</div></div>' +
+    '<div class="analysis-stat"><div class="stat-value">' + nDisc + '</div><div class="stat-label">Disciplines Detected</div></div>' +
+    '<div class="analysis-stat"><div class="stat-value">' + nDivs + '</div><div class="stat-label">CSI Divisions</div></div>' +
+    '<div class="analysis-stat"><div class="stat-value">' + nUnclass + '</div><div class="stat-label">Unclassified Pages</div></div>';
+
+  // Discipline rows with checkboxes
+  const discEl = document.getElementById('analysisDisciplines');
+  const recommended = analysis.recommended_disciplines || {};
+  let html = '';
+  for (const [key, meta] of Object.entries(DISC_GROUPS)) {
+    const rec = recommended[key];
+    const checked = rec ? ' checked' : '';
+    const pageCount = rec ? rec.page_count : 0;
+    const sheets = rec ? (rec.sheet_ids || []).slice(0, 5).join(', ') : '';
+    const divsList = meta.divs.join(', ');
+    html += '<div class="analysis-disc-row">' +
+      '<input type="checkbox" name="disc" value="' + key + '" data-divs="' + divsList + '"' + checked +
+      ' onchange="updateDiscCount()">' +
+      '<div class="analysis-disc-name">' + esc(meta.name) + '</div>' +
+      '<div class="analysis-disc-pages">' + pageCount + ' pages</div>' +
+      (sheets ? '<div class="analysis-disc-sheets" title="' + esc(sheets) + '">' + esc(sheets) + '</div>' : '') +
+      '<div class="analysis-disc-divs">Div ' + divsList + '</div>' +
+      '</div>';
+  }
+  discEl.innerHTML = html;
+  updateDiscCount();
+}
+
+function updateDiscCount() {
+  const n = document.querySelectorAll('#analysisDisciplines input:checked').length;
+  const el = document.getElementById('discCount');
+  if (!el) return;
+  el.textContent = n;
+  el.classList.toggle('zero', n === 0);
+  const confirmBtn = document.getElementById('confirmBtn');
+  if (confirmBtn) confirmBtn.disabled = n === 0;
+}
+
+function selectAllDiscs(checked) {
+  document.querySelectorAll('#analysisDisciplines input').forEach(cb => cb.checked = checked);
+  updateDiscCount();
+}
+
+async function confirmReview() {
+  if (!currentAnalysisJobId) return;
+  const btn = document.getElementById('confirmBtn');
+  const status = document.getElementById('confirmStatus');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.innerHTML = '<span class="spinner"></span>Starting review...';
+
+  // Collect all CSI divisions from checked discipline groups
+  const divSet = new Set();
+  document.querySelectorAll('#analysisDisciplines input:checked').forEach(cb => {
+    cb.dataset.divs.split(',').map(d => d.trim()).forEach(d => divSet.add(d));
+  });
+
+  try {
+    const resp = await fetch('/api/confirm/' + currentAnalysisJobId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ divisions: Array.from(divSet).sort() }),
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      status.textContent = 'Review started! Job ID: ' + data.id;
+      status.style.color = 'var(--green)';
+      // Reset form and panel
+      document.getElementById('reviewForm').reset();
+      document.getElementById('uploadFilename').textContent = '';
+      document.getElementById('uploadZone').classList.remove('has-file');
+      document.getElementById('analysisPanel').classList.remove('visible');
+      document.getElementById('submitBtn').style.display = '';
+      currentAnalysisJobId = null;
+      // Switch to queue tab
+      document.querySelector('[data-tab="queue"]').click();
+      refreshQueue();
+    } else {
+      status.textContent = data.error || 'Failed to start review';
+      status.style.color = 'var(--red)';
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.textContent = 'Start Full Review';
+    }
+  } catch (err) {
+    status.textContent = 'Network error: ' + err.message;
+    status.style.color = 'var(--red)';
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.textContent = 'Start Full Review';
+  }
+}
+
+async function viewAnalysis(jobId) {
+  // Switch to submit tab and load analysis
+  document.querySelector('[data-tab="submit"]').click();
+  currentAnalysisJobId = jobId;
+  try {
+    const resp = await fetch('/api/analysis/' + jobId);
+    if (resp.ok) {
+      const data = await resp.json();
+      showAnalysisResults(jobId, data.analysis);
+    }
+  } catch (err) { console.error('Failed to load analysis:', err); }
+}
 
 // --- Elapsed time formatter ---
 function fmtElapsed(seconds) {
@@ -957,7 +1161,11 @@ function setStatusFilter(filter, btn) {
 function applyQueueFilters() {
   const search = (document.getElementById('queueSearch').value || '').toLowerCase();
   const filtered = queueData.filter(j => {
-    if (statusFilter !== 'all' && (j.status || '').toLowerCase() !== statusFilter) return false;
+    if (statusFilter !== 'all') {
+      let sc = (j.status || '').toLowerCase();
+      if (sc === 'awaiting confirmation') sc = 'awaiting';
+      if (sc !== statusFilter) return false;
+    }
     if (search) {
       const name = (j.projectName || '').toLowerCase();
       const id = (j.id || '').toLowerCase();
@@ -985,7 +1193,8 @@ function renderQueue(jobs) {
   }
 
   tbody.innerHTML = jobs.map(j => {
-    const sc = (j.status || '').toLowerCase();
+    let sc = (j.status || '').toLowerCase();
+    if (sc === 'awaiting confirmation') sc = 'awaiting';
     const isStalled = sc === 'processing' && j.stalledMinutes;
     const rowCls = isStalled ? ' class="stalled-row"' : '';
     const divs = (j.divisions || []).join(', ');
@@ -1030,6 +1239,10 @@ function renderQueue(jobs) {
         (j.emailSent ? '<span class="email-icon sent" title="Email sent ' + esc(j.emailSentAt) + '">&#9993;</span>'
          : j.emailError ? '<span class="email-icon error" title="Email failed: ' + esc(j.emailError) + '">&#9993;</span>'
          : '') +
+        (sc === 'analyzing' ? '<div class="elapsed-time">Analyzing PDF...</div>' : '') +
+        (sc === 'awaiting' ?
+          '<button class="btn-sm primary" style="margin-top:.3rem;font-size:.7rem" ' +
+          'onclick="viewAnalysis(\'' + esc(j.id) + '\')">View Analysis</button>' : '') +
         (sc === 'processing' && j.progress ? buildTracker(j.progress, j.stalledMinutes, j.progressDetail, j.stalledPhase) +
           (j.elapsedSeconds ? '<div class="elapsed-time">Elapsed: ' + fmtElapsed(j.elapsedSeconds) + '</div>' : '') +
           buildDiscDetail(j) : '') +
