@@ -135,17 +135,6 @@ html.dark .form-group > label { color: var(--text-light); }
 .form-group input:focus, .form-group select:focus { border-color: var(--primary); }
 
 /* Division Groups */
-.division-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .75rem; }
-.div-group {
-  background: var(--table-head-bg); border-radius: 8px; padding: .75rem 1rem;
-}
-.div-group h4 { font-size: .8rem; font-weight: 700; color: var(--primary); margin-bottom: .4rem; }
-html.dark .div-group h4 { color: var(--accent); }
-.div-group label {
-  display: block; font-size: .78rem; padding: .15rem 0; cursor: pointer; font-weight: 400;
-  color: var(--text);
-}
-.div-group label input { margin-right: .4rem; }
 .div-quick-actions { margin-top: .5rem; display: flex; gap: .5rem; }
 .div-count {
   display: inline-block; background: var(--primary); color: #fff; font-size: .7rem;
@@ -168,6 +157,7 @@ html.dark .upload-message.error { background: #7f1d1d; color: #f87171; }
 .analysis-panel.visible { display: block; }
 .analysis-header { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
 .analysis-header h3 { margin: 0; color: var(--primary); }
+html.dark .analysis-header h3 { color: var(--accent); }
 .analysis-confidence {
   font-size: .7rem; padding: .2rem .5rem; border-radius: 10px; font-weight: 600;
 }
@@ -215,6 +205,7 @@ html.dark .analysis-confidence.low { background: #7f1d1d; color: #f87171; }
 }
 .confirm-btn:hover { background: #047857; }
 .confirm-btn:disabled { opacity: .5; cursor: not-allowed; }
+.confirm-btn.loading { display: flex; align-items: center; justify-content: center; gap: .5rem; }
 .analysis-note {
   font-size: .78rem; color: var(--text-light); margin-top: .5rem; text-align: center;
 }
@@ -1015,6 +1006,7 @@ async function confirmReview() {
       document.getElementById('analysisPanel').classList.remove('visible');
       document.getElementById('submitBtn').style.display = '';
       currentAnalysisJobId = null;
+      document.getElementById('confirmStatus').textContent = '';
       // Switch to queue tab
       document.querySelector('[data-tab="queue"]').click();
       refreshQueue();
@@ -1296,8 +1288,12 @@ async function refreshQueue() {
       const proc = queueData.filter(j => (j.status||'').toLowerCase() === 'processing').length;
       const comp = queueData.filter(j => (j.status||'').toLowerCase() === 'complete').length;
       const fail = queueData.filter(j => (j.status||'').toLowerCase() === 'failed').length;
+      const anal = queueData.filter(j => (j.status||'').toLowerCase() === 'analyzing').length;
+      const await_ = queueData.filter(j => (j.status||'').toLowerCase() === 'awaiting confirmation').length;
       footer.innerHTML =
         '<span>Total: ' + queueStats.totalJobs + ' jobs</span>' +
+        '<span>Analyzing: ' + anal + '</span>' +
+        '<span>Awaiting: ' + await_ + '</span>' +
         '<span>Processing: ' + proc + '</span>' +
         '<span>Complete: ' + comp + '</span>' +
         '<span>Failed: ' + fail + '</span>' +
