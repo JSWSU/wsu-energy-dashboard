@@ -320,7 +320,107 @@ sub check_job_status {
     my ($job_id) = @_;
     my $job = read_job_json($job_id);
     return undef unless $job;
-    return $job unless ($job->{status} || '') eq 'Processing';
+    my $status = $job->{status} || '';
+
+    # --- Handle "Analyzing" state (Phase 0 + sheet analysis) ---
+    if ($status eq 'Analyzing') {
+        my $job_dir  = "$REVIEWS_DIR/$job_id";
+        my $analysis_complete = "$job_dir/ANALYSIS_COMPLETE";
+        my $failed   = "$job_dir/output/FAILED";
+
+        if (-f $analysis_complete) {
+            # Read analysis.json and store summary in job
+            my $analysis_file = "$job_dir/analysis.json";
+            if (-f $analysis_file) {
+                eval {
+                    open my $afh, '<', $analysis_file or die "Cannot read: $!";
+                    local $/; my $ajson = <$afh>; close $afh;
+                    my $analysis = decode_json($ajson);
+                    $job->{analysisSummary} = {
+                        totalPages           => $analysis->{total_pages},
+                        confidence           => $analysis->{confidence},
+                        recommendedDivisions => $analysis->{recommended_divisions},
+                        disciplineCount      => scalar(keys %{$analysis->{recommended_disciplines} || {}}),
+                        unclassifiedPages    => scalar(@{$analysis->{unclassified_pages} || []}),
+                    };
+                };
+                warn "[ANALYSIS] Error reading analysis.json for $job_id: $@\n" if $@;
+            }
+            $job->{status} = 'Awaiting Confirmation';
+            $job->{progress} = 100;
+            $job->{progressDetail} = 'Analysis complete — awaiting division confirmation';
+            $job->{analysisCompleted} = iso_now();
+            write_job_json($job_id, $job);
+        }
+        elsif (-f $failed) {
+            my $err = '';
+            if (open my $fh, '<', $failed) {
+                local $/; $err = <$fh>; close $fh;
+            }
+            $job->{status} = 'Failed';
+            $job->{progress} = 0;
+            $job->{error} = $err || 'Analysis failed';
+            $job->{failedPhase} = 'Phase 0 (analysis)';
+            $job->{completed} = iso_now();
+            $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
+            write_job_json($job_id, $job);
+        }
+        else {
+            # Progress: 10% = extracting PDF, 30% = pages exist (analysis running)
+            my $pct = 5;
+            my $detail = 'Starting analysis...';
+            if (-d "$job_dir/pages" && -f "$job_dir/pages/manifest.txt") {
+                $pct = 30;
+                $detail = 'Analyzing sheet content...';
+            } elsif (-d "$job_dir/pages") {
+                $pct = 10;
+                $detail = 'Extracting PDF pages...';
+            }
+            $job->{progress} = $pct;
+            $job->{progressDetail} = $detail;
+
+            # Stall detection for analysis phase (15 min stall, 30 min auto-fail)
+            my $newest_mtime = 0;
+            for my $subdir ("$job_dir/pages", "$job_dir/output") {
+                if (opendir my $dh, $subdir) {
+                    for my $f (readdir $dh) {
+                        next if $f =~ /^\./;
+                        my $mt = (stat "$subdir/$f")[9] || 0;
+                        $newest_mtime = $mt if $mt > $newest_mtime;
+                    }
+                    closedir $dh;
+                }
+            }
+            if ($newest_mtime > 0) {
+                my $idle = int((time() - $newest_mtime) / 60);
+                if ($idle >= 30) {
+                    my $fail_msg = "AUTO-FAIL: Analysis stalled for $idle minutes "
+                        . "(threshold: 30min). Last activity: "
+                        . scalar(localtime($newest_mtime));
+                    make_path("$job_dir/output") unless -d "$job_dir/output";
+                    open my $ff, '>', "$job_dir/output/FAILED" or warn "Cannot write FAILED: $!\n";
+                    if ($ff) { print $ff $fail_msg; close $ff; }
+                    $job->{status} = 'Failed';
+                    $job->{error} = $fail_msg;
+                    $job->{failedPhase} = 'Phase 0 (analysis)';
+                    $job->{completed} = iso_now();
+                    $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
+                    write_job_json($job_id, $job);
+                } elsif ($idle >= 15) {
+                    $job->{stalledMinutes} = $idle;
+                    $job->{stalledPhase} = 'Phase 0 (analysis)';
+                }
+            }
+        }
+        return $job;
+    }
+
+    # --- Handle "Awaiting Confirmation" state (no transitions needed) ---
+    if ($status eq 'Awaiting Confirmation') {
+        return $job;
+    }
+
+    return $job unless $status eq 'Processing';
 
     my $complete = "$REVIEWS_DIR/$job_id/output/COMPLETE";
     my $failed   = "$REVIEWS_DIR/$job_id/output/FAILED";
@@ -555,10 +655,96 @@ sub check_job_status {
     return $job;
 }
 
+# --- Spawn Analysis (Phase 0 + sheet classification) -----------------------
+
+sub spawn_analysis {
+    my ($job_id, $job) = @_;
+    my $job_dir    = "$REVIEWS_DIR/$job_id";
+    my $output_dir = "$job_dir/output";
+    make_path($output_dir) unless -d $output_dir;
+
+    my $script = "$job_dir/run-analysis.sh";
+    open my $fh, '>', $script or do {
+        warn "Cannot write $script: $!\n";
+        return;
+    };
+
+    print $fh "#!/bin/bash\n";
+    print $fh "# Phase 0 analysis: PDF extraction + sheet classification\n";
+    print $fh "# Job: $job_id\n\n";
+
+    # Python discovery (same logic as spawn_review)
+    print $fh "# --- Python discovery ---\n";
+    print $fh "PYUSER=\"\${USERNAME:-\$USER}\"\n";
+    print $fh "PYTHON=\"\"\n";
+    print $fh "for p in \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python313/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python312/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python311/python.exe\" \\\n";
+    print $fh "  \"/c/Python313/python.exe\" \"/c/Python312/python.exe\" \\\n";
+    print $fh "  \"\$(command -v python3 2>/dev/null)\" \\\n";
+    print $fh "  \"\$(command -v python 2>/dev/null)\" \\\n";
+    print $fh "  \"\$(command -v py 2>/dev/null)\"; do\n";
+    print $fh "  [ -n \"\$p\" ] && [ -x \"\$p\" ] && { PYTHON=\"\$p\"; break; }\n";
+    print $fh "done\n";
+    print $fh "if [ -z \"\$PYTHON\" ]; then\n";
+    print $fh "  echo \"ERROR: Python not found. Install Python 3.11+ and ensure it is on PATH.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "echo \"Using Python: \$PYTHON\"\n";
+    print $fh "\"\$PYTHON\" -m pip install --quiet pdfplumber 2>/dev/null\n\n";
+
+    # Phase 0: PDF text extraction
+    print $fh "# === Step 1: PDF text extraction ===\n";
+    print $fh "echo \"Extracting PDF text...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "\"\$PYTHON\" \"$ROOT/extract_pdf.py\" \"$job_dir/input.pdf\" \"$job_dir/pages\"\n";
+    print $fh "if [ \$? -ne 0 ]; then\n";
+    print $fh "  echo \"ERROR: extract_pdf.py failed. Check that pdfplumber is installed.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "echo \"PDF extraction complete.\" >> \"$output_dir/progress.log\"\n\n";
+
+    # Sheet analysis
+    print $fh "# === Step 2: Sheet analysis (page classification) ===\n";
+    print $fh "echo \"Analyzing sheet content...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "\"\$PYTHON\" \"$ROOT/analyze_sheets.py\" \"$job_dir/pages\" \"$job_dir/analysis.json\"\n";
+    print $fh "if [ \$? -ne 0 ]; then\n";
+    print $fh "  echo \"ERROR: analyze_sheets.py failed.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "echo \"Sheet analysis complete.\" >> \"$output_dir/progress.log\"\n\n";
+
+    # Write ANALYSIS_COMPLETE marker
+    print $fh "# Signal completion\n";
+    print $fh "touch \"$job_dir/ANALYSIS_COMPLETE\"\n";
+    print $fh "echo \"Analysis pipeline complete.\" >> \"$output_dir/progress.log\"\n";
+
+    close $fh;
+    chmod 0755, $script;
+
+    print "[" . localtime() . "] Spawning analysis for job $job_id\n";
+    print "  Step 1: PDF text extraction (pdfplumber)\n";
+    print "  Step 2: Sheet analysis (analyze_sheets.py)\n";
+    print "  Script: $script\n";
+
+    # Launch via nohup (same pattern as spawn_review)
+    (my $script_bash = $script) =~ s{\\}{/}g;
+    my $launcher = "$job_dir/launch-analysis.sh";
+    open my $lfh, '>', $launcher or do {
+        warn "Cannot write launcher: $!\n";
+        return;
+    };
+    print $lfh "#!/bin/bash\n";
+    print $lfh "nohup bash \"$script_bash\" > /dev/null 2>&1 &\n";
+    close $lfh;
+    chmod 0755, $launcher;
+    system("bash \"$launcher\"");
+}
+
 # --- Spawn Claude -----------------------------------------------------------
 
 sub spawn_review {
-    my ($job_id, $job) = @_;
+    my ($job_id, $job, $analysis) = @_;
     my $job_dir    = "$REVIEWS_DIR/$job_id";
     my $output_dir = "$job_dir/output";
     make_path($output_dir) unless -d $output_dir;
@@ -681,6 +867,22 @@ sub spawn_review {
 
         $p .= "DISCIPLINE: $grp->{name} (Divisions $divs_str)\n";
         $p .= "Focus on: $grp->{desc}\n\n";
+
+        # Add page hints from analysis data if available
+        if ($analysis && $analysis->{recommended_disciplines} && $analysis->{recommended_disciplines}{$grp->{key}}) {
+            my $disc_info = $analysis->{recommended_disciplines}{$grp->{key}};
+            my @pages = @{$disc_info->{pages} || []};
+            my @sids  = @{$disc_info->{sheet_ids} || []};
+            if (@pages) {
+                my $page_list = join(', ', map { "page-" . sprintf('%04d', $_) . ".txt" } @pages);
+                $p .= "PAGE HINTS (from automated sheet analysis):\n";
+                $p .= "  Relevant pages for this discipline: $page_list\n";
+                if (@sids) {
+                    $p .= "  Detected sheet IDs: " . join(', ', @sids) . "\n";
+                }
+                $p .= "  Start with these pages but still review all pages for context.\n\n";
+            }
+        }
 
         $p .= "INSTRUCTIONS:\n";
         $p .= "1. Read the extracted page text files in $job_rel/pages/.\n";
@@ -871,15 +1073,19 @@ sub spawn_review {
     print $fh "echo \"Using Python: \$PYTHON\"\n";
     print $fh "\"\$PYTHON\" -m pip install --quiet openpyxl python-docx pdfplumber 2>/dev/null\n\n";
 
-    # Phase 0: One-time PDF text extraction
+    # Phase 0: One-time PDF text extraction (skip if pages already extracted by analysis phase)
     print $fh "# === PHASE 0: One-time PDF text extraction ===\n";
-    print $fh "echo \"Phase 0: Extracting PDF text...\" >> \"$output_dir/progress.log\"\n";
-    print $fh "\"\$PYTHON\" \"$ROOT/extract_pdf.py\" \"$job_dir/input.pdf\" \"$job_dir/pages\"\n";
-    print $fh "if [ \$? -ne 0 ]; then\n";
-    print $fh "  echo \"ERROR: extract_pdf.py failed. Check that pdfplumber is installed.\" > \"$output_dir/FAILED\"\n";
-    print $fh "  exit 1\n";
-    print $fh "fi\n";
-    print $fh "echo \"Phase 0 complete.\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "if [ -f \"$job_dir/pages/manifest.txt\" ]; then\n";
+    print $fh "  echo \"Phase 0: Skipped (pages already extracted by analysis phase).\" >> \"$output_dir/progress.log\"\n";
+    print $fh "else\n";
+    print $fh "  echo \"Phase 0: Extracting PDF text...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "  \"\$PYTHON\" \"$ROOT/extract_pdf.py\" \"$job_dir/input.pdf\" \"$job_dir/pages\"\n";
+    print $fh "  if [ \$? -ne 0 ]; then\n";
+    print $fh "    echo \"ERROR: extract_pdf.py failed. Check that pdfplumber is installed.\" > \"$output_dir/FAILED\"\n";
+    print $fh "    exit 1\n";
+    print $fh "  fi\n";
+    print $fh "  echo \"Phase 0 complete.\" >> \"$output_dir/progress.log\"\n";
+    print $fh "fi\n\n";
 
     # Phase 1: parallel discipline CLIs (all 8 run simultaneously — API-bound, not CPU-bound)
     # Wave priority kept for ordering; with MAX_PARALLEL=8, all fit in a single wave.
@@ -1228,10 +1434,6 @@ while (my $c = $srv->accept) {
             send_json($c, 400, { error => 'Project name is required' });
             close $c; next;
         }
-        if (!$divs_str) {
-            send_json($c, 400, { error => 'At least one division must be selected' });
-            close $c; next;
-        }
         if (!$pdf || !$pdf->{data}) {
             send_json($c, 400, { error => 'PDF file is required' });
             close $c; next;
@@ -1248,7 +1450,8 @@ while (my $c = $srv->accept) {
                 while (my $dir = readdir $dh) {
                     next if $dir =~ /^\./;
                     my $existing = read_job_json($dir);
-                    if ($existing && ($existing->{status} || '') eq 'Processing') {
+                    my $st = $existing->{status} || '';
+                    if ($existing && ($st eq 'Processing' || $st eq 'Analyzing')) {
                         $running_id = $dir;
                         last;
                     }
@@ -1277,7 +1480,7 @@ while (my $c = $srv->accept) {
         print $fh $pdf->{data};
         close $fh;
 
-        my @divs = map { s/^\s+|\s+$//gr } split(/,/, $divs_str);
+        my @divs = $divs_str ? map { s/^\s+|\s+$//gr } split(/,/, $divs_str) : ();
         my $pdf_size = -s "$job_dir/input.pdf";
         my $job = {
             id               => $job_id,
@@ -1286,7 +1489,7 @@ while (my $c = $srv->accept) {
             reviewPhase      => $phase,
             constructionType => $type,
             divisions        => \@divs,
-            status           => 'Processing',
+            status           => 'Analyzing',
             submitted        => iso_now(),
             submittedEpoch   => time(),
             completed        => undef,
@@ -1294,9 +1497,9 @@ while (my $c = $srv->accept) {
             pdfSizeBytes     => $pdf_size,
         };
         write_job_json($job_id, $job);
-        spawn_review($job_id, $job);
+        spawn_analysis($job_id, $job);
 
-        send_json($c, 201, { id => $job_id, status => 'Processing' });
+        send_json($c, 201, { id => $job_id, status => 'Analyzing' });
         close $c;
         next;
     }
@@ -1361,6 +1564,84 @@ while (my $c = $srv->accept) {
         } else {
             send_json($c, 404, { error => 'Job not found' });
         }
+        close $c;
+        next;
+    }
+
+    # GET /api/analysis/{id} — return analysis.json for a job
+    if ($method eq 'GET' && $path =~ m{^/api/analysis/([a-zA-Z0-9_-]+)$}) {
+        my $id = $1;
+        my $job = read_job_json($id);
+        if (!$job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        my $analysis_file = "$REVIEWS_DIR/$id/analysis.json";
+        if (!-f $analysis_file) {
+            send_json($c, 404, { error => 'Analysis not yet available' });
+            close $c; next;
+        }
+        open my $afh, '<', $analysis_file or do {
+            send_json($c, 500, { error => "Cannot read analysis.json: $!" });
+            close $c; next;
+        };
+        local $/; my $ajson = <$afh>; close $afh;
+        send_response($c, 200, 'application/json', $ajson);
+        close $c;
+        next;
+    }
+
+    # POST /api/confirm/{id} — confirm divisions and launch full review
+    if ($method eq 'POST' && $path =~ m{^/api/confirm/([a-zA-Z0-9_-]+)$}) {
+        my $id = $1;
+        my $job = read_job_json($id);
+        if (!$job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        if (($job->{status} || '') ne 'Awaiting Confirmation') {
+            send_json($c, 400, {
+                error => "Job is not awaiting confirmation (current status: $job->{status})"
+            });
+            close $c; next;
+        }
+
+        # Parse JSON body for divisions
+        my $confirm_data = eval { decode_json($body) };
+        if (!$confirm_data || !$confirm_data->{divisions} || ref($confirm_data->{divisions}) ne 'ARRAY') {
+            send_json($c, 400, { error => 'Request body must include "divisions" array' });
+            close $c; next;
+        }
+        my @divs = @{$confirm_data->{divisions}};
+        if (!@divs) {
+            send_json($c, 400, { error => 'At least one division must be selected' });
+            close $c; next;
+        }
+
+        # Load analysis.json for page hints
+        my $analysis;
+        my $analysis_file = "$REVIEWS_DIR/$id/analysis.json";
+        if (-f $analysis_file) {
+            eval {
+                open my $afh, '<', $analysis_file or die "Cannot read: $!";
+                local $/; my $ajson = <$afh>; close $afh;
+                $analysis = decode_json($ajson);
+            };
+            warn "[CONFIRM] Error reading analysis.json for $id: $@\n" if $@;
+        }
+
+        # Update job with confirmed divisions and transition to Processing
+        $job->{divisions} = \@divs;
+        $job->{status} = 'Processing';
+        $job->{progress} = 5;
+        $job->{progressDetail} = 'Starting review...';
+        $job->{confirmedAt} = iso_now();
+        write_job_json($id, $job);
+
+        # Spawn the full review pipeline
+        spawn_review($id, $job, $analysis);
+
+        send_json($c, 200, { id => $id, status => 'Processing' });
         close $c;
         next;
     }
