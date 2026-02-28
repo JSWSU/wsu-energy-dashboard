@@ -1131,6 +1131,8 @@ sub spawn_review {
     # Write PID file for recovery daemon's job-specific process detection
     print $fh "echo \$\$ > \"$output_dir/pipeline.pid\"\n\n";
 
+    print $fh "DISCIPLINE_TIMEOUT=$CFG{disciplineTimeoutSec}\n\n";
+
     # Orphan cleanup function: Claude CLIs with --dangerously-skip-permissions can
     # spawn child processes (e.g. pdfplumber) that survive after the parent exits.
     # This function kills any orphaned python.exe children spawned by our CLIs.
@@ -1235,7 +1237,7 @@ sub spawn_review {
             print $fh "# Discipline: $grp->{name}\n";
             print $fh "echo \"  Launching: $grp->{name}...\"\n";
             print $fh "PROMPT_${var_key}=\$(cat \"$pfile\")\n";
-            print $fh "\"$CLAUDE_PATH\" -p \"\$PROMPT_${var_key}\" \\\n";
+            print $fh "timeout \$DISCIPLINE_TIMEOUT \"$CLAUDE_PATH\" -p \"\$PROMPT_${var_key}\" \\\n";
             print $fh "  --model sonnet \\\n";
             print $fh "  --allowedTools Read Write \\\n";
             print $fh "  --dangerously-skip-permissions \\\n";
@@ -1255,7 +1257,7 @@ sub spawn_review {
         print $fh "echo \"Waiting for $wave_count disciplines...\"\n";
         print $fh "wait\n";
         print $fh "cleanup_wave\n";
-        print $fh "echo \"Batch $wave_num/$num_waves complete.\" >> \"$output_dir/progress.log\"\n\n";
+        print $fh "echo \"Batch $wave_num/$num_waves complete (timeout=\${DISCIPLINE_TIMEOUT}s per discipline).\" >> \"$output_dir/progress.log\"\n\n";
     }
 
     print $fh "echo \"Phase 1 complete ($expected_count disciplines).\" >> \"$output_dir/progress.log\"\n\n";
@@ -1326,7 +1328,7 @@ sub spawn_review {
     # Launch all missing disciplines in parallel
     print $fh "    for key in \$MISSING; do\n";
     print $fh "      PROMPT_VAR=\$(cat \"$job_dir/prompt-\${key}.txt\")\n";
-    print $fh "      \"$CLAUDE_PATH\" -p \"\$PROMPT_VAR\" \\\n";
+    print $fh "      timeout \$DISCIPLINE_TIMEOUT \"$CLAUDE_PATH\" -p \"\$PROMPT_VAR\" \\\n";
     print $fh "        --model sonnet \\\n";
     print $fh "        --allowedTools Read Write \\\n";
     print $fh "        --dangerously-skip-permissions \\\n";
@@ -1401,7 +1403,7 @@ sub spawn_review {
     print $fh "echo \"Phase 2b: Generating executive summary...\" >> \"$output_dir/progress.log\"\n";
     print $fh "EXEC_PROMPT=\$(cat \"$exec_prompt\")\n";
     print $fh "cd \"$output_dir\"\n";
-    print $fh "\"$CLAUDE_PATH\" -p \"\$EXEC_PROMPT\" \\\n";
+    print $fh "timeout 300 \"$CLAUDE_PATH\" -p \"\$EXEC_PROMPT\" \\\n";
     print $fh "  --model haiku \\\n";
     print $fh "  --allowedTools Read Write \\\n";
     print $fh "  --dangerously-skip-permissions \\\n";
