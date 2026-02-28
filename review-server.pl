@@ -59,8 +59,12 @@ sub load_config {
         tokenExpiryHours => 24,
         adminEmails     => [],
     );
+    my %cleanup_defaults = (
+        archiveAfterDays => 90,
+        diskWarnMB       => 5000,
+    );
     if (-f $path) {
-        open my $fh, '<', $path or do { warn "Cannot read $path: $!\n"; $defaults{stallThresholds} = \%stall_defaults; $defaults{email} = \%email_defaults; $defaults{auth} = \%auth_defaults; return %defaults; };
+        open my $fh, '<', $path or do { warn "Cannot read $path: $!\n"; $defaults{stallThresholds} = \%stall_defaults; $defaults{email} = \%email_defaults; $defaults{auth} = \%auth_defaults; $defaults{cleanup} = \%cleanup_defaults; return %defaults; };
         local $/; my $json = <$fh>; close $fh;
         my $cfg = eval { decode_json($json) };
         if ($@ || ref($cfg) ne 'HASH') {
@@ -68,6 +72,7 @@ sub load_config {
             $defaults{stallThresholds} = \%stall_defaults;
             $defaults{email} = \%email_defaults;
             $defaults{auth} = \%auth_defaults;
+            $defaults{cleanup} = \%cleanup_defaults;
             return %defaults;
         }
         # Merge top-level defaults
@@ -89,11 +94,17 @@ sub load_config {
         for my $k (keys %auth_defaults) {
             $cfg->{auth}{$k} = $auth_defaults{$k} unless defined $cfg->{auth}{$k};
         }
+        # Merge cleanup defaults
+        $cfg->{cleanup} = {} unless ref($cfg->{cleanup}) eq 'HASH';
+        for my $k (keys %cleanup_defaults) {
+            $cfg->{cleanup}{$k} = $cleanup_defaults{$k} unless defined $cfg->{cleanup}{$k};
+        }
         return %$cfg;
     }
     $defaults{stallThresholds} = \%stall_defaults;
     $defaults{email} = \%email_defaults;
     $defaults{auth} = \%auth_defaults;
+    $defaults{cleanup} = \%cleanup_defaults;
     return %defaults;
 }
 
@@ -1674,6 +1685,42 @@ sub spawn_review {
     system("bash \"$launcher\"");
 }
 
+# --- Periodic cleanup -------------------------------------------------------
+
+my $last_cleanup = 0;
+
+sub periodic_cleanup {
+    return if time() - $last_cleanup < 3600;  # once per hour
+    $last_cleanup = time();
+
+    my $archive_days = $CFG{cleanup}{archiveAfterDays} || 90;
+    my $cutoff = time() - ($archive_days * 86400);
+    my $archive_dir = "$REVIEWS_DIR/archive";
+    my $archived = 0;
+
+    if (opendir my $dh, $REVIEWS_DIR) {
+        while (my $dir = readdir $dh) {
+            next if $dir =~ /^\.|^archive$/;
+            my $job = read_job_json($dir);
+            next unless $job;
+            my $st = $job->{status} || '';
+            next unless $st eq 'Complete' || $st eq 'Failed';
+            my $submitted = $job->{submittedEpoch} || 0;
+            next unless $submitted > 0 && $submitted < $cutoff;
+            # Archive: move directory
+            make_path($archive_dir) unless -d $archive_dir;
+            if (rename "$REVIEWS_DIR/$dir", "$archive_dir/$dir") {
+                $archived++;
+                print "[CLEANUP] Archived job $dir\n";
+            } else {
+                warn "[CLEANUP] Failed to archive $dir: $!\n";
+            }
+        }
+        closedir $dh;
+    }
+    print "[CLEANUP] Archived $archived jobs older than $archive_days days\n" if $archived;
+}
+
 # --- Job queue drain --------------------------------------------------------
 
 sub drain_queue {
@@ -1735,6 +1782,7 @@ while (!$shutdown) {
     unless ($accept_sel->can_read(5)) {
         drain_queue();
         drain_email_queue();
+        periodic_cleanup();
         next;
     }
     my $c = $srv->accept or next;
