@@ -1588,13 +1588,67 @@ sub spawn_review {
     system("bash \"$launcher\"");
 }
 
+# --- Job queue drain --------------------------------------------------------
+
+sub drain_queue {
+    # Check if any job is currently active
+    my @queued;
+    if (opendir my $dh, $REVIEWS_DIR) {
+        while (my $dir = readdir $dh) {
+            next if $dir =~ /^\./;
+            my $j = read_job_json($dir);
+            next unless $j;
+            my $st = $j->{status} || '';
+            return if $st eq 'Processing' || $st eq 'Analyzing';  # something is running
+            push @queued, { id => $dir, job => $j } if $st eq 'Queued';
+        }
+        closedir $dh;
+    }
+    return unless @queued;
+    # Sort by submission time, start the oldest
+    @queued = sort { ($a->{job}{submittedEpoch} || 0) <=> ($b->{job}{submittedEpoch} || 0) } @queued;
+    my $next = $queued[0];
+    print "[" . localtime() . "] Starting queued job $next->{id}\n";
+
+    # Check if this job needs analysis or review
+    my $job = $next->{job};
+    my $job_id = $next->{id};
+    my $job_dir = "$REVIEWS_DIR/$job_id";
+    delete $job->{queuePosition};
+
+    if ($job->{confirmedDisciplines}) {
+        # Job was confirmed — load analysis.json and go straight to Processing/review
+        my $analysis;
+        my $analysis_file = "$job_dir/analysis.json";
+        if (-f $analysis_file) {
+            eval {
+                open my $afh, '<', $analysis_file or die "Cannot read: $!";
+                local $/; my $ajson = <$afh>; close $afh;
+                $analysis = decode_json($ajson);
+            };
+            warn "[DRAIN] Error reading analysis.json for $job_id: $@\n" if $@;
+        }
+        $job->{status} = 'Processing';
+        $job->{progress} = 5;
+        $job->{progressDetail} = 'Starting review...';
+        write_job_json($job_id, $job);
+        spawn_review($job_id, $job, $analysis);
+    } else {
+        # Job needs analysis first
+        $job->{status} = 'Analyzing';
+        write_job_json($job_id, $job);
+        spawn_analysis($job_id, $job);
+    }
+}
+
 # --- Request handler --------------------------------------------------------
 
 my $accept_sel = IO::Select->new($srv);
 
 while (!$shutdown) {
     unless ($accept_sel->can_read(5)) {
-        next;  # timeout — check $shutdown flag
+        drain_queue();
+        next;
     }
     my $c = $srv->accept or next;
     binmode $c;
@@ -1743,29 +1797,19 @@ while (!$shutdown) {
             close $c; next;
         }
 
-        # Concurrent job guard: prevent submitting while another review is running
-        {
-            my $running_id;
-            if (opendir my $dh, $REVIEWS_DIR) {
-                while (my $dir = readdir $dh) {
-                    next if $dir =~ /^\./;
-                    my $existing = read_job_json($dir);
-                    my $st = $existing->{status} || '';
-                    if ($existing && ($st eq 'Processing' || $st eq 'Analyzing')) {
-                        $running_id = $dir;
-                        last;
-                    }
-                }
-                closedir $dh;
+        # Check for running jobs — if any are active, queue this one
+        my $has_active = 0;
+        my $queue_position = 0;
+        if (opendir my $dh, $REVIEWS_DIR) {
+            while (my $dir = readdir $dh) {
+                next if $dir =~ /^\./;
+                my $existing = read_job_json($dir);
+                next unless $existing;
+                my $st = $existing->{status} || '';
+                $has_active = 1 if $st eq 'Processing' || $st eq 'Analyzing';
+                $queue_position++ if $st eq 'Queued';
             }
-            if ($running_id) {
-                send_json($c, 409, {
-                    error => "A review is already running (job $running_id). Please wait for it to complete before submitting another.",
-                    runningJob => $running_id,
-                });
-                close $c;
-                next;
-            }
+            closedir $dh;
         }
 
         my $job_id = make_job_id();
@@ -1812,10 +1856,19 @@ while (!$shutdown) {
         };
         write_job_json($job_id, $job);
 
-        # Respond immediately — spawn runs in background
+        if ($has_active || $queue_position > 0) {
+            $job->{status} = 'Queued';
+            $job->{queuePosition} = $queue_position + 1;
+            write_job_json($job_id, $job);
+            send_json($c, 201, { id => $job_id, status => 'Queued', queuePosition => $queue_position + 1 });
+            close $c;
+            next;
+        }
+        # No active job — start analysis immediately
+        $job->{status} = 'Analyzing';
+        write_job_json($job_id, $job);
         send_json($c, 201, { id => $job_id, status => 'Analyzing' });
         close $c;
-
         spawn_analysis($job_id, $job);
         next;
     }
@@ -1960,12 +2013,41 @@ while (!$shutdown) {
             warn "[CONFIRM] Error reading analysis.json for $id: $@\n" if $@;
         }
 
-        # Update job with confirmed divisions and transition to Processing
+        # Check for running jobs — if any are active, queue instead of starting
+        my $confirm_has_active = 0;
+        my $confirm_queue_pos = 0;
+        if (opendir my $qdh, $REVIEWS_DIR) {
+            while (my $dir = readdir $qdh) {
+                next if $dir =~ /^\./;
+                next if $dir eq $id;  # skip this job itself
+                my $ej = read_job_json($dir);
+                next unless $ej;
+                my $est = $ej->{status} || '';
+                $confirm_has_active = 1 if $est eq 'Processing' || $est eq 'Analyzing';
+                $confirm_queue_pos++ if $est eq 'Queued';
+            }
+            closedir $qdh;
+        }
+
+        # Update job with confirmed divisions
         $job->{divisions} = \@divs;
+        $job->{confirmedAt} = iso_now();
+        $job->{confirmedDisciplines} = \@divs;
+
+        if ($confirm_has_active || $confirm_queue_pos > 0) {
+            # Queue this job — another is still running
+            $job->{status} = 'Queued';
+            $job->{queuePosition} = $confirm_queue_pos + 1;
+            write_job_json($id, $job);
+            send_json($c, 200, { id => $id, status => 'Queued', queuePosition => $confirm_queue_pos + 1 });
+            close $c;
+            next;
+        }
+
+        # No active job — start processing immediately
         $job->{status} = 'Processing';
         $job->{progress} = 5;
         $job->{progressDetail} = 'Starting review...';
-        $job->{confirmedAt} = iso_now();
         write_job_json($id, $job);
 
         # Respond immediately — spawn_review() generates a large script and blocks

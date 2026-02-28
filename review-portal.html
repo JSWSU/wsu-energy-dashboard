@@ -267,6 +267,8 @@ html.dark .job-status.failed { background: #7f1d1d; color: #f87171; }
 .job-status.awaiting { background: #fefce8; color: #a16207; }
 html.dark .job-status.analyzing { background: #1e3a5f; color: #60a5fa; }
 html.dark .job-status.awaiting { background: #422006; color: #fbbf24; }
+.job-status.queued { background: #fef3c7; color: #92400e; }
+html.dark .job-status.queued { background: #78350f; color: #fbbf24; }
 /* Email status icon */
 .email-icon {
   display: inline-block; margin-left: .4rem; font-size: .72rem; cursor: default;
@@ -613,6 +615,7 @@ footer {
         <input type="text" class="queue-search" id="queueSearch" placeholder="Search by project name or job ID..." oninput="applyQueueFilters()">
         <div class="filter-bar">
           <button class="filter-btn active" onclick="setStatusFilter('all', this)">All</button>
+          <button class="filter-btn" onclick="setStatusFilter('queued', this)">Queued</button>
           <button class="filter-btn" onclick="setStatusFilter('analyzing', this)">Analyzing</button>
           <button class="filter-btn" onclick="setStatusFilter('awaiting', this)">Awaiting</button>
           <button class="filter-btn" onclick="setStatusFilter('processing', this)">Processing</button>
@@ -673,7 +676,8 @@ footer {
 
       <div class="help-section">
         <h3>Status Meanings</h3>
-        <p style="font-size:.82rem"><span class="job-status analyzing">Analyzing</span> — PDF is being extracted and pages classified by discipline.</p>
+        <p style="font-size:.82rem"><span class="job-status queued">Queued</span> — Waiting for the current review to finish before starting.</p>
+        <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status analyzing">Analyzing</span> — PDF is being extracted and pages classified by discipline.</p>
         <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status awaiting">Awaiting Confirmation</span> — Analysis complete. Click "View Analysis" to review recommendations and start the full review.</p>
         <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status processing">Processing</span> — Review is running. Claude is reading the PDF and comparing against WSU standards.</p>
         <p style="font-size:.82rem;margin-top:.4rem"><span class="job-status complete">Complete</span> — Review finished. Download links are available.</p>
@@ -902,7 +906,17 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
   try {
     const resp = await apiFetch('/api/submit', { method: 'POST', body: fd });
     const data = await resp.json();
-    if (resp.ok) {
+    if (resp.ok && data.status === 'Queued') {
+      status.textContent = 'Review queued at position #' + data.queuePosition + '. It will start automatically when the current review finishes.';
+      status.className = 'submit-status';
+      status.style.color = 'var(--accent)';
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.textContent = 'Analyze PDF';
+      // Switch to queue tab to show position
+      document.querySelector('[data-tab="queue"]').click();
+      refreshQueue();
+    } else if (resp.ok) {
       currentAnalysisJobId = data.id;
       sessionStorage.setItem('analysisJobId', data.id);
       status.textContent = 'Analyzing PDF... (this takes 1-7 minutes depending on size)';
@@ -910,8 +924,6 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
       status.style.color = 'var(--blue)';
       // Start polling for analysis completion
       pollAnalysis(data.id);
-    } else if (resp.status === 409) {
-      showErr(data.error || 'A review is already running.');
     } else {
       showErr(data.error || 'Submission failed');
     }
@@ -1107,8 +1119,13 @@ async function confirmReview() {
     });
     const data = await resp.json();
     if (resp.ok) {
-      status.textContent = 'Review started! Job ID: ' + data.id;
-      status.style.color = 'var(--green)';
+      if (data.status === 'Queued') {
+        status.textContent = 'Review queued at position #' + data.queuePosition + '. It will start automatically when the current review finishes.';
+        status.style.color = 'var(--accent)';
+      } else {
+        status.textContent = 'Review started! Job ID: ' + data.id;
+        status.style.color = 'var(--green)';
+      }
       // Reset form and panel
       document.getElementById('reviewForm').reset();
       document.getElementById('uploadFilename').textContent = '';
@@ -1359,6 +1376,7 @@ function renderQueue(jobs) {
         (j.emailSent ? '<span class="email-icon sent" title="Email sent ' + esc(j.emailSentAt) + '">&#9993;</span>'
          : j.emailError ? '<span class="email-icon error" title="Email failed: ' + esc(j.emailError) + '">&#9993;</span>'
          : '') +
+        (sc === 'queued' ? '<div class="elapsed-time">Queue position #' + (j.queuePosition || '?') + '</div>' : '') +
         (sc === 'analyzing' ? '<div class="elapsed-time">Analyzing PDF...</div>' : '') +
         (sc === 'awaiting' ?
           '<button class="btn-sm primary" style="margin-top:.3rem;font-size:.7rem" ' +
@@ -1418,8 +1436,10 @@ async function refreshQueue() {
       const fail = queueData.filter(j => (j.status||'').toLowerCase() === 'failed').length;
       const anal = queueData.filter(j => (j.status||'').toLowerCase() === 'analyzing').length;
       const await_ = queueData.filter(j => (j.status||'').toLowerCase() === 'awaiting confirmation').length;
+      const queued = queueData.filter(j => (j.status||'').toLowerCase() === 'queued').length;
       footer.innerHTML =
         '<span>Total: ' + queueStats.totalJobs + ' jobs</span>' +
+        (queued ? '<span>Queued: ' + queued + '</span>' : '') +
         '<span>Analyzing: ' + anal + '</span>' +
         '<span>Awaiting: ' + await_ + '</span>' +
         '<span>Processing: ' + proc + '</span>' +
