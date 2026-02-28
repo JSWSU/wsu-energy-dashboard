@@ -984,6 +984,15 @@ function showAnalysisResults(jobId, analysis) {
     '<div class="analysis-stat"><div class="stat-value">' + nDivs + '</div><div class="stat-label">CSI Divisions</div></div>' +
     '<div class="analysis-stat"><div class="stat-value">' + nUnclass + '</div><div class="stat-label">Unclassified Pages</div></div>';
 
+  let warningHtml = '';
+  if (analysis.confidence === 'low') {
+    warningHtml = '<div style="background:var(--info-bg);border:1px solid var(--red);' +
+      'border-radius:6px;padding:8px 12px;margin-top:8px;font-size:0.85rem;color:var(--red)">' +
+      'Low confidence: Sheet designations could not be detected. All disciplines are selected by default — ' +
+      'uncheck any that are not relevant to this project to reduce review time and cost.</div>';
+  }
+  sumEl.innerHTML += warningHtml;
+
   // Discipline rows with checkboxes
   const discEl = document.getElementById('analysisDisciplines');
   const recommended = analysis.recommended_disciplines || {};
@@ -1015,6 +1024,15 @@ function updateDiscCount() {
   el.classList.toggle('zero', n === 0);
   const confirmBtn = document.getElementById('confirmBtn');
   if (confirmBtn) confirmBtn.disabled = n === 0;
+  let hint = document.getElementById('discHint');
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.id = 'discHint';
+    hint.style.cssText = 'color:var(--red);font-size:0.85rem;margin-top:4px;';
+    const parent = document.getElementById('analysisDisciplines');
+    if (parent) parent.parentNode.insertBefore(hint, parent.nextSibling);
+  }
+  hint.textContent = n === 0 ? 'Select at least one discipline to continue.' : '';
 }
 
 function selectAllDiscs(checked) {
