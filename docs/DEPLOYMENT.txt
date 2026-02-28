@@ -1,0 +1,145 @@
+WSU CONSTRUCTION DOCUMENT REVIEW SERVER
+DEPLOYMENT GUIDE
+========================================
+
+PREREQUISITES
+---
+- Windows 10/11 or Windows Server
+- Strawberry Perl (https://strawberryperl.com/) — includes Digest::SHA
+- Python 3.11+ with pip
+- Python packages: pdfplumber, openpyxl, python-docx
+- Claude CLI (claude.exe) — installed via Anthropic
+- NSSM (https://nssm.cc/) — for running as a Windows Service
+- Git Bash / MSYS2 (ships with Git for Windows)
+
+INSTALLATION
+---
+1. Clone the repository:
+   git clone <repo-url> C:\ReviewServer
+   cd C:\ReviewServer
+
+2. Install Python packages:
+   pip install pdfplumber openpyxl python-docx
+
+3. Verify Claude CLI is installed:
+   claude --version
+   (Should show Claude CLI version. If not found, install from Anthropic.)
+
+4. Create configuration:
+   Copy review-config.json and edit:
+   - auth.password: Set a strong shared password
+   - auth.secret: Set a random string (used for token signing)
+   - auth.adminEmails: Add admin email addresses
+   - email.*: Configure SMTP if email notifications desired
+   - bindAddress: "0.0.0.0" for network access, "127.0.0.1" for localhost only
+
+5. Test the server manually:
+   perl review-server.pl
+   Open http://localhost:8083/review-portal.html
+   Check health: http://localhost:8083/api/health
+
+6. Install as Windows Service:
+   Run install-service.bat as Administrator
+   nssm start WSUReviewServer
+
+7. Configure Windows Firewall (if binding to 0.0.0.0):
+   netsh advfirewall firewall add rule name="WSU Review Server" ^
+     dir=in action=allow protocol=tcp localport=8083
+
+CONFIGURATION REFERENCE (review-config.json)
+---
+Field                              Default     Description
+port                               8083        HTTP listen port
+bindAddress                        0.0.0.0     Bind address (0.0.0.0 = all interfaces)
+reviewsDir                         ./reviews   Directory for job data
+maxUploadMB                        100         Maximum PDF upload size in MB
+maxParallelDisciplines             8           Claude CLI instances per review
+disciplineTimeoutSec               600         Timeout per discipline (seconds)
+bodyReadTimeoutSec                 120         HTTP body read timeout
+headerReadTimeoutSec               30          HTTP header read timeout
+
+stallThresholds.phase0FailMin      30          Auto-fail analysis after N minutes
+stallThresholds.phase1WarnMin      45          Warn if Phase 1 stalls N minutes
+stallThresholds.phase1FailMin      60          Auto-fail Phase 1 after N minutes
+stallThresholds.phase2WarnMin      30          Warn if Phase 2 stalls
+stallThresholds.phase2FailMin      45          Auto-fail Phase 2
+stallThresholds.phase3WarnMin      15          Warn if Phase 3 stalls
+stallThresholds.phase3FailMin      30          Auto-fail Phase 3
+
+auth.password                      Energy@WSU  Shared access password
+auth.secret                        (change!)   HMAC signing secret
+auth.tokenExpiryHours              24          Token lifetime in hours
+auth.adminEmails                   []          Admin email addresses (see all jobs)
+
+email.enabled                      false       Enable email notifications
+email.smtpHost                     ""          SMTP server hostname
+email.smtpPort                     587         SMTP port
+email.smtpUser                     ""          SMTP username
+email.smtpPass                     ""          SMTP password
+email.from                         ""          Sender email address
+
+cleanup.archiveAfterDays           90          Archive completed jobs after N days
+cleanup.diskWarnMB                 5000        Disk usage warning threshold (MB)
+
+OPERATIONS RUNBOOK
+---
+CHECK SERVER STATUS:
+  curl http://localhost:8083/api/health
+  (Returns JSON with uptime, active/queued job counts, PID)
+
+RESTART SERVICE:
+  nssm restart WSUReviewServer
+
+CHECK LOGS:
+  Server log:    logs/service-stdout.log
+  Error log:     logs/service-stderr.log
+  Access log:    access.log (API audit trail)
+  Watchdog log:  watchdog.log
+
+CLEAR A STUCK JOB:
+  1. Find the job directory: ls reviews/
+  2. Check job status: cat reviews/<job-id>/job.json
+  3. Write FAILED sentinel: echo "Manual fail" > reviews/<job-id>/output/FAILED
+  4. The server will detect it on next poll cycle
+
+ROTATE API KEY:
+  1. Get new Claude API key from Anthropic dashboard
+  2. Update Claude CLI config: claude config set apiKey <new-key>
+  3. Restart service: nssm restart WSUReviewServer
+
+PURGE OLD JOBS:
+  Jobs older than 90 days are auto-archived to reviews/archive/
+  To manually delete: rm -rf reviews/archive/<job-id>
+
+TROUBLESHOOTING
+---
+SYMPTOM: Server won't start
+  - Check port in use: netstat -an | find "8083"
+  - Check Perl installed: perl --version
+  - Check config valid: perl -MJSON::PP -e "decode_json(do{local $/; open my $f,'<','review-config.json';scalar <$f>})"
+
+SYMPTOM: Reviews take too long (>30 min)
+  - Check timing.json in completed job output for per-phase breakdown
+  - Reduce disciplineTimeoutSec (default 600s = 10min per discipline)
+  - Check Claude API status
+
+SYMPTOM: Claude CLI not found
+  - Verify path: where claude.exe
+  - Check APPDATA/Claude/claude-code/ directory
+  - Server auto-detects on startup; restart after install
+
+SYMPTOM: Email not sending
+  - Check email.enabled is true in config
+  - Verify SMTP settings (host, port, user, pass)
+  - Check pending-email.json in job directories for retry status
+  - Check service-stderr.log for SMTP errors
+
+SYMPTOM: 401 Unauthorized on all API calls
+  - Token may be expired (24h default)
+  - Clear browser localStorage and re-authenticate
+  - Check auth.secret matches between config and running server
+
+SYMPTOM: Cannot access from other machines
+  - Verify bindAddress is "0.0.0.0" (not "127.0.0.1")
+  - Check Windows Firewall rule for port 8083
+  - Try: curl http://<server-ip>:8083/api/health from remote machine
