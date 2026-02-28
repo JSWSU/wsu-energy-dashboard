@@ -453,6 +453,7 @@ sub check_job_status {
             checklist.txt findings.txt notes.txt
             checklist.md  findings.md  notes.md
             report.docx report.xlsx
+            review-data.json executive-summary.txt
         );
         my @out = grep { -f "$job_dir/output/$_" } @deliverables;
         $job->{outputFiles} = \@out;
