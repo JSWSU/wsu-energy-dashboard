@@ -283,7 +283,7 @@ def merge_findings(all_disciplines):
             'discipline': f['_discipline'],
             'division': f.get('division', ''),
             'csi_code': f.get('csi_code', ''),
-            'title': (f.get('issue', '') or '')[:120],
+            'title': f.get('issue', '') or '',
             'severity': f.get('severity') or 'Minor',
             'status': f.get('status', 'D'),
             'pdf_reference': f.get('pdf_reference', ''),
