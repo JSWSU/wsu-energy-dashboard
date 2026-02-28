@@ -407,6 +407,60 @@ sub send_completion_email {
     print "[EMAIL] Sent completion notification for job $job_id to $to\n";
 }
 
+sub parse_timing_log {
+    my ($job_dir) = @_;
+    my $logfile = "$job_dir/output/timing.log";
+    return {} unless -f $logfile;
+    open my $fh, '<', $logfile or return {};
+    my %data;
+    while (<$fh>) {
+        chomp;
+        my ($k, $v) = split /=/, $_, 2;
+        $data{$k} = $v if defined $k && defined $v;
+    }
+    close $fh;
+
+    my %timing;
+    # Phase 0
+    if ($data{phase0_start}) {
+        $timing{phase0} = {
+            durationSec => ($data{phase0_end} || time()) - $data{phase0_start},
+            pageCount   => int($data{phase0_pages} || 0),
+        };
+    }
+    # Phase 1
+    if ($data{phase1_start}) {
+        $timing{phase1} = {
+            durationSec  => ($data{phase1_end} || time()) - $data{phase1_start},
+            disciplines  => int($data{phase1_disciplines} || 0),
+        };
+    }
+    # Phase 2a (synthesis)
+    if ($data{phase2a_start}) {
+        $timing{phase2a} = {
+            durationSec => ($data{phase2a_end} || time()) - $data{phase2a_start},
+        };
+    }
+    # Phase 2b (exec summary)
+    if ($data{phase2b_start}) {
+        $timing{phase2b} = {
+            durationSec => ($data{phase2b_end} || time()) - $data{phase2b_start},
+        };
+    }
+    # Phase 3
+    if ($data{phase3_start}) {
+        $timing{phase3} = {
+            durationSec => ($data{phase3_end} || time()) - $data{phase3_start},
+        };
+    }
+    # Total
+    my $first_start = $data{phase0_start} || $data{phase1_start};
+    my $last_end = $data{phase3_end} || $data{phase2b_end} || $data{phase2a_end} || $data{phase1_end};
+    $timing{totalDurationSec} = ($last_end || time()) - ($first_start || time()) if $first_start;
+
+    return \%timing;
+}
+
 sub check_job_status {
     my ($job_id) = @_;
     my $job = read_job_json($job_id);
@@ -522,6 +576,19 @@ sub check_job_status {
         $job->{progress} = 100;
         $job->{completed} = iso_now();
         $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
+        # Parse timing log and write timing.json before building deliverables
+        my $timing = parse_timing_log($job_dir);
+        if (keys %$timing) {
+            $job->{timing} = $timing;
+            my $timing_path = "$job_dir/output/timing.json";
+            if (open my $tfh, '>', $timing_path) {
+                print $tfh encode_json($timing);
+                close $tfh;
+            } else {
+                warn "Cannot write timing.json: $!\n";
+            }
+        }
+
         # Only list final deliverables (not intermediate discipline files, scripts, etc.)
         # Supports both old (.md) and new (.txt) naming for backward compatibility
         my @deliverables = qw(
@@ -529,6 +596,7 @@ sub check_job_status {
             checklist.md  findings.md  notes.md
             report.docx report.xlsx
             review-data.json executive-summary.txt
+            timing.json
         );
         my @out = grep { -f "$job_dir/output/$_" } @deliverables;
         $job->{outputFiles} = \@out;
@@ -1133,6 +1201,8 @@ sub spawn_review {
 
     print $fh "DISCIPLINE_TIMEOUT=$CFG{disciplineTimeoutSec}\n\n";
 
+    print $fh "TIMING_LOG=\"$output_dir/timing.log\"\n\n";
+
     # Orphan cleanup function: Claude CLIs with --dangerously-skip-permissions can
     # spawn child processes (e.g. pdfplumber) that survive after the parent exits.
     # This function kills any orphaned python.exe children spawned by our CLIs.
@@ -1176,6 +1246,7 @@ sub spawn_review {
 
     # Phase 0: One-time PDF text extraction (skip if pages already extracted by analysis phase)
     print $fh "# === PHASE 0: One-time PDF text extraction ===\n";
+    print $fh "echo \"phase0_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "if [ -f \"$job_dir/pages/manifest.txt\" ]; then\n";
     print $fh "  echo \"Phase 0: Skipped (pages already extracted by analysis phase).\" >> \"$output_dir/progress.log\"\n";
     print $fh "else\n";
@@ -1186,7 +1257,9 @@ sub spawn_review {
     print $fh "    exit 1\n";
     print $fh "  fi\n";
     print $fh "  echo \"Phase 0 complete.\" >> \"$output_dir/progress.log\"\n";
-    print $fh "fi\n\n";
+    print $fh "fi\n";
+    print $fh "echo \"phase0_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
+    print $fh "echo \"phase0_pages=\$(ls \"$job_dir/pages\" 2>/dev/null | wc -l)\" >> \"\$TIMING_LOG\"\n\n";
 
     # Phase 1: parallel discipline CLIs (all 8 run simultaneously — API-bound, not CPU-bound)
     # Wave priority kept for ordering; with MAX_PARALLEL=8, all fit in a single wave.
@@ -1213,6 +1286,7 @@ sub spawn_review {
     my $num_waves = scalar @waves;
 
     print $fh "# === PHASE 1: $expected_count parallel discipline scans ===\n";
+    print $fh "echo \"phase1_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "echo \"Phase 1: Launching $expected_count discipline scans (all parallel)...\" >> \"$output_dir/progress.log\"\n\n";
 
     for my $wi (0 .. $#waves) {
@@ -1260,7 +1334,9 @@ sub spawn_review {
         print $fh "echo \"Batch $wave_num/$num_waves complete (timeout=\${DISCIPLINE_TIMEOUT}s per discipline).\" >> \"$output_dir/progress.log\"\n\n";
     }
 
-    print $fh "echo \"Phase 1 complete ($expected_count disciplines).\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 1 complete ($expected_count disciplines).\" >> \"$output_dir/progress.log\"\n";
+    print $fh "echo \"phase1_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
+    print $fh "echo \"phase1_disciplines=$expected_count\" >> \"\$TIMING_LOG\"\n\n";
 
     # JSON sanitization: fix unescaped quotes in measurement strings
     print $fh "# --- Post-process: fix common JSON errors ---\n";
@@ -1382,6 +1458,7 @@ sub spawn_review {
 
     # Phase 2a: Python synthesis (JSON merge + renumber, zero tokens)
     print $fh "# === PHASE 2a: Python synthesis -> review-data.json ===\n";
+    print $fh "echo \"phase2a_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "echo \"Phase 2a: Synthesizing (Python)...\" >> \"$output_dir/progress.log\"\n";
     my $synth_stdout = "$output_dir/synthesis-stdout.log";
     my $synth_stderr = "$output_dir/synthesis-stderr.log";
@@ -1393,13 +1470,15 @@ sub spawn_review {
     print $fh "  echo \"ERROR: synthesize.py did not produce review-data.json. Check synthesis-stderr.log\" > \"$output_dir/FAILED\"\n";
     print $fh "  exit 1\n";
     print $fh "fi\n";
-    print $fh "echo \"Phase 2a complete: review-data.json produced.\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 2a complete: review-data.json produced.\" >> \"$output_dir/progress.log\"\n";
+    print $fh "echo \"phase2a_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
 
     # Phase 2b: Claude executive summary (Haiku, small + fast)
     my $exec_prompt = "$job_dir/prompt-exec-summary.txt";
     my $exec_stdout = "$output_dir/executive-summary.txt";
     my $exec_stderr = "$output_dir/summary-stderr.log";
     print $fh "# === PHASE 2b: Claude executive summary (Haiku) ===\n";
+    print $fh "echo \"phase2b_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "echo \"Phase 2b: Generating executive summary...\" >> \"$output_dir/progress.log\"\n";
     print $fh "EXEC_PROMPT=\$(cat \"$exec_prompt\")\n";
     print $fh "cd \"$output_dir\"\n";
@@ -1411,10 +1490,12 @@ sub spawn_review {
     print $fh "  > \"$exec_stdout\" \\\n";
     print $fh "  2> \"$exec_stderr\"\n";
     print $fh "cd \"$ROOT\"\n";
-    print $fh "echo \"Phase 2b complete.\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 2b complete.\" >> \"$output_dir/progress.log\"\n";
+    print $fh "echo \"phase2b_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
 
     # Phase 3: local Python report generation
     print $fh "# === PHASE 3: Local report generation (zero tokens) ===\n";
+    print $fh "echo \"phase3_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "echo \"Phase 3: Generating reports...\" >> \"$output_dir/progress.log\"\n";
     print $fh "\"\$PYTHON\" \"$ROOT/generate_reports.py\" \"$output_dir/review-data.json\"\n";
     print $fh "PYEXIT=\$?\n";
@@ -1425,6 +1506,7 @@ sub spawn_review {
     print $fh "  exit 1\n";
     print $fh "fi\n\n";
 
+    print $fh "echo \"phase3_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "echo \"Pipeline complete.\" >> \"$output_dir/progress.log\"\n";
 
     close $fh;
