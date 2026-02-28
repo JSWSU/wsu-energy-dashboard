@@ -28,6 +28,7 @@ sub load_config {
     my %defaults = (
         port                   => 8083,
         bindAddress            => '127.0.0.1',
+        corsOrigin             => '',  # auto-detected if empty
         reviewsDir             => './reviews',
         maxUploadMB            => 100,
         maxParallelDisciplines => 8,
@@ -112,6 +113,18 @@ sub load_config {
 
 my $port = $ARGV[0] || $CFG{port};
 my $REVIEWS_DIR = File::Spec->rel2abs($CFG{reviewsDir}, $ROOT);
+
+# Resolve CORS origin: use configured value, or auto-detect from hostname
+my $CORS_ORIGIN;
+if ($CFG{corsOrigin}) {
+    $CORS_ORIGIN = $CFG{corsOrigin};
+} else {
+    my $hostname = $CFG{bindAddress};
+    if ($hostname eq '0.0.0.0' || $hostname eq '127.0.0.1') {
+        $hostname = 'localhost';
+    }
+    $CORS_ORIGIN = "http://$hostname:$port";
+}
 my $CLAUDE_PATH = '';
 
 # Auto-detect Claude CLI
@@ -176,6 +189,8 @@ print "  Config:    " . ($cfg_loaded ? "$ROOT/review-config.json" : "defaults (n
 
 # --- Helpers ----------------------------------------------------------------
 
+my $_make_job_counter = 0;
+
 sub iso_now {
     my @t = localtime;
     return sprintf('%04d-%02d-%02dT%02d:%02d:%02d',
@@ -183,12 +198,14 @@ sub iso_now {
 }
 
 sub make_job_id {
-    # UUID v4: 8-4-4-4-12 hex characters
-    my @hex = map { sprintf('%04x', int(rand(65536))) } 1..8;
-    my $uuid = join('', @hex[0..1]) . '-' . $hex[2] . '-'
-             . substr(sprintf('4%03x', int(rand(4096))), 0, 4) . '-'
-             . substr(sprintf('%04x', int(rand(16384)) | 0x8000), 0, 4) . '-'
-             . join('', @hex[5..7]);
+    # UUID v4 using SHA256 for better entropy than rand()
+    my $entropy = join(':', time(), $$, rand(), $., $0, ++$_make_job_counter);
+    my $hash = Digest::SHA::sha256_hex($entropy);
+    # Format as UUID v4: 8-4-4-4-12 with version/variant bits
+    my $uuid = substr($hash, 0, 8) . '-' . substr($hash, 8, 4) . '-'
+             . '4' . substr($hash, 13, 3) . '-'
+             . sprintf('%x', (hex(substr($hash, 16, 1)) & 0x3) | 0x8) . substr($hash, 17, 3) . '-'
+             . substr($hash, 20, 12);
     return $uuid;
 }
 
@@ -201,7 +218,7 @@ sub send_response {
     print $c "HTTP/1.0 $code $status\r\n"
         . "Content-Type: $ct\r\n"
         . "Content-Length: " . length($body) . "\r\n"
-        . "Access-Control-Allow-Origin: http://$CFG{bindAddress}:$port\r\n"
+        . "Access-Control-Allow-Origin: $CORS_ORIGIN\r\n"
         . "\r\n"
         . $body;
 }
@@ -541,8 +558,16 @@ sub drain_email_queue {
             next if time() < ($email->{nextTry} || 0);
             next if ($email->{attempts} || 0) >= 3;
 
-            # Attempt to send
-            my $ok = eval { send_completion_email($dir, read_job_json($dir)); 1; };
+            # Attempt to send — read fresh job data and call send directly
+            my $job = read_job_json($dir);
+            my $ok = 0;
+            if ($job) {
+                $ok = eval { send_completion_email($dir, $job); 1; };
+                # send_completion_email sets emailError on failure without dying,
+                # so check if emailSent was actually set
+                $job = read_job_json($dir);  # re-read after send attempt
+                $ok = $job && $job->{emailSent} ? 1 : 0;
+            }
             if ($ok) {
                 unlink $ef;
                 print "[" . localtime() . "] Email sent successfully for job $dir\n";
@@ -1726,6 +1751,22 @@ sub periodic_cleanup {
         closedir $dh;
     }
     print "[CLEANUP] Archived $archived jobs older than $archive_days days\n" if $archived;
+
+    # Clean stale rate limit entries (IPs not seen in last hour)
+    my $rl_cutoff = time() - 3600;
+    for my $ip (keys %rate_limits) {
+        my $has_recent = 0;
+        for my $bucket (keys %{$rate_limits{$ip}}) {
+            my @recent = grep { $_ > $rl_cutoff } @{$rate_limits{$ip}{$bucket} || []};
+            if (@recent) {
+                $rate_limits{$ip}{$bucket} = \@recent;
+                $has_recent = 1;
+            } else {
+                delete $rate_limits{$ip}{$bucket};
+            }
+        }
+        delete $rate_limits{$ip} unless $has_recent;
+    }
 }
 
 # --- Job queue drain --------------------------------------------------------
@@ -1829,7 +1870,7 @@ while (!$shutdown) {
     # CORS preflight
     if ($method eq 'OPTIONS') {
         print $c "HTTP/1.0 204 No Content\r\n"
-            . "Access-Control-Allow-Origin: http://$CFG{bindAddress}:$port\r\n"
+            . "Access-Control-Allow-Origin: $CORS_ORIGIN\r\n"
             . "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n"
             . "Access-Control-Allow-Headers: Content-Type, Authorization, X-User-Email\r\n"
             . "\r\n";
@@ -2364,8 +2405,22 @@ while (!$shutdown) {
     # --- Static file serving ------------------------------------------------
     if ($method eq 'GET') {
         $path = '/review-portal.html' if $path eq '/';
-        $path =~ s{/\.\.}{}g;
-        my $file = "$ROOT$path";
+
+        # Security: resolve to absolute path and verify it stays under $ROOT
+        my $candidate = "$ROOT$path";
+        my $resolved = abs_path($candidate);
+        if (!$resolved || index($resolved, $ROOT) != 0) {
+            send_response($c, 403, 'text/plain', 'Forbidden');
+            close $c; next;
+        }
+        # Block sensitive files from being served
+        my $basename_lc = lc( (File::Spec->splitpath($resolved))[2] );
+        if ($basename_lc eq 'review-config.json' || $basename_lc eq 'review-server.pid'
+            || $basename_lc eq 'access.log' || $basename_lc =~ /^\./) {
+            send_response($c, 403, 'text/plain', 'Forbidden');
+            close $c; next;
+        }
+        my $file = $resolved;
 
         if (-f $file) {
             open my $fh, '<:raw', $file or do {
