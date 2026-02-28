@@ -886,7 +886,21 @@ function pollAnalysis(jobId) {
           clearInterval(analysisPoller);
           analysisPoller = null;
           showAnalysisResults(jobId, data.analysis);
-        } else if (data.status === 'Processing' || data.status === 'Complete' || data.status === 'Failed') {
+        } else if (data.status === 'Failed') {
+          clearInterval(analysisPoller);
+          analysisPoller = null;
+          currentAnalysisJobId = null;
+          sessionStorage.removeItem('analysisJobId');
+          const btn = document.getElementById('submitBtn');
+          btn.disabled = false;
+          btn.classList.remove('loading');
+          btn.textContent = 'Analyze PDF';
+          btn.style.display = '';
+          const status = document.getElementById('submitStatus');
+          const errDetail = data.analysis?.error || data.error || '';
+          status.textContent = 'Analysis failed for job ' + jobId + '.' + (errDetail ? ' ' + errDetail : ' Check server logs.');
+          status.style.color = 'var(--red)';
+        } else if (data.status === 'Processing' || data.status === 'Complete') {
           // Job moved past analysis — clean up
           clearInterval(analysisPoller);
           analysisPoller = null;
@@ -1050,6 +1064,17 @@ async function confirmReview() {
       btn.disabled = false;
       btn.classList.remove('loading');
       btn.textContent = 'Start Full Review';
+      // If job moved past awaiting confirmation, dismiss stale panel after showing error
+      if (resp.status === 400 && (data.error || '').includes('not awaiting confirmation')) {
+        setTimeout(() => {
+          document.getElementById('analysisPanel').classList.remove('visible');
+          document.getElementById('submitBtn').style.display = '';
+          document.getElementById('submitBtn').disabled = false;
+          document.getElementById('submitBtn').textContent = 'Analyze PDF';
+          currentAnalysisJobId = null;
+          sessionStorage.removeItem('analysisJobId');
+        }, 3000);
+      }
     }
   } catch (err) {
     status.textContent = 'Network error: ' + err.message;
