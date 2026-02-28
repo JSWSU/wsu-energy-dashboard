@@ -481,12 +481,18 @@ def analyze_pages(pages_dir):
     for dk in recommended_disciplines:
         all_recommended_divs.update(recommended_disciplines[dk]['divisions'])
 
-    # Compute confidence
+    # Compute confidence label
     classified_pages = total_pages - len(unclassified)
-    if total_pages > 0:
-        confidence = round(classified_pages / total_pages, 3)
+    has_sheet_ids = any(
+        len(sids) > 0 for sids in all_sheet_ids.values()
+    )
+    if has_sheet_ids and classified_pages > 0:
+        confidence = 'high'
+    elif classified_pages > 0:
+        confidence = 'medium'
     else:
-        confidence = 0.0
+        confidence = 'low'
+    classified_ratio = round(classified_pages / total_pages, 3) if total_pages > 0 else 0.0
 
     # Build detected_categories summary
     detected_categories_out = {}
@@ -501,6 +507,7 @@ def analyze_pages(pages_dir):
     analysis = {
         'total_pages': total_pages,
         'confidence': confidence,
+        'classified_ratio': classified_ratio,
         'detected_categories': detected_categories_out,
         'recommended_disciplines': recommended_disciplines,
         'recommended_divisions': sorted(all_recommended_divs),

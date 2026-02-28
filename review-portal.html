@@ -802,6 +802,18 @@ function showFile(f) {
 let currentAnalysisJobId = null;
 let analysisPoller = null;
 
+// Restore from session storage if page was reloaded during analysis
+(function() {
+  const saved = sessionStorage.getItem('analysisJobId');
+  if (saved) {
+    currentAnalysisJobId = saved;
+    pollAnalysis(saved);
+    const status = document.getElementById('submitStatus');
+    status.textContent = 'Resuming analysis poll for job ' + saved + '...';
+    status.style.color = 'var(--blue)';
+  }
+})();
+
 document.getElementById('reviewForm').addEventListener('submit', async e => {
   e.preventDefault();
   const form = e.target;
@@ -843,6 +855,7 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
     const data = await resp.json();
     if (resp.ok) {
       currentAnalysisJobId = data.id;
+      sessionStorage.setItem('analysisJobId', data.id);
       status.textContent = 'Analyzing PDF... (this takes 1-7 minutes depending on size)';
       status.className = 'submit-status';
       status.style.color = 'var(--blue)';
@@ -880,6 +893,8 @@ function pollAnalysis(jobId) {
           if (job && job.status === 'Failed') {
             clearInterval(analysisPoller);
             analysisPoller = null;
+            currentAnalysisJobId = null;
+            sessionStorage.removeItem('analysisJobId');
             const btn = document.getElementById('submitBtn');
             btn.disabled = false;
             btn.classList.remove('loading');
@@ -1006,6 +1021,7 @@ async function confirmReview() {
       document.getElementById('analysisPanel').classList.remove('visible');
       document.getElementById('submitBtn').style.display = '';
       currentAnalysisJobId = null;
+      sessionStorage.removeItem('analysisJobId');
       document.getElementById('confirmStatus').textContent = '';
       // Switch to queue tab
       document.querySelector('[data-tab="queue"]').click();
@@ -1030,6 +1046,7 @@ async function viewAnalysis(jobId) {
   // Switch to submit tab and load analysis
   document.querySelector('[data-tab="submit"]').click();
   currentAnalysisJobId = jobId;
+  sessionStorage.setItem('analysisJobId', jobId);
   try {
     const resp = await fetch('/api/analysis/' + jobId);
     if (resp.ok) {
@@ -1312,8 +1329,11 @@ async function refreshQueue() {
     if (banner) banner.classList.remove('visible');
 
     // Always re-render if any job is processing (elapsedSeconds changes each poll)
-    var hasProcessing = newData.some(function(j) { return (j.status||'').toLowerCase() === 'processing'; });
-    if (changed || hasProcessing) applyQueueFilters();
+    var hasActive = newData.some(function(j) {
+      var s = (j.status||'').toLowerCase();
+      return s === 'processing' || s === 'analyzing';
+    });
+    if (changed || hasActive) applyQueueFilters();
   } catch (err) {
     pollFailures++;
     pollInterval = Math.min(POLL_MAX, POLL_BASE * Math.pow(1.5, pollFailures));
