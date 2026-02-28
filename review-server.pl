@@ -171,13 +171,13 @@ sub read_exact {
     while (length($buf) < $len) {
         unless ($sel->can_read($timeout)) {
             warn "[TIMEOUT] read_exact timed out after ${timeout}s with " . length($buf) . "/$len bytes\n";
-            last;
+            return ($buf, 0);
         }
         my $n = read($sock, my $chunk, $len - length($buf));
-        last unless $n;
+        return ($buf, 0) unless $n;  # EOF — incomplete
         $buf .= $chunk;
     }
-    return $buf;
+    return ($buf, 1);
 }
 
 # --- Multipart parser -------------------------------------------------------
@@ -1592,7 +1592,14 @@ while (my $c = $srv->accept) {
             close $c;
             next;
         }
-        $body = read_exact($c, $len);
+        my $complete;
+        ($body, $complete) = read_exact($c, $len);
+        unless ($complete) {
+            warn "[UPLOAD] Incomplete upload: got " . length($body) . "/$len bytes\n";
+            send_json($c, 400, { error => 'Upload incomplete — connection closed before all data received' });
+            close $c;
+            next;
+        }
     }
 
     # --- API Routes ---------------------------------------------------------
@@ -1668,6 +1675,20 @@ while (my $c = $srv->accept) {
         };
         print $fh $pdf->{data};
         close $fh;
+
+        # Validate PDF header
+        open my $vfh, '<:raw', "$job_dir/input.pdf" or do {
+            send_json($c, 500, { error => "Cannot verify PDF" });
+            remove_tree($job_dir);
+            close $c; next;
+        };
+        read $vfh, my $magic, 5;
+        close $vfh;
+        if (($magic || '') ne '%PDF-') {
+            send_json($c, 400, { error => 'Uploaded file is not a valid PDF (missing %PDF- header)' });
+            remove_tree($job_dir);
+            close $c; next;
+        }
 
         my @divs = $divs_str ? map { s/^\s+|\s+$//gr } split(/,/, $divs_str) : ();
         my $pdf_size = -s "$job_dir/input.pdf";
