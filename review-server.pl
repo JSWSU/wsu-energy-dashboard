@@ -247,6 +247,13 @@ sub validate_token {
     return $sig eq $expected;
 }
 
+sub is_admin {
+    my ($headers) = @_;
+    my $email = $headers->{'x-user-email'} || '';
+    return 0 unless $email;
+    return scalar grep { lc($_) eq lc($email) } @{$CFG{auth}{adminEmails} || []};
+}
+
 # --- Rate limiter -----------------------------------------------------------
 
 my %rate_limits;  # ip => { submit => [timestamps], api => [timestamps] }
@@ -1906,6 +1913,77 @@ while (!$shutdown) {
             send_json($c, 429, { error => 'Rate limit exceeded: max 60 requests per minute' });
             close $c; next;
         }
+    }
+
+    # GET /api/admin/stats — server statistics (admin only)
+    if ($method eq 'GET' && $path eq '/api/admin/stats') {
+        unless (is_admin(\%headers)) {
+            send_json($c, 403, { error => 'Admin access required' });
+            close $c; next;
+        }
+        my %counts = (active => 0, queued => 0, complete => 0, failed => 0, analyzing => 0, awaiting => 0);
+        my @recent_jobs;
+        my $total_bytes = 0;
+        if (opendir my $dh, $REVIEWS_DIR) {
+            while (my $dir = readdir $dh) {
+                next if $dir =~ /^\.|^archive$/;
+                my $j = read_job_json($dir);
+                next unless $j;
+                my $st = lc($j->{status} || '');
+                $counts{active}++ if $st eq 'processing';
+                $counts{analyzing}++ if $st eq 'analyzing';
+                $counts{queued}++ if $st eq 'queued';
+                $counts{complete}++ if $st eq 'complete';
+                $counts{failed}++ if $st eq 'failed';
+                $counts{awaiting}++ if $st eq 'awaiting confirmation';
+                $total_bytes += $j->{pdfSizeBytes} || 0;
+                push @recent_jobs, {
+                    id        => $dir,
+                    project   => $j->{projectName} || '',
+                    status    => $j->{status} || '',
+                    submitted => $j->{submitted} || '',
+                    timing    => $j->{timing} || undef,
+                    duration  => $j->{durationSeconds} || undef,
+                    email     => $j->{pmEmail} || '',
+                };
+            }
+            closedir $dh;
+        }
+        @recent_jobs = sort { ($b->{submitted} || '') cmp ($a->{submitted} || '') } @recent_jobs;
+        @recent_jobs = @recent_jobs[0..49] if @recent_jobs > 50;
+
+        send_json($c, 200, {
+            uptime     => time() - $^T,
+            pid        => $$,
+            jobCounts  => \%counts,
+            totalBytes => $total_bytes,
+            recentJobs => \@recent_jobs,
+        });
+        close $c; next;
+    }
+
+    # POST /api/admin/force-fail/{id} — force a stuck job to Failed (admin only)
+    if ($method eq 'POST' && $path =~ m{^/api/admin/force-fail/([a-zA-Z0-9_-]+)$}) {
+        my $id = $1;
+        unless (is_admin(\%headers)) {
+            send_json($c, 403, { error => 'Admin access required' });
+            close $c; next;
+        }
+        my $job = read_job_json($id);
+        unless ($job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        my $job_dir = "$REVIEWS_DIR/$id";
+        make_path("$job_dir/output") unless -d "$job_dir/output";
+        open my $ff, '>', "$job_dir/output/FAILED" or warn "Cannot write FAILED: $!\n";
+        if ($ff) { print $ff "ADMIN-FAIL: Manually failed by administrator"; close $ff; }
+        $job->{status} = 'Failed';
+        $job->{error} = 'Manually failed by administrator';
+        $job->{completed} = iso_now();
+        write_job_json($id, $job);
+        send_json($c, 200, { status => 'Failed', message => "Job $id force-failed" });
+        close $c; next;
     }
 
     # POST /api/submit — new review submission
