@@ -126,6 +126,20 @@ my $srv = IO::Socket::INET->new(
     Proto => 'tcp', Listen => 5, ReuseAddr => 1,
 ) or die "Cannot bind to port $port: $!\n";
 
+# Write PID file
+my $pidfile = "$ROOT/review-server.pid";
+{
+    open my $pidfh, '>', $pidfile or warn "Cannot write PID file: $!\n";
+    if ($pidfh) { print $pidfh $$; close $pidfh; }
+}
+
+# Signal handlers for clean shutdown
+my $shutdown = 0;
+$SIG{INT} = $SIG{TERM} = sub {
+    print "\n[" . localtime() . "] Received shutdown signal. Closing server.\n";
+    $shutdown = 1;
+};
+
 print "WSU Review Portal Server\n";
 print "  Root:   $ROOT\n";
 print "  Claude: $CLAUDE_PATH\n";
@@ -1539,7 +1553,13 @@ sub spawn_review {
 
 # --- Request handler --------------------------------------------------------
 
-while (my $c = $srv->accept) {
+my $accept_sel = IO::Select->new($srv);
+
+while (!$shutdown) {
+    unless ($accept_sel->can_read(5)) {
+        next;  # timeout — check $shutdown flag
+    }
+    my $c = $srv->accept or next;
     binmode $c;
     $c->autoflush(1);
 
@@ -1603,6 +1623,31 @@ while (my $c = $srv->accept) {
     }
 
     # --- API Routes ---------------------------------------------------------
+
+    # GET /api/health — server health check
+    if ($method eq 'GET' && $path eq '/api/health') {
+        my $uptime = time() - $^T;  # $^T is Perl's script start time
+        my ($active, $queued) = (0, 0);
+        if (opendir my $dh, $REVIEWS_DIR) {
+            while (my $d = readdir $dh) {
+                next if $d =~ /^\./;
+                my $j = read_job_json($d);
+                next unless $j;
+                my $st = $j->{status} || '';
+                $active++ if $st eq 'Processing' || $st eq 'Analyzing';
+                $queued++ if $st eq 'Queued';
+            }
+            closedir $dh;
+        }
+        send_json($c, 200, {
+            status     => 'ok',
+            uptime     => $uptime,
+            activeJobs => $active,
+            queuedJobs => $queued,
+            pid        => $$,
+        });
+        close $c; next;
+    }
 
     # POST /api/submit — new review submission
     if ($method eq 'POST' && $path eq '/api/submit') {
@@ -1943,3 +1988,8 @@ while (my $c = $srv->accept) {
 
     close $c;
 }
+
+# Cleanup on exit
+close $srv;
+unlink $pidfile if -f $pidfile;
+print "[" . localtime() . "] Server shut down cleanly.\n";
