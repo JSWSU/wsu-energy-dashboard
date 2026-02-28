@@ -808,6 +808,10 @@ let analysisPoller = null;
   if (saved) {
     currentAnalysisJobId = saved;
     pollAnalysis(saved);
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.innerHTML = '<span class="spinner"></span>Analyzing...';
     const status = document.getElementById('submitStatus');
     status.textContent = 'Resuming analysis poll for job ' + saved + '...';
     status.style.color = 'var(--blue)';
@@ -882,6 +886,20 @@ function pollAnalysis(jobId) {
           clearInterval(analysisPoller);
           analysisPoller = null;
           showAnalysisResults(jobId, data.analysis);
+        } else if (data.status === 'Processing' || data.status === 'Complete' || data.status === 'Failed') {
+          // Job moved past analysis — clean up
+          clearInterval(analysisPoller);
+          analysisPoller = null;
+          currentAnalysisJobId = null;
+          sessionStorage.removeItem('analysisJobId');
+          const btn = document.getElementById('submitBtn');
+          btn.disabled = false;
+          btn.classList.remove('loading');
+          btn.textContent = 'Analyze PDF';
+          btn.style.display = '';
+          const status = document.getElementById('submitStatus');
+          status.textContent = 'Job ' + jobId + ' has already moved to ' + data.status + '.';
+          status.style.color = 'var(--text-light)';
         }
       } else if (resp.status === 404) {
         // Analysis not ready yet — check if job failed

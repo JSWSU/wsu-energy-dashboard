@@ -512,6 +512,7 @@ def analyze_pages(pages_dir):
         'recommended_disciplines': recommended_disciplines,
         'recommended_divisions': sorted(all_recommended_divs),
         'unclassified_pages': unclassified,
+        'unclassified_count': len(unclassified),
         'page_details': page_details,
     }
 
@@ -551,7 +552,7 @@ def main():
 
     print(f"Sheet analysis: {total} pages, {n_disc} disciplines detected, "
           f"{n_divs} CSI divisions, {n_unclass} unclassified, "
-          f"confidence={conf:.1%}")
+          f"confidence={conf}")
     if disc_names:
         for name in disc_names:
             print(f"  - {name}")
