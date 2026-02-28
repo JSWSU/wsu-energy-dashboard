@@ -1,6 +1,6 @@
 {
   "port": 8083,
-  "bindAddress": "127.0.0.1",
+  "bindAddress": "0.0.0.0",
   "reviewsDir": "./reviews",
   "maxUploadMB": 100,
   "maxParallelDisciplines": 8,

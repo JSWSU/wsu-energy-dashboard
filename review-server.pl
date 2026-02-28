@@ -154,10 +154,14 @@ $SIG{INT} = $SIG{TERM} = sub {
     $shutdown = 1;
 };
 
+my $cfg_loaded = -f "$ROOT/review-config.json";
+my $display_addr = $CFG{bindAddress} eq '0.0.0.0' ? '<your-hostname>' : $CFG{bindAddress};
 print "WSU Review Portal Server\n";
-print "  Root:   $ROOT\n";
-print "  Claude: $CLAUDE_PATH\n";
-print "  URL:    http://localhost:$port/review-portal.html\n\n";
+print "  Listening: $CFG{bindAddress}:$port\n";
+print "  Portal:    http://$display_addr:$port/review-portal.html\n";
+print "  Health:    http://$display_addr:$port/api/health\n";
+print "  Claude:    $CLAUDE_PATH\n";
+print "  Config:    " . ($cfg_loaded ? "$ROOT/review-config.json" : "defaults (no config file)") . "\n\n";
 
 # --- Helpers ----------------------------------------------------------------
 
