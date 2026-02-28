@@ -1586,7 +1586,13 @@ while (my $c = $srv->accept) {
             close $c; next;
         };
         local $/; my $ajson = <$afh>; close $afh;
-        send_response($c, 200, 'application/json', $ajson);
+        my $analysis = eval { decode_json($ajson) } || {};
+        send_json($c, 200, {
+            jobId       => $id,
+            status      => $job->{status},
+            projectName => $job->{projectName},
+            analysis    => $analysis,
+        });
         close $c;
         next;
     }
