@@ -709,28 +709,73 @@ footer {
 
 <script>
 // --- Auth Gate ---
-const AUTH_KEY = 'wsuReviewAuth';
-const AUTH_PASS = 'Energy@WSU';
-function checkAuth() {
+const AUTH_KEY = 'wsuReviewToken';
+
+async function checkAuth() {
   const input = document.getElementById('authPass');
   const btn = document.querySelector('.auth-card button');
   btn.disabled = true;
-  if (input.value === AUTH_PASS) {
-    localStorage.setItem(AUTH_KEY, 'ok');
-    document.getElementById('authGate').style.display = 'none';
-  } else {
+  try {
+    const resp = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: input.value }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      localStorage.setItem(AUTH_KEY, data.token);
+      document.getElementById('authGate').style.display = 'none';
+    } else {
+      document.getElementById('authError').style.display = 'block';
+      input.value = '';
+      input.focus();
+    }
+  } catch (err) {
     document.getElementById('authError').style.display = 'block';
-    input.value = '';
-    input.focus();
-    btn.disabled = false;
   }
+  btn.disabled = false;
 }
-if (localStorage.getItem(AUTH_KEY) === 'ok') {
-  document.getElementById('authGate').style.display = 'none';
-}
+
+// Check if existing token is still valid
+(async () => {
+  const token = localStorage.getItem(AUTH_KEY);
+  if (token) {
+    try {
+      const resp = await fetch('/api/health', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (resp.ok) {
+        document.getElementById('authGate').style.display = 'none';
+        return;
+      }
+    } catch (e) {}
+    // Token invalid or expired — clear and show gate
+    localStorage.removeItem(AUTH_KEY);
+  }
+})();
+
 document.getElementById('authPass').addEventListener('keydown', e => {
   if (e.key === 'Enter') checkAuth();
 });
+
+function apiFetch(url, opts = {}) {
+  const token = localStorage.getItem(AUTH_KEY);
+  if (token) {
+    if (!opts.headers) opts.headers = {};
+    if (opts.headers instanceof Headers) {
+      opts.headers.set('Authorization', 'Bearer ' + token);
+    } else {
+      opts.headers['Authorization'] = 'Bearer ' + token;
+    }
+  }
+  return fetch(url, opts).then(resp => {
+    if (resp.status === 401) {
+      localStorage.removeItem(AUTH_KEY);
+      document.getElementById('authGate').style.display = '';
+    }
+    return resp;
+  });
+}
 
 // --- Dark Mode ---
 function toggleDark() {
@@ -855,7 +900,7 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
   fd.append('pdf', pdf);
 
   try {
-    const resp = await fetch('/api/submit', { method: 'POST', body: fd });
+    const resp = await apiFetch('/api/submit', { method: 'POST', body: fd });
     const data = await resp.json();
     if (resp.ok) {
       currentAnalysisJobId = data.id;
@@ -879,7 +924,7 @@ function pollAnalysis(jobId) {
   if (analysisPoller) clearInterval(analysisPoller);
   analysisPoller = setInterval(async () => {
     try {
-      const resp = await fetch('/api/analysis/' + jobId);
+      const resp = await apiFetch('/api/analysis/' + jobId);
       if (resp.ok) {
         const data = await resp.json();
         if (data.status === 'Awaiting Confirmation') {
@@ -917,7 +962,7 @@ function pollAnalysis(jobId) {
         }
       } else if (resp.status === 404) {
         // Analysis not ready yet — check if job failed
-        const jobResp = await fetch('/api/jobs');
+        const jobResp = await apiFetch('/api/jobs');
         if (jobResp.ok) {
           const jobData = await jobResp.json();
           const jobs = Array.isArray(jobData) ? jobData : (jobData.jobs || []);
@@ -1055,7 +1100,7 @@ async function confirmReview() {
   });
 
   try {
-    const resp = await fetch('/api/confirm/' + currentAnalysisJobId, {
+    const resp = await apiFetch('/api/confirm/' + currentAnalysisJobId, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ divisions: Array.from(divSet).sort() }),
@@ -1109,7 +1154,7 @@ async function viewAnalysis(jobId) {
   currentAnalysisJobId = jobId;
   sessionStorage.setItem('analysisJobId', jobId);
   try {
-    const resp = await fetch('/api/analysis/' + jobId);
+    const resp = await apiFetch('/api/analysis/' + jobId);
     if (resp.ok) {
       const data = await resp.json();
       showAnalysisResults(jobId, data.analysis);
@@ -1249,7 +1294,7 @@ function applyQueueFilters() {
 async function deleteJob(jobId, name) {
   if (!confirm('Delete job ' + jobId + (name ? ' (' + name + ')' : '') + '?\n\nThis permanently removes all files.')) return;
   try {
-    const resp = await fetch('/api/jobs/' + jobId, { method: 'DELETE' });
+    const resp = await apiFetch('/api/jobs/' + jobId, { method: 'DELETE' });
     if (resp.ok) {
       refreshQueue();
     } else {
@@ -1352,7 +1397,7 @@ async function refreshQueue() {
   const banner = document.getElementById('connBanner');
   const dot = document.getElementById('refreshDot');
   try {
-    const resp = await fetch('/api/jobs');
+    const resp = await apiFetch('/api/jobs');
     const result = await resp.json();
     const newData = Array.isArray(result) ? result : (result.jobs || []);
     queueStats = {

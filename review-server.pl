@@ -15,6 +15,7 @@ use File::Basename;
 use Cwd 'abs_path';
 use File::Spec;
 use Net::SMTP;
+use Digest::SHA qw(hmac_sha256_hex);
 
 my $ROOT = dirname(abs_path($0));
 
@@ -52,14 +53,21 @@ sub load_config {
         smtpPass => '',
         from     => '',
     );
+    my %auth_defaults = (
+        password        => 'Energy@WSU',
+        secret          => 'default-secret',
+        tokenExpiryHours => 24,
+        adminEmails     => [],
+    );
     if (-f $path) {
-        open my $fh, '<', $path or do { warn "Cannot read $path: $!\n"; $defaults{stallThresholds} = \%stall_defaults; $defaults{email} = \%email_defaults; return %defaults; };
+        open my $fh, '<', $path or do { warn "Cannot read $path: $!\n"; $defaults{stallThresholds} = \%stall_defaults; $defaults{email} = \%email_defaults; $defaults{auth} = \%auth_defaults; return %defaults; };
         local $/; my $json = <$fh>; close $fh;
         my $cfg = eval { decode_json($json) };
         if ($@ || ref($cfg) ne 'HASH') {
             warn "Invalid config JSON: $@\n";
             $defaults{stallThresholds} = \%stall_defaults;
             $defaults{email} = \%email_defaults;
+            $defaults{auth} = \%auth_defaults;
             return %defaults;
         }
         # Merge top-level defaults
@@ -76,10 +84,16 @@ sub load_config {
         for my $k (keys %email_defaults) {
             $cfg->{email}{$k} = $email_defaults{$k} unless defined $cfg->{email}{$k};
         }
+        # Merge auth defaults
+        $cfg->{auth} = {} unless ref($cfg->{auth}) eq 'HASH';
+        for my $k (keys %auth_defaults) {
+            $cfg->{auth}{$k} = $auth_defaults{$k} unless defined $cfg->{auth}{$k};
+        }
         return %$cfg;
     }
     $defaults{stallThresholds} = \%stall_defaults;
     $defaults{email} = \%email_defaults;
+    $defaults{auth} = \%auth_defaults;
     return %defaults;
 }
 
@@ -166,7 +180,7 @@ sub make_job_id {
 sub send_response {
     my ($c, $code, $ct, $body) = @_;
     my $status = $code == 200 ? 'OK' : $code == 201 ? 'Created' : $code == 204 ? 'No Content'
-        : $code == 400 ? 'Bad Request' : $code == 404 ? 'Not Found'
+        : $code == 400 ? 'Bad Request' : $code == 401 ? 'Unauthorized' : $code == 404 ? 'Not Found'
         : $code == 413 ? 'Payload Too Large' : $code == 500 ? 'Internal Server Error' : 'Error';
     print $c "HTTP/1.0 $code $status\r\n"
         . "Content-Type: $ct\r\n"
@@ -196,6 +210,25 @@ sub read_exact {
         $buf .= $chunk;
     }
     return ($buf, 1);
+}
+
+# --- Auth token helpers -----------------------------------------------------
+
+sub generate_token {
+    my ($password) = @_;
+    my $expiry = time() + (($CFG{auth}{tokenExpiryHours} || 24) * 3600);
+    my $payload = "$password:$expiry";
+    my $sig = hmac_sha256_hex($payload, $CFG{auth}{secret} || 'default-secret');
+    return "$expiry:$sig";
+}
+
+sub validate_token {
+    my ($token) = @_;
+    return 0 unless $token && $token =~ /^(\d+):([a-f0-9]+)$/;
+    my ($expiry, $sig) = ($1, $2);
+    return 0 if time() > $expiry;
+    my $expected = hmac_sha256_hex("$CFG{auth}{password}:$expiry", $CFG{auth}{secret} || 'default-secret');
+    return $sig eq $expected;
 }
 
 # --- Multipart parser -------------------------------------------------------
@@ -1601,7 +1634,7 @@ while (!$shutdown) {
         print $c "HTTP/1.0 204 No Content\r\n"
             . "Access-Control-Allow-Origin: http://$CFG{bindAddress}:$port\r\n"
             . "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n"
-            . "Access-Control-Allow-Headers: Content-Type\r\n"
+            . "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
             . "\r\n";
         close $c;
         next;
@@ -1651,6 +1684,28 @@ while (!$shutdown) {
             pid        => $$,
         });
         close $c; next;
+    }
+
+    # POST /api/login — authenticate and get token
+    if ($method eq 'POST' && $path eq '/api/login') {
+        my $data = eval { decode_json($body) };
+        if (!$data || ($data->{password} || '') ne ($CFG{auth}{password} || '')) {
+            send_json($c, 401, { error => 'Invalid password' });
+            close $c; next;
+        }
+        my $token = generate_token($data->{password});
+        send_json($c, 200, { token => $token });
+        close $c; next;
+    }
+
+    # Auth check for all /api/* endpoints (except login, health, OPTIONS)
+    if ($path =~ m{^/api/} && $path ne '/api/login' && $path ne '/api/health' && $method ne 'OPTIONS') {
+        my $auth_header = $headers{authorization} || '';
+        my ($token) = $auth_header =~ /^Bearer\s+(.+)/;
+        unless (validate_token($token)) {
+            send_json($c, 401, { error => 'Authentication required' });
+            close $c; next;
+        }
     }
 
     # POST /api/submit — new review submission

@@ -24,5 +24,11 @@
     "smtpUser": "",
     "smtpPass": "",
     "from": ""
+  },
+  "auth": {
+    "password": "Energy@WSU",
+    "secret": "change-me-to-a-random-string",
+    "tokenExpiryHours": 24,
+    "adminEmails": []
   }
 }
