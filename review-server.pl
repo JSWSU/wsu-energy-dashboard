@@ -154,9 +154,13 @@ sub iso_now {
 }
 
 sub make_job_id {
-    my @t = localtime;
-    return sprintf('%04d%02d%02d-%02d%02d%02d',
-        $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+    # UUID v4: 8-4-4-4-12 hex characters
+    my @hex = map { sprintf('%04x', int(rand(65536))) } 1..8;
+    my $uuid = join('', @hex[0..1]) . '-' . $hex[2] . '-'
+             . substr(sprintf('4%03x', int(rand(4096))), 0, 4) . '-'
+             . substr(sprintf('%04x', int(rand(16384)) | 0x8000), 0, 4) . '-'
+             . join('', @hex[5..7]);
+    return $uuid;
 }
 
 sub send_response {
@@ -167,7 +171,7 @@ sub send_response {
     print $c "HTTP/1.0 $code $status\r\n"
         . "Content-Type: $ct\r\n"
         . "Content-Length: " . length($body) . "\r\n"
-        . "Access-Control-Allow-Origin: *\r\n"
+        . "Access-Control-Allow-Origin: http://$CFG{bindAddress}:$port\r\n"
         . "\r\n"
         . $body;
 }
@@ -1595,7 +1599,7 @@ while (!$shutdown) {
     # CORS preflight
     if ($method eq 'OPTIONS') {
         print $c "HTTP/1.0 204 No Content\r\n"
-            . "Access-Control-Allow-Origin: *\r\n"
+            . "Access-Control-Allow-Origin: http://$CFG{bindAddress}:$port\r\n"
             . "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n"
             . "Access-Control-Allow-Headers: Content-Type\r\n"
             . "\r\n";
