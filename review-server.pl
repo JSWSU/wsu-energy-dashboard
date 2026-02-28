@@ -154,6 +154,22 @@ sub write_job_json {
     rename $tmp, $path;
 }
 
+sub _mark_spawn_failed {
+    my ($job_id, $job, $error_msg) = @_;
+    $job->{status} = 'Failed';
+    $job->{progress} = 0;
+    $job->{error} = $error_msg;
+    $job->{completed} = iso_now();
+    $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
+    write_job_json($job_id, $job);
+    my $failed_path = "$REVIEWS_DIR/$job_id/output/FAILED";
+    make_path("$REVIEWS_DIR/$job_id/output") unless -d "$REVIEWS_DIR/$job_id/output";
+    if (open my $ff, '>', $failed_path) {
+        print $ff $error_msg;
+        close $ff;
+    }
+}
+
 sub read_job_json {
     my ($job_id) = @_;
     my $path = "$REVIEWS_DIR/$job_id/job.json";
@@ -666,6 +682,7 @@ sub spawn_analysis {
     my $script = "$job_dir/run-analysis.sh";
     open my $fh, '>', $script or do {
         warn "Cannot write $script: $!\n";
+        _mark_spawn_failed($job_id, $job, "Cannot write analysis script: $!");
         return;
     };
 
@@ -732,6 +749,7 @@ sub spawn_analysis {
     my $launcher = "$job_dir/launch-analysis.sh";
     open my $lfh, '>', $launcher or do {
         warn "Cannot write launcher: $!\n";
+        _mark_spawn_failed($job_id, $job, "Cannot write analysis launcher: $!");
         return;
     };
     print $lfh "#!/bin/bash\n";
@@ -959,7 +977,11 @@ sub spawn_review {
         $s .= "Output ONLY the executive summary text, no JSON, no headings, no markdown.\n";
 
         my $sfile = "$job_dir/prompt-exec-summary.txt";
-        open my $sf, '>', $sfile or do { warn "Cannot write exec summary prompt: $!\n"; return; };
+        open my $sf, '>', $sfile or do {
+            warn "Cannot write exec summary prompt: $!\n";
+            _mark_spawn_failed($job_id, $job, "Cannot write exec summary prompt: $!");
+            return;
+        };
         print $sf $s;
         close $sf;
     }
@@ -997,6 +1019,7 @@ sub spawn_review {
     my $discipline_keys_str = join(' ', map { $_->{key} } @active);
     open my $fh, '>', $script or do {
         warn "Cannot write $script: $!\n";
+        _mark_spawn_failed($job_id, $job, "Cannot write review script: $!");
         return;
     };
 
@@ -1344,6 +1367,7 @@ sub spawn_review {
     my $launcher = "$job_dir/launch.sh";
     open my $lfh, '>', $launcher or do {
         warn "Cannot write launcher: $!\n";
+        _mark_spawn_failed($job_id, $job, "Cannot write review launcher: $!");
         return;
     };
     print $lfh "#!/bin/bash\n";
