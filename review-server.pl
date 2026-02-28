@@ -1357,6 +1357,7 @@ sub spawn_review {
 
 while (my $c = $srv->accept) {
     binmode $c;
+    $c->autoflush(1);
 
     # 30-second timeout for initial request read (prevents dead connections from blocking)
     my $sel = IO::Select->new($c);
@@ -1497,10 +1498,12 @@ while (my $c = $srv->accept) {
             pdfSizeBytes     => $pdf_size,
         };
         write_job_json($job_id, $job);
-        spawn_analysis($job_id, $job);
 
+        # Respond immediately — spawn runs in background
         send_json($c, 201, { id => $job_id, status => 'Analyzing' });
         close $c;
+
+        spawn_analysis($job_id, $job);
         next;
     }
 
@@ -1644,11 +1647,12 @@ while (my $c = $srv->accept) {
         $job->{confirmedAt} = iso_now();
         write_job_json($id, $job);
 
-        # Spawn the full review pipeline
-        spawn_review($id, $job, $analysis);
-
+        # Respond immediately — spawn_review() generates a large script and blocks
         send_json($c, 200, { id => $id, status => 'Processing' });
         close $c;
+
+        # Spawn the full review pipeline (blocks server briefly while generating script)
+        spawn_review($id, $job, $analysis);
         next;
     }
 
