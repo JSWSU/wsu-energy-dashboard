@@ -184,8 +184,9 @@ sub make_job_id {
 sub send_response {
     my ($c, $code, $ct, $body) = @_;
     my $status = $code == 200 ? 'OK' : $code == 201 ? 'Created' : $code == 204 ? 'No Content'
-        : $code == 400 ? 'Bad Request' : $code == 401 ? 'Unauthorized' : $code == 404 ? 'Not Found'
-        : $code == 413 ? 'Payload Too Large' : $code == 500 ? 'Internal Server Error' : 'Error';
+        : $code == 400 ? 'Bad Request' : $code == 401 ? 'Unauthorized' : $code == 403 ? 'Forbidden'
+        : $code == 404 ? 'Not Found' : $code == 409 ? 'Conflict' : $code == 413 ? 'Payload Too Large'
+        : $code == 429 ? 'Too Many Requests' : $code == 500 ? 'Internal Server Error' : 'Error';
     print $c "HTTP/1.0 $code $status\r\n"
         . "Content-Type: $ct\r\n"
         . "Content-Length: " . length($body) . "\r\n"
@@ -233,6 +234,30 @@ sub validate_token {
     return 0 if time() > $expiry;
     my $expected = hmac_sha256_hex("$CFG{auth}{password}:$expiry", $CFG{auth}{secret} || 'default-secret');
     return $sig eq $expected;
+}
+
+# --- Rate limiter -----------------------------------------------------------
+
+my %rate_limits;  # ip => { submit => [timestamps], api => [timestamps] }
+
+sub check_rate_limit {
+    my ($ip, $bucket, $max, $window_sec) = @_;
+    my $now = time();
+    $rate_limits{$ip}{$bucket} = [ grep { $_ > $now - $window_sec } @{$rate_limits{$ip}{$bucket} || []} ];
+    return 0 if scalar @{$rate_limits{$ip}{$bucket}} >= $max;
+    push @{$rate_limits{$ip}{$bucket}}, $now;
+    return 1;
+}
+
+# --- Audit log --------------------------------------------------------------
+
+sub audit_log {
+    my ($ip, $method, $path, $status_code) = @_;
+    my $logfile = "$ROOT/access.log";
+    if (open my $fh, '>>', $logfile) {
+        printf $fh "%s %s %s %s %d\n", iso_now(), $ip, $method, $path, $status_code;
+        close $fh;
+    }
 }
 
 # --- Multipart parser -------------------------------------------------------
@@ -1715,6 +1740,7 @@ while (!$shutdown) {
     my $c = $srv->accept or next;
     binmode $c;
     $c->autoflush(1);
+    my $peer_ip = $c->peerhost || '127.0.0.1';
 
     # 30-second timeout for initial request read (prevents dead connections from blocking)
     my $sel = IO::Select->new($c);
@@ -1750,7 +1776,7 @@ while (!$shutdown) {
         print $c "HTTP/1.0 204 No Content\r\n"
             . "Access-Control-Allow-Origin: http://$CFG{bindAddress}:$port\r\n"
             . "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n"
-            . "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
+            . "Access-Control-Allow-Headers: Content-Type, Authorization, X-User-Email\r\n"
             . "\r\n";
         close $c;
         next;
@@ -1806,10 +1832,12 @@ while (!$shutdown) {
     if ($method eq 'POST' && $path eq '/api/login') {
         my $data = eval { decode_json($body) };
         if (!$data || ($data->{password} || '') ne ($CFG{auth}{password} || '')) {
+            audit_log($peer_ip, $method, $path, 401);
             send_json($c, 401, { error => 'Invalid password' });
             close $c; next;
         }
         my $token = generate_token($data->{password});
+        audit_log($peer_ip, $method, $path, 200);
         send_json($c, 200, { token => $token });
         close $c; next;
     }
@@ -1824,8 +1852,20 @@ while (!$shutdown) {
         }
     }
 
+    # Rate limit for all /api/* endpoints (60 requests/minute)
+    if ($path =~ m{^/api/}) {
+        unless (check_rate_limit($peer_ip, 'api', 60, 60)) {
+            send_json($c, 429, { error => 'Rate limit exceeded: max 60 requests per minute' });
+            close $c; next;
+        }
+    }
+
     # POST /api/submit — new review submission
     if ($method eq 'POST' && $path eq '/api/submit') {
+        unless (check_rate_limit($peer_ip, 'submit', 5, 3600)) {
+            send_json($c, 429, { error => 'Rate limit exceeded: max 5 submissions per hour' });
+            close $c; next;
+        }
         my $ct = $headers{'content-type'} || '';
         my ($boundary) = $ct =~ /boundary=([^;\s]+)/;
         if (!$boundary) {
@@ -1922,6 +1962,7 @@ while (!$shutdown) {
             $job->{status} = 'Queued';
             $job->{queuePosition} = $queue_position + 1;
             write_job_json($job_id, $job);
+            audit_log($peer_ip, $method, $path, 201);
             send_json($c, 201, { id => $job_id, status => 'Queued', queuePosition => $queue_position + 1 });
             close $c;
             next;
@@ -1929,6 +1970,7 @@ while (!$shutdown) {
         # No active job — start analysis immediately
         $job->{status} = 'Analyzing';
         write_job_json($job_id, $job);
+        audit_log($peer_ip, $method, $path, 201);
         send_json($c, 201, { id => $job_id, status => 'Analyzing' });
         close $c;
         spawn_analysis($job_id, $job);
@@ -2002,6 +2044,7 @@ while (!$shutdown) {
         }
         remove_tree($job_dir);
         print "[" . localtime() . "] Deleted job $id\n";
+        audit_log($peer_ip, $method, $path, 200);
         send_json($c, 200, { deleted => $id });
         close $c;
         next;
@@ -2125,6 +2168,18 @@ while (!$shutdown) {
     if ($method eq 'GET' && $path =~ m{^/api/download/([a-zA-Z0-9_-]+)/([a-zA-Z0-9._-]+)$}) {
         my ($id, $filename) = ($1, $2);
         $filename =~ s/[^a-zA-Z0-9._-]//g;  # sanitize
+        my $job = read_job_json($id);
+        if (!$job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        # Check ownership (admin bypass)
+        my $requester_email = $headers{'x-user-email'} || '';
+        my $is_admin = grep { lc($_) eq lc($requester_email) } @{$CFG{auth}{adminEmails} || []};
+        if (!$is_admin && $job->{pmEmail} && lc($requester_email) ne lc($job->{pmEmail})) {
+            send_json($c, 403, { error => 'You do not have access to this job' });
+            close $c; next;
+        }
         my $file = "$REVIEWS_DIR/$id/output/$filename";
         if (-f $file) {
             open my $fh, '<:raw', $file or do {
@@ -2134,6 +2189,7 @@ while (!$shutdown) {
             local $/; my $data = <$fh>; close $fh;
             my ($ext) = $filename =~ /\.(\w+)$/;
             my $ct = $mime{lc($ext || '')} || 'application/octet-stream';
+            audit_log($peer_ip, $method, $path, 200);
             send_response($c, 200, $ct, $data);
         } else {
             send_json($c, 404, { error => 'File not found' });
@@ -2151,6 +2207,18 @@ while (!$shutdown) {
             send_json($c, 400, { error => 'Only .log and .txt files can be downloaded' });
             close $c; next;
         }
+        my $job = read_job_json($id);
+        if (!$job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        # Check ownership (admin bypass)
+        my $requester_email = $headers{'x-user-email'} || '';
+        my $is_admin = grep { lc($_) eq lc($requester_email) } @{$CFG{auth}{adminEmails} || []};
+        if (!$is_admin && $job->{pmEmail} && lc($requester_email) ne lc($job->{pmEmail})) {
+            send_json($c, 403, { error => 'You do not have access to this job' });
+            close $c; next;
+        }
         my $file = "$REVIEWS_DIR/$id/output/$filename";
         if (-f $file) {
             open my $fh, '<:raw', $file or do {
@@ -2158,6 +2226,7 @@ while (!$shutdown) {
                 close $c; next;
             };
             local $/; my $data = <$fh>; close $fh;
+            audit_log($peer_ip, $method, $path, 200);
             send_response($c, 200, 'text/plain', $data);
         } else {
             send_json($c, 404, { error => 'Log file not found' });

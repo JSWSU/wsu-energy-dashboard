@@ -772,6 +772,15 @@ function apiFetch(url, opts = {}) {
       opts.headers['Authorization'] = 'Bearer ' + token;
     }
   }
+  const email = localStorage.getItem('wsuReviewEmail') || '';
+  if (email) {
+    if (!opts.headers) opts.headers = {};
+    if (opts.headers instanceof Headers) {
+      opts.headers.set('X-User-Email', email);
+    } else {
+      opts.headers['X-User-Email'] = email;
+    }
+  }
   return fetch(url, opts).then(resp => {
     if (resp.status === 401) {
       localStorage.removeItem(AUTH_KEY);
@@ -902,6 +911,8 @@ document.getElementById('reviewForm').addEventListener('submit', async e => {
   fd.append('constructionType', form.constructionType.value);
   fd.append('divisions', '');  // empty — filled after analysis
   fd.append('pdf', pdf);
+
+  localStorage.setItem('wsuReviewEmail', document.getElementById('pmEmail').value || '');
 
   try {
     const resp = await apiFetch('/api/submit', { method: 'POST', body: fd });
