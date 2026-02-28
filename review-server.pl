@@ -13,11 +13,80 @@ use JSON::PP;
 use File::Path qw(make_path remove_tree);
 use File::Basename;
 use Cwd 'abs_path';
+use File::Spec;
 use Net::SMTP;
 
-my $port = $ARGV[0] || 8083;
 my $ROOT = dirname(abs_path($0));
-my $REVIEWS_DIR = "$ROOT/reviews";
+
+# --- Configuration ----------------------------------------------------------
+
+my %CFG;
+
+sub load_config {
+    my $path = "$ROOT/review-config.json";
+    my %defaults = (
+        port                   => 8083,
+        bindAddress            => '127.0.0.1',
+        reviewsDir             => './reviews',
+        maxUploadMB            => 100,
+        maxParallelDisciplines => 8,
+        disciplineTimeoutSec   => 600,
+        bodyReadTimeoutSec     => 120,
+        headerReadTimeoutSec   => 30,
+    );
+    my %stall_defaults = (
+        phase0WarnMin => 15,
+        phase0FailMin => 30,
+        phase1WarnMin => 45,
+        phase1FailMin => 60,
+        phase2WarnMin => 30,
+        phase2FailMin => 45,
+        phase3WarnMin => 15,
+        phase3FailMin => 30,
+    );
+    my %email_defaults = (
+        enabled  => JSON::PP::false,
+        smtpHost => '',
+        smtpPort => 587,
+        smtpUser => '',
+        smtpPass => '',
+        from     => '',
+    );
+    if (-f $path) {
+        open my $fh, '<', $path or do { warn "Cannot read $path: $!\n"; $defaults{stallThresholds} = \%stall_defaults; $defaults{email} = \%email_defaults; return %defaults; };
+        local $/; my $json = <$fh>; close $fh;
+        my $cfg = eval { decode_json($json) };
+        if ($@ || ref($cfg) ne 'HASH') {
+            warn "Invalid config JSON: $@\n";
+            $defaults{stallThresholds} = \%stall_defaults;
+            $defaults{email} = \%email_defaults;
+            return %defaults;
+        }
+        # Merge top-level defaults
+        for my $k (keys %defaults) {
+            $cfg->{$k} = $defaults{$k} unless defined $cfg->{$k};
+        }
+        # Merge stallThresholds defaults
+        $cfg->{stallThresholds} = {} unless ref($cfg->{stallThresholds}) eq 'HASH';
+        for my $k (keys %stall_defaults) {
+            $cfg->{stallThresholds}{$k} = $stall_defaults{$k} unless defined $cfg->{stallThresholds}{$k};
+        }
+        # Merge email defaults
+        $cfg->{email} = {} unless ref($cfg->{email}) eq 'HASH';
+        for my $k (keys %email_defaults) {
+            $cfg->{email}{$k} = $email_defaults{$k} unless defined $cfg->{email}{$k};
+        }
+        return %$cfg;
+    }
+    $defaults{stallThresholds} = \%stall_defaults;
+    $defaults{email} = \%email_defaults;
+    return %defaults;
+}
+
+%CFG = load_config();
+
+my $port = $ARGV[0] || $CFG{port};
+my $REVIEWS_DIR = File::Spec->rel2abs($CFG{reviewsDir}, $ROOT);
 my $CLAUDE_PATH = '';
 
 # Auto-detect Claude CLI
@@ -53,7 +122,7 @@ my %mime = (
 );
 
 my $srv = IO::Socket::INET->new(
-    LocalAddr => '0.0.0.0', LocalPort => $port,
+    LocalAddr => $CFG{bindAddress}, LocalPort => $port,
     Proto => 'tcp', Listen => 5, ReuseAddr => 1,
 ) or die "Cannot bind to port $port: $!\n";
 
@@ -96,7 +165,7 @@ sub send_json {
 
 sub read_exact {
     my ($sock, $len, $timeout) = @_;
-    $timeout ||= 120;  # default 120s for body reads
+    $timeout ||= $CFG{bodyReadTimeoutSec};  # default from config
     my $sel = IO::Select->new($sock);
     my $buf = '';
     while (length($buf) < $len) {
@@ -232,6 +301,12 @@ my $_email_cfg;   # cached config
 
 sub load_email_config {
     return $_email_cfg if $_email_cfg;
+    # Read from unified config (%CFG{email}), fall back to legacy email-config.json
+    if ($CFG{email} && ref($CFG{email}) eq 'HASH' && ($CFG{email}{smtpHost} || $CFG{email}{enabled})) {
+        $_email_cfg = $CFG{email};
+        return $_email_cfg;
+    }
+    # Legacy fallback: read separate email-config.json
     my $path = "$ROOT/email-config.json";
     return undef unless -f $path;
     open my $fh, '<', $path or do { warn "[EMAIL] Cannot read $path: $!\n"; return undef; };
@@ -260,7 +335,7 @@ sub send_completion_email {
 
     my $project  = $job->{projectName} || 'Unnamed Project';
     my $phase    = $job->{reviewPhase} || '';
-    my $portal   = $cfg->{portal_url} || 'http://localhost:8083/review-portal.html';
+    my $portal   = $cfg->{portal_url} || "http://localhost:$CFG{port}/review-portal.html";
     my @files    = @{$job->{outputFiles} || []};
     my $file_list = join("\n", map { "  - $_" } @files) || '  (none)';
 
@@ -409,9 +484,9 @@ sub check_job_status {
             }
             if ($newest_mtime > 0) {
                 my $idle = int((time() - $newest_mtime) / 60);
-                if ($idle >= 30) {
+                if ($idle >= $CFG{stallThresholds}{phase0FailMin}) {
                     my $fail_msg = "AUTO-FAIL: Analysis stalled for $idle minutes "
-                        . "(threshold: 30min). Last activity: "
+                        . "(threshold: $CFG{stallThresholds}{phase0FailMin}min). Last activity: "
                         . scalar(localtime($newest_mtime));
                     make_path("$job_dir/output") unless -d "$job_dir/output";
                     open my $ff, '>', "$job_dir/output/FAILED" or warn "Cannot write FAILED: $!\n";
@@ -422,7 +497,7 @@ sub check_job_status {
                     $job->{completed} = iso_now();
                     $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
                     write_job_json($job_id, $job);
-                } elsif ($idle >= 15) {
+                } elsif ($idle >= $CFG{stallThresholds}{phase0WarnMin}) {
                     $job->{stalledMinutes} = $idle;
                     $job->{stalledPhase} = 'Phase 0 (analysis)';
                 }
@@ -640,13 +715,13 @@ sub check_job_status {
             my $idle = int((time() - $newest_mtime) / 60);
             my ($stall_thresh, $fail_thresh, $phase_name);
             if ($pct < 82) {
-                $stall_thresh = 45; $fail_thresh = 60;
+                $stall_thresh = $CFG{stallThresholds}{phase1WarnMin}; $fail_thresh = $CFG{stallThresholds}{phase1FailMin};
                 $phase_name = 'Phase 1 (discipline scanning)';
             } elsif ($pct < 92) {
-                $stall_thresh = 30; $fail_thresh = 45;
+                $stall_thresh = $CFG{stallThresholds}{phase2WarnMin}; $fail_thresh = $CFG{stallThresholds}{phase2FailMin};
                 $phase_name = 'Phase 2 (synthesis)';
             } else {
-                $stall_thresh = 15; $fail_thresh = 30;
+                $stall_thresh = $CFG{stallThresholds}{phase3WarnMin}; $fail_thresh = $CFG{stallThresholds}{phase3FailMin};
                 $phase_name = 'Phase 3 (report generation)';
             }
 
@@ -1123,7 +1198,7 @@ sub spawn_review {
         'hvac-controls'  => 3,   # Wave 3 - medium (196KB)
         'arch-structure'  => 3,  # Wave 3 - medium (163KB)
     );
-    my $MAX_PARALLEL = 8;  # all disciplines run simultaneously (API-bound, not CPU-bound)
+    my $MAX_PARALLEL = $CFG{maxParallelDisciplines};  # all disciplines run simultaneously (API-bound, not CPU-bound)
 
     # Sort @active into waves based on priority (unrecognized keys go to last wave)
     my @sorted = sort { ($wave_priority{$a->{key}} || 99) <=> ($wave_priority{$b->{key}} || 99) } @active;
@@ -1386,7 +1461,7 @@ while (my $c = $srv->accept) {
 
     # 30-second timeout for initial request read (prevents dead connections from blocking)
     my $sel = IO::Select->new($c);
-    unless ($sel->can_read(30)) {
+    unless ($sel->can_read($CFG{headerReadTimeoutSec})) {
         close $c;
         next;
     }
@@ -1428,8 +1503,8 @@ while (my $c = $srv->accept) {
     my $body = '';
     if ($method eq 'POST' && $headers{'content-length'}) {
         my $len = int($headers{'content-length'});
-        if ($len > 104_857_600) {  # 100MB
-            send_json($c, 413, { error => 'File too large (100MB max)' });
+        if ($len > $CFG{maxUploadMB} * 1024 * 1024) {
+            send_json($c, 413, { error => "File too large ($CFG{maxUploadMB}MB max)" });
             close $c;
             next;
         }

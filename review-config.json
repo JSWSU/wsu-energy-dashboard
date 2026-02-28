@@ -1,0 +1,28 @@
+{
+  "port": 8083,
+  "bindAddress": "127.0.0.1",
+  "reviewsDir": "./reviews",
+  "maxUploadMB": 100,
+  "maxParallelDisciplines": 8,
+  "disciplineTimeoutSec": 600,
+  "bodyReadTimeoutSec": 120,
+  "headerReadTimeoutSec": 30,
+  "stallThresholds": {
+    "phase0WarnMin": 15,
+    "phase0FailMin": 30,
+    "phase1WarnMin": 45,
+    "phase1FailMin": 60,
+    "phase2WarnMin": 30,
+    "phase2FailMin": 45,
+    "phase3WarnMin": 15,
+    "phase3FailMin": 30
+  },
+  "email": {
+    "enabled": false,
+    "smtpHost": "",
+    "smtpPort": 587,
+    "smtpUser": "",
+    "smtpPass": "",
+    "from": ""
+  }
+}
