@@ -1588,13 +1588,21 @@ while (my $c = $srv->accept) {
     if ($method eq 'DELETE' && $path =~ m{^/api/jobs/([a-zA-Z0-9_-]+)$}) {
         my $id = $1;
         my $job_dir = "$REVIEWS_DIR/$id";
-        if (-f "$job_dir/job.json") {
-            remove_tree($job_dir);
-            print "[" . localtime() . "] Deleted job $id\n";
-            send_json($c, 200, { deleted => $id });
-        } else {
+        my $job = read_job_json($id);
+        if (!$job) {
             send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
         }
+        my $st = $job->{status} || '';
+        if ($st eq 'Processing' || $st eq 'Analyzing') {
+            send_json($c, 409, {
+                error => "Cannot delete job $id while it is $st. Wait for completion or failure.",
+            });
+            close $c; next;
+        }
+        remove_tree($job_dir);
+        print "[" . localtime() . "] Deleted job $id\n";
+        send_json($c, 200, { deleted => $id });
         close $c;
         next;
     }

@@ -1207,7 +1207,12 @@ async function deleteJob(jobId, name) {
   if (!confirm('Delete job ' + jobId + (name ? ' (' + name + ')' : '') + '?\n\nThis permanently removes all files.')) return;
   try {
     const resp = await fetch('/api/jobs/' + jobId, { method: 'DELETE' });
-    if (resp.ok) refreshQueue();
+    if (resp.ok) {
+      refreshQueue();
+    } else {
+      const data = await resp.json().catch(() => ({}));
+      alert(data.error || 'Failed to delete job');
+    }
   } catch (err) { /* retry next cycle */ }
 }
 
