@@ -462,6 +462,63 @@ sub send_completion_email {
     print "[EMAIL] Sent completion notification for job $job_id to $to\n";
 }
 
+sub queue_completion_email {
+    my ($job_id, $job) = @_;
+    return if $job->{emailSent};
+    my $to = $job->{pmEmail} || '';
+    $to =~ s/^\s+|\s+$//g;
+    return unless $to =~ /.+\@.+/;
+    my $cfg = $CFG{email} || {};
+    return unless $cfg->{enabled};
+
+    my $email_file = "$REVIEWS_DIR/$job_id/pending-email.json";
+    return if -f $email_file;  # already queued
+    open my $fh, '>', $email_file or do { warn "[EMAIL] Cannot write pending-email: $!\n"; return; };
+    print $fh encode_json({
+        to       => $to,
+        jobId    => $job_id,
+        project  => $job->{projectName} || '',
+        attempts => 0,
+        nextTry  => time(),
+    });
+    close $fh;
+    print "[" . localtime() . "] Email queued for job $job_id -> $to\n";
+}
+
+sub drain_email_queue {
+    return unless ($CFG{email} || {})->{enabled};
+    if (opendir my $dh, $REVIEWS_DIR) {
+        while (my $dir = readdir $dh) {
+            next if $dir =~ /^\./;
+            my $ef = "$REVIEWS_DIR/$dir/pending-email.json";
+            next unless -f $ef;
+            open my $fh, '<', $ef or next;
+            local $/; my $json = <$fh>; close $fh;
+            my $email = eval { decode_json($json) } or next;
+            next if time() < ($email->{nextTry} || 0);
+            next if ($email->{attempts} || 0) >= 3;
+
+            # Attempt to send
+            my $ok = eval { send_completion_email($dir, read_job_json($dir)); 1; };
+            if ($ok) {
+                unlink $ef;
+                print "[" . localtime() . "] Email sent successfully for job $dir\n";
+            } else {
+                $email->{attempts}++;
+                # Backoff: 1min, 5min, 15min
+                my @delays = (60, 300, 900);
+                $email->{nextTry} = time() + ($delays[$email->{attempts} - 1] || 900);
+                $email->{lastError} = "$@" if $@;
+                open my $wfh, '>', $ef or next;
+                print $wfh encode_json($email);
+                close $wfh;
+                warn "[EMAIL] Retry $email->{attempts}/3 failed for job $dir: $@\n";
+            }
+        }
+        closedir $dh;
+    }
+}
+
 sub parse_timing_log {
     my ($job_dir) = @_;
     my $logfile = "$job_dir/output/timing.log";
@@ -656,7 +713,7 @@ sub check_job_status {
         my @out = grep { -f "$job_dir/output/$_" } @deliverables;
         $job->{outputFiles} = \@out;
         write_job_json($job_id, $job);
-        send_completion_email($job_id, $job);
+        queue_completion_email($job_id, $job);
     }
     elsif (-f $failed) {
         $job->{status} = 'Failed';
@@ -1652,6 +1709,7 @@ my $accept_sel = IO::Select->new($srv);
 while (!$shutdown) {
     unless ($accept_sel->can_read(5)) {
         drain_queue();
+        drain_email_queue();
         next;
     }
     my $c = $srv->accept or next;
