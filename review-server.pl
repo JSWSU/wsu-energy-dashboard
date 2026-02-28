@@ -1440,7 +1440,7 @@ while (my $c = $srv->accept) {
     # POST /api/submit — new review submission
     if ($method eq 'POST' && $path eq '/api/submit') {
         my $ct = $headers{'content-type'} || '';
-        my ($boundary) = $ct =~ /boundary=(.+)/;
+        my ($boundary) = $ct =~ /boundary=([^;\s]+)/;
         if (!$boundary) {
             send_json($c, 400, { error => 'Expected multipart/form-data' });
             close $c;
@@ -1459,12 +1459,16 @@ while (my $c = $srv->accept) {
             send_json($c, 400, { error => 'Project name is required' });
             close $c; next;
         }
-        if (!$pdf || !$pdf->{data}) {
+        if (!$pdf || !defined($pdf->{data})) {
             send_json($c, 400, { error => 'PDF file is required' });
             close $c; next;
         }
         if (lc($pdf->{filename}) !~ /\.pdf$/) {
             send_json($c, 400, { error => 'File must be a PDF' });
+            close $c; next;
+        }
+        if (!length($pdf->{data})) {
+            send_json($c, 400, { error => 'PDF file is empty (0 bytes)' });
             close $c; next;
         }
 
