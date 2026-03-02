@@ -3,5 +3,4 @@
 *.xlsx
 ~$*
 reviews/
-review-config.json
 email-config.json

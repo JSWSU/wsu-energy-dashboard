@@ -13,11 +13,118 @@ use JSON::PP;
 use File::Path qw(make_path remove_tree);
 use File::Basename;
 use Cwd 'abs_path';
+use File::Spec;
 use Net::SMTP;
+use Digest::SHA qw(hmac_sha256_hex);
 
-my $port = $ARGV[0] || 8083;
 my $ROOT = dirname(abs_path($0));
-my $REVIEWS_DIR = "$ROOT/reviews";
+
+# --- Configuration ----------------------------------------------------------
+
+my %CFG;
+
+sub load_config {
+    my $path = "$ROOT/review-config.json";
+    my %defaults = (
+        port                   => 8083,
+        bindAddress            => '127.0.0.1',
+        corsOrigin             => '',  # auto-detected if empty
+        reviewsDir             => './reviews',
+        maxUploadMB            => 100,
+        maxParallelDisciplines => 8,
+        disciplineTimeoutSec   => 600,
+        bodyReadTimeoutSec     => 120,
+        headerReadTimeoutSec   => 30,
+    );
+    my %stall_defaults = (
+        phase0WarnMin => 15,
+        phase0FailMin => 30,
+        phase1WarnMin => 45,
+        phase1FailMin => 60,
+        phase2WarnMin => 30,
+        phase2FailMin => 45,
+        phase3WarnMin => 15,
+        phase3FailMin => 30,
+    );
+    my %email_defaults = (
+        enabled  => JSON::PP::false,
+        smtpHost => '',
+        smtpPort => 587,
+        smtpUser => '',
+        smtpPass => '',
+        from     => '',
+    );
+    my %auth_defaults = (
+        password        => 'Energy@WSU',
+        secret          => 'default-secret',
+        tokenExpiryHours => 24,
+        adminEmails     => [],
+    );
+    my %cleanup_defaults = (
+        archiveAfterDays => 90,
+        diskWarnMB       => 5000,
+    );
+    if (-f $path) {
+        open my $fh, '<', $path or do { warn "Cannot read $path: $!\n"; $defaults{stallThresholds} = \%stall_defaults; $defaults{email} = \%email_defaults; $defaults{auth} = \%auth_defaults; $defaults{cleanup} = \%cleanup_defaults; return %defaults; };
+        local $/; my $json = <$fh>; close $fh;
+        my $cfg = eval { decode_json($json) };
+        if ($@ || ref($cfg) ne 'HASH') {
+            warn "Invalid config JSON: $@\n";
+            $defaults{stallThresholds} = \%stall_defaults;
+            $defaults{email} = \%email_defaults;
+            $defaults{auth} = \%auth_defaults;
+            $defaults{cleanup} = \%cleanup_defaults;
+            return %defaults;
+        }
+        # Merge top-level defaults
+        for my $k (keys %defaults) {
+            $cfg->{$k} = $defaults{$k} unless defined $cfg->{$k};
+        }
+        # Merge stallThresholds defaults
+        $cfg->{stallThresholds} = {} unless ref($cfg->{stallThresholds}) eq 'HASH';
+        for my $k (keys %stall_defaults) {
+            $cfg->{stallThresholds}{$k} = $stall_defaults{$k} unless defined $cfg->{stallThresholds}{$k};
+        }
+        # Merge email defaults
+        $cfg->{email} = {} unless ref($cfg->{email}) eq 'HASH';
+        for my $k (keys %email_defaults) {
+            $cfg->{email}{$k} = $email_defaults{$k} unless defined $cfg->{email}{$k};
+        }
+        # Merge auth defaults
+        $cfg->{auth} = {} unless ref($cfg->{auth}) eq 'HASH';
+        for my $k (keys %auth_defaults) {
+            $cfg->{auth}{$k} = $auth_defaults{$k} unless defined $cfg->{auth}{$k};
+        }
+        # Merge cleanup defaults
+        $cfg->{cleanup} = {} unless ref($cfg->{cleanup}) eq 'HASH';
+        for my $k (keys %cleanup_defaults) {
+            $cfg->{cleanup}{$k} = $cleanup_defaults{$k} unless defined $cfg->{cleanup}{$k};
+        }
+        return %$cfg;
+    }
+    $defaults{stallThresholds} = \%stall_defaults;
+    $defaults{email} = \%email_defaults;
+    $defaults{auth} = \%auth_defaults;
+    $defaults{cleanup} = \%cleanup_defaults;
+    return %defaults;
+}
+
+%CFG = load_config();
+
+my $port = $ARGV[0] || $CFG{port};
+my $REVIEWS_DIR = File::Spec->rel2abs($CFG{reviewsDir}, $ROOT);
+
+# Resolve CORS origin: use configured value, or auto-detect from hostname
+my $CORS_ORIGIN;
+if ($CFG{corsOrigin}) {
+    $CORS_ORIGIN = $CFG{corsOrigin};
+} else {
+    my $hostname = $CFG{bindAddress};
+    if ($hostname eq '0.0.0.0' || $hostname eq '127.0.0.1') {
+        $hostname = 'localhost';
+    }
+    $CORS_ORIGIN = "http://$hostname:$port";
+}
 my $CLAUDE_PATH = '';
 
 # Auto-detect Claude CLI
@@ -53,16 +160,36 @@ my %mime = (
 );
 
 my $srv = IO::Socket::INET->new(
-    LocalAddr => '0.0.0.0', LocalPort => $port,
+    LocalAddr => $CFG{bindAddress}, LocalPort => $port,
     Proto => 'tcp', Listen => 5, ReuseAddr => 1,
 ) or die "Cannot bind to port $port: $!\n";
 
+# Write PID file
+my $pidfile = "$ROOT/review-server.pid";
+{
+    open my $pidfh, '>', $pidfile or warn "Cannot write PID file: $!\n";
+    if ($pidfh) { print $pidfh $$; close $pidfh; }
+}
+
+# Signal handlers for clean shutdown
+my $shutdown = 0;
+$SIG{INT} = $SIG{TERM} = sub {
+    print "\n[" . localtime() . "] Received shutdown signal. Closing server.\n";
+    $shutdown = 1;
+};
+
+my $cfg_loaded = -f "$ROOT/review-config.json";
+my $display_addr = $CFG{bindAddress} eq '0.0.0.0' ? '<your-hostname>' : $CFG{bindAddress};
 print "WSU Review Portal Server\n";
-print "  Root:   $ROOT\n";
-print "  Claude: $CLAUDE_PATH\n";
-print "  URL:    http://localhost:$port/review-portal.html\n\n";
+print "  Listening: $CFG{bindAddress}:$port\n";
+print "  Portal:    http://$display_addr:$port/review-portal.html\n";
+print "  Health:    http://$display_addr:$port/api/health\n";
+print "  Claude:    $CLAUDE_PATH\n";
+print "  Config:    " . ($cfg_loaded ? "$ROOT/review-config.json" : "defaults (no config file)") . "\n\n";
 
 # --- Helpers ----------------------------------------------------------------
+
+my $_make_job_counter = 0;
 
 sub iso_now {
     my @t = localtime;
@@ -71,20 +198,27 @@ sub iso_now {
 }
 
 sub make_job_id {
-    my @t = localtime;
-    return sprintf('%04d%02d%02d-%02d%02d%02d',
-        $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+    # UUID v4 using SHA256 for better entropy than rand()
+    my $entropy = join(':', time(), $$, rand(), $., $0, ++$_make_job_counter);
+    my $hash = Digest::SHA::sha256_hex($entropy);
+    # Format as UUID v4: 8-4-4-4-12 with version/variant bits
+    my $uuid = substr($hash, 0, 8) . '-' . substr($hash, 8, 4) . '-'
+             . '4' . substr($hash, 13, 3) . '-'
+             . sprintf('%x', (hex(substr($hash, 16, 1)) & 0x3) | 0x8) . substr($hash, 17, 3) . '-'
+             . substr($hash, 20, 12);
+    return $uuid;
 }
 
 sub send_response {
     my ($c, $code, $ct, $body) = @_;
     my $status = $code == 200 ? 'OK' : $code == 201 ? 'Created' : $code == 204 ? 'No Content'
-        : $code == 400 ? 'Bad Request' : $code == 404 ? 'Not Found'
-        : $code == 413 ? 'Payload Too Large' : $code == 500 ? 'Internal Server Error' : 'Error';
+        : $code == 400 ? 'Bad Request' : $code == 401 ? 'Unauthorized' : $code == 403 ? 'Forbidden'
+        : $code == 404 ? 'Not Found' : $code == 409 ? 'Conflict' : $code == 413 ? 'Payload Too Large'
+        : $code == 429 ? 'Too Many Requests' : $code == 500 ? 'Internal Server Error' : 'Error';
     print $c "HTTP/1.0 $code $status\r\n"
         . "Content-Type: $ct\r\n"
         . "Content-Length: " . length($body) . "\r\n"
-        . "Access-Control-Allow-Origin: *\r\n"
+        . "Access-Control-Allow-Origin: $CORS_ORIGIN\r\n"
         . "\r\n"
         . $body;
 }
@@ -96,19 +230,69 @@ sub send_json {
 
 sub read_exact {
     my ($sock, $len, $timeout) = @_;
-    $timeout ||= 120;  # default 120s for body reads
+    $timeout ||= $CFG{bodyReadTimeoutSec};  # default from config
     my $sel = IO::Select->new($sock);
     my $buf = '';
     while (length($buf) < $len) {
         unless ($sel->can_read($timeout)) {
             warn "[TIMEOUT] read_exact timed out after ${timeout}s with " . length($buf) . "/$len bytes\n";
-            last;
+            return ($buf, 0);
         }
         my $n = read($sock, my $chunk, $len - length($buf));
-        last unless $n;
+        return ($buf, 0) unless $n;  # EOF — incomplete
         $buf .= $chunk;
     }
-    return $buf;
+    return ($buf, 1);
+}
+
+# --- Auth token helpers -----------------------------------------------------
+
+sub generate_token {
+    my ($password) = @_;
+    my $expiry = time() + (($CFG{auth}{tokenExpiryHours} || 24) * 3600);
+    my $payload = "$password:$expiry";
+    my $sig = hmac_sha256_hex($payload, $CFG{auth}{secret} || 'default-secret');
+    return "$expiry:$sig";
+}
+
+sub validate_token {
+    my ($token) = @_;
+    return 0 unless $token && $token =~ /^(\d+):([a-f0-9]+)$/;
+    my ($expiry, $sig) = ($1, $2);
+    return 0 if time() > $expiry;
+    my $expected = hmac_sha256_hex("$CFG{auth}{password}:$expiry", $CFG{auth}{secret} || 'default-secret');
+    return $sig eq $expected;
+}
+
+sub is_admin {
+    my ($headers) = @_;
+    my $email = $headers->{'x-user-email'} || '';
+    return 0 unless $email;
+    return scalar grep { lc($_) eq lc($email) } @{$CFG{auth}{adminEmails} || []};
+}
+
+# --- Rate limiter -----------------------------------------------------------
+
+my %rate_limits;  # ip => { submit => [timestamps], api => [timestamps] }
+
+sub check_rate_limit {
+    my ($ip, $bucket, $max, $window_sec) = @_;
+    my $now = time();
+    $rate_limits{$ip}{$bucket} = [ grep { $_ > $now - $window_sec } @{$rate_limits{$ip}{$bucket} || []} ];
+    return 0 if scalar @{$rate_limits{$ip}{$bucket}} >= $max;
+    push @{$rate_limits{$ip}{$bucket}}, $now;
+    return 1;
+}
+
+# --- Audit log --------------------------------------------------------------
+
+sub audit_log {
+    my ($ip, $method, $path, $status_code) = @_;
+    my $logfile = "$ROOT/access.log";
+    if (open my $fh, '>>', $logfile) {
+        printf $fh "%s %s %s %s %d\n", iso_now(), $ip, $method, $path, $status_code;
+        close $fh;
+    }
 }
 
 # --- Multipart parser -------------------------------------------------------
@@ -152,6 +336,22 @@ sub write_job_json {
     close $fh;
     unlink $path if -f $path;  # Windows rename() cannot overwrite
     rename $tmp, $path;
+}
+
+sub _mark_spawn_failed {
+    my ($job_id, $job, $error_msg) = @_;
+    $job->{status} = 'Failed';
+    $job->{progress} = 0;
+    $job->{error} = $error_msg;
+    $job->{completed} = iso_now();
+    $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
+    write_job_json($job_id, $job);
+    my $failed_path = "$REVIEWS_DIR/$job_id/output/FAILED";
+    make_path("$REVIEWS_DIR/$job_id/output") unless -d "$REVIEWS_DIR/$job_id/output";
+    if (open my $ff, '>', $failed_path) {
+        print $ff $error_msg;
+        close $ff;
+    }
 }
 
 sub read_job_json {
@@ -216,6 +416,12 @@ my $_email_cfg;   # cached config
 
 sub load_email_config {
     return $_email_cfg if $_email_cfg;
+    # Read from unified config (%CFG{email}), fall back to legacy email-config.json
+    if ($CFG{email} && ref($CFG{email}) eq 'HASH' && ($CFG{email}{smtpHost} || $CFG{email}{enabled})) {
+        $_email_cfg = $CFG{email};
+        return $_email_cfg;
+    }
+    # Legacy fallback: read separate email-config.json
     my $path = "$ROOT/email-config.json";
     return undef unless -f $path;
     open my $fh, '<', $path or do { warn "[EMAIL] Cannot read $path: $!\n"; return undef; };
@@ -244,7 +450,7 @@ sub send_completion_email {
 
     my $project  = $job->{projectName} || 'Unnamed Project';
     my $phase    = $job->{reviewPhase} || '';
-    my $portal   = $cfg->{portal_url} || 'http://localhost:8083/review-portal.html';
+    my $portal   = $cfg->{portal_url} || "http://localhost:$CFG{port}/review-portal.html";
     my @files    = @{$job->{outputFiles} || []};
     my $file_list = join("\n", map { "  - $_" } @files) || '  (none)';
 
@@ -316,11 +522,230 @@ sub send_completion_email {
     print "[EMAIL] Sent completion notification for job $job_id to $to\n";
 }
 
+sub queue_completion_email {
+    my ($job_id, $job) = @_;
+    return if $job->{emailSent};
+    my $to = $job->{pmEmail} || '';
+    $to =~ s/^\s+|\s+$//g;
+    return unless $to =~ /.+\@.+/;
+    my $cfg = $CFG{email} || {};
+    return unless $cfg->{enabled};
+
+    my $email_file = "$REVIEWS_DIR/$job_id/pending-email.json";
+    return if -f $email_file;  # already queued
+    open my $fh, '>', $email_file or do { warn "[EMAIL] Cannot write pending-email: $!\n"; return; };
+    print $fh encode_json({
+        to       => $to,
+        jobId    => $job_id,
+        project  => $job->{projectName} || '',
+        attempts => 0,
+        nextTry  => time(),
+    });
+    close $fh;
+    print "[" . localtime() . "] Email queued for job $job_id -> $to\n";
+}
+
+sub drain_email_queue {
+    return unless ($CFG{email} || {})->{enabled};
+    if (opendir my $dh, $REVIEWS_DIR) {
+        while (my $dir = readdir $dh) {
+            next if $dir =~ /^\./;
+            my $ef = "$REVIEWS_DIR/$dir/pending-email.json";
+            next unless -f $ef;
+            open my $fh, '<', $ef or next;
+            local $/; my $json = <$fh>; close $fh;
+            my $email = eval { decode_json($json) } or next;
+            next if time() < ($email->{nextTry} || 0);
+            next if ($email->{attempts} || 0) >= 3;
+
+            # Attempt to send — read fresh job data and call send directly
+            my $job = read_job_json($dir);
+            my $ok = 0;
+            if ($job) {
+                $ok = eval { send_completion_email($dir, $job); 1; };
+                # send_completion_email sets emailError on failure without dying,
+                # so check if emailSent was actually set
+                $job = read_job_json($dir);  # re-read after send attempt
+                $ok = $job && $job->{emailSent} ? 1 : 0;
+            }
+            if ($ok) {
+                unlink $ef;
+                print "[" . localtime() . "] Email sent successfully for job $dir\n";
+            } else {
+                $email->{attempts}++;
+                # Backoff: 1min, 5min, 15min
+                my @delays = (60, 300, 900);
+                $email->{nextTry} = time() + ($delays[$email->{attempts} - 1] || 900);
+                $email->{lastError} = "$@" if $@;
+                open my $wfh, '>', $ef or next;
+                print $wfh encode_json($email);
+                close $wfh;
+                warn "[EMAIL] Retry $email->{attempts}/3 failed for job $dir: $@\n";
+            }
+        }
+        closedir $dh;
+    }
+}
+
+sub parse_timing_log {
+    my ($job_dir) = @_;
+    my $logfile = "$job_dir/output/timing.log";
+    return {} unless -f $logfile;
+    open my $fh, '<', $logfile or return {};
+    my %data;
+    while (<$fh>) {
+        chomp;
+        my ($k, $v) = split /=/, $_, 2;
+        $data{$k} = $v if defined $k && defined $v;
+    }
+    close $fh;
+
+    my %timing;
+    # Phase 0
+    if ($data{phase0_start}) {
+        $timing{phase0} = {
+            durationSec => ($data{phase0_end} || time()) - $data{phase0_start},
+            pageCount   => int($data{phase0_pages} || 0),
+        };
+    }
+    # Phase 1
+    if ($data{phase1_start}) {
+        $timing{phase1} = {
+            durationSec  => ($data{phase1_end} || time()) - $data{phase1_start},
+            disciplines  => int($data{phase1_disciplines} || 0),
+        };
+    }
+    # Phase 2a (synthesis)
+    if ($data{phase2a_start}) {
+        $timing{phase2a} = {
+            durationSec => ($data{phase2a_end} || time()) - $data{phase2a_start},
+        };
+    }
+    # Phase 2b (exec summary)
+    if ($data{phase2b_start}) {
+        $timing{phase2b} = {
+            durationSec => ($data{phase2b_end} || time()) - $data{phase2b_start},
+        };
+    }
+    # Phase 3
+    if ($data{phase3_start}) {
+        $timing{phase3} = {
+            durationSec => ($data{phase3_end} || time()) - $data{phase3_start},
+        };
+    }
+    # Total
+    my $first_start = $data{phase0_start} || $data{phase1_start};
+    my $last_end = $data{phase3_end} || $data{phase2b_end} || $data{phase2a_end} || $data{phase1_end};
+    $timing{totalDurationSec} = ($last_end || time()) - ($first_start || time()) if $first_start;
+
+    return \%timing;
+}
+
 sub check_job_status {
     my ($job_id) = @_;
     my $job = read_job_json($job_id);
     return undef unless $job;
-    return $job unless ($job->{status} || '') eq 'Processing';
+    my $status = $job->{status} || '';
+
+    # --- Handle "Analyzing" state (Phase 0 + sheet analysis) ---
+    if ($status eq 'Analyzing') {
+        my $job_dir  = "$REVIEWS_DIR/$job_id";
+        my $analysis_complete = "$job_dir/ANALYSIS_COMPLETE";
+        my $failed   = "$job_dir/output/FAILED";
+
+        if (-f $analysis_complete) {
+            # Read analysis.json and store summary in job
+            my $analysis_file = "$job_dir/analysis.json";
+            if (-f $analysis_file) {
+                eval {
+                    open my $afh, '<', $analysis_file or die "Cannot read: $!";
+                    local $/; my $ajson = <$afh>; close $afh;
+                    my $analysis = decode_json($ajson);
+                    $job->{analysisSummary} = {
+                        totalPages           => $analysis->{total_pages},
+                        confidence           => $analysis->{confidence},
+                        recommendedDivisions => $analysis->{recommended_divisions},
+                        disciplineCount      => scalar(keys %{$analysis->{recommended_disciplines} || {}}),
+                        unclassifiedPages    => scalar(@{$analysis->{unclassified_pages} || []}),
+                    };
+                };
+                warn "[ANALYSIS] Error reading analysis.json for $job_id: $@\n" if $@;
+            }
+            $job->{status} = 'Awaiting Confirmation';
+            $job->{progress} = 100;
+            $job->{progressDetail} = 'Analysis complete — awaiting division confirmation';
+            $job->{analysisCompleted} = iso_now();
+            write_job_json($job_id, $job);
+        }
+        elsif (-f $failed) {
+            my $err = '';
+            if (open my $fh, '<', $failed) {
+                local $/; $err = <$fh>; close $fh;
+            }
+            $job->{status} = 'Failed';
+            $job->{progress} = 0;
+            $job->{error} = $err || 'Analysis failed';
+            $job->{failedPhase} = 'Phase 0 (analysis)';
+            $job->{completed} = iso_now();
+            $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
+            write_job_json($job_id, $job);
+        }
+        else {
+            # Progress: 10% = extracting PDF, 30% = pages exist (analysis running)
+            my $pct = 5;
+            my $detail = 'Starting analysis...';
+            if (-d "$job_dir/pages" && -f "$job_dir/pages/manifest.txt") {
+                $pct = 30;
+                $detail = 'Analyzing sheet content...';
+            } elsif (-d "$job_dir/pages") {
+                $pct = 10;
+                $detail = 'Extracting PDF pages...';
+            }
+            $job->{progress} = $pct;
+            $job->{progressDetail} = $detail;
+
+            # Stall detection for analysis phase (15 min stall, 30 min auto-fail)
+            my $newest_mtime = 0;
+            for my $subdir ("$job_dir/pages", "$job_dir/output") {
+                if (opendir my $dh, $subdir) {
+                    for my $f (readdir $dh) {
+                        next if $f =~ /^\./;
+                        my $mt = (stat "$subdir/$f")[9] || 0;
+                        $newest_mtime = $mt if $mt > $newest_mtime;
+                    }
+                    closedir $dh;
+                }
+            }
+            if ($newest_mtime > 0) {
+                my $idle = int((time() - $newest_mtime) / 60);
+                if ($idle >= $CFG{stallThresholds}{phase0FailMin}) {
+                    my $fail_msg = "AUTO-FAIL: Analysis stalled for $idle minutes "
+                        . "(threshold: $CFG{stallThresholds}{phase0FailMin}min). Last activity: "
+                        . scalar(localtime($newest_mtime));
+                    make_path("$job_dir/output") unless -d "$job_dir/output";
+                    open my $ff, '>', "$job_dir/output/FAILED" or warn "Cannot write FAILED: $!\n";
+                    if ($ff) { print $ff $fail_msg; close $ff; }
+                    $job->{status} = 'Failed';
+                    $job->{error} = $fail_msg;
+                    $job->{failedPhase} = 'Phase 0 (analysis)';
+                    $job->{completed} = iso_now();
+                    $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
+                    write_job_json($job_id, $job);
+                } elsif ($idle >= $CFG{stallThresholds}{phase0WarnMin}) {
+                    $job->{stalledMinutes} = $idle;
+                    $job->{stalledPhase} = 'Phase 0 (analysis)';
+                }
+            }
+        }
+        return $job;
+    }
+
+    # --- Handle "Awaiting Confirmation" state (no transitions needed) ---
+    if ($status eq 'Awaiting Confirmation') {
+        return $job;
+    }
+
+    return $job unless $status eq 'Processing';
 
     my $complete = "$REVIEWS_DIR/$job_id/output/COMPLETE";
     my $failed   = "$REVIEWS_DIR/$job_id/output/FAILED";
@@ -330,22 +755,39 @@ sub check_job_status {
         $job->{status} = 'Complete';
         $job->{progress} = 100;
         $job->{completed} = iso_now();
+        $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
+        # Parse timing log and write timing.json before building deliverables
+        my $timing = parse_timing_log($job_dir);
+        if (keys %$timing) {
+            $job->{timing} = $timing;
+            my $timing_path = "$job_dir/output/timing.json";
+            if (open my $tfh, '>', $timing_path) {
+                print $tfh encode_json($timing);
+                close $tfh;
+            } else {
+                warn "Cannot write timing.json: $!\n";
+            }
+        }
+
         # Only list final deliverables (not intermediate discipline files, scripts, etc.)
         # Supports both old (.md) and new (.txt) naming for backward compatibility
         my @deliverables = qw(
             checklist.txt findings.txt notes.txt
             checklist.md  findings.md  notes.md
             report.docx report.xlsx
+            review-data.json executive-summary.txt
+            timing.json
         );
         my @out = grep { -f "$job_dir/output/$_" } @deliverables;
         $job->{outputFiles} = \@out;
         write_job_json($job_id, $job);
-        send_completion_email($job_id, $job);
+        queue_completion_email($job_id, $job);
     }
     elsif (-f $failed) {
         $job->{status} = 'Failed';
         $job->{progress} = 0;
         $job->{completed} = iso_now();
+        $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
 
         # Read primary error from FAILED file
         my $err = '';
@@ -394,29 +836,28 @@ sub check_job_status {
         write_job_json($job_id, $job);
     }
     else {
-        # 3-phase progress milestones:
-        # Phase 1: discipline scans (5% -> 12%)
+        # Progress milestones (Phase 1 gets most of the bar since it's ~36 min):
+        # Phase 1: discipline scans (5% -> 80%)
         #   5%  = Job submitted
         #   7%  = stdout logs exist (CLIs launched, scanning)
-        #  7-12 = partial discipline findings arriving
-        #  12%  = All discipline JSON files exist
-        # Phase 2: synthesis (15% -> 50%)
-        #  15%  = synthesis-stdout.log exists (synthesis started)
-        #  50%  = review-data.json exists
-        # Phase 3: local generation (60% -> 95%)
-        #  60%  = report.docx exists
-        #  70%  = report.xlsx exists
-        #  80%  = checklist.txt exists
-        #  85%  = findings.txt exists
-        #  90%  = notes.txt exists
-        #  95%  = all 5 deliverables exist
+        #  7-80 = proportional to disciplines completed (73% range / N disciplines)
+        #  80%  = All discipline JSON files exist
+        # Phase 2: synthesis (82% -> 90%)
+        #  82%  = synthesis started
+        #  90%  = review-data.json exists
+        # Phase 3: local generation (92% -> 99%)
+        #  92%  = report.docx exists
+        #  94%  = report.xlsx exists
+        #  96%  = checklist.txt exists
+        #  98%  = findings.txt exists
+        #  99%  = notes.txt / all deliverables exist
         # 100%  = COMPLETE
 
         my $pct = 5;
         my $detail = '';
         my $expected = $job->{expectedGroups} || 0;
 
-        # Phase 1: discipline scans (5% to 12%)
+        # Phase 1: discipline scans (7% to 80%) — longest phase, gets most of the bar
         my $done = 0;
         my $scanning = 0;
         if ($expected > 0 && opendir my $dh, "$job_dir/output") {
@@ -427,53 +868,53 @@ sub check_job_status {
             $scanning = scalar grep { /-stdout\.log$/ && !/^synthesis-/ } @files;
 
             if ($done >= $expected) {
-                $pct = 12;
+                $pct = 80;
                 $detail = "All $expected disciplines scanned";
             } elsif ($done > 0) {
-                $pct = 7 + int(5 * $done / $expected);
-                $detail = "Scanning: $done of $expected disciplines complete (waves of 3)";
+                $pct = 7 + int(73 * $done / $expected);
+                $detail = "Scanning: $done of $expected disciplines complete";
             } elsif ($scanning > 0) {
                 $pct = 7;
-                $detail = "Scanning $expected disciplines in waves...";
+                $detail = "Scanning $expected disciplines...";
             }
         }
 
-        # Phase 2: synthesis (15% to 50%)
+        # Phase 2: synthesis (82% to 90%)
         my $in_synthesis = -f "$job_dir/output/synthesis-stdout.log";
         if ($in_synthesis || ($done >= $expected && $expected > 0)) {
-            $pct = 15 unless $pct > 15;
+            $pct = 82 unless $pct > 82;
             $detail = "Synthesizing findings...";
             if (-f "$job_dir/output/review-data.json") {
-                $pct = 50;
+                $pct = 90;
                 $detail = "Review data merged";
             }
         }
 
-        # Phase 3: local report generation (60% to 95%)
+        # Phase 3: local report generation (92% to 98%)
         if (-f "$job_dir/output/review-data.json") {
-            $pct = 50 unless $pct > 50;
-            $detail = "Generating reports..." unless $pct > 50;
+            $pct = 90 unless $pct > 90;
+            $detail = "Generating reports..." unless $pct > 90;
             if (-f "$job_dir/output/report.docx") {
-                $pct = 60; $detail = "Generating reports...";
+                $pct = 92; $detail = "Generating reports...";
             }
             if (-f "$job_dir/output/report.xlsx") {
-                $pct = 70; $detail = "Generating reports...";
+                $pct = 94; $detail = "Generating reports...";
             }
             if (-f "$job_dir/output/checklist.txt") {
-                $pct = 80; $detail = "Generating reports...";
+                $pct = 96; $detail = "Generating reports...";
             }
             if (-f "$job_dir/output/findings.txt") {
-                $pct = 85; $detail = "Validating...";
+                $pct = 98; $detail = "Finalizing...";
             }
             if (-f "$job_dir/output/notes.txt") {
-                $pct = 90; $detail = "Finalizing...";
+                $pct = 99; $detail = "Finalizing...";
             }
             if (-f "$job_dir/output/report.xlsx"
                 && -f "$job_dir/output/report.docx"
                 && -f "$job_dir/output/notes.txt"
                 && -f "$job_dir/output/findings.txt"
                 && -f "$job_dir/output/checklist.txt") {
-                $pct = 95; $detail = "Finalizing...";
+                $pct = 99; $detail = "Finalizing...";
             }
         }
 
@@ -506,9 +947,9 @@ sub check_job_status {
         $job->{elapsedSeconds} = time() - $job->{submittedEpoch} if $job->{submittedEpoch};
 
         # Phase-aware stall detection + auto-fail
-        # Phase 1 (pct < 15): stall 45min, auto-fail 60min
-        # Phase 2 (pct 15-49): stall 30min, auto-fail 45min
-        # Phase 3 (pct >= 50): stall 15min, auto-fail 30min
+        # Phase 1 (pct < 82): stall 45min, auto-fail 60min
+        # Phase 2 (pct 82-91): stall 30min, auto-fail 45min
+        # Phase 3 (pct >= 92): stall 15min, auto-fail 30min
         my $newest_mtime = 0;
         if (opendir my $dh2, "$job_dir/output") {
             for my $f (readdir $dh2) {
@@ -521,14 +962,14 @@ sub check_job_status {
         if ($newest_mtime > 0) {
             my $idle = int((time() - $newest_mtime) / 60);
             my ($stall_thresh, $fail_thresh, $phase_name);
-            if ($pct < 15) {
-                $stall_thresh = 45; $fail_thresh = 60;
+            if ($pct < 82) {
+                $stall_thresh = $CFG{stallThresholds}{phase1WarnMin}; $fail_thresh = $CFG{stallThresholds}{phase1FailMin};
                 $phase_name = 'Phase 1 (discipline scanning)';
-            } elsif ($pct < 50) {
-                $stall_thresh = 30; $fail_thresh = 45;
+            } elsif ($pct < 92) {
+                $stall_thresh = $CFG{stallThresholds}{phase2WarnMin}; $fail_thresh = $CFG{stallThresholds}{phase2FailMin};
                 $phase_name = 'Phase 2 (synthesis)';
             } else {
-                $stall_thresh = 15; $fail_thresh = 30;
+                $stall_thresh = $CFG{stallThresholds}{phase3WarnMin}; $fail_thresh = $CFG{stallThresholds}{phase3FailMin};
                 $phase_name = 'Phase 3 (report generation)';
             }
 
@@ -543,6 +984,7 @@ sub check_job_status {
                 $job->{error} = $fail_msg;
                 $job->{failedPhase} = $phase_name;
                 $job->{completed} = iso_now();
+                $job->{durationSeconds} = time() - ($job->{submittedEpoch} || time());
                 write_job_json($job_id, $job);
             } elsif ($idle >= $stall_thresh) {
                 $job->{stalledMinutes} = $idle;
@@ -553,10 +995,98 @@ sub check_job_status {
     return $job;
 }
 
+# --- Spawn Analysis (Phase 0 + sheet classification) -----------------------
+
+sub spawn_analysis {
+    my ($job_id, $job) = @_;
+    my $job_dir    = "$REVIEWS_DIR/$job_id";
+    my $output_dir = "$job_dir/output";
+    make_path($output_dir) unless -d $output_dir;
+
+    my $script = "$job_dir/run-analysis.sh";
+    open my $fh, '>', $script or do {
+        warn "Cannot write $script: $!\n";
+        _mark_spawn_failed($job_id, $job, "Cannot write analysis script: $!");
+        return;
+    };
+
+    print $fh "#!/bin/bash\n";
+    print $fh "# Phase 0 analysis: PDF extraction + sheet classification\n";
+    print $fh "# Job: $job_id\n\n";
+
+    # Python discovery (same logic as spawn_review)
+    print $fh "# --- Python discovery ---\n";
+    print $fh "PYUSER=\"\${USERNAME:-\$USER}\"\n";
+    print $fh "PYTHON=\"\"\n";
+    print $fh "for p in \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python313/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python312/python.exe\" \\\n";
+    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python311/python.exe\" \\\n";
+    print $fh "  \"/c/Python313/python.exe\" \"/c/Python312/python.exe\" \\\n";
+    print $fh "  \"\$(command -v python3 2>/dev/null)\" \\\n";
+    print $fh "  \"\$(command -v python 2>/dev/null)\" \\\n";
+    print $fh "  \"\$(command -v py 2>/dev/null)\"; do\n";
+    print $fh "  [ -n \"\$p\" ] && [ -x \"\$p\" ] && { PYTHON=\"\$p\"; break; }\n";
+    print $fh "done\n";
+    print $fh "if [ -z \"\$PYTHON\" ]; then\n";
+    print $fh "  echo \"ERROR: Python not found. Install Python 3.11+ and ensure it is on PATH.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "echo \"Using Python: \$PYTHON\"\n";
+    print $fh "\"\$PYTHON\" -m pip install --quiet pdfplumber 2>/dev/null\n\n";
+
+    # Phase 0: PDF text extraction
+    print $fh "# === Step 1: PDF text extraction ===\n";
+    print $fh "echo \"Extracting PDF text...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "\"\$PYTHON\" \"$ROOT/extract_pdf.py\" \"$job_dir/input.pdf\" \"$job_dir/pages\"\n";
+    print $fh "if [ \$? -ne 0 ]; then\n";
+    print $fh "  echo \"ERROR: extract_pdf.py failed. Check that pdfplumber is installed.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "echo \"PDF extraction complete.\" >> \"$output_dir/progress.log\"\n\n";
+
+    # Sheet analysis
+    print $fh "# === Step 2: Sheet analysis (page classification) ===\n";
+    print $fh "echo \"Analyzing sheet content...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "\"\$PYTHON\" \"$ROOT/analyze_sheets.py\" \"$job_dir/pages\" \"$job_dir/analysis.json\"\n";
+    print $fh "if [ \$? -ne 0 ]; then\n";
+    print $fh "  echo \"ERROR: analyze_sheets.py failed.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "echo \"Sheet analysis complete.\" >> \"$output_dir/progress.log\"\n\n";
+
+    # Write ANALYSIS_COMPLETE marker
+    print $fh "# Signal completion\n";
+    print $fh "touch \"$job_dir/ANALYSIS_COMPLETE\"\n";
+    print $fh "echo \"Analysis pipeline complete.\" >> \"$output_dir/progress.log\"\n";
+
+    close $fh;
+    chmod 0755, $script;
+
+    print "[" . localtime() . "] Spawning analysis for job $job_id\n";
+    print "  Step 1: PDF text extraction (pdfplumber)\n";
+    print "  Step 2: Sheet analysis (analyze_sheets.py)\n";
+    print "  Script: $script\n";
+
+    # Launch via nohup (same pattern as spawn_review)
+    (my $script_bash = $script) =~ s{\\}{/}g;
+    my $launcher = "$job_dir/launch-analysis.sh";
+    open my $lfh, '>', $launcher or do {
+        warn "Cannot write launcher: $!\n";
+        _mark_spawn_failed($job_id, $job, "Cannot write analysis launcher: $!");
+        return;
+    };
+    print $lfh "#!/bin/bash\n";
+    print $lfh "nohup bash \"$script_bash\" > /dev/null 2>&1 &\n";
+    close $lfh;
+    chmod 0755, $launcher;
+    system("bash \"$launcher\"");
+}
+
 # --- Spawn Claude -----------------------------------------------------------
 
 sub spawn_review {
-    my ($job_id, $job) = @_;
+    my ($job_id, $job, $analysis) = @_;
     my $job_dir    = "$REVIEWS_DIR/$job_id";
     my $output_dir = "$job_dir/output";
     make_path($output_dir) unless -d $output_dir;
@@ -657,7 +1187,6 @@ sub spawn_review {
     # Store expected group count and discipline metadata for progress tracking
     $job->{expectedGroups} = scalar @active;
     $job->{disciplineGroups} = [ map { { key => $_->{key}, name => $_->{name} } } @active ];
-    $job->{submittedEpoch} = time();
     write_job_json($job_id, $job);
 
     # --- Build pre-concatenated standards per discipline ---
@@ -666,6 +1195,7 @@ sub spawn_review {
     }
 
     # --- Write per-discipline prompt files (Phase 1) ---
+    my $job_rel = "reviews/$job_id";
     my $common_header = "Project: $job->{projectName}\n"
         . "Phase: $job->{reviewPhase}\n"
         . "Construction type: $job->{constructionType}\n\n";
@@ -680,9 +1210,27 @@ sub spawn_review {
         $p .= "DISCIPLINE: $grp->{name} (Divisions $divs_str)\n";
         $p .= "Focus on: $grp->{desc}\n\n";
 
+        # Add page hints from analysis data if available
+        if ($analysis && $analysis->{recommended_disciplines} && $analysis->{recommended_disciplines}{$grp->{key}}) {
+            my $disc_info = $analysis->{recommended_disciplines}{$grp->{key}};
+            my @pages = @{$disc_info->{pages} || []};
+            my @sids  = @{$disc_info->{sheet_ids} || []};
+            if (@pages) {
+                my $page_list = join(', ', map { "page-" . sprintf('%04d', $_) . ".txt" } @pages);
+                $p .= "PAGE HINTS (from automated sheet analysis):\n";
+                $p .= "  Relevant pages for this discipline: $page_list\n";
+                if (@sids) {
+                    $p .= "  Detected sheet IDs: " . join(', ', @sids) . "\n";
+                }
+                $p .= "  Start with these pages but still review all pages for context.\n\n";
+            }
+        }
+
         $p .= "INSTRUCTIONS:\n";
-        $p .= "1. Read the PDF at reviews/$job_id/input.pdf.\n";
-        $p .= "   Focus on sheets relevant to this discipline but review the full drawing set for context.\n";
+        $p .= "1. Read the extracted page text files in $job_rel/pages/.\n";
+        $p .= "   Start by reading $job_rel/pages/manifest.txt for the page list.\n";
+        $p .= "   Focus on pages relevant to this discipline but review all pages for context.\n";
+        $p .= "   These are pre-extracted text from the construction drawings PDF.\n";
         $p .= "2. Read the combined standards file at $combined_file.\n";
         $p .= "   This file contains ALL WSU standards for this discipline — read it IN ITS ENTIRETY.\n";
         $p .= "3. For EVERY numbered requirement, clause, and sub-clause in the standards:\n";
@@ -723,6 +1271,10 @@ sub spawn_review {
         $p .= "  ]\n";
         $p .= "}\n\n";
         $p .= "CRITICAL: Output MUST be valid JSON. Include ALL requirements (both compliant and non-compliant).\n";
+        $p .= "CRITICAL: Properly escape all double quotes inside JSON string values.\n";
+        $p .= "   Architectural measurements must NOT contain unescaped quotes.\n";
+        $p .= "   WRONG: \"5'-0\\\" from wall\"   CORRECT: \"5 ft-0 in. from wall\"\n";
+        $p .= "   WRONG: \"3/4\\\" pipe\"         CORRECT: \"3/4 in. pipe\"\n";
         $p .= "For compliant requirements: status=\"C\", severity=null, finding_id=null, issue=null, required_action=null.\n";
         $p .= "Summary counts MUST match: total_requirements = compliant + deviations + omissions + concerns.\n\n";
 
@@ -749,7 +1301,11 @@ sub spawn_review {
         $s .= "Output ONLY the executive summary text, no JSON, no headings, no markdown.\n";
 
         my $sfile = "$job_dir/prompt-exec-summary.txt";
-        open my $sf, '>', $sfile or do { warn "Cannot write exec summary prompt: $!\n"; return; };
+        open my $sf, '>', $sfile or do {
+            warn "Cannot write exec summary prompt: $!\n";
+            _mark_spawn_failed($job_id, $job, "Cannot write exec summary prompt: $!");
+            return;
+        };
         print $sf $s;
         close $sf;
     }
@@ -758,7 +1314,8 @@ sub spawn_review {
     {
         open my $dbg, '>', "$job_dir/prompt.txt" or warn "Cannot write prompt.txt: $!\n";
         if ($dbg) {
-            print $dbg "=== 3-PHASE PIPELINE ARCHITECTURE ===\n";
+            print $dbg "=== PIPELINE ARCHITECTURE ===\n";
+            print $dbg "Phase 0: PDF text extraction (one-time, pdfplumber)\n";
             print $dbg "Phase 1: " . scalar(@active) . " parallel Claude CLIs (Sonnet) -> JSON findings\n";
             print $dbg "Phase 2a: Python synthesize.py -> review-data.json (zero tokens)\n";
             print $dbg "Phase 2b: Claude CLI (Haiku) -> executive-summary.txt\n";
@@ -780,17 +1337,20 @@ sub spawn_review {
         }
     }
 
-    # --- Write 3-phase bash script ---
+    # --- Write review bash script ---
     my $script = "$job_dir/run-review.sh";
     my $expected_count = scalar @active;
+    my $discipline_keys_str = join(' ', map { $_->{key} } @active);
     open my $fh, '>', $script or do {
         warn "Cannot write $script: $!\n";
+        _mark_spawn_failed($job_id, $job, "Cannot write review script: $!");
         return;
     };
 
     # Script header
     print $fh "#!/bin/bash\n";
-    print $fh "# 3-phase parallel review: $job_id\n";
+    print $fh "# Multi-phase parallel review: $job_id\n";
+    print $fh "# Phase 0:  PDF text extraction (one-time, pdfplumber)\n";
     print $fh "# Phase 1:  $expected_count parallel discipline scans (Sonnet) -> JSON\n";
     print $fh "# Phase 2a: Python synthesis -> review-data.json (zero tokens)\n";
     print $fh "# Phase 2b: Claude Haiku -> executive-summary.txt\n";
@@ -807,14 +1367,21 @@ sub spawn_review {
     print $fh "  [ -f \"\$candidate\" ] && { GIT_BASH=\"\$candidate\"; break; }\n";
     print $fh "done\n";
     print $fh "if [ -n \"\$GIT_BASH\" ]; then\n";
-    # Claude CLI on Windows needs backslash path for GIT_BASH
+    # Claude CLI on Windows needs a clean Windows path (no mixed separators)
+    print $fh "  GIT_BASH=\$(cygpath -w \"\$GIT_BASH\" 2>/dev/null || echo \"\$GIT_BASH\")\n";
     print $fh "  export CLAUDE_CODE_GIT_BASH_PATH=\"\$GIT_BASH\"\n";
     print $fh "fi\n\n";
+
+    print $fh "export CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000\n\n";
 
     print $fh "cd \"$ROOT\"\n\n";
 
     # Write PID file for recovery daemon's job-specific process detection
     print $fh "echo \$\$ > \"$output_dir/pipeline.pid\"\n\n";
+
+    print $fh "DISCIPLINE_TIMEOUT=$CFG{disciplineTimeoutSec}\n\n";
+
+    print $fh "TIMING_LOG=\"$output_dir/timing.log\"\n\n";
 
     # Orphan cleanup function: Claude CLIs with --dangerously-skip-permissions can
     # spawn child processes (e.g. pdfplumber) that survive after the parent exits.
@@ -855,11 +1422,27 @@ sub spawn_review {
     print $fh "  exit 1\n";
     print $fh "fi\n";
     print $fh "echo \"Using Python: \$PYTHON\"\n";
-    print $fh "\"\$PYTHON\" -m pip install --quiet openpyxl python-docx 2>/dev/null\n\n";
+    print $fh "\"\$PYTHON\" -m pip install --quiet openpyxl python-docx pdfplumber 2>/dev/null\n\n";
 
-    # Phase 1: batched wave discipline CLIs (MAX_PARALLEL=3 to prevent RAM exhaustion)
-    # Smart ordering: interleave slow disciplines (large standards) with fast ones
-    # so each wave finishes around the same time.
+    # Phase 0: One-time PDF text extraction (skip if pages already extracted by analysis phase)
+    print $fh "# === PHASE 0: One-time PDF text extraction ===\n";
+    print $fh "echo \"phase0_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
+    print $fh "if [ -f \"$job_dir/pages/manifest.txt\" ]; then\n";
+    print $fh "  echo \"Phase 0: Skipped (pages already extracted by analysis phase).\" >> \"$output_dir/progress.log\"\n";
+    print $fh "else\n";
+    print $fh "  echo \"Phase 0: Extracting PDF text...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "  \"\$PYTHON\" \"$ROOT/extract_pdf.py\" \"$job_dir/input.pdf\" \"$job_dir/pages\"\n";
+    print $fh "  if [ \$? -ne 0 ]; then\n";
+    print $fh "    echo \"ERROR: extract_pdf.py failed. Check that pdfplumber is installed.\" > \"$output_dir/FAILED\"\n";
+    print $fh "    exit 1\n";
+    print $fh "  fi\n";
+    print $fh "  echo \"Phase 0 complete.\" >> \"$output_dir/progress.log\"\n";
+    print $fh "fi\n";
+    print $fh "echo \"phase0_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
+    print $fh "echo \"phase0_pages=\$(ls \"$job_dir/pages\" 2>/dev/null | wc -l)\" >> \"\$TIMING_LOG\"\n\n";
+
+    # Phase 1: parallel discipline CLIs (all 8 run simultaneously — API-bound, not CPU-bound)
+    # Wave priority kept for ordering; with MAX_PARALLEL=8, all fit in a single wave.
     my %wave_priority = (
         'communications' => 1,   # Wave 1 - slow (399KB standards)
         'plumbing'       => 1,   # Wave 1 - fast (49KB)
@@ -870,7 +1453,7 @@ sub spawn_review {
         'hvac-controls'  => 3,   # Wave 3 - medium (196KB)
         'arch-structure'  => 3,  # Wave 3 - medium (163KB)
     );
-    my $MAX_PARALLEL = 3;
+    my $MAX_PARALLEL = $CFG{maxParallelDisciplines};  # all disciplines run simultaneously (API-bound, not CPU-bound)
 
     # Sort @active into waves based on priority (unrecognized keys go to last wave)
     my @sorted = sort { ($wave_priority{$a->{key}} || 99) <=> ($wave_priority{$b->{key}} || 99) } @active;
@@ -882,8 +1465,9 @@ sub spawn_review {
     }
     my $num_waves = scalar @waves;
 
-    print $fh "# === PHASE 1: Batched discipline scans ($expected_count CLIs in $num_waves waves of $MAX_PARALLEL max) ===\n";
-    print $fh "echo \"Phase 1: Launching $expected_count discipline scans in $num_waves waves (max $MAX_PARALLEL parallel)...\" > \"$output_dir/progress.log\"\n\n";
+    print $fh "# === PHASE 1: $expected_count parallel discipline scans ===\n";
+    print $fh "echo \"phase1_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
+    print $fh "echo \"Phase 1: Launching $expected_count discipline scans (all parallel)...\" >> \"$output_dir/progress.log\"\n\n";
 
     for my $wi (0 .. $#waves) {
         my $wave = $waves[$wi];
@@ -891,53 +1475,170 @@ sub spawn_review {
         my $wave_count = scalar @$wave;
         my $wave_names = join(', ', map { $_->{name} } @$wave);
 
-        print $fh "# --- Wave $wave_num of $num_waves ($wave_count disciplines: $wave_names) ---\n";
+        print $fh "# --- Batch $wave_num of $num_waves ($wave_count disciplines: $wave_names) ---\n";
         print $fh "WAVE_PIDS=\"\"\n";
-        print $fh "echo \"Wave $wave_num/$num_waves: Launching $wave_count disciplines...\"\n";
-        print $fh "echo \"Wave $wave_num/$num_waves: $wave_names\" >> \"$output_dir/progress.log\"\n\n";
+        print $fh "echo \"Launching $wave_count disciplines: $wave_names\"\n";
+        print $fh "echo \"Launching: $wave_names\" >> \"$output_dir/progress.log\"\n\n";
 
+        my $wave_size = scalar @$wave;
+        my $grp_idx = 0;
         for my $grp (@$wave) {
             my $pfile   = "$job_dir/prompt-$grp->{key}.txt";
             my $stdout  = "$output_dir/$grp->{key}-stdout.log";
             my $stderr  = "$output_dir/$grp->{key}-stderr.log";
 
-            (my $var_key = uc($grp->{key})) =~ s/-/_/g;  # bash-safe var name
+            (my $var_key = uc($grp->{key})) =~ s/-/_/g;
             print $fh "# Discipline: $grp->{name}\n";
             print $fh "echo \"  Launching: $grp->{name}...\"\n";
             print $fh "PROMPT_${var_key}=\$(cat \"$pfile\")\n";
-            print $fh "\"$CLAUDE_PATH\" -p \"\$PROMPT_${var_key}\" \\\n";
+            print $fh "timeout \$DISCIPLINE_TIMEOUT \"$CLAUDE_PATH\" -p \"\$PROMPT_${var_key}\" \\\n";
             print $fh "  --model sonnet \\\n";
             print $fh "  --allowedTools Read Write \\\n";
             print $fh "  --dangerously-skip-permissions \\\n";
             print $fh "  --output-format text \\\n";
             print $fh "  > \"$stdout\" \\\n";
             print $fh "  2> \"$stderr\" &\n";
-            print $fh "WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n\n";
+            print $fh "WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n";
+            $grp_idx++;
+            # Stagger launches to avoid API rate limiting
+            if ($grp_idx < $wave_size) {
+                print $fh "sleep 3\n";
+            }
+            print $fh "\n";
         }
 
-        print $fh "# Wait for wave $wave_num to complete, then kill orphaned children\n";
-        print $fh "echo \"Waiting for wave $wave_num ($wave_count disciplines)...\"\n";
+        print $fh "# Wait for batch $wave_num to complete, then kill orphaned children\n";
+        print $fh "echo \"Waiting for $wave_count disciplines...\"\n";
         print $fh "wait\n";
         print $fh "cleanup_wave\n";
-        print $fh "echo \"Wave $wave_num/$num_waves complete.\" >> \"$output_dir/progress.log\"\n\n";
+        print $fh "echo \"Batch $wave_num/$num_waves complete (timeout=\${DISCIPLINE_TIMEOUT}s per discipline).\" >> \"$output_dir/progress.log\"\n\n";
     }
 
-    print $fh "echo \"Phase 1 complete ($expected_count disciplines in $num_waves waves).\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 1 complete ($expected_count disciplines).\" >> \"$output_dir/progress.log\"\n";
+    print $fh "echo \"phase1_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
+    print $fh "echo \"phase1_disciplines=$expected_count\" >> \"\$TIMING_LOG\"\n\n";
 
-    # Validate Phase 1 output
-    print $fh "# Validate Phase 1 output\n";
+    # JSON sanitization: fix unescaped quotes in measurement strings
+    print $fh "# --- Post-process: fix common JSON errors ---\n";
+    print $fh "echo \"Sanitizing JSON output...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "for jf in \"$output_dir\"/discipline-*-findings.json; do\n";
+    print $fh "  [ -f \"\$jf\" ] || continue\n";
+    print $fh "  if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
+    print $fh "    continue\n";
+    print $fh "  fi\n";
+    print $fh "  echo \"Repairing malformed JSON: \$(basename \$jf)\"\n";
+    print $fh "  \"\$PYTHON\" - \"\$jf\" <<'PYEOF'\n";
+    print $fh 'import re, json, sys, shutil' . "\n";
+    print $fh 'src = sys.argv[1]' . "\n";
+    print $fh 'bak = src + ".bak"' . "\n";
+    print $fh 'shutil.copy2(src, bak)' . "\n";
+    print $fh 'with open(src, "r", encoding="utf-8") as f:' . "\n";
+    print $fh '    text = f.read()' . "\n";
+    print $fh '# Fix unescaped inch marks inside JSON string values.' . "\n";
+    print $fh '# Only match: digit + " + space + word-char (e.g. 24" wide -> 24 in. wide)' . "\n";
+    print $fh 'fixed = re.sub(r\'(\d)"(\s+\w)\', r\'\\1 in.\\2\', text)' . "\n";
+    print $fh '# Fix fraction inch marks: digit/digit + " (e.g. 3/4" -> 3/4 in.)' . "\n";
+    print $fh 'fixed = re.sub(r\'(\d/\d+)"\', r\'\\1 in.\', fixed)' . "\n";
+    print $fh '# Fix foot-inch: digit\'-digit" (e.g. 5\'-0" -> 5 ft-0 in.)' . "\n";
+    print $fh "fixed = re.sub(r\"(\\d+)'-(\\d+)\\\"\", r\"\\1 ft-\\2 in.\", fixed)\n";
+    print $fh 'try:' . "\n";
+    print $fh '    json.loads(fixed)' . "\n";
+    print $fh '    with open(src, "w", encoding="utf-8") as f:' . "\n";
+    print $fh '        f.write(fixed)' . "\n";
+    print $fh '    print("  Repaired successfully")' . "\n";
+    print $fh '    import os; os.remove(bak)' . "\n";
+    print $fh 'except json.JSONDecodeError as e:' . "\n";
+    print $fh '    shutil.move(bak, src)  # restore original' . "\n";
+    print $fh '    print(f"  Could not auto-repair: {e}", file=sys.stderr)' . "\n";
+    print $fh "PYEOF\n";
+    print $fh "done\n\n";
+
+    # Validate Phase 1 output and retry failed disciplines
+    print $fh "# === Validate and retry failed disciplines ===\n";
     print $fh "FOUND=0\n";
-    print $fh "for f in \"$output_dir\"/discipline-*-findings.json; do\n";
-    print $fh "  [ -f \"\$f\" ] && FOUND=\$((FOUND + 1))\n";
-    print $fh "done\n";
-    print $fh "echo \"Phase 1 produced \$FOUND of $expected_count findings files.\"\n";
+    print $fh "MISSING=\"\"\n";
+    print $fh "for key in $discipline_keys_str; do\n";
+    print $fh "  jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
+    print $fh "  if [ -f \"\$jf\" ]; then\n";
+    print $fh "    if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
+    print $fh "      FOUND=\$((FOUND + 1))\n";
+    print $fh "    else\n";
+    print $fh "      echo \"Invalid JSON for \$key after sanitization — will retry\"\n";
+    print $fh "      rm \"\$jf\"\n";
+    print $fh "      MISSING=\"\$MISSING \$key\"\n";
+    print $fh "    fi\n";
+    print $fh "  else\n";
+    print $fh "    echo \"Missing output for \$key — will retry\"\n";
+    print $fh "    MISSING=\"\$MISSING \$key\"\n";
+    print $fh "  fi\n";
+    print $fh "done\n\n";
+
+    print $fh "if [ -n \"\$MISSING\" ]; then\n";
+    print $fh "  echo \"Retrying failed disciplines:\$MISSING\" >> \"$output_dir/progress.log\"\n";
+    print $fh "  for attempt in 1 2 3; do\n";
+    print $fh "    [ -z \"\$MISSING\" ] && break\n";
+    print $fh "    echo \"  Retry attempt \$attempt/3 for:\$MISSING\"\n";
+    print $fh "    echo \"  Retry attempt \$attempt/3 for:\$MISSING\" >> \"$output_dir/progress.log\"\n";
+    print $fh "    [ \"\$attempt\" -gt 1 ] && sleep 10\n";
+    print $fh "    WAVE_PIDS=\"\"\n";
+    # Launch all missing disciplines in parallel
+    print $fh "    for key in \$MISSING; do\n";
+    print $fh "      PROMPT_VAR=\$(cat \"$job_dir/prompt-\${key}.txt\")\n";
+    print $fh "      timeout \$DISCIPLINE_TIMEOUT \"$CLAUDE_PATH\" -p \"\$PROMPT_VAR\" \\\n";
+    print $fh "        --model sonnet \\\n";
+    print $fh "        --allowedTools Read Write \\\n";
+    print $fh "        --dangerously-skip-permissions \\\n";
+    print $fh "        --output-format text \\\n";
+    print $fh "        > \"$output_dir/\${key}-retry-stdout.log\" \\\n";
+    print $fh "        2> \"$output_dir/\${key}-retry-stderr.log\" &\n";
+    print $fh "      WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n";
+    print $fh "      sleep 3\n";
+    print $fh "    done\n";
+    print $fh "    wait\n";
+    print $fh "    cleanup_wave\n";
+    # Check which succeeded
+    print $fh "    STILL_MISSING=\"\"\n";
+    print $fh "    for key in \$MISSING; do\n";
+    print $fh "      jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
+    print $fh "      if [ -f \"\$jf\" ]; then\n";
+    print $fh "        if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
+    print $fh "          FOUND=\$((FOUND + 1))\n";
+    print $fh "          echo \"  Retry \$attempt succeeded for \$key\" >> \"$output_dir/progress.log\"\n";
+    print $fh "          echo \"  Retry \$attempt succeeded for \$key\"\n";
+    print $fh "        else\n";
+    print $fh "          echo \"  Retry \$attempt: invalid JSON for \$key\"\n";
+    print $fh "          rm \"\$jf\"\n";
+    print $fh "          STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
+    print $fh "        fi\n";
+    print $fh "      else\n";
+    print $fh "        echo \"  Retry \$attempt: no output for \$key\"\n";
+    print $fh "        STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
+    print $fh "      fi\n";
+    print $fh "    done\n";
+    print $fh "    MISSING=\"\$STILL_MISSING\"\n";
+    print $fh "  done\n";
+    # Report any still-missing after all retries
+    print $fh "  if [ -n \"\$MISSING\" ]; then\n";
+    print $fh "    for key in \$MISSING; do\n";
+    print $fh "      echo \"  FAILED: \$key after 3 retries\" >> \"$output_dir/progress.log\"\n";
+    print $fh "    done\n";
+    print $fh "  fi\n";
+    print $fh "fi\n\n";
+
+    print $fh "echo \"Phase 1 produced \$FOUND of $expected_count valid findings files.\" >> \"$output_dir/progress.log\"\n";
+    print $fh "echo \"Phase 1 produced \$FOUND of $expected_count valid findings files.\"\n";
     print $fh "if [ \"\$FOUND\" -lt 1 ]; then\n";
-    print $fh "  echo \"ERROR: No discipline findings JSON files produced. Check stderr logs.\" > \"$output_dir/FAILED\"\n";
+    print $fh "  echo \"ERROR: No valid discipline findings produced. Check stderr logs.\" > \"$output_dir/FAILED\"\n";
     print $fh "  exit 1\n";
+    print $fh "fi\n";
+    print $fh "if [ \"\$FOUND\" -lt \"$expected_count\" ]; then\n";
+    print $fh "  echo \"WARNING: Only \$FOUND of $expected_count disciplines produced results. Missing:\$MISSING\" >> \"$output_dir/progress.log\"\n";
+    print $fh "  echo \"WARNING: Continuing with partial results (\$FOUND/$expected_count). Missing disciplines:\$MISSING\"\n";
     print $fh "fi\n\n";
 
     # Phase 2a: Python synthesis (JSON merge + renumber, zero tokens)
     print $fh "# === PHASE 2a: Python synthesis -> review-data.json ===\n";
+    print $fh "echo \"phase2a_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "echo \"Phase 2a: Synthesizing (Python)...\" >> \"$output_dir/progress.log\"\n";
     my $synth_stdout = "$output_dir/synthesis-stdout.log";
     my $synth_stderr = "$output_dir/synthesis-stderr.log";
@@ -949,17 +1650,19 @@ sub spawn_review {
     print $fh "  echo \"ERROR: synthesize.py did not produce review-data.json. Check synthesis-stderr.log\" > \"$output_dir/FAILED\"\n";
     print $fh "  exit 1\n";
     print $fh "fi\n";
-    print $fh "echo \"Phase 2a complete: review-data.json produced.\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 2a complete: review-data.json produced.\" >> \"$output_dir/progress.log\"\n";
+    print $fh "echo \"phase2a_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
 
     # Phase 2b: Claude executive summary (Haiku, small + fast)
     my $exec_prompt = "$job_dir/prompt-exec-summary.txt";
     my $exec_stdout = "$output_dir/executive-summary.txt";
     my $exec_stderr = "$output_dir/summary-stderr.log";
     print $fh "# === PHASE 2b: Claude executive summary (Haiku) ===\n";
+    print $fh "echo \"phase2b_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "echo \"Phase 2b: Generating executive summary...\" >> \"$output_dir/progress.log\"\n";
     print $fh "EXEC_PROMPT=\$(cat \"$exec_prompt\")\n";
     print $fh "cd \"$output_dir\"\n";
-    print $fh "\"$CLAUDE_PATH\" -p \"\$EXEC_PROMPT\" \\\n";
+    print $fh "timeout 300 \"$CLAUDE_PATH\" -p \"\$EXEC_PROMPT\" \\\n";
     print $fh "  --model haiku \\\n";
     print $fh "  --allowedTools Read Write \\\n";
     print $fh "  --dangerously-skip-permissions \\\n";
@@ -967,10 +1670,12 @@ sub spawn_review {
     print $fh "  > \"$exec_stdout\" \\\n";
     print $fh "  2> \"$exec_stderr\"\n";
     print $fh "cd \"$ROOT\"\n";
-    print $fh "echo \"Phase 2b complete.\" >> \"$output_dir/progress.log\"\n\n";
+    print $fh "echo \"Phase 2b complete.\" >> \"$output_dir/progress.log\"\n";
+    print $fh "echo \"phase2b_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
 
     # Phase 3: local Python report generation
     print $fh "# === PHASE 3: Local report generation (zero tokens) ===\n";
+    print $fh "echo \"phase3_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "echo \"Phase 3: Generating reports...\" >> \"$output_dir/progress.log\"\n";
     print $fh "\"\$PYTHON\" \"$ROOT/generate_reports.py\" \"$output_dir/review-data.json\"\n";
     print $fh "PYEXIT=\$?\n";
@@ -981,14 +1686,15 @@ sub spawn_review {
     print $fh "  exit 1\n";
     print $fh "fi\n\n";
 
+    print $fh "echo \"phase3_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
     print $fh "echo \"Pipeline complete.\" >> \"$output_dir/progress.log\"\n";
 
     close $fh;
     chmod 0755, $script;
 
     my $group_names = join(', ', map { $_->{name} } @active);
-    print "[" . localtime() . "] Spawning 3-phase pipeline for job $job_id\n";
-    print "  Phase 1:  " . scalar(@active) . " CLIs in " . scalar(@waves) . " waves of $MAX_PARALLEL max (Sonnet) -> JSON\n";
+    print "[" . localtime() . "] Spawning pipeline for job $job_id\n";
+    print "  Phase 1:  " . scalar(@active) . " CLIs, all parallel (Sonnet) -> JSON\n";
     print "  Phase 2a: Python synthesis -> review-data.json\n";
     print "  Phase 2b: Claude Haiku -> executive-summary.txt\n";
     print "  Phase 3:  Local Python -> reports\n";
@@ -1001,6 +1707,7 @@ sub spawn_review {
     my $launcher = "$job_dir/launch.sh";
     open my $lfh, '>', $launcher or do {
         warn "Cannot write launcher: $!\n";
+        _mark_spawn_failed($job_id, $job, "Cannot write review launcher: $!");
         return;
     };
     print $lfh "#!/bin/bash\n";
@@ -1010,14 +1717,130 @@ sub spawn_review {
     system("bash \"$launcher\"");
 }
 
+# --- Periodic cleanup -------------------------------------------------------
+
+my $last_cleanup = 0;
+
+sub periodic_cleanup {
+    return if time() - $last_cleanup < 3600;  # once per hour
+    $last_cleanup = time();
+
+    my $archive_days = $CFG{cleanup}{archiveAfterDays} || 90;
+    my $cutoff = time() - ($archive_days * 86400);
+    my $archive_dir = "$REVIEWS_DIR/archive";
+    my $archived = 0;
+
+    if (opendir my $dh, $REVIEWS_DIR) {
+        while (my $dir = readdir $dh) {
+            next if $dir =~ /^\.|^archive$/;
+            my $job = read_job_json($dir);
+            next unless $job;
+            my $st = $job->{status} || '';
+            next unless $st eq 'Complete' || $st eq 'Failed';
+            my $submitted = $job->{submittedEpoch} || 0;
+            next unless $submitted > 0 && $submitted < $cutoff;
+            # Archive: move directory
+            make_path($archive_dir) unless -d $archive_dir;
+            if (rename "$REVIEWS_DIR/$dir", "$archive_dir/$dir") {
+                $archived++;
+                print "[CLEANUP] Archived job $dir\n";
+            } else {
+                warn "[CLEANUP] Failed to archive $dir: $!\n";
+            }
+        }
+        closedir $dh;
+    }
+    print "[CLEANUP] Archived $archived jobs older than $archive_days days\n" if $archived;
+
+    # Clean stale rate limit entries (IPs not seen in last hour)
+    my $rl_cutoff = time() - 3600;
+    for my $ip (keys %rate_limits) {
+        my $has_recent = 0;
+        for my $bucket (keys %{$rate_limits{$ip}}) {
+            my @recent = grep { $_ > $rl_cutoff } @{$rate_limits{$ip}{$bucket} || []};
+            if (@recent) {
+                $rate_limits{$ip}{$bucket} = \@recent;
+                $has_recent = 1;
+            } else {
+                delete $rate_limits{$ip}{$bucket};
+            }
+        }
+        delete $rate_limits{$ip} unless $has_recent;
+    }
+}
+
+# --- Job queue drain --------------------------------------------------------
+
+sub drain_queue {
+    # Check if any job is currently active
+    my @queued;
+    if (opendir my $dh, $REVIEWS_DIR) {
+        while (my $dir = readdir $dh) {
+            next if $dir =~ /^\./;
+            my $j = read_job_json($dir);
+            next unless $j;
+            my $st = $j->{status} || '';
+            return if $st eq 'Processing' || $st eq 'Analyzing';  # something is running
+            push @queued, { id => $dir, job => $j } if $st eq 'Queued';
+        }
+        closedir $dh;
+    }
+    return unless @queued;
+    # Sort by submission time, start the oldest
+    @queued = sort { ($a->{job}{submittedEpoch} || 0) <=> ($b->{job}{submittedEpoch} || 0) } @queued;
+    my $next = $queued[0];
+    print "[" . localtime() . "] Starting queued job $next->{id}\n";
+
+    # Check if this job needs analysis or review
+    my $job = $next->{job};
+    my $job_id = $next->{id};
+    my $job_dir = "$REVIEWS_DIR/$job_id";
+    delete $job->{queuePosition};
+
+    if ($job->{confirmedDisciplines}) {
+        # Job was confirmed — load analysis.json and go straight to Processing/review
+        my $analysis;
+        my $analysis_file = "$job_dir/analysis.json";
+        if (-f $analysis_file) {
+            eval {
+                open my $afh, '<', $analysis_file or die "Cannot read: $!";
+                local $/; my $ajson = <$afh>; close $afh;
+                $analysis = decode_json($ajson);
+            };
+            warn "[DRAIN] Error reading analysis.json for $job_id: $@\n" if $@;
+        }
+        $job->{status} = 'Processing';
+        $job->{progress} = 5;
+        $job->{progressDetail} = 'Starting review...';
+        write_job_json($job_id, $job);
+        spawn_review($job_id, $job, $analysis);
+    } else {
+        # Job needs analysis first
+        $job->{status} = 'Analyzing';
+        write_job_json($job_id, $job);
+        spawn_analysis($job_id, $job);
+    }
+}
+
 # --- Request handler --------------------------------------------------------
 
-while (my $c = $srv->accept) {
+my $accept_sel = IO::Select->new($srv);
+
+while (!$shutdown) {
+    unless ($accept_sel->can_read(5)) {
+        drain_queue();
+        drain_email_queue();
+        periodic_cleanup();
+        next;
+    }
+    my $c = $srv->accept or next;
     binmode $c;
+    $c->autoflush(1);
+    my $peer_ip = $c->peerhost || '127.0.0.1';
 
     # 30-second timeout for initial request read (prevents dead connections from blocking)
     my $sel = IO::Select->new($c);
-    unless ($sel->can_read(30)) {
+    unless ($sel->can_read($CFG{headerReadTimeoutSec})) {
         close $c;
         next;
     }
@@ -1028,14 +1851,10 @@ while (my $c = $srv->accept) {
     my ($method, $path) = ($1, $2);
     $path =~ s/\?.*//;  # strip query string
 
-    # Read all headers (with 30s timeout to prevent slowloris)
+    # Read all headers
     my %headers;
     my $header_ok = 1;
     while (1) {
-        unless ($sel->can_read(30)) {
-            $header_ok = 0;
-            last;
-        }
         my $hdr = <$c>;
         unless (defined $hdr) { $header_ok = 0; last; }
         $hdr =~ s/\r?\n$//;
@@ -1048,13 +1867,12 @@ while (my $c = $srv->accept) {
         close $c;
         next;
     }
-
     # CORS preflight
     if ($method eq 'OPTIONS') {
         print $c "HTTP/1.0 204 No Content\r\n"
-            . "Access-Control-Allow-Origin: *\r\n"
+            . "Access-Control-Allow-Origin: $CORS_ORIGIN\r\n"
             . "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n"
-            . "Access-Control-Allow-Headers: Content-Type\r\n"
+            . "Access-Control-Allow-Headers: Content-Type, Authorization, X-User-Email\r\n"
             . "\r\n";
         close $c;
         next;
@@ -1064,20 +1882,159 @@ while (my $c = $srv->accept) {
     my $body = '';
     if ($method eq 'POST' && $headers{'content-length'}) {
         my $len = int($headers{'content-length'});
-        if ($len > 104_857_600) {  # 100MB
-            send_json($c, 413, { error => 'File too large (100MB max)' });
+        if ($len > $CFG{maxUploadMB} * 1024 * 1024) {
+            send_json($c, 413, { error => "File too large ($CFG{maxUploadMB}MB max)" });
             close $c;
             next;
         }
-        $body = read_exact($c, $len);
+        my $complete;
+        ($body, $complete) = read_exact($c, $len);
+        unless ($complete) {
+            warn "[UPLOAD] Incomplete upload: got " . length($body) . "/$len bytes\n";
+            send_json($c, 400, { error => 'Upload incomplete — connection closed before all data received' });
+            close $c;
+            next;
+        }
     }
 
     # --- API Routes ---------------------------------------------------------
 
+    # GET /api/health — server health check
+    if ($method eq 'GET' && $path eq '/api/health') {
+        my $uptime = time() - $^T;  # $^T is Perl's script start time
+        my ($active, $queued) = (0, 0);
+        if (opendir my $dh, $REVIEWS_DIR) {
+            while (my $d = readdir $dh) {
+                next if $d =~ /^\./;
+                my $j = read_job_json($d);
+                next unless $j;
+                my $st = $j->{status} || '';
+                $active++ if $st eq 'Processing' || $st eq 'Analyzing';
+                $queued++ if $st eq 'Queued';
+            }
+            closedir $dh;
+        }
+        send_json($c, 200, {
+            status     => 'ok',
+            uptime     => $uptime,
+            activeJobs => $active,
+            queuedJobs => $queued,
+            pid        => $$,
+        });
+        close $c; next;
+    }
+
+    # POST /api/login — authenticate and get token
+    if ($method eq 'POST' && $path eq '/api/login') {
+        my $data = eval { decode_json($body) };
+        if (!$data || ($data->{password} || '') ne ($CFG{auth}{password} || '')) {
+            audit_log($peer_ip, $method, $path, 401);
+            send_json($c, 401, { error => 'Invalid password' });
+            close $c; next;
+        }
+        my $token = generate_token($data->{password});
+        audit_log($peer_ip, $method, $path, 200);
+        send_json($c, 200, { token => $token });
+        close $c; next;
+    }
+
+    # Auth check for all /api/* endpoints (except login, health, OPTIONS)
+    if ($path =~ m{^/api/} && $path ne '/api/login' && $path ne '/api/health' && $method ne 'OPTIONS') {
+        my $auth_header = $headers{authorization} || '';
+        my ($token) = $auth_header =~ /^Bearer\s+(.+)/;
+        unless (validate_token($token)) {
+            send_json($c, 401, { error => 'Authentication required' });
+            close $c; next;
+        }
+    }
+
+    # Rate limit for all /api/* endpoints (60 requests/minute)
+    if ($path =~ m{^/api/}) {
+        unless (check_rate_limit($peer_ip, 'api', 60, 60)) {
+            send_json($c, 429, { error => 'Rate limit exceeded: max 60 requests per minute' });
+            close $c; next;
+        }
+    }
+
+    # GET /api/admin/stats — server statistics (admin only)
+    if ($method eq 'GET' && $path eq '/api/admin/stats') {
+        unless (is_admin(\%headers)) {
+            send_json($c, 403, { error => 'Admin access required' });
+            close $c; next;
+        }
+        my %counts = (active => 0, queued => 0, complete => 0, failed => 0, analyzing => 0, awaiting => 0);
+        my @recent_jobs;
+        my $total_bytes = 0;
+        if (opendir my $dh, $REVIEWS_DIR) {
+            while (my $dir = readdir $dh) {
+                next if $dir =~ /^\.|^archive$/;
+                my $j = read_job_json($dir);
+                next unless $j;
+                my $st = lc($j->{status} || '');
+                $counts{active}++ if $st eq 'processing';
+                $counts{analyzing}++ if $st eq 'analyzing';
+                $counts{queued}++ if $st eq 'queued';
+                $counts{complete}++ if $st eq 'complete';
+                $counts{failed}++ if $st eq 'failed';
+                $counts{awaiting}++ if $st eq 'awaiting confirmation';
+                $total_bytes += $j->{pdfSizeBytes} || 0;
+                push @recent_jobs, {
+                    id        => $dir,
+                    project   => $j->{projectName} || '',
+                    status    => $j->{status} || '',
+                    submitted => $j->{submitted} || '',
+                    timing    => $j->{timing} || undef,
+                    duration  => $j->{durationSeconds} || undef,
+                    email     => $j->{pmEmail} || '',
+                };
+            }
+            closedir $dh;
+        }
+        @recent_jobs = sort { ($b->{submitted} || '') cmp ($a->{submitted} || '') } @recent_jobs;
+        @recent_jobs = @recent_jobs[0..49] if @recent_jobs > 50;
+
+        send_json($c, 200, {
+            uptime     => time() - $^T,
+            pid        => $$,
+            jobCounts  => \%counts,
+            totalBytes => $total_bytes,
+            recentJobs => \@recent_jobs,
+        });
+        close $c; next;
+    }
+
+    # POST /api/admin/force-fail/{id} — force a stuck job to Failed (admin only)
+    if ($method eq 'POST' && $path =~ m{^/api/admin/force-fail/([a-zA-Z0-9_-]+)$}) {
+        my $id = $1;
+        unless (is_admin(\%headers)) {
+            send_json($c, 403, { error => 'Admin access required' });
+            close $c; next;
+        }
+        my $job = read_job_json($id);
+        unless ($job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        my $job_dir = "$REVIEWS_DIR/$id";
+        make_path("$job_dir/output") unless -d "$job_dir/output";
+        open my $ff, '>', "$job_dir/output/FAILED" or warn "Cannot write FAILED: $!\n";
+        if ($ff) { print $ff "ADMIN-FAIL: Manually failed by administrator"; close $ff; }
+        $job->{status} = 'Failed';
+        $job->{error} = 'Manually failed by administrator';
+        $job->{completed} = iso_now();
+        write_job_json($id, $job);
+        send_json($c, 200, { status => 'Failed', message => "Job $id force-failed" });
+        close $c; next;
+    }
+
     # POST /api/submit — new review submission
     if ($method eq 'POST' && $path eq '/api/submit') {
+        unless (check_rate_limit($peer_ip, 'submit', 5, 3600)) {
+            send_json($c, 429, { error => 'Rate limit exceeded: max 5 submissions per hour' });
+            close $c; next;
+        }
         my $ct = $headers{'content-type'} || '';
-        my ($boundary) = $ct =~ /boundary=(.+)/;
+        my ($boundary) = $ct =~ /boundary=([^;\s]+)/;
         if (!$boundary) {
             send_json($c, 400, { error => 'Expected multipart/form-data' });
             close $c;
@@ -1096,11 +2053,7 @@ while (my $c = $srv->accept) {
             send_json($c, 400, { error => 'Project name is required' });
             close $c; next;
         }
-        if (!$divs_str) {
-            send_json($c, 400, { error => 'At least one division must be selected' });
-            close $c; next;
-        }
-        if (!$pdf || !$pdf->{data}) {
+        if (!$pdf || !defined($pdf->{data})) {
             send_json($c, 400, { error => 'PDF file is required' });
             close $c; next;
         }
@@ -1108,29 +2061,24 @@ while (my $c = $srv->accept) {
             send_json($c, 400, { error => 'File must be a PDF' });
             close $c; next;
         }
+        if (!length($pdf->{data})) {
+            send_json($c, 400, { error => 'PDF file is empty (0 bytes)' });
+            close $c; next;
+        }
 
-        # Concurrent job guard: prevent submitting while another review is running
-        {
-            my $running_id;
-            if (opendir my $dh, $REVIEWS_DIR) {
-                while (my $dir = readdir $dh) {
-                    next if $dir =~ /^\./;
-                    my $existing = read_job_json($dir);
-                    if ($existing && ($existing->{status} || '') eq 'Processing') {
-                        $running_id = $dir;
-                        last;
-                    }
-                }
-                closedir $dh;
+        # Check for running jobs — if any are active, queue this one
+        my $has_active = 0;
+        my $queue_position = 0;
+        if (opendir my $dh, $REVIEWS_DIR) {
+            while (my $dir = readdir $dh) {
+                next if $dir =~ /^\./;
+                my $existing = read_job_json($dir);
+                next unless $existing;
+                my $st = $existing->{status} || '';
+                $has_active = 1 if $st eq 'Processing' || $st eq 'Analyzing';
+                $queue_position++ if $st eq 'Queued';
             }
-            if ($running_id) {
-                send_json($c, 409, {
-                    error => "A review is already running (job $running_id). Please wait for it to complete before submitting another.",
-                    runningJob => $running_id,
-                });
-                close $c;
-                next;
-            }
+            closedir $dh;
         }
 
         my $job_id = make_job_id();
@@ -1145,7 +2093,22 @@ while (my $c = $srv->accept) {
         print $fh $pdf->{data};
         close $fh;
 
-        my @divs = map { s/^\s+|\s+$//gr } split(/,/, $divs_str);
+        # Validate PDF header
+        open my $vfh, '<:raw', "$job_dir/input.pdf" or do {
+            send_json($c, 500, { error => "Cannot verify PDF" });
+            remove_tree($job_dir);
+            close $c; next;
+        };
+        read $vfh, my $magic, 5;
+        close $vfh;
+        if (($magic || '') ne '%PDF-') {
+            send_json($c, 400, { error => 'Uploaded file is not a valid PDF (missing %PDF- header)' });
+            remove_tree($job_dir);
+            close $c; next;
+        }
+
+        my @divs = $divs_str ? map { s/^\s+|\s+$//gr } split(/,/, $divs_str) : ();
+        my $pdf_size = -s "$job_dir/input.pdf";
         my $job = {
             id               => $job_id,
             projectName      => $project,
@@ -1153,16 +2116,31 @@ while (my $c = $srv->accept) {
             reviewPhase      => $phase,
             constructionType => $type,
             divisions        => \@divs,
-            status           => 'Processing',
+            status           => 'Analyzing',
             submitted        => iso_now(),
+            submittedEpoch   => time(),
             completed        => undef,
             pdfFilename      => $pdf->{filename},
+            pdfSizeBytes     => $pdf_size,
         };
         write_job_json($job_id, $job);
-        spawn_review($job_id, $job);
 
-        send_json($c, 201, { id => $job_id, status => 'Processing' });
+        if ($has_active || $queue_position > 0) {
+            $job->{status} = 'Queued';
+            $job->{queuePosition} = $queue_position + 1;
+            write_job_json($job_id, $job);
+            audit_log($peer_ip, $method, $path, 201);
+            send_json($c, 201, { id => $job_id, status => 'Queued', queuePosition => $queue_position + 1 });
+            close $c;
+            next;
+        }
+        # No active job — start analysis immediately
+        $job->{status} = 'Analyzing';
+        write_job_json($job_id, $job);
+        audit_log($peer_ip, $method, $path, 201);
+        send_json($c, 201, { id => $job_id, status => 'Analyzing' });
         close $c;
+        spawn_analysis($job_id, $job);
         next;
     }
 
@@ -1219,14 +2197,137 @@ while (my $c = $srv->accept) {
     if ($method eq 'DELETE' && $path =~ m{^/api/jobs/([a-zA-Z0-9_-]+)$}) {
         my $id = $1;
         my $job_dir = "$REVIEWS_DIR/$id";
-        if (-f "$job_dir/job.json") {
-            remove_tree($job_dir);
-            print "[" . localtime() . "] Deleted job $id\n";
-            send_json($c, 200, { deleted => $id });
-        } else {
+        my $job = read_job_json($id);
+        if (!$job) {
             send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
         }
+        my $st = $job->{status} || '';
+        if ($st eq 'Processing' || $st eq 'Analyzing') {
+            send_json($c, 409, {
+                error => "Cannot delete job $id while it is $st. Wait for completion or failure.",
+            });
+            close $c; next;
+        }
+        remove_tree($job_dir);
+        print "[" . localtime() . "] Deleted job $id\n";
+        audit_log($peer_ip, $method, $path, 200);
+        send_json($c, 200, { deleted => $id });
         close $c;
+        next;
+    }
+
+    # GET /api/analysis/{id} — return analysis.json for a job
+    if ($method eq 'GET' && $path =~ m{^/api/analysis/([a-zA-Z0-9_-]+)$}) {
+        my $id = $1;
+        my $job = read_job_json($id);
+        if (!$job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        my $analysis_file = "$REVIEWS_DIR/$id/analysis.json";
+        if (!-f $analysis_file) {
+            send_json($c, 404, { error => 'Analysis not yet available' });
+            close $c; next;
+        }
+        open my $afh, '<', $analysis_file or do {
+            send_json($c, 500, { error => "Cannot read analysis.json: $!" });
+            close $c; next;
+        };
+        local $/; my $ajson = <$afh>; close $afh;
+        my $analysis = eval { decode_json($ajson) } || {};
+        send_json($c, 200, {
+            jobId       => $id,
+            status      => $job->{status},
+            projectName => $job->{projectName},
+            analysis    => $analysis,
+        });
+        close $c;
+        next;
+    }
+
+    # POST /api/confirm/{id} — confirm divisions and launch full review
+    if ($method eq 'POST' && $path =~ m{^/api/confirm/([a-zA-Z0-9_-]+)$}) {
+        my $id = $1;
+        my $job = read_job_json($id);
+        if (!$job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        if (($job->{status} || '') ne 'Awaiting Confirmation') {
+            send_json($c, 400, {
+                error => "Job is not awaiting confirmation (current status: $job->{status})"
+            });
+            close $c; next;
+        }
+
+        # Parse JSON body for divisions
+        my $confirm_data = eval { decode_json($body) };
+        if (!$confirm_data || !$confirm_data->{divisions} || ref($confirm_data->{divisions}) ne 'ARRAY') {
+            send_json($c, 400, { error => 'Request body must include "divisions" array' });
+            close $c; next;
+        }
+        my @divs = @{$confirm_data->{divisions}};
+        if (!@divs) {
+            send_json($c, 400, { error => 'At least one division must be selected' });
+            close $c; next;
+        }
+
+        # Load analysis.json for page hints
+        my $analysis;
+        my $analysis_file = "$REVIEWS_DIR/$id/analysis.json";
+        if (-f $analysis_file) {
+            eval {
+                open my $afh, '<', $analysis_file or die "Cannot read: $!";
+                local $/; my $ajson = <$afh>; close $afh;
+                $analysis = decode_json($ajson);
+            };
+            warn "[CONFIRM] Error reading analysis.json for $id: $@\n" if $@;
+        }
+
+        # Check for running jobs — if any are active, queue instead of starting
+        my $confirm_has_active = 0;
+        my $confirm_queue_pos = 0;
+        if (opendir my $qdh, $REVIEWS_DIR) {
+            while (my $dir = readdir $qdh) {
+                next if $dir =~ /^\./;
+                next if $dir eq $id;  # skip this job itself
+                my $ej = read_job_json($dir);
+                next unless $ej;
+                my $est = $ej->{status} || '';
+                $confirm_has_active = 1 if $est eq 'Processing' || $est eq 'Analyzing';
+                $confirm_queue_pos++ if $est eq 'Queued';
+            }
+            closedir $qdh;
+        }
+
+        # Update job with confirmed divisions
+        $job->{divisions} = \@divs;
+        $job->{confirmedAt} = iso_now();
+        $job->{confirmedDisciplines} = \@divs;
+
+        if ($confirm_has_active || $confirm_queue_pos > 0) {
+            # Queue this job — another is still running
+            $job->{status} = 'Queued';
+            $job->{queuePosition} = $confirm_queue_pos + 1;
+            write_job_json($id, $job);
+            send_json($c, 200, { id => $id, status => 'Queued', queuePosition => $confirm_queue_pos + 1 });
+            close $c;
+            next;
+        }
+
+        # No active job — start processing immediately
+        $job->{status} = 'Processing';
+        $job->{progress} = 5;
+        $job->{progressDetail} = 'Starting review...';
+        write_job_json($id, $job);
+
+        # Respond immediately — spawn_review() generates a large script and blocks
+        send_json($c, 200, { id => $id, status => 'Processing' });
+        close $c;
+
+        # Spawn the full review pipeline (blocks server briefly while generating script)
+        spawn_review($id, $job, $analysis);
         next;
     }
 
@@ -1234,6 +2335,18 @@ while (my $c = $srv->accept) {
     if ($method eq 'GET' && $path =~ m{^/api/download/([a-zA-Z0-9_-]+)/([a-zA-Z0-9._-]+)$}) {
         my ($id, $filename) = ($1, $2);
         $filename =~ s/[^a-zA-Z0-9._-]//g;  # sanitize
+        my $job = read_job_json($id);
+        if (!$job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        # Check ownership (admin bypass)
+        my $requester_email = $headers{'x-user-email'} || '';
+        my $is_admin = grep { lc($_) eq lc($requester_email) } @{$CFG{auth}{adminEmails} || []};
+        if (!$is_admin && $job->{pmEmail} && lc($requester_email) ne lc($job->{pmEmail})) {
+            send_json($c, 403, { error => 'You do not have access to this job' });
+            close $c; next;
+        }
         my $file = "$REVIEWS_DIR/$id/output/$filename";
         if (-f $file) {
             open my $fh, '<:raw', $file or do {
@@ -1243,6 +2356,7 @@ while (my $c = $srv->accept) {
             local $/; my $data = <$fh>; close $fh;
             my ($ext) = $filename =~ /\.(\w+)$/;
             my $ct = $mime{lc($ext || '')} || 'application/octet-stream';
+            audit_log($peer_ip, $method, $path, 200);
             send_response($c, 200, $ct, $data);
         } else {
             send_json($c, 404, { error => 'File not found' });
@@ -1260,6 +2374,18 @@ while (my $c = $srv->accept) {
             send_json($c, 400, { error => 'Only .log and .txt files can be downloaded' });
             close $c; next;
         }
+        my $job = read_job_json($id);
+        if (!$job) {
+            send_json($c, 404, { error => 'Job not found' });
+            close $c; next;
+        }
+        # Check ownership (admin bypass)
+        my $requester_email = $headers{'x-user-email'} || '';
+        my $is_admin = grep { lc($_) eq lc($requester_email) } @{$CFG{auth}{adminEmails} || []};
+        if (!$is_admin && $job->{pmEmail} && lc($requester_email) ne lc($job->{pmEmail})) {
+            send_json($c, 403, { error => 'You do not have access to this job' });
+            close $c; next;
+        }
         my $file = "$REVIEWS_DIR/$id/output/$filename";
         if (-f $file) {
             open my $fh, '<:raw', $file or do {
@@ -1267,6 +2393,7 @@ while (my $c = $srv->accept) {
                 close $c; next;
             };
             local $/; my $data = <$fh>; close $fh;
+            audit_log($peer_ip, $method, $path, 200);
             send_response($c, 200, 'text/plain', $data);
         } else {
             send_json($c, 404, { error => 'Log file not found' });
@@ -1278,8 +2405,22 @@ while (my $c = $srv->accept) {
     # --- Static file serving ------------------------------------------------
     if ($method eq 'GET') {
         $path = '/review-portal.html' if $path eq '/';
-        $path =~ s{/\.\.}{}g;
-        my $file = "$ROOT$path";
+
+        # Security: resolve to absolute path and verify it stays under $ROOT
+        my $candidate = "$ROOT$path";
+        my $resolved = abs_path($candidate);
+        if (!$resolved || index($resolved, $ROOT) != 0) {
+            send_response($c, 403, 'text/plain', 'Forbidden');
+            close $c; next;
+        }
+        # Block sensitive files from being served
+        my $basename_lc = lc( (File::Spec->splitpath($resolved))[2] );
+        if ($basename_lc eq 'review-config.json' || $basename_lc eq 'review-server.pid'
+            || $basename_lc eq 'access.log' || $basename_lc =~ /^\./) {
+            send_response($c, 403, 'text/plain', 'Forbidden');
+            close $c; next;
+        }
+        my $file = $resolved;
 
         if (-f $file) {
             open my $fh, '<:raw', $file or do {
@@ -1300,3 +2441,8 @@ while (my $c = $srv->accept) {
 
     close $c;
 }
+
+# Cleanup on exit
+close $srv;
+unlink $pidfile if -f $pidfile;
+print "[" . localtime() . "] Server shut down cleanly.\n";

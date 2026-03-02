@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WSU Review Server Admin</title>
+<style>
+:root {
+  --primary: #981e32;
+  --primary-dark: #7a1828;
+  --secondary: #5f6b6d;
+  --accent: #c69214;
+  --bg: #f5f5f5;
+  --card-bg: #fff;
+  --text: #2d2d2d;
+  --text-light: #6b7280;
+  --border: #e5e7eb;
+  --green: #059669;
+  --red: #dc2626;
+  --blue: #2563eb;
+  --table-head-bg: #f9fafb;
+  --table-hover: #f9fafb;
+  --info-bg: #f0f9ff;
+  --info-border: #bae6fd;
+  --info-text: #0c4a6e;
+}
+html.dark {
+  --bg: #111827; --card-bg: #1f2937; --text: #e5e7eb; --text-light: #9ca3af;
+  --border: #374151; --green: #34d399; --red: #f87171;
+  --table-head-bg: #1a2332; --table-hover: #253347;
+  --info-bg: #1e293b; --info-border: #334155; --info-text: #7dd3fc;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+}
+
+/* Auth Gate */
+#authGate {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.auth-card {
+  background: var(--card-bg); border-radius: 16px; padding: 2.5rem; width: 380px;
+  box-shadow: 0 25px 50px rgba(0,0,0,.25); text-align: center;
+}
+.auth-card h2 { color: var(--primary); margin-bottom: .5rem; font-size: 1.4rem; }
+.auth-card p { color: var(--text-light); margin-bottom: 1.5rem; font-size: .85rem; }
+.auth-card input {
+  width: 100%; padding: .75rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+  font-size: .95rem; background: var(--bg); color: var(--text); outline: none;
+  margin-bottom: .75rem;
+}
+.auth-card input:focus { border-color: var(--primary); }
+.auth-card button {
+  width: 100%; padding: .75rem; border: none; border-radius: 8px;
+  background: var(--primary); color: #fff; font-size: .95rem; font-weight: 600; cursor: pointer;
+}
+.auth-card button:hover { background: var(--primary-dark); }
+.auth-error { color: var(--red); font-size: .8rem; margin-top: .5rem; display: none; }
+
+/* Header */
+header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff; padding: 1rem 2rem;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
+}
+.header-text h1 { font-size: 1.5rem; font-weight: 700; }
+.header-text p { font-size: .8rem; opacity: .85; }
+.header-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.header-actions a {
+  color: rgba(255,255,255,.75); text-decoration: none; font-size: .78rem; padding: .3rem .6rem;
+  border: 1px solid rgba(255,255,255,.25); border-radius: 6px;
+}
+.header-actions a:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+/* Dark Mode Toggle */
+.dark-toggle { display: flex; align-items: center; gap: .5rem; }
+.dark-toggle-label { font-size: .78rem; color: rgba(255,255,255,.8); }
+.dark-toggle-switch {
+  width: 40px; height: 22px; border-radius: 11px; border: none;
+  background: rgba(255,255,255,.25); cursor: pointer; position: relative;
+}
+.dark-toggle-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; transition: transform .2s;
+}
+html.dark .dark-toggle-switch { background: var(--accent); }
+html.dark .dark-toggle-switch::after { transform: translateX(18px); }
+
+/* Container & Cards */
+.container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+.card {
+  background: var(--card-bg); border-radius: 12px; padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-bottom: 1.5rem;
+}
+.card h2 { font-size: 1.1rem; color: var(--primary); margin-bottom: 1rem; }
+html.dark .card h2 { color: var(--accent); }
+
+/* KPI Grid */
+.kpi-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem; margin-bottom: 1rem;
+}
+.kpi-card {
+  background: var(--card-bg); border-radius: 10px; padding: 1rem;
+  border: 1px solid var(--border); text-align: center;
+}
+.kpi-card .kpi-value { font-size: 1.8rem; font-weight: 700; line-height: 1.2; }
+.kpi-card .kpi-label { font-size: .75rem; color: var(--text-light); margin-top: .25rem; text-transform: uppercase; letter-spacing: .5px; }
+.kpi-card.active { border-left: 4px solid #f59e0b; }
+.kpi-card.active .kpi-value { color: #f59e0b; }
+.kpi-card.queued { border-left: 4px solid #92400e; }
+.kpi-card.queued .kpi-value { color: #92400e; }
+.kpi-card.analyzing { border-left: 4px solid var(--blue); }
+.kpi-card.analyzing .kpi-value { color: var(--blue); }
+.kpi-card.awaiting { border-left: 4px solid #a16207; }
+.kpi-card.awaiting .kpi-value { color: #a16207; }
+.kpi-card.complete { border-left: 4px solid var(--green); }
+.kpi-card.complete .kpi-value { color: var(--green); }
+.kpi-card.failed { border-left: 4px solid var(--red); }
+.kpi-card.failed .kpi-value { color: var(--red); }
+
+/* Server Info */
+.server-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+.server-info .info-item { font-size: .85rem; }
+.server-info .info-label { color: var(--text-light); font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; }
+.server-info .info-value { font-weight: 600; margin-top: .15rem; }
+
+/* Table */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+th {
+  background: var(--table-head-bg); text-align: left; padding: .6rem .8rem;
+  font-weight: 600; color: var(--text-light); border-bottom: 2px solid var(--border);
+  cursor: pointer; white-space: nowrap; user-select: none;
+}
+th:hover { color: var(--text); }
+th .sort-arrow { font-size: .7rem; margin-left: .3rem; }
+td { padding: .6rem .8rem; border-bottom: 1px solid var(--border); }
+tr:hover { background: var(--table-hover); }
+
+/* Status badges */
+.job-status {
+  display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .75rem; font-weight: 600;
+}
+.job-status.processing { background: #fffbeb; color: #92400e; }
+.job-status.complete { background: #ecfdf5; color: #059669; }
+.job-status.failed { background: #fef2f2; color: #dc2626; }
+.job-status.analyzing { background: #eff6ff; color: #2563eb; }
+.job-status.awaiting { background: #fefce8; color: #a16207; }
+.job-status.queued { background: #fef3c7; color: #92400e; }
+html.dark .job-status.processing { background: #78350f; color: #fbbf24; }
+html.dark .job-status.complete { background: #064e3b; color: #34d399; }
+html.dark .job-status.failed { background: #7f1d1d; color: #f87171; }
+html.dark .job-status.analyzing { background: #1e3a5f; color: #60a5fa; }
+html.dark .job-status.awaiting { background: #422006; color: #fbbf24; }
+html.dark .job-status.queued { background: #78350f; color: #fbbf24; }
+
+/* Buttons */
+.btn-sm {
+  padding: .25rem .6rem; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--card-bg); color: var(--text); font-size: .75rem; cursor: pointer;
+}
+.btn-sm:hover { background: var(--table-hover); }
+.btn-sm.danger { border-color: var(--red); color: var(--red); }
+.btn-sm.danger:hover { background: #fef2f2; }
+html.dark .btn-sm.danger:hover { background: #7f1d1d; }
+
+/* Timing detail */
+.timing-row { display: none; }
+.timing-row.visible { display: table-row; }
+.timing-row td { padding: .4rem .8rem .4rem 2rem; background: var(--info-bg); }
+.timing-detail { font-size: .78rem; color: var(--info-text); }
+.timing-detail span { margin-right: 1rem; }
+
+/* Last updated */
+.last-updated { font-size: .75rem; color: var(--text-light); text-align: right; margin-top: .5rem; }
+
+/* Confirm dialog */
+.confirm-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 900;
+  display: none; align-items: center; justify-content: center;
+}
+.confirm-overlay.show { display: flex; }
+.confirm-box {
+  background: var(--card-bg); border-radius: 12px; padding: 1.5rem; width: 360px;
+  box-shadow: 0 25px 50px rgba(0,0,0,.25); text-align: center;
+}
+.confirm-box h3 { color: var(--red); margin-bottom: .75rem; font-size: 1.1rem; }
+.confirm-box p { font-size: .85rem; color: var(--text-light); margin-bottom: 1.25rem; }
+.confirm-box .btn-row { display: flex; gap: .75rem; justify-content: center; }
+.confirm-box button {
+  padding: .5rem 1.25rem; border-radius: 8px; font-size: .85rem; font-weight: 600; cursor: pointer; border: none;
+}
+.confirm-box .btn-cancel { background: var(--border); color: var(--text); }
+.confirm-box .btn-confirm { background: var(--red); color: #fff; }
+.confirm-box .btn-confirm:hover { opacity: .9; }
+html.dark .confirm-box .btn-cancel { background: #374151; }
+
+/* Access denied */
+.access-denied {
+  text-align: center; padding: 4rem 2rem;
+}
+.access-denied h2 { color: var(--red); margin-bottom: .5rem; }
+.access-denied p { color: var(--text-light); font-size: .9rem; }
+
+/* Footer */
+footer {
+  text-align: center; padding: 1rem; font-size: .75rem; color: var(--text-light);
+  border-top: 1px solid var(--border); margin-top: 2rem;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  header { padding: .75rem 1rem; }
+  .header-text h1 { font-size: 1.2rem; }
+  .container { padding: 1rem; }
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- Auth Gate -->
+<div id="authGate">
+  <div class="auth-card">
+    <h2>Admin Panel</h2>
+    <p>Enter the review portal password to continue.</p>
+    <input type="password" id="authPass" placeholder="Password" autocomplete="off">
+    <button onclick="checkAuth()">Sign In</button>
+    <div class="auth-error" id="authError">Invalid password. Please try again.</div>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="header-text">
+    <h1>WSU Review Server Admin</h1>
+    <p>Server monitoring and job management</p>
+  </div>
+  <div class="header-actions">
+    <a href="review-portal.html">Back to Portal</a>
+    <div class="dark-toggle">
+      <span class="dark-toggle-label">Dark Mode</span>
+      <button class="dark-toggle-switch" id="darkToggle" onclick="toggleDark()"></button>
+    </div>
+  </div>
+</header>
+
+<!-- Main Content (hidden until admin verified) -->
+<div class="container" id="adminContent" style="display:none">
+
+  <!-- Access Denied (shown if not admin) -->
+  <div class="access-denied" id="accessDenied" style="display:none">
+    <h2>Access Denied</h2>
+    <p>Your email is not in the admin list. Contact a system administrator to gain access.</p>
+  </div>
+
+  <!-- Dashboard (shown if admin) -->
+  <div id="dashboard" style="display:none">
+
+    <!-- Server Status -->
+    <div class="card">
+      <h2>Server Status</h2>
+      <div class="server-info">
+        <div class="info-item">
+          <div class="info-label">Uptime</div>
+          <div class="info-value" id="statUptime">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">PID</div>
+          <div class="info-value" id="statPid">--</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">PDF Disk Usage</div>
+          <div class="info-value" id="statDisk">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Job Counts -->
+    <div class="card">
+      <h2>Job Counts</h2>
+      <div class="kpi-grid">
+        <div class="kpi-card active">
+          <div class="kpi-value" id="cntActive">0</div>
+          <div class="kpi-label">Processing</div>
+        </div>
+        <div class="kpi-card queued">
+          <div class="kpi-value" id="cntQueued">0</div>
+          <div class="kpi-label">Queued</div>
+        </div>
+        <div class="kpi-card analyzing">
+          <div class="kpi-value" id="cntAnalyzing">0</div>
+          <div class="kpi-label">Analyzing</div>
+        </div>
+        <div class="kpi-card awaiting">
+          <div class="kpi-value" id="cntAwaiting">0</div>
+          <div class="kpi-label">Awaiting</div>
+        </div>
+        <div class="kpi-card complete">
+          <div class="kpi-value" id="cntComplete">0</div>
+          <div class="kpi-label">Complete</div>
+        </div>
+        <div class="kpi-card failed">
+          <div class="kpi-value" id="cntFailed">0</div>
+          <div class="kpi-label">Failed</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Jobs -->
+    <div class="card">
+      <h2>Recent Jobs</h2>
+      <div class="table-wrap">
+        <table id="jobsTable">
+          <thead>
+            <tr>
+              <th data-col="id">Job ID <span class="sort-arrow"></span></th>
+              <th data-col="project">Project <span class="sort-arrow"></span></th>
+              <th data-col="status">Status <span class="sort-arrow"></span></th>
+              <th data-col="submitted">Submitted <span class="sort-arrow"></span></th>
+              <th data-col="duration">Duration <span class="sort-arrow"></span></th>
+              <th data-col="email">Email <span class="sort-arrow"></span></th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="jobsBody"></tbody>
+        </table>
+      </div>
+      <div class="last-updated">Last updated: <span id="lastUpdated">--</span></div>
+    </div>
+
+  </div><!-- /dashboard -->
+
+</div><!-- /container -->
+
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <h3>Force Fail Job</h3>
+    <p>Are you sure you want to force-fail job <strong id="confirmJobId"></strong>? This cannot be undone.</p>
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-confirm" onclick="doForceFail()">Force Fail</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  WSU Facilities Services &bull; Review Server Admin Panel
+</footer>
+
+<script>
+// --- Auth Gate ---
+const AUTH_KEY = 'wsuReviewToken';
+
+async function checkAuth() {
+  const input = document.getElementById('authPass');
+  const btn = document.querySelector('.auth-card button');
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: input.value }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      localStorage.setItem(AUTH_KEY, data.token);
+      document.getElementById('authGate').style.display = 'none';
+      initAdmin();
+    } else {
+      document.getElementById('authError').style.display = 'block';
+      input.value = '';
+      input.focus();
+    }
+  } catch (err) {
+    document.getElementById('authError').style.display = 'block';
+  }
+  btn.disabled = false;
+}
+
+(async () => {
+  const token = localStorage.getItem(AUTH_KEY);
+  if (token) {
+    try {
+      const resp = await fetch('/api/health', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (resp.ok) {
+        document.getElementById('authGate').style.display = 'none';
+        initAdmin();
+        return;
+      }
+    } catch (e) {}
+    localStorage.removeItem(AUTH_KEY);
+  }
+})();
+
+document.getElementById('authPass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') checkAuth();
+});
+
+function apiFetch(url, opts = {}) {
+  const token = localStorage.getItem(AUTH_KEY);
+  if (token) {
+    if (!opts.headers) opts.headers = {};
+    opts.headers['Authorization'] = 'Bearer ' + token;
+  }
+  const email = localStorage.getItem('wsuReviewEmail') || '';
+  if (email) {
+    if (!opts.headers) opts.headers = {};
+    opts.headers['X-User-Email'] = email;
+  }
+  return fetch(url, opts).then(resp => {
+    if (resp.status === 401) {
+      localStorage.removeItem(AUTH_KEY);
+      document.getElementById('authGate').style.display = '';
+    }
+    return resp;
+  });
+}
+
+// --- Dark Mode ---
+function toggleDark() {
+  const on = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('wsuDarkMode', on ? 'on' : 'off');
+}
+if (localStorage.getItem('wsuDarkMode') === 'on') {
+  document.documentElement.classList.add('dark');
+}
+
+// --- Admin Init ---
+let refreshTimer = null;
+let sortCol = 'submitted';
+let sortDir = 'desc';
+let jobsData = [];
+let pendingForceFailId = null;
+
+function initAdmin() {
+  document.getElementById('adminContent').style.display = '';
+  loadStats();
+  refreshTimer = setInterval(loadStats, 30000);
+}
+
+async function loadStats() {
+  try {
+    const resp = await apiFetch('/api/admin/stats');
+    if (resp.status === 403) {
+      document.getElementById('accessDenied').style.display = '';
+      document.getElementById('dashboard').style.display = 'none';
+      if (refreshTimer) clearInterval(refreshTimer);
+      return;
+    }
+    if (!resp.ok) return;
+    const data = await resp.json();
+    document.getElementById('accessDenied').style.display = 'none';
+    document.getElementById('dashboard').style.display = '';
+
+    // Server status
+    document.getElementById('statUptime').textContent = formatUptime(data.uptime || 0);
+    document.getElementById('statPid').textContent = data.pid || '--';
+    document.getElementById('statDisk').textContent = formatBytes(data.totalBytes || 0);
+
+    // Job counts
+    const c = data.jobCounts || {};
+    document.getElementById('cntActive').textContent = c.active || 0;
+    document.getElementById('cntQueued').textContent = c.queued || 0;
+    document.getElementById('cntAnalyzing').textContent = c.analyzing || 0;
+    document.getElementById('cntAwaiting').textContent = c.awaiting || 0;
+    document.getElementById('cntComplete').textContent = c.complete || 0;
+    document.getElementById('cntFailed').textContent = c.failed || 0;
+
+    // Recent jobs
+    jobsData = data.recentJobs || [];
+    renderJobs();
+
+    // Last updated
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+  } catch (err) {
+    console.error('Failed to load admin stats:', err);
+  }
+}
+
+// --- Formatting helpers ---
+function formatUptime(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return d + 'd ' + h + 'h ' + m + 'm';
+  if (h > 0) return h + 'h ' + m + 'm';
+  return m + 'm';
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+}
+
+function formatDuration(seconds) {
+  if (seconds == null) return '--';
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return m > 0 ? m + 'm ' + s + 's' : s + 's';
+}
+
+function esc(str) {
+  const el = document.createElement('span');
+  el.textContent = str || '';
+  return el.innerHTML;
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return '--';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return ts; }
+}
+
+// --- Job table rendering ---
+function renderJobs() {
+  const sorted = [...jobsData].sort((a, b) => {
+    let va = a[sortCol] || '', vb = b[sortCol] || '';
+    if (sortCol === 'duration') { va = a.duration || 0; vb = b.duration || 0; }
+    if (typeof va === 'number' && typeof vb === 'number') {
+      return sortDir === 'asc' ? va - vb : vb - va;
+    }
+    va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+    return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+
+  const tbody = document.getElementById('jobsBody');
+  let html = '';
+  for (const j of sorted) {
+    const sc = (j.status || '').toLowerCase().replace(/\s+/g, '-');
+    const statusClass = sc === 'awaiting-confirmation' ? 'awaiting' : sc;
+    const isStuck = statusClass === 'processing' || statusClass === 'analyzing' || statusClass === 'queued';
+    const shortId = (j.id || '').substring(0, 8);
+    const hasTiming = j.timing && typeof j.timing === 'object';
+
+    html += '<tr class="job-row' + (hasTiming ? ' has-timing' : '') + '" data-id="' + esc(j.id) + '">';
+    html += '<td title="' + esc(j.id) + '">' + (hasTiming ? '<span style="cursor:pointer;color:var(--blue)" onclick="toggleTiming(this)">' : '') + esc(shortId) + (hasTiming ? '</span>' : '') + '</td>';
+    html += '<td>' + esc(j.project) + '</td>';
+    html += '<td><span class="job-status ' + statusClass + '">' + esc(j.status) + '</span></td>';
+    html += '<td>' + formatTimestamp(j.submitted) + '</td>';
+    html += '<td>' + formatDuration(j.duration) + '</td>';
+    html += '<td>' + esc(j.email) + '</td>';
+    html += '<td>';
+    if (isStuck) {
+      html += '<button class="btn-sm danger" onclick="confirmForceFail(\'' + esc(j.id) + '\')">Force Fail</button>';
+    }
+    html += '</td>';
+    html += '</tr>';
+
+    // Timing detail row
+    if (hasTiming) {
+      html += '<tr class="timing-row" data-timing-for="' + esc(j.id) + '"><td colspan="7"><div class="timing-detail">';
+      const t = j.timing;
+      if (t.phase0) html += '<span>Phase 0 (extract): ' + formatDuration(t.phase0) + '</span>';
+      if (t.phase1) html += '<span>Phase 1 (scan): ' + formatDuration(t.phase1) + '</span>';
+      if (t.phase2a) html += '<span>Phase 2a (combine): ' + formatDuration(t.phase2a) + '</span>';
+      if (t.phase2b) html += '<span>Phase 2b (review): ' + formatDuration(t.phase2b) + '</span>';
+      if (t.phase3) html += '<span>Phase 3 (report): ' + formatDuration(t.phase3) + '</span>';
+      html += '</div></td></tr>';
+    }
+  }
+  tbody.innerHTML = html;
+
+  // Update sort arrows
+  document.querySelectorAll('#jobsTable th[data-col]').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if (th.dataset.col === sortCol) {
+      arrow.textContent = sortDir === 'asc' ? ' \u25B2' : ' \u25BC';
+    } else {
+      arrow.textContent = ' \u25B4\u25BE';
+    }
+  });
+}
+
+// --- Sort ---
+document.querySelectorAll('#jobsTable th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortCol = col;
+      sortDir = col === 'submitted' || col === 'duration' ? 'desc' : 'asc';
+    }
+    renderJobs();
+  });
+});
+
+// --- Timing toggle ---
+function toggleTiming(el) {
+  const row = el.closest('tr');
+  const id = row.dataset.id;
+  const timingRow = document.querySelector('tr[data-timing-for="' + id + '"]');
+  if (timingRow) timingRow.classList.toggle('visible');
+}
+
+// --- Force Fail ---
+function confirmForceFail(jobId) {
+  pendingForceFailId = jobId;
+  document.getElementById('confirmJobId').textContent = jobId.substring(0, 8) + '...';
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+
+function closeConfirm() {
+  pendingForceFailId = null;
+  document.getElementById('confirmOverlay').classList.remove('show');
+}
+
+async function doForceFail() {
+  if (!pendingForceFailId) return;
+  const id = pendingForceFailId;
+  closeConfirm();
+  try {
+    const resp = await apiFetch('/api/admin/force-fail/' + id, { method: 'POST' });
+    if (resp.ok) {
+      loadStats(); // refresh
+    } else {
+      const data = await resp.json().catch(() => ({}));
+      alert('Failed: ' + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    alert('Network error: ' + err.message);
+  }
+}
+</script>
+</body>
+</html>
