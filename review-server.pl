@@ -231,16 +231,22 @@ sub send_json {
 sub read_exact {
     my ($sock, $len, $timeout) = @_;
     $timeout ||= $CFG{bodyReadTimeoutSec};  # default from config
-    my $sel = IO::Select->new($sock);
     my $buf = '';
+    my $deadline = time() + $timeout;
+    # Use read() directly instead of IO::Select — buffered readline (<$c>)
+    # for headers may have consumed body data into Perl's internal buffer,
+    # making IO::Select miss it at the OS socket level.
     while (length($buf) < $len) {
-        unless ($sel->can_read($timeout)) {
+        my $n = read($sock, my $chunk, $len - length($buf));
+        unless ($n) {
+            warn "[UPLOAD] read_exact: connection closed with " . length($buf) . "/$len bytes\n";
+            return ($buf, 0);
+        }
+        $buf .= $chunk;
+        if (time() > $deadline) {
             warn "[TIMEOUT] read_exact timed out after ${timeout}s with " . length($buf) . "/$len bytes\n";
             return ($buf, 0);
         }
-        my $n = read($sock, my $chunk, $len - length($buf));
-        return ($buf, 0) unless $n;  # EOF — incomplete
-        $buf .= $chunk;
     }
     return ($buf, 1);
 }
