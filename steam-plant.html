@@ -1593,32 +1593,31 @@ const EXCEL_COLUMNS = [
 ];
 
 function exportExcel() {
-  const headers = EXCEL_COLUMNS.map(c => c[1]);
-  const rows = [headers];
-  let dayNum = 0;
-  let prevMonth = '';
-  DATA.daily.forEach(d => {
-    const curMonth = d.date.slice(0, 7);
-    if (curMonth !== prevMonth) { dayNum = 1; prevMonth = curMonth; } else { dayNum++; }
-    const row = EXCEL_COLUMNS.map(([key]) => {
-      if (key === null) return dayNum;
-      if (key === 'date') return new Date(d.date + 'T00:00:00');
-      return d[key] ?? 0;
+  try {
+    const headers = EXCEL_COLUMNS.map(c => c[1]);
+    const rows = [headers];
+    let dayNum = 0;
+    let prevMonth = '';
+    DATA.daily.forEach(d => {
+      const curMonth = d.date.slice(0, 7);
+      if (curMonth !== prevMonth) { dayNum = 1; prevMonth = curMonth; } else { dayNum++; }
+      const row = EXCEL_COLUMNS.map(([key]) => {
+        if (key === null) return dayNum;
+        if (key === 'date') return d.date;
+        return d[key] ?? 0;
+      });
+      rows.push(row);
     });
-    rows.push(row);
-  });
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  // Set date column format
-  const dateCol = 1; // column B
-  for (let r = 1; r < rows.length; r++) {
-    const cell = XLSX.utils.encode_cell({ r: r, c: dateCol });
-    if (ws[cell]) ws[cell].t = 'd';
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = EXCEL_COLUMNS.map((_, i) => ({ wch: i <= 1 ? 12 : 18 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Daily Data');
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    downloadBlob(new Blob([wbout], { type: 'application/octet-stream' }), 'WSU_Energy_Data_Export.xlsx');
+  } catch (e) {
+    alert('Excel export failed: ' + e.message);
+    console.error('Excel export error:', e);
   }
-  // Set column widths
-  ws['!cols'] = EXCEL_COLUMNS.map((_, i) => ({ wch: i <= 1 ? 12 : 18 }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Daily Data');
-  XLSX.writeFile(wb, 'WSU_Energy_Data_Export.xlsx');
 }
 
 // Aggregation keys for monthly rollup in JS (matches Python logic)
