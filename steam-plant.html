@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WSU Steam Plant Operations Dashboard</title>
+<script src="chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #981e32;
+    --primary-dark: #7a1828;
+    --secondary: #5f6b6d;
+    --accent: #c69214;
+    --bg: #f5f5f5;
+    --card-bg: #fff;
+    --text: #2d2d2d;
+    --text-light: #6b7280;
+    --border: #e5e7eb;
+    --green: #059669;
+    --red: #dc2626;
+    --blue: #2563eb;
+    --table-head-bg: #f9fafb;
+    --table-hover: #f9fafb;
+    --total-row-bg: #f0f4ff;
+    --info-bg: #f0f9ff;
+    --info-border: #bae6fd;
+    --info-text: #0c4a6e;
+    --mini-row-border: #f3f4f6;
+    /* Steam plant utility colors */
+    --clr-b1: #3b82f6;
+    --clr-b2: #ef4444;
+    --clr-b3: #f59e0b;
+    --clr-b4: #8b5cf6;
+    --clr-b5: #06b6d4;
+    --clr-casp: #981e32;
+    --clr-gwsp: #059669;
+    --clr-campus: #c69214;
+    --clr-gen: #6366f1;
+    --clr-water: #3b82f6;
+    --clr-oil: #92400e;
+  }
+  html.dark {
+    --bg: #111827;
+    --card-bg: #1f2937;
+    --text: #e5e7eb;
+    --text-light: #9ca3af;
+    --border: #374151;
+    --secondary: #9ca3af;
+    --green: #34d399;
+    --red: #f87171;
+    --table-head-bg: #1a2332;
+    --table-hover: #253347;
+    --total-row-bg: #1e293b;
+    --info-bg: #1e293b;
+    --info-border: #334155;
+    --info-text: #7dd3fc;
+    --mini-row-border: #253347;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; padding: 1.5rem 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .header-text { flex: 1; min-width: 0; }
+  .header-text h1 { font-size: 1.6rem; font-weight: 700; }
+  .header-text p { opacity: 0.85; font-size: 0.9rem; margin-top: 0.25rem; }
+  .header-actions { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+  .header-actions a {
+    color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.82rem;
+    padding: 0.4rem 0.8rem; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .header-actions a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .dark-toggle { display: flex; align-items: center; gap: 0.5rem; }
+  .dark-toggle-label { font-size: 0.75rem; opacity: 0.85; color: #fff; }
+  .dark-toggle-switch {
+    position: relative; width: 40px; height: 22px; background: rgba(255,255,255,0.25);
+    border-radius: 11px; cursor: pointer; transition: background 0.3s; border: none; padding: 0;
+  }
+  .dark-toggle-switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+    background: #fff; border-radius: 50%; transition: transform 0.3s;
+  }
+  html.dark .dark-toggle-switch { background: var(--accent); }
+  html.dark .dark-toggle-switch::after { transform: translateX(18px); }
+  .container { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
+  /* Nav Tabs */
+  .nav-tabs {
+    display: flex; gap: 0.25rem; background: var(--card-bg); border-radius: 8px;
+    padding: 0.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto;
+  }
+  .nav-tab {
+    padding: 0.6rem 1.2rem; border: none; background: transparent; border-radius: 6px;
+    cursor: pointer; font-size: 0.85rem; font-weight: 500; color: var(--text-light);
+    white-space: nowrap; transition: all 0.2s;
+  }
+  .nav-tab:hover { background: var(--table-hover); color: var(--text); }
+  .nav-tab.active { background: var(--primary); color: #fff; }
+  /* KPI */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card {
+    background: var(--card-bg); border-radius: 10px; padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary);
+    cursor: pointer; transition: box-shadow 0.2s ease, transform 0.15s ease; position: relative;
+  }
+  .kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-2px); }
+  .kpi-label { font-size: 0.78rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.05em; }
+  .kpi-value { font-size: 1.8rem; font-weight: 700; margin: 0.25rem 0; }
+  .kpi-sub { font-size: 0.8rem; color: var(--text-light); }
+  .kpi-tooltip {
+    visibility: hidden; opacity: 0; position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); background: #1f2937; color: #fff; font-size: 0.75rem;
+    line-height: 1.4; padding: 0.5rem 0.75rem; border-radius: 6px; white-space: normal;
+    width: max-content; max-width: 260px; z-index: 100; pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .kpi-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #1f2937;
+  }
+  .kpi-card:hover .kpi-tooltip { visibility: visible; opacity: 1; }
+  .kpi-expand {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.35s ease, margin-top 0.35s ease, opacity 0.25s ease;
+    opacity: 0; margin-top: 0;
+  }
+  .kpi-card.expanded .kpi-expand { max-height: 500px; overflow: auto; opacity: 1; margin-top: 0.75rem; }
+  .kpi-card.expanded { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+  .kpi-expand-icon {
+    position: absolute; top: 0.75rem; right: 0.75rem; font-size: 0.7rem;
+    color: var(--text-light); transition: transform 0.3s ease;
+  }
+  .kpi-card.expanded .kpi-expand-icon { transform: rotate(180deg); }
+  .kpi-mini-table { min-width: 100%; border-collapse: collapse; font-size: 0.75rem; white-space: nowrap; }
+  .kpi-mini-table th {
+    text-align: left; font-weight: 600; color: var(--secondary); padding: 0.3rem 0.5rem;
+    border-bottom: 2px solid var(--border); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .kpi-mini-table th:not(:first-child) { text-align: right; }
+  .kpi-mini-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--mini-row-border); }
+  .kpi-mini-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+  .kpi-mini-table tr:last-child { font-weight: 700; border-top: 2px solid var(--primary); }
+  .kpi-mini-table tr:last-child td { border-bottom: none; padding-top: 0.4rem; }
+  /* KPI color modifiers */
+  .kpi-card.b1 { border-left-color: var(--clr-b1); }
+  .kpi-card.b2 { border-left-color: var(--clr-b2); }
+  .kpi-card.b3 { border-left-color: var(--clr-b3); }
+  .kpi-card.b4 { border-left-color: var(--clr-b4); }
+  .kpi-card.b5 { border-left-color: var(--clr-b5); }
+  .kpi-card.casp { border-left-color: var(--clr-casp); }
+  .kpi-card.gwsp { border-left-color: var(--clr-gwsp); }
+  .kpi-card.campus { border-left-color: var(--clr-campus); }
+  .kpi-card.gen { border-left-color: var(--clr-gen); }
+  .kpi-card.water { border-left-color: var(--clr-water); }
+  .kpi-card.oil { border-left-color: var(--clr-oil); }
+  .kpi-card.info { border-left-color: var(--secondary); }
+  /* Cards */
+  .card {
+    background: var(--card-bg); border-radius: 10px; padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem;
+  }
+  .card h2 {
+    font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--primary);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  html.dark .card h2 { color: var(--clr-campus); }
+  .chart-container { position: relative; height: 350px; width: 100%; }
+  .chart-container.tall { height: 500px; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th {
+    background: var(--table-head-bg); padding: 0.6rem 0.75rem; text-align: right;
+    font-weight: 600; color: var(--secondary); border-bottom: 2px solid var(--border); white-space: nowrap;
+  }
+  thead th:first-child { text-align: left; }
+  tbody td { padding: 0.5rem 0.75rem; text-align: right; border-bottom: 1px solid var(--border); }
+  tbody td:first-child { text-align: left; }
+  tbody tr:hover { background: var(--table-hover); }
+  tbody tr.total-row { font-weight: 700; background: var(--total-row-bg); border-top: 2px solid var(--primary); }
+  /* Sections */
+  .section { display: none; }
+  .section.active { display: block; }
+  /* Info box */
+  .info-box {
+    background: var(--info-bg); border: 1px solid var(--info-border); border-radius: 8px;
+    padding: 1rem 1.25rem; font-size: 0.82rem; color: var(--info-text); margin-bottom: 1rem;
+  }
+  .info-box code {
+    background: rgba(0,0,0,0.06); padding: 0.1rem 0.4rem; border-radius: 3px;
+    font-size: 0.78rem; font-family: 'Courier New', monospace;
+  }
+  html.dark .info-box code { background: rgba(255,255,255,0.08); }
+  /* Heatmap */
+  .heatmap-wrap { overflow-x: auto; margin-top: 0.5rem; }
+  .heatmap { border-collapse: collapse; font-size: 0.72rem; white-space: nowrap; }
+  .heatmap th { padding: 0.35rem 0.5rem; text-align: center; font-weight: 600; color: var(--secondary); border-bottom: 2px solid var(--border); background: var(--table-head-bg); }
+  .heatmap th:first-child { text-align: left; min-width: 70px; }
+  .heatmap td { padding: 0.3rem 0.5rem; text-align: center; border: 1px solid var(--border); min-width: 52px; }
+  .heatmap td.heat-high { background: #dcfce7; color: #166534; font-weight: 600; }
+  .heatmap td.heat-med { background: #fef9c3; color: #854d0e; }
+  .heatmap td.heat-low { background: #fee2e2; color: #991b1b; }
+  .heatmap td.heat-zero { background: var(--table-head-bg); color: var(--text-light); }
+  html.dark .heatmap td.heat-high { background: #064e3b; color: #34d399; }
+  html.dark .heatmap td.heat-med { background: #713f12; color: #fbbf24; }
+  html.dark .heatmap td.heat-low { background: #7f1d1d; color: #f87171; }
+  html.dark .heatmap td.heat-zero { background: var(--table-head-bg); color: var(--text-light); }
+  /* Data Management */
+  .import-zone {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 2rem;
+    text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 1rem;
+  }
+  .import-zone:hover, .import-zone.dragover { border-color: var(--primary); background: var(--info-bg); }
+  .import-zone input[type="file"] { display: none; }
+  .import-zone h3 { font-size: 1rem; color: var(--text); margin-bottom: 0.25rem; }
+  .import-zone p { font-size: 0.82rem; color: var(--text-light); }
+  .preview-panel {
+    background: var(--table-head-bg); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;
+    font-size: 0.82rem; display: none;
+  }
+  .preview-panel.visible { display: block; }
+  .preview-panel h3 { font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .btn {
+    padding: 0.6rem 1.2rem; border: none; border-radius: 6px; font-size: 0.85rem;
+    font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .btn.primary { background: var(--primary); color: #fff; }
+  .btn.primary:hover { background: var(--primary-dark); }
+  .btn.secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); }
+  .btn.secondary:hover { border-color: var(--primary); color: var(--primary); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  /* Loading */
+  #loading {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; z-index: 9999;
+    flex-direction: column; gap: 1rem;
+  }
+  .spinner {
+    width: 40px; height: 40px; border: 4px solid var(--border);
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Auth Gate */
+  #authGate {
+    position: fixed; inset: 0; z-index: 99999; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+  }
+  #authGate .auth-header {
+    position: absolute; top: 0; left: 0; right: 0;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; padding: 1.5rem 2rem; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  #authGate .auth-header h1 { font-size: 1.4rem; font-weight: 700; }
+  #authGate .auth-header p { opacity: 0.85; font-size: 0.85rem; margin-top: 0.25rem; }
+  #authGate .auth-card {
+    background: var(--card-bg); border-radius: 12px; padding: 2.5rem 2rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1); text-align: center;
+    width: 100%; max-width: 380px; margin-top: 60px;
+  }
+  #authGate .auth-card h2 { font-size: 1.1rem; color: var(--text); margin-bottom: 0.5rem; }
+  #authGate .auth-card p { font-size: 0.82rem; color: var(--text-light); margin-bottom: 1.5rem; }
+  #authGate .auth-input {
+    width: 100%; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+    background: var(--card-bg); color: var(--text);
+  }
+  #authGate .auth-input:focus { border-color: var(--primary); }
+  #authGate .auth-btn {
+    width: 100%; padding: 0.75rem; margin-top: 1rem; border: none; border-radius: 8px;
+    background: var(--primary); color: #fff; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  #authGate .auth-btn:hover { background: var(--primary-dark); }
+  #authGate .auth-error { color: var(--red); font-size: 0.8rem; margin-top: 0.75rem; min-height: 1.2rem; }
+  html.dark #authGate .auth-input { background: var(--bg); color: var(--text); border-color: var(--border); }
+  /* Help tab */
+  .help-section { margin-bottom: 1.5rem; }
+  .help-section h3 { font-size: 0.95rem; font-weight: 600; color: var(--primary); margin-bottom: 0.5rem; }
+  html.dark .help-section h3 { color: var(--clr-campus); }
+  .help-steps { counter-reset: step; list-style: none; padding: 0; }
+  .help-steps li { counter-increment: step; padding: 0.5rem 0 0.5rem 2.5rem; position: relative; font-size: 0.85rem; }
+  .help-steps li::before {
+    content: counter(step); position: absolute; left: 0; top: 0.4rem;
+    width: 1.8rem; height: 1.8rem; background: var(--primary); color: #fff;
+    border-radius: 50%; text-align: center; line-height: 1.8rem; font-weight: 700; font-size: 0.78rem;
+  }
+  .help-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.5rem 0 1rem; }
+  .help-table th { text-align: left; padding: 0.4rem 0.6rem; background: var(--table-head-bg); border-bottom: 2px solid var(--border); font-weight: 600; }
+  .help-table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
+  .help-tip {
+    background: #ecfdf5; border-left: 3px solid var(--green); padding: 0.6rem 1rem;
+    font-size: 0.82rem; border-radius: 0 6px 6px 0; margin: 0.5rem 0;
+  }
+  html.dark .help-tip { background: #064e3b; }
+  /* Footer */
+  footer {
+    text-align: center; padding: 1.5rem; color: var(--text-light); font-size: 0.78rem;
+    border-top: 1px solid var(--border); margin-top: 2rem;
+  }
+  footer a { color: var(--primary); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  /* Print */
+  @media print {
+    @page { size: landscape; margin: 0.5in; }
+    * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+    body { background: #fff !important; }
+    html.dark { --bg:#f5f5f5; --card-bg:#fff; --text:#2d2d2d; --text-light:#6b7280; --border:#e5e7eb; }
+    header, #authGate, #loading, .nav-tabs, .dark-toggle, .header-actions { display: none !important; }
+    .section { display: none !important; }
+    #printSummary { display: block !important; }
+    .card { box-shadow: none; border: 1px solid #e5e7eb; page-break-inside: avoid; }
+  }
+  /* Drill-down modal */
+  .drill-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000;
+    align-items: center; justify-content: center;
+  }
+  .drill-overlay.visible { display: flex; }
+  .drill-modal {
+    background: var(--card-bg); border-radius: 12px; padding: 1.5rem; max-width: 900px;
+    width: 95%; max-height: 85vh; overflow: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  }
+  .drill-modal h3 { font-size: 1rem; margin-bottom: 1rem; }
+  .drill-close {
+    float: right; background: none; border: none; font-size: 1.3rem; cursor: pointer;
+    color: var(--text-light); padding: 0.25rem;
+  }
+  .drill-close:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- Auth Gate -->
+<div id="authGate">
+  <div class="auth-header">
+    <h1>WSU Steam Plant Operations</h1>
+    <p>Steam Plant Operations Dashboard &bull; WSU Facilities Services</p>
+  </div>
+  <div class="auth-card">
+    <h2>Restricted Access</h2>
+    <p>Enter the dashboard password to continue.</p>
+    <input type="password" class="auth-input" id="authInput" placeholder="Password" autocomplete="off">
+    <button class="auth-btn" id="authBtn">Sign In</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="color:var(--text-light); font-size:0.9rem;">Loading steam plant data...</div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="header-text">
+    <h1>WSU Steam Plant Operations</h1>
+    <p id="headerSub">Loading...</p>
+  </div>
+  <div class="header-actions">
+    <a href="metering.html">Campus Metering</a>
+    <a href="index.html">Energy Cost Projection</a>
+    <div class="dark-toggle">
+      <span class="dark-toggle-label">Dark Mode</span>
+      <button class="dark-toggle-switch" id="darkToggle" aria-label="Toggle dark mode"></button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Nav Tabs -->
+  <div class="nav-tabs" id="navTabs">
+    <button class="nav-tab active" data-tab="overview">Overview</button>
+    <button class="nav-tab" data-tab="gas">Gas Consumption</button>
+    <button class="nav-tab" data-tab="steam">Steam &amp; Efficiency</button>
+    <button class="nav-tab" data-tab="runtime">Runtime &amp; Availability</button>
+    <button class="nav-tab" data-tab="water">Plant Water</button>
+    <button class="nav-tab" data-tab="data">Data Management</button>
+    <button class="nav-tab" data-tab="help">Help</button>
+  </div>
+
+  <!-- ==================== OVERVIEW TAB ==================== -->
+  <div class="section active" id="sec-overview">
+    <div class="kpi-grid" id="kpiOverview"></div>
+    <div class="chart-row">
+      <div class="card">
+        <h2>Monthly Gas &amp; Steam Trends</h2>
+        <div class="chart-container"><canvas id="chartOverviewTrend"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Gas Consumption by Fiscal Year</h2>
+        <div class="chart-container"><canvas id="chartFYGas"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== GAS CONSUMPTION TAB ==================== -->
+  <div class="section" id="sec-gas">
+    <div class="kpi-grid" id="kpiGas"></div>
+    <div class="card">
+      <h2>Monthly Gas by Boiler (scf)</h2>
+      <div class="chart-container tall"><canvas id="chartGasBoiler"></canvas></div>
+    </div>
+    <div class="chart-row">
+      <div class="card">
+        <h2>CASP vs GWSP vs Campus Gas</h2>
+        <div class="chart-container"><canvas id="chartGasPlant"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Oil Usage (lbs) &mdash; Boilers 3, 4, 5</h2>
+        <div class="chart-container"><canvas id="chartOil"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Monthly Gas Detail Table</h2>
+      <div class="table-wrap"><table id="tblGas"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ==================== STEAM & EFFICIENCY TAB ==================== -->
+  <div class="section" id="sec-steam">
+    <div class="kpi-grid" id="kpiSteam"></div>
+    <div class="card">
+      <h2>Monthly Steam Production by Boiler (lbs)</h2>
+      <div class="chart-container tall"><canvas id="chartSteamBoiler"></canvas></div>
+    </div>
+    <div class="chart-row">
+      <div class="card">
+        <h2>Efficiency Ratio (steam lbs / gas scf)</h2>
+        <div class="chart-container"><canvas id="chartEfficiency"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Economizer Delta-T (&deg;F) by Boiler</h2>
+        <div class="chart-container"><canvas id="chartEconDelta"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== RUNTIME & AVAILABILITY TAB ==================== -->
+  <div class="section" id="sec-runtime">
+    <div class="kpi-grid" id="kpiRuntime"></div>
+    <div class="card">
+      <h2>Monthly Boiler Runtime (hrs)</h2>
+      <div class="chart-container tall"><canvas id="chartRuntimeBoiler"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Boiler Availability Heatmap</h2>
+      <div class="heatmap-wrap" id="heatmapWrap"></div>
+    </div>
+    <div class="card">
+      <h2>Generator Runtime &amp; Output</h2>
+      <div class="chart-container"><canvas id="chartGenerators"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ==================== PLANT WATER TAB ==================== -->
+  <div class="section" id="sec-water">
+    <div class="kpi-grid" id="kpiWater"></div>
+    <div class="card">
+      <h2>Monthly Plant Water by Source</h2>
+      <div class="chart-container tall"><canvas id="chartWaterStacked"></canvas></div>
+    </div>
+    <div class="chart-row">
+      <div class="card">
+        <h2>GWSP Water Trends</h2>
+        <div class="chart-container"><canvas id="chartGWSPWater"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Makeup Water Temperature (&deg;F)</h2>
+        <div class="chart-container"><canvas id="chartWaterTemp"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>CASP East vs West Water</h2>
+      <div class="chart-container"><canvas id="chartCASPWater"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ==================== DATA MANAGEMENT TAB ==================== -->
+  <div class="section" id="sec-data">
+    <div class="card">
+      <h2>Import Monthly Excel Files</h2>
+      <div class="info-box">
+        <p>Upload one or more monthly ENERGY Excel files (.xlsx/.xlsm). The dashboard will parse them in-browser using SheetJS and merge into the existing dataset. Duplicate months will be replaced.</p>
+      </div>
+      <div class="import-zone" id="importZone">
+        <h3>Drop Excel files here or click to browse</h3>
+        <p>Accepts .xlsx and .xlsm files</p>
+        <input type="file" id="importFiles" accept=".xlsx,.xlsm" multiple>
+      </div>
+      <div class="preview-panel" id="importPreview">
+        <h3>Import Preview</h3>
+        <div id="importPreviewContent"></div>
+        <div style="margin-top:0.75rem">
+          <button class="btn primary" id="importMergeBtn" disabled>Merge Into Dataset</button>
+          <button class="btn secondary" id="importCancelBtn">Cancel</button>
+        </div>
+      </div>
+      <div id="importStatus" style="font-size:0.82rem; color:var(--green); margin-top:0.5rem;"></div>
+    </div>
+    <div class="card">
+      <h2>Export Data</h2>
+      <div class="btn-row">
+        <button class="btn secondary" id="exportJSON">Download JSON (Daily+Monthly)</button>
+        <button class="btn secondary" id="exportCSV">Download Daily CSV</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Data Inventory</h2>
+      <div class="table-wrap"><table id="tblInventory"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ==================== HELP TAB ==================== -->
+  <div class="section" id="sec-help">
+    <div class="card">
+      <div class="help-section">
+        <h2>Dashboard Overview</h2>
+        <p style="font-size:0.85rem; margin-bottom:1rem;">This dashboard visualizes WSU steam plant operations data covering 5 boilers (B1-B5), 2 steam plants (CASP and GWSP), 3 generators, fuel oil storage, and plant water systems. Data spans from FY21 (July 2020) forward.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Tab Guide</h3>
+        <table class="help-table">
+          <thead><tr><th>Tab</th><th>What It Shows</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Overview</strong></td><td>Campus-wide KPIs, monthly gas/steam trends, fiscal year comparisons</td></tr>
+            <tr><td><strong>Gas Consumption</strong></td><td>Gas usage by boiler and plant, oil firing events, monthly breakdown table</td></tr>
+            <tr><td><strong>Steam &amp; Efficiency</strong></td><td>Steam production by boiler, efficiency ratios, economizer performance</td></tr>
+            <tr><td><strong>Runtime &amp; Availability</strong></td><td>Boiler runtime hours, availability heatmap, generator output</td></tr>
+            <tr><td><strong>Plant Water</strong></td><td>GWSP and CASP water usage, makeup temperature trends, waste water</td></tr>
+            <tr><td><strong>Data Management</strong></td><td>Import new monthly Excel files, export JSON/CSV, view data inventory</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Metric Definitions</h3>
+        <table class="help-table">
+          <thead><tr><th>Metric</th><th>Unit</th><th>Definition</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Gas (scf)</strong></td><td>Standard cubic feet</td><td>Natural gas consumption measured at standard conditions</td></tr>
+            <tr><td><strong>Steam (lbs)</strong></td><td>Pounds</td><td>Steam produced, measured by mass flow</td></tr>
+            <tr><td><strong>Efficiency Ratio</strong></td><td>lbs/scf</td><td>Steam output divided by gas input. Higher = more efficient</td></tr>
+            <tr><td><strong>Economizer Delta-T</strong></td><td>&deg;F</td><td>Temperature gain across economizer (outlet minus inlet). Higher = better heat recovery</td></tr>
+            <tr><td><strong>Runtime</strong></td><td>Hours</td><td>Cumulative run hours per month for each boiler/generator</td></tr>
+            <tr><td><strong>Oil (lbs)</strong></td><td>Pounds</td><td>Fuel oil consumed by dual-fuel boilers (B3, B4, B5)</td></tr>
+            <tr><td><strong>kWh</strong></td><td>Kilowatt-hours</td><td>Electrical energy generated by on-site generators</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Monthly Update Workflow</h3>
+        <ol class="help-steps">
+          <li>Obtain the monthly ENERGY Excel file from the plant operator</li>
+          <li>Go to the <strong>Data Management</strong> tab</li>
+          <li>Drag and drop the file (or click to browse)</li>
+          <li>Review the preview — check detected month, row counts, and any warnings</li>
+          <li>Click <strong>Merge Into Dataset</strong> to add the new month</li>
+          <li>Click <strong>Download JSON (Daily+Monthly)</strong> to export the updated file</li>
+          <li>Upload the new <code>steam_plant.json</code> to the GitHub <code>data/</code> folder</li>
+        </ol>
+        <div class="help-tip">
+          <strong>Tip:</strong> If the same month already exists in the dataset, the import tool will replace it with the new data. This is useful for correcting data.
+        </div>
+      </div>
+
+      <div class="help-section">
+        <h3>Equipment Reference</h3>
+        <table class="help-table">
+          <thead><tr><th>Equipment</th><th>Plant</th><th>Fuel</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Boiler 1</td><td>CASP</td><td>Gas only</td><td>Single-fuel boiler</td></tr>
+            <tr><td>Boiler 2</td><td>CASP</td><td>Gas only</td><td>Single-fuel boiler</td></tr>
+            <tr><td>Boiler 3</td><td>GWSP</td><td>Gas + Oil</td><td>Dual-fuel, tracks oil separately</td></tr>
+            <tr><td>Boiler 4</td><td>GWSP</td><td>Gas + Oil</td><td>Dual-fuel, tracks oil separately</td></tr>
+            <tr><td>Boiler 5</td><td>GWSP</td><td>Gas + Oil</td><td>Dual-fuel, tracks oil separately</td></tr>
+            <tr><td>Generator 1</td><td>&mdash;</td><td>Gas</td><td>Gas-fired generator</td></tr>
+            <tr><td>Generator 2</td><td>&mdash;</td><td>Gas</td><td>Gas-fired generator</td></tr>
+            <tr><td>Generator 3</td><td>&mdash;</td><td>Diesel</td><td>Diesel generator, tracks fuel gallons</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="help-section">
+        <h3>Troubleshooting</h3>
+        <table class="help-table">
+          <thead><tr><th>Issue</th><th>Solution</th></tr></thead>
+          <tbody>
+            <tr><td>Charts not loading</td><td>Check that <code>data/steam_plant.json</code> exists. Hard refresh (Ctrl+Shift+R).</td></tr>
+            <tr><td>Import fails</td><td>Ensure the file is a valid .xlsx/.xlsm with "Daily Data" and/or "Hourly Data" sheets.</td></tr>
+            <tr><td>Missing months</td><td>Check the Data Inventory table. Missing months can be filled by importing the source Excel file.</td></tr>
+            <tr><td>Dark mode stuck</td><td>Clear localStorage: open console, run <code>localStorage.removeItem('wsuDarkMode')</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Print Summary (hidden, populated by JS) -->
+<div id="printSummary" style="display:none;"></div>
+
+<!-- Drill-down Overlay -->
+<div class="drill-overlay" id="drillOverlay">
+  <div class="drill-modal">
+    <button class="drill-close" id="drillClose">&times;</button>
+    <h3 id="drillTitle"></h3>
+    <div class="table-wrap" id="drillContent"></div>
+  </div>
+</div>
+
+<footer>
+  WSU Facilities Services &bull; Steam Plant Operations Dashboard &bull;
+  <a href="metering.html">Campus Metering</a> &bull;
+  <a href="index.html">Energy Cost Projection</a>
+</footer>
+
+<script>
+// ============================================================
+//  AUTH GATE
+// ============================================================
+(function() {
+  const gate = document.getElementById('authGate');
+  const input = document.getElementById('authInput');
+  const btn = document.getElementById('authBtn');
+  const err = document.getElementById('authError');
+  if (localStorage.getItem('wsuMeteringAuth') === 'ok') {
+    gate.style.display = 'none';
+  }
+  function tryAuth() {
+    if (input.value === 'Energy@WSU') {
+      localStorage.setItem('wsuMeteringAuth', 'ok');
+      gate.style.display = 'none';
+      err.textContent = '';
+    } else {
+      err.textContent = 'Incorrect password. Please try again.';
+      input.value = '';
+      input.focus();
+    }
+  }
+  btn.addEventListener('click', tryAuth);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+})();
+
+// ============================================================
+//  DARK MODE
+// ============================================================
+(function() {
+  if (localStorage.getItem('wsuDarkMode') === 'on') {
+    document.documentElement.classList.add('dark');
+  }
+  document.getElementById('darkToggle').addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('wsuDarkMode', document.documentElement.classList.contains('dark') ? 'on' : 'off');
+    applyChartTheme();
+    chartInstances.forEach(c => { c.options.color = Chart.defaults.color; c.update(); });
+  });
+})();
+
+// ============================================================
+//  TAB NAVIGATION
+// ============================================================
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ============================================================
+//  GLOBALS & CHART THEMING
+// ============================================================
+const chartInstances = [];
+const COLORS = {
+  b1: '#3b82f6', b2: '#ef4444', b3: '#f59e0b', b4: '#8b5cf6', b5: '#06b6d4',
+  casp: '#981e32', gwsp: '#059669', campus: '#c69214',
+  gen1: '#6366f1', gen2: '#ec4899', gen3: '#f97316',
+  water: '#3b82f6', oil: '#92400e'
+};
+
+function applyChartTheme() {
+  const dark = document.documentElement.classList.contains('dark');
+  Chart.defaults.color = dark ? '#9ca3af' : '#6b7280';
+  Chart.defaults.borderColor = dark ? '#374151' : '#e5e7eb';
+}
+applyChartTheme();
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.padding = 16;
+
+// ============================================================
+//  FORMATTERS
+// ============================================================
+function fmt(n, dec) {
+  if (n == null || isNaN(n)) return '0';
+  dec = dec ?? 0;
+  return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function fmtNum(v) { return (v || 0).toLocaleString('en-US'); }
+function fmtPct(v) { return (v || 0).toFixed(1) + '%'; }
+function sum(arr) { return arr.reduce((a, b) => a + (b || 0), 0); }
+
+function monthLabel(key) {
+  const [y, m] = key.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(m, 10) - 1] + ' ' + y.slice(2);
+}
+
+function fyLabel(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  return m >= 7 ? 'FY' + String(y + 1).slice(2) : 'FY' + String(y).slice(2);
+}
+
+// ============================================================
+//  CHART FACTORY
+// ============================================================
+function createChart(canvasId, config) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  const c = new Chart(ctx, config);
+  chartInstances.push(c);
+  return c;
+}
+
+function stackedBar(canvasId, labels, datasets, yLabel) {
+  return createChart(canvasId, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 0) } }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: {
+          stacked: true, beginAtZero: true,
+          title: { display: !!yLabel, text: yLabel || '' },
+          ticks: { callback: v => v >= 1e9 ? (v/1e9).toFixed(1)+'B' : v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'k' : v }
+        }
+      }
+    }
+  });
+}
+
+function lineChart(canvasId, labels, datasets, yLabel, opts) {
+  const scales = {
+    x: { grid: { display: false } },
+    y: {
+      beginAtZero: opts?.noZero ? false : true,
+      title: { display: !!yLabel, text: yLabel || '' },
+      ticks: { callback: v => v >= 1e9 ? (v/1e9).toFixed(1)+'B' : v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'k' : v }
+    }
+  };
+  if (opts?.y2) {
+    scales.y2 = {
+      position: 'right', beginAtZero: true,
+      title: { display: true, text: opts.y2Label || '' },
+      ticks: { callback: v => v >= 1e9 ? (v/1e9).toFixed(1)+'B' : v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'k' : v },
+      grid: { drawOnChartArea: false }
+    };
+  }
+  return createChart(canvasId, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 2) } }
+      },
+      scales
+    }
+  });
+}
+
+function barChart(canvasId, labels, datasets, yLabel) {
+  return createChart(canvasId, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: datasets.length > 1, position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 0) } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          title: { display: !!yLabel, text: yLabel || '' },
+          ticks: { callback: v => v >= 1e9 ? (v/1e9).toFixed(1)+'B' : v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'k' : v }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+//  KPI RENDERER
+// ============================================================
+function renderKPIs(containerId, kpis) {
+  const grid = document.getElementById(containerId);
+  grid.innerHTML = '';
+  kpis.forEach(k => {
+    const card = document.createElement('div');
+    card.className = 'kpi-card' + (k.cls ? ' ' + k.cls : '');
+    let expandHtml = '';
+    if (k.table) {
+      expandHtml = `<span class="kpi-expand-icon">&#9660;</span><div class="kpi-expand"><table class="kpi-mini-table">${k.table}</table></div>`;
+      card.addEventListener('click', () => card.classList.toggle('expanded'));
+    }
+    card.innerHTML = `
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub || ''}</div>
+      ${k.tip ? `<div class="kpi-tooltip">${k.tip}</div>` : ''}
+      ${expandHtml}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ============================================================
+//  DATA STORE
+// ============================================================
+let DATA = null; // { meta, columns, monthly, daily }
+
+async function loadData() {
+  const resp = await fetch('data/steam_plant.json');
+  if (!resp.ok) throw new Error('Failed to load data/steam_plant.json');
+  DATA = await resp.json();
+}
+
+// ============================================================
+//  MAIN RENDER
+// ============================================================
+async function init() {
+  try {
+    await loadData();
+  } catch (e) {
+    document.getElementById('loading').innerHTML = `<div style="color:var(--red); text-align:center; padding:2rem;"><h2>Error Loading Data</h2><p>${e.message}</p><p style="font-size:0.82rem; color:var(--text-light); margin-top:0.5rem;">Make sure <code>data/steam_plant.json</code> exists.</p></div>`;
+    return;
+  }
+  document.getElementById('loading').style.display = 'none';
+
+  const M = DATA.monthly;
+  const labels = M.map(m => monthLabel(m.month));
+
+  // Update header subtitle
+  const firstMonth = monthLabel(M[0].month);
+  const lastMonth = monthLabel(M[M.length - 1].month);
+  document.getElementById('headerSub').textContent = firstMonth + ' \u2013 ' + lastMonth + ' \u2022 ' + M.length + ' Months \u2022 5 Boilers, 2 Plants, 3 Generators';
+
+  renderOverviewTab(M, labels);
+  renderGasTab(M, labels);
+  renderSteamTab(M, labels);
+  renderRuntimeTab(M, labels);
+  renderWaterTab(M, labels);
+  renderDataManagement();
+  buildPrintSummary(M);
+}
+
+// ============================================================
+//  TAB 1: OVERVIEW
+// ============================================================
+function renderOverviewTab(M, labels) {
+  const totalGas = sum(M.map(m => m.campus_gas || 0));
+  const totalSteam = sum(M.map(m => m.campus_steam || 0));
+  const totalRuntime = sum(M.map(m =>
+    (m.b1_runtime||0) + (m.b2_runtime||0) + (m.b3_runtime_total||0) + (m.b4_runtime_total||0) + (m.b5_runtime_total||0)
+  ));
+  const totalGenKwh = sum(M.map(m => (m.gen1_kwh||0) + (m.gen2_kwh||0) + (m.gen3_kwh||0)));
+  const totalWater = sum(M.map(m =>
+    (m.gwsp_raw_water||0) + (m.gwsp_potable||0) + (m.gwsp_permeate||0) + (m.casp_east_water||0) + (m.casp_west_water||0)
+  ));
+
+  // Build monthly breakdown table for gas KPI
+  function buildGasTable() {
+    let html = '<thead><tr><th>Month</th><th>Campus Gas (scf)</th></tr></thead><tbody>';
+    M.slice(-12).forEach(m => { html += `<tr><td>${monthLabel(m.month)}</td><td>${fmt(m.campus_gas)}</td></tr>`; });
+    html += `<tr><td>12-mo Total</td><td>${fmt(sum(M.slice(-12).map(m=>m.campus_gas||0)))}</td></tr></tbody>`;
+    return html;
+  }
+  function buildSteamTable() {
+    let html = '<thead><tr><th>Month</th><th>Campus Steam (lbs)</th></tr></thead><tbody>';
+    M.slice(-12).forEach(m => { html += `<tr><td>${monthLabel(m.month)}</td><td>${fmt(m.campus_steam)}</td></tr>`; });
+    html += `<tr><td>12-mo Total</td><td>${fmt(sum(M.slice(-12).map(m=>m.campus_steam||0)))}</td></tr></tbody>`;
+    return html;
+  }
+
+  renderKPIs('kpiOverview', [
+    { label: 'Campus Total Gas', value: fmt(totalGas) + ' scf', sub: M.length + '-month total', cls: 'campus', tip: 'Total natural gas consumed across all boilers', table: buildGasTable() },
+    { label: 'Campus Total Steam', value: fmt(totalSteam) + ' lbs', sub: M.length + '-month total', cls: 'casp', tip: 'Total steam produced across all boilers', table: buildSteamTable() },
+    { label: 'Total Boiler Runtime', value: fmt(totalRuntime) + ' hrs', sub: 'All boilers combined', cls: 'b3', tip: 'Sum of monthly runtime for all 5 boilers' },
+    { label: 'Generator Output', value: fmt(totalGenKwh) + ' kWh', sub: 'All generators combined', cls: 'gen', tip: 'Total electricity generated by on-site generators' },
+    { label: 'Total Plant Water', value: fmt(totalWater), sub: 'All water sources combined', cls: 'water', tip: 'Sum of GWSP raw, potable, permeate + CASP east/west water' },
+    { label: 'Data Period', value: M.length + ' months', sub: monthLabel(M[0].month) + ' \u2013 ' + monthLabel(M[M.length-1].month), cls: 'info', tip: DATA.meta.dayCount + ' daily rows from ' + DATA.meta.dateRange[0] + ' to ' + DATA.meta.dateRange[1] },
+  ]);
+
+  // Dual-axis trend: gas + steam
+  lineChart('chartOverviewTrend', labels, [
+    { label: 'Campus Gas (scf)', data: M.map(m => m.campus_gas || 0), borderColor: COLORS.campus, backgroundColor: COLORS.campus + '33', fill: false, tension: 0.3, yAxisID: 'y' },
+    { label: 'Campus Steam (lbs)', data: M.map(m => m.campus_steam || 0), borderColor: COLORS.casp, backgroundColor: COLORS.casp + '33', fill: false, tension: 0.3, yAxisID: 'y2' },
+  ], 'Gas (scf)', { y2: true, y2Label: 'Steam (lbs)' });
+
+  // FY bar chart
+  const fyMap = {};
+  M.forEach(m => {
+    const fy = fyLabel(m.month);
+    fyMap[fy] = (fyMap[fy] || 0) + (m.campus_gas || 0);
+  });
+  const fyKeys = Object.keys(fyMap).sort();
+  barChart('chartFYGas', fyKeys, [
+    { label: 'Campus Gas (scf)', data: fyKeys.map(k => fyMap[k]), backgroundColor: COLORS.campus + 'cc', borderColor: COLORS.campus, borderWidth: 1 }
+  ], 'Gas (scf)');
+}
+
+// ============================================================
+//  TAB 2: GAS CONSUMPTION
+// ============================================================
+function renderGasTab(M, labels) {
+  const totalCASP = sum(M.map(m => m.casp_gas || 0));
+  const totalGWSP = sum(M.map(m => m.gwsp_gas || 0));
+  const totalCampus = sum(M.map(m => m.campus_gas || 0));
+  const oilMonths = M.filter(m => (m.b3_oil||0) + (m.b4_oil||0) + (m.b5_oil||0) > 0).length;
+
+  renderKPIs('kpiGas', [
+    { label: 'CASP Total Gas', value: fmt(totalCASP) + ' scf', sub: 'Boilers 1 & 2', cls: 'casp', tip: 'Central Auditorium Steam Plant gas consumption' },
+    { label: 'GWSP Total Gas', value: fmt(totalGWSP) + ' scf', sub: 'Boilers 3, 4, 5', cls: 'gwsp', tip: 'Grimes Way Steam Plant gas consumption' },
+    { label: 'Campus Total Gas', value: fmt(totalCampus) + ' scf', sub: oilMonths + ' months with oil firing', cls: 'campus', tip: 'Combined gas consumption from both plants' },
+  ]);
+
+  // Stacked bar: gas by boiler
+  stackedBar('chartGasBoiler', labels, [
+    { label: 'B1', data: M.map(m => m.b1_gas || 0), backgroundColor: COLORS.b1 + 'cc' },
+    { label: 'B2', data: M.map(m => m.b2_gas || 0), backgroundColor: COLORS.b2 + 'cc' },
+    { label: 'B3', data: M.map(m => m.b3_gas || 0), backgroundColor: COLORS.b3 + 'cc' },
+    { label: 'B4', data: M.map(m => m.b4_gas || 0), backgroundColor: COLORS.b4 + 'cc' },
+    { label: 'B5', data: M.map(m => m.b5_gas || 0), backgroundColor: COLORS.b5 + 'cc' },
+  ], 'Gas (scf)');
+
+  // Line: CASP vs GWSP vs Campus
+  lineChart('chartGasPlant', labels, [
+    { label: 'CASP', data: M.map(m => m.casp_gas || 0), borderColor: COLORS.casp, fill: false, tension: 0.3 },
+    { label: 'GWSP', data: M.map(m => m.gwsp_gas || 0), borderColor: COLORS.gwsp, fill: false, tension: 0.3 },
+    { label: 'Campus', data: M.map(m => m.campus_gas || 0), borderColor: COLORS.campus, fill: false, tension: 0.3 },
+  ], 'Gas (scf)');
+
+  // Oil usage bar
+  barChart('chartOil', labels, [
+    { label: 'B3 Oil', data: M.map(m => m.b3_oil || 0), backgroundColor: COLORS.b3 + 'cc' },
+    { label: 'B4 Oil', data: M.map(m => m.b4_oil || 0), backgroundColor: COLORS.b4 + 'cc' },
+    { label: 'B5 Oil', data: M.map(m => m.b5_oil || 0), backgroundColor: COLORS.b5 + 'cc' },
+  ], 'Oil (lbs)');
+
+  // Monthly gas detail table
+  const tbl = document.getElementById('tblGas');
+  tbl.querySelector('thead').innerHTML = '<tr><th style="text-align:left">Month</th><th>B1</th><th>B2</th><th>B3</th><th>B4</th><th>B5</th><th>CASP</th><th>GWSP</th><th>Campus</th><th>Oil (lbs)</th></tr>';
+  const tbody = tbl.querySelector('tbody');
+  tbody.innerHTML = '';
+  M.forEach(m => {
+    const oil = (m.b3_oil||0) + (m.b4_oil||0) + (m.b5_oil||0);
+    const oilFlag = oil > 0 ? ' style="color:var(--red);font-weight:600"' : '';
+    tbody.innerHTML += `<tr><td style="text-align:left">${monthLabel(m.month)}</td><td>${fmt(m.b1_gas)}</td><td>${fmt(m.b2_gas)}</td><td>${fmt(m.b3_gas)}</td><td>${fmt(m.b4_gas)}</td><td>${fmt(m.b5_gas)}</td><td>${fmt(m.casp_gas)}</td><td>${fmt(m.gwsp_gas)}</td><td>${fmt(m.campus_gas)}</td><td${oilFlag}>${fmt(oil)}</td></tr>`;
+  });
+  // Total row
+  tbody.innerHTML += `<tr class="total-row"><td style="text-align:left">Total</td><td>${fmt(sum(M.map(m=>m.b1_gas||0)))}</td><td>${fmt(sum(M.map(m=>m.b2_gas||0)))}</td><td>${fmt(sum(M.map(m=>m.b3_gas||0)))}</td><td>${fmt(sum(M.map(m=>m.b4_gas||0)))}</td><td>${fmt(sum(M.map(m=>m.b5_gas||0)))}</td><td>${fmt(totalCASP)}</td><td>${fmt(totalGWSP)}</td><td>${fmt(totalCampus)}</td><td>${fmt(sum(M.map(m=>(m.b3_oil||0)+(m.b4_oil||0)+(m.b5_oil||0))))}</td></tr>`;
+}
+
+// ============================================================
+//  TAB 3: STEAM & EFFICIENCY
+// ============================================================
+function renderSteamTab(M, labels) {
+  const totalSteam = sum(M.map(m => m.campus_steam || 0));
+  const totalGas = sum(M.map(m => m.campus_gas || 0));
+  const avgEfficiency = totalGas > 0 ? totalSteam / totalGas : 0;
+
+  // Average economizer delta-T across all boilers that have data
+  let econDeltas = [];
+  M.forEach(m => {
+    [['b1_econ_out','b1_econ_in'],['b2_econ_out','b2_econ_in'],['b3_econ_out','b3_econ_in'],['b4_econ_out','b4_econ_in'],['b5_econ_out','b5_econ_in']].forEach(([out,inp]) => {
+      if ((m[out]||0) > 0 && (m[inp]||0) > 0) econDeltas.push((m[out]||0) - (m[inp]||0));
+    });
+  });
+  const avgEconDelta = econDeltas.length > 0 ? sum(econDeltas) / econDeltas.length : 0;
+
+  // Peak steam month
+  let peakSteamMonth = M[0];
+  M.forEach(m => { if ((m.campus_steam||0) > (peakSteamMonth.campus_steam||0)) peakSteamMonth = m; });
+
+  renderKPIs('kpiSteam', [
+    { label: 'Campus Total Steam', value: fmt(totalSteam) + ' lbs', sub: M.length + '-month total', cls: 'casp' },
+    { label: 'Avg Efficiency Ratio', value: fmt(avgEfficiency, 2) + ' lbs/scf', sub: 'Higher is better', cls: 'gwsp', tip: 'Steam output (lbs) divided by gas input (scf) across all boilers' },
+    { label: 'Avg Economizer Delta-T', value: fmt(avgEconDelta, 1) + ' \u00B0F', sub: 'Outlet minus inlet', cls: 'b3', tip: 'Average temperature gain across economizers — higher means better heat recovery' },
+    { label: 'Peak Steam Month', value: monthLabel(peakSteamMonth.month), sub: fmt(peakSteamMonth.campus_steam || 0) + ' lbs', cls: 'campus' },
+  ]);
+
+  // Stacked steam by boiler
+  // For B1/B2 (gas only), steam = steam_gas. For B3-B5 (dual fuel), steam = steam_total
+  stackedBar('chartSteamBoiler', labels, [
+    { label: 'B1', data: M.map(m => m.b1_steam_gas || 0), backgroundColor: COLORS.b1 + 'cc' },
+    { label: 'B2', data: M.map(m => m.b2_steam_gas || 0), backgroundColor: COLORS.b2 + 'cc' },
+    { label: 'B3', data: M.map(m => m.b3_steam_total || 0), backgroundColor: COLORS.b3 + 'cc' },
+    { label: 'B4', data: M.map(m => m.b4_steam_total || 0), backgroundColor: COLORS.b4 + 'cc' },
+    { label: 'B5', data: M.map(m => m.b5_steam_total || 0), backgroundColor: COLORS.b5 + 'cc' },
+  ], 'Steam (lbs)');
+
+  // Efficiency ratio line chart per boiler
+  function effRatio(steam, gas) { return gas > 0 ? steam / gas : null; }
+  lineChart('chartEfficiency', labels, [
+    { label: 'B1', data: M.map(m => effRatio(m.b1_steam_gas, m.b1_gas)), borderColor: COLORS.b1, fill: false, tension: 0.3, spanGaps: true },
+    { label: 'B2', data: M.map(m => effRatio(m.b2_steam_gas, m.b2_gas)), borderColor: COLORS.b2, fill: false, tension: 0.3, spanGaps: true },
+    { label: 'B3', data: M.map(m => effRatio(m.b3_steam_total, m.b3_gas)), borderColor: COLORS.b3, fill: false, tension: 0.3, spanGaps: true },
+    { label: 'B4', data: M.map(m => effRatio(m.b4_steam_total, m.b4_gas)), borderColor: COLORS.b4, fill: false, tension: 0.3, spanGaps: true },
+    { label: 'B5', data: M.map(m => effRatio(m.b5_steam_total, m.b5_gas)), borderColor: COLORS.b5, fill: false, tension: 0.3, spanGaps: true },
+  ], 'lbs/scf', { noZero: true });
+
+  // Economizer delta-T line chart
+  lineChart('chartEconDelta', labels, [
+    { label: 'B1', data: M.map(m => (m.b1_econ_out||0) > 0 && (m.b1_econ_in||0) > 0 ? (m.b1_econ_out - m.b1_econ_in) : null), borderColor: COLORS.b1, fill: false, tension: 0.3, spanGaps: true },
+    { label: 'B2', data: M.map(m => (m.b2_econ_out||0) > 0 && (m.b2_econ_in||0) > 0 ? (m.b2_econ_out - m.b2_econ_in) : null), borderColor: COLORS.b2, fill: false, tension: 0.3, spanGaps: true },
+    { label: 'B3', data: M.map(m => (m.b3_econ_out||0) > 0 && (m.b3_econ_in||0) > 0 ? (m.b3_econ_out - m.b3_econ_in) : null), borderColor: COLORS.b3, fill: false, tension: 0.3, spanGaps: true },
+    { label: 'B4', data: M.map(m => (m.b4_econ_out||0) > 0 && (m.b4_econ_in||0) > 0 ? (m.b4_econ_out - m.b4_econ_in) : null), borderColor: COLORS.b4, fill: false, tension: 0.3, spanGaps: true },
+    { label: 'B5', data: M.map(m => (m.b5_econ_out||0) > 0 && (m.b5_econ_in||0) > 0 ? (m.b5_econ_out - m.b5_econ_in) : null), borderColor: COLORS.b5, fill: false, tension: 0.3, spanGaps: true },
+  ], 'Delta-T (\u00B0F)', { noZero: true });
+}
+
+// ============================================================
+//  TAB 4: RUNTIME & AVAILABILITY
+// ============================================================
+function renderRuntimeTab(M, labels) {
+  function boilerRuntime(m) {
+    return (m.b1_runtime||0) + (m.b2_runtime||0) + (m.b3_runtime_total||0) + (m.b4_runtime_total||0) + (m.b5_runtime_total||0);
+  }
+  const totalBoilerRuntime = sum(M.map(boilerRuntime));
+  const totalGenRuntime = sum(M.map(m => (m.gen1_runtime||0) + (m.gen2_runtime||0) + (m.gen3_runtime||0)));
+  const totalGenKwh = sum(M.map(m => (m.gen1_kwh||0) + (m.gen2_kwh||0) + (m.gen3_kwh||0)));
+  const oilRuntimeMonths = M.filter(m => (m.b3_runtime_oil||0) + (m.b4_runtime_oil||0) + (m.b5_runtime_oil||0) > 0).length;
+
+  renderKPIs('kpiRuntime', [
+    { label: 'Total Boiler Runtime', value: fmt(totalBoilerRuntime) + ' hrs', sub: 'All 5 boilers', cls: 'campus' },
+    { label: 'Generator Runtime', value: fmt(totalGenRuntime) + ' hrs', sub: 'All 3 generators', cls: 'gen' },
+    { label: 'Generator Output', value: fmt(totalGenKwh) + ' kWh', sub: 'Total electricity generated', cls: 'gen' },
+    { label: 'Oil Runtime Events', value: oilRuntimeMonths + ' months', sub: 'Months with oil-fired runtime', cls: 'oil' },
+  ]);
+
+  // Stacked runtime bar
+  stackedBar('chartRuntimeBoiler', labels, [
+    { label: 'B1', data: M.map(m => m.b1_runtime || 0), backgroundColor: COLORS.b1 + 'cc' },
+    { label: 'B2', data: M.map(m => m.b2_runtime || 0), backgroundColor: COLORS.b2 + 'cc' },
+    { label: 'B3', data: M.map(m => m.b3_runtime_total || 0), backgroundColor: COLORS.b3 + 'cc' },
+    { label: 'B4', data: M.map(m => m.b4_runtime_total || 0), backgroundColor: COLORS.b4 + 'cc' },
+    { label: 'B5', data: M.map(m => m.b5_runtime_total || 0), backgroundColor: COLORS.b5 + 'cc' },
+  ], 'Runtime (hrs)');
+
+  // Heatmap
+  buildHeatmap(M);
+
+  // Generator bar chart with kWh
+  const genLabels = labels;
+  createChart('chartGenerators', {
+    type: 'bar',
+    data: {
+      labels: genLabels,
+      datasets: [
+        { label: 'Gen 1 kWh', data: M.map(m => m.gen1_kwh || 0), backgroundColor: COLORS.gen1 + 'cc', yAxisID: 'y' },
+        { label: 'Gen 2 kWh', data: M.map(m => m.gen2_kwh || 0), backgroundColor: COLORS.gen2 + 'cc', yAxisID: 'y' },
+        { label: 'Gen 3 kWh', data: M.map(m => m.gen3_kwh || 0), backgroundColor: COLORS.gen3 + 'cc', yAxisID: 'y' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y, 0) } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, title: { display: true, text: 'kWh' }, ticks: { callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'k' : v } },
+      }
+    }
+  });
+}
+
+function buildHeatmap(M) {
+  const wrap = document.getElementById('heatmapWrap');
+  const boilers = [
+    { name: 'B1', key: 'b1_runtime' },
+    { name: 'B2', key: 'b2_runtime' },
+    { name: 'B3', key: 'b3_runtime_total' },
+    { name: 'B4', key: 'b4_runtime_total' },
+    { name: 'B5', key: 'b5_runtime_total' },
+  ];
+  // Only show last 24 months for readability
+  const recent = M.slice(-24);
+  let html = '<table class="heatmap"><thead><tr><th>Boiler</th>';
+  recent.forEach(m => { html += `<th>${monthLabel(m.month)}</th>`; });
+  html += '</tr></thead><tbody>';
+  boilers.forEach(b => {
+    html += `<tr><td style="text-align:left;font-weight:600">${b.name}</td>`;
+    recent.forEach(m => {
+      const v = m[b.key] || 0;
+      let cls = 'heat-zero';
+      if (v > 500) cls = 'heat-high';
+      else if (v > 100) cls = 'heat-med';
+      else if (v > 0) cls = 'heat-low';
+      html += `<td class="${cls}">${v > 0 ? fmt(v, 0) : '\u2014'}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// ============================================================
+//  TAB 5: PLANT WATER
+// ============================================================
+function renderWaterTab(M, labels) {
+  const totalRaw = sum(M.map(m => m.gwsp_raw_water || 0));
+  const totalPotable = sum(M.map(m => m.gwsp_potable || 0));
+  const totalPermeate = sum(M.map(m => m.gwsp_permeate || 0));
+  const totalEast = sum(M.map(m => m.casp_east_water || 0));
+  const totalWest = sum(M.map(m => m.casp_west_water || 0));
+
+  renderKPIs('kpiWater', [
+    { label: 'GWSP Raw Water', value: fmt(totalRaw), sub: 'gal x1000', cls: 'water', tip: 'Grimes Way raw water intake' },
+    { label: 'GWSP Potable', value: fmt(totalPotable), sub: 'gal x100', cls: 'gwsp', tip: 'Grimes Way potable water' },
+    { label: 'GWSP Permeate', value: fmt(totalPermeate), cls: 'b5', tip: 'Reverse osmosis permeate output' },
+    { label: 'CASP East Water', value: fmt(totalEast), sub: 'gal x100', cls: 'casp', tip: 'Central Auditorium east side water' },
+    { label: 'CASP West Water', value: fmt(totalWest), sub: 'gal x100', cls: 'b4', tip: 'Central Auditorium west side water' },
+  ]);
+
+  // Stacked water bar
+  stackedBar('chartWaterStacked', labels, [
+    { label: 'GWSP Raw', data: M.map(m => m.gwsp_raw_water || 0), backgroundColor: '#3b82f6cc' },
+    { label: 'GWSP Potable', data: M.map(m => m.gwsp_potable || 0), backgroundColor: '#059669cc' },
+    { label: 'GWSP Permeate', data: M.map(m => m.gwsp_permeate || 0), backgroundColor: '#06b6d4cc' },
+    { label: 'CASP East', data: M.map(m => m.casp_east_water || 0), backgroundColor: '#981e32cc' },
+    { label: 'CASP West', data: M.map(m => m.casp_west_water || 0), backgroundColor: '#8b5cf6cc' },
+  ]);
+
+  // GWSP water trends
+  lineChart('chartGWSPWater', labels, [
+    { label: 'Raw Water', data: M.map(m => m.gwsp_raw_water || 0), borderColor: '#3b82f6', fill: false, tension: 0.3 },
+    { label: 'Potable', data: M.map(m => m.gwsp_potable || 0), borderColor: '#059669', fill: false, tension: 0.3 },
+    { label: 'Permeate', data: M.map(m => m.gwsp_permeate || 0), borderColor: '#06b6d4', fill: false, tension: 0.3 },
+  ]);
+
+  // Makeup water temp
+  lineChart('chartWaterTemp', labels, [
+    { label: 'Makeup Temp (\u00B0F)', data: M.map(m => (m.gwsp_makeup_temp_f || 0) > 0 ? m.gwsp_makeup_temp_f : null), borderColor: '#ef4444', fill: false, tension: 0.3, spanGaps: true },
+  ], 'Temperature (\u00B0F)', { noZero: true });
+
+  // CASP east vs west
+  barChart('chartCASPWater', labels, [
+    { label: 'CASP East', data: M.map(m => m.casp_east_water || 0), backgroundColor: '#981e32cc' },
+    { label: 'CASP West', data: M.map(m => m.casp_west_water || 0), backgroundColor: '#8b5cf6cc' },
+  ]);
+}
+
+// ============================================================
+//  TAB 6: DATA MANAGEMENT
+// ============================================================
+function renderDataManagement() {
+  // Data inventory table
+  const tbl = document.getElementById('tblInventory');
+  tbl.querySelector('thead').innerHTML = '<tr><th style="text-align:left">Month</th><th>Daily Rows</th><th>Source File</th></tr>';
+  const tbody = tbl.querySelector('tbody');
+  tbody.innerHTML = '';
+
+  // Count daily rows per month
+  const dailyByMonth = {};
+  if (DATA.daily) {
+    DATA.daily.forEach(d => {
+      const mk = d.date.slice(0, 7);
+      dailyByMonth[mk] = (dailyByMonth[mk] || 0) + 1;
+    });
+  }
+
+  DATA.monthly.forEach(m => {
+    tbody.innerHTML += `<tr><td style="text-align:left">${monthLabel(m.month)}</td><td>${dailyByMonth[m.month] || '\u2014'}</td><td>${DATA.meta.sourceFiles[0] || '\u2014'}</td></tr>`;
+  });
+
+  // Import zone
+  const zone = document.getElementById('importZone');
+  const fileInput = document.getElementById('importFiles');
+  const preview = document.getElementById('importPreview');
+  const previewContent = document.getElementById('importPreviewContent');
+  const mergeBtn = document.getElementById('importMergeBtn');
+  const cancelBtn = document.getElementById('importCancelBtn');
+  const statusEl = document.getElementById('importStatus');
+
+  let pendingImport = null;
+
+  zone.addEventListener('click', () => fileInput.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+  async function handleFiles(files) {
+    if (!files || files.length === 0) return;
+    if (typeof XLSX === 'undefined') {
+      statusEl.style.color = 'var(--red)';
+      statusEl.textContent = 'SheetJS library not loaded. Add xlsx.min.js to the page.';
+      return;
+    }
+    statusEl.textContent = '';
+    let allNewDaily = [];
+    let info = [];
+
+    for (const file of files) {
+      const ab = await file.arrayBuffer();
+      const wb = XLSX.read(ab, { type: 'array', cellDates: true });
+      const dailySheet = wb.Sheets['Daily Data'];
+      if (!dailySheet) {
+        info.push(`<strong>${file.name}:</strong> No "Daily Data" sheet found — skipped.`);
+        continue;
+      }
+      const rows = XLSX.utils.sheet_to_json(dailySheet, { header: 1, raw: true, dateNF: 'yyyy-mm-dd' });
+      // Find data rows (skip headers — rows where col 0 is numeric)
+      let dataRows = [];
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        if (r[0] != null && !isNaN(Number(r[0])) && r[1] != null) {
+          // Parse date
+          let dateStr;
+          if (r[1] instanceof Date) {
+            dateStr = r[1].toISOString().slice(0, 10);
+          } else if (typeof r[1] === 'string') {
+            dateStr = r[1].slice(0, 10);
+          } else if (typeof r[1] === 'number') {
+            // Excel serial date
+            const d = new Date((r[1] - 25569) * 86400000);
+            dateStr = d.toISOString().slice(0, 10);
+          } else continue;
+
+          const record = { date: dateStr };
+          // Map columns using DAILY_COLS equivalent
+          const colMap = [
+            null, null, // skip day + date
+            'b1_gas','b1_steam_gas','b1_econ_in','b1_econ_out','b1_runtime',
+            'b2_gas','b2_steam_gas','b2_econ_in','b2_econ_out','b2_runtime',
+            'b3_gas','b3_oil','b3_steam_gas','b3_steam_oil','b3_econ_in','b3_econ_out','b3_steam_total','b3_runtime_gas','b3_runtime_oil','b3_runtime_total',
+            'b4_gas','b4_oil','b4_steam_gas','b4_steam_oil','b4_econ_in','b4_econ_out','b4_steam_total','b4_runtime_gas','b4_runtime_oil','b4_runtime_total',
+            'b5_gas','b5_oil','b5_steam_gas','b5_steam_oil','b5_econ_in','b5_econ_out','b5_steam_total','b5_runtime_gas','b5_runtime_oil','b5_runtime_total',
+            'casp_gas','gwsp_gas','campus_gas','gwsp_oil','casp_steam','gwsp_steam','campus_steam',
+            'gwsp_tunnel_steam',
+            'fuel_oil_level','fuel_oil_gal','fuel_oil_change',
+            'gwsp_raw_water','gwsp_potable','gwsp_makeup_temp_c','gwsp_makeup_temp_f','gwsp_permeate','casp_east_water','casp_west_water','gwsp_waste_water',
+            'gen1_runtime','gen1_gas','gen1_kwh','gen2_runtime','gen2_gas','gen2_kwh','gen3_fuel_rate','gen3_runtime','gen3_kwh','gen3_fuel_gal'
+          ];
+          for (let c = 2; c < colMap.length; c++) {
+            if (colMap[c]) record[colMap[c]] = typeof r[c] === 'number' ? r[c] : 0;
+          }
+          dataRows.push(record);
+        }
+      }
+      const months = [...new Set(dataRows.map(d => d.date.slice(0, 7)))];
+      info.push(`<strong>${file.name}:</strong> ${dataRows.length} daily rows, months: ${months.map(monthLabel).join(', ')}`);
+      allNewDaily = allNewDaily.concat(dataRows);
+    }
+
+    if (allNewDaily.length === 0) {
+      previewContent.innerHTML = info.join('<br>') + '<br><em>No data rows found to import.</em>';
+      preview.classList.add('visible');
+      mergeBtn.disabled = true;
+      return;
+    }
+
+    pendingImport = allNewDaily;
+    previewContent.innerHTML = info.join('<br>') + `<br><strong>Total: ${allNewDaily.length} daily rows ready to merge.</strong>`;
+    preview.classList.add('visible');
+    mergeBtn.disabled = false;
+  }
+
+  mergeBtn.addEventListener('click', () => {
+    if (!pendingImport) return;
+    // Merge: replace existing daily rows for overlapping dates, add new ones
+    const existingByDate = {};
+    DATA.daily.forEach(d => { existingByDate[d.date] = d; });
+    let replaced = 0, added = 0;
+    pendingImport.forEach(d => {
+      if (existingByDate[d.date]) { replaced++; } else { added++; }
+      existingByDate[d.date] = d;
+    });
+    DATA.daily = Object.values(existingByDate).sort((a, b) => a.date.localeCompare(b.date));
+
+    // Rebuild monthly rollups
+    DATA.monthly = buildMonthlyRollup(DATA.daily);
+
+    // Update meta
+    const dates = DATA.daily.map(d => d.date);
+    DATA.meta.dateRange = [dates[0], dates[dates.length - 1]];
+    DATA.meta.dayCount = DATA.daily.length;
+    DATA.meta.monthCount = DATA.monthly.length;
+    DATA.meta.lastUpdated = new Date().toISOString().slice(0, 10);
+
+    // Re-render
+    const labels = DATA.monthly.map(m => monthLabel(m.month));
+    chartInstances.forEach(c => c.destroy());
+    chartInstances.length = 0;
+    renderOverviewTab(DATA.monthly, labels);
+    renderGasTab(DATA.monthly, labels);
+    renderSteamTab(DATA.monthly, labels);
+    renderRuntimeTab(DATA.monthly, labels);
+    renderWaterTab(DATA.monthly, labels);
+    renderDataManagement();
+
+    preview.classList.remove('visible');
+    pendingImport = null;
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = `Merge complete: ${replaced} rows replaced, ${added} rows added. ${DATA.monthly.length} months, ${DATA.daily.length} daily rows.`;
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    preview.classList.remove('visible');
+    pendingImport = null;
+    fileInput.value = '';
+  });
+
+  // Export JSON
+  document.getElementById('exportJSON').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(DATA, null, 0)], { type: 'application/json' });
+    downloadBlob(blob, 'steam_plant.json');
+  });
+
+  // Export CSV
+  document.getElementById('exportCSV').addEventListener('click', () => {
+    if (!DATA.daily || DATA.daily.length === 0) return;
+    const keys = Object.keys(DATA.daily[0]);
+    let csv = keys.join(',') + '\n';
+    DATA.daily.forEach(row => {
+      csv += keys.map(k => row[k] ?? '').join(',') + '\n';
+    });
+    downloadBlob(new Blob([csv], { type: 'text/csv' }), 'steam_plant_daily.csv');
+  });
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Aggregation keys for monthly rollup in JS (matches Python logic)
+const AVG_KEYS = new Set([
+  'b1_econ_in','b1_econ_out','b2_econ_in','b2_econ_out',
+  'b3_econ_in','b3_econ_out','b4_econ_in','b4_econ_out',
+  'b5_econ_in','b5_econ_out',
+  'gwsp_makeup_temp_c','gwsp_makeup_temp_f',
+  'gwsp_tunnel_steam','gen3_fuel_rate','fuel_oil_level'
+]);
+const MAX_KEYS = new Set([
+  'b1_runtime','b2_runtime',
+  'b3_runtime_gas','b3_runtime_oil','b3_runtime_total',
+  'b4_runtime_gas','b4_runtime_oil','b4_runtime_total',
+  'b5_runtime_gas','b5_runtime_oil','b5_runtime_total',
+  'gen1_runtime','gen2_runtime','gen3_runtime'
+]);
+
+function buildMonthlyRollup(dailyRows) {
+  const months = {};
+  dailyRows.forEach(row => {
+    const mk = row.date.slice(0, 7);
+    if (!months[mk]) months[mk] = [];
+    months[mk].push(row);
+  });
+  const allKeys = Object.keys(dailyRows[0]).filter(k => k !== 'date');
+  return Object.keys(months).sort().map(mk => {
+    const days = months[mk];
+    const rec = { month: mk };
+    allKeys.forEach(key => {
+      const vals = days.map(d => d[key] || 0);
+      const nonzero = vals.filter(v => v !== 0);
+      if (AVG_KEYS.has(key)) {
+        rec[key] = nonzero.length > 0 ? Math.round((sum(nonzero) / nonzero.length) * 100) / 100 : 0;
+      } else if (MAX_KEYS.has(key)) {
+        rec[key] = Math.round(Math.max(...vals) * 100) / 100;
+      } else {
+        rec[key] = Math.round(sum(vals) * 100) / 100;
+      }
+    });
+    return rec;
+  });
+}
+
+// ============================================================
+//  PRINT SUMMARY
+// ============================================================
+function buildPrintSummary(M) {
+  const ps = document.getElementById('printSummary');
+  const totalGas = sum(M.map(m => m.campus_gas || 0));
+  const totalSteam = sum(M.map(m => m.campus_steam || 0));
+  ps.innerHTML = `
+    <h1 style="text-align:center; color:var(--primary); margin-bottom:1rem;">WSU Steam Plant Operations Summary</h1>
+    <p style="text-align:center; margin-bottom:2rem; color:var(--text-light);">${monthLabel(M[0].month)} \u2013 ${monthLabel(M[M.length-1].month)} (${M.length} months)</p>
+    <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+      <tr><td style="padding:0.5rem; font-weight:600;">Campus Total Gas</td><td style="padding:0.5rem; text-align:right;">${fmt(totalGas)} scf</td></tr>
+      <tr><td style="padding:0.5rem; font-weight:600;">Campus Total Steam</td><td style="padding:0.5rem; text-align:right;">${fmt(totalSteam)} lbs</td></tr>
+    </table>
+  `;
+}
+
+// ============================================================
+//  DRILL-DOWN MODAL
+// ============================================================
+document.getElementById('drillClose').addEventListener('click', () => {
+  document.getElementById('drillOverlay').classList.remove('visible');
+});
+document.getElementById('drillOverlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('visible');
+});
+
+// ============================================================
+//  INIT
+// ============================================================
+init();
+</script>
+<script src="xlsx.min.js" defer></script>
+</body>
+</html>
