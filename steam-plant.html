@@ -1599,7 +1599,270 @@ function saveUPManual() {
   renderUPPreview();
 }
 
-function generateUPExcel() { console.log('generateUPExcel stub'); }
+function generateUPExcel() {
+  try {
+    if (!UP_CURRENT) { alert('Load a month first.'); return; }
+    if (typeof XLSX === 'undefined') { alert('SheetJS library not loaded.'); return; }
+
+    const a = UP_CURRENT.auto;
+    const [yr, mo] = UP_CURRENT.month.split('-');
+    const mmyy = mo + yr.slice(2);
+    const monthName = monthLabel(UP_CURRENT.month);
+
+    // Manual field reader
+    const mv = (id) => {
+      if (UP_CURRENT.manual && UP_CURRENT.manual[id] != null) return UP_CURRENT.manual[id];
+      const el = document.getElementById(id);
+      return el && el.value ? parseFloat(el.value) : 0;
+    };
+
+    const ws = {};
+
+    const setCell = (ref, val, type) => {
+      if (type === 'f') ws[ref] = { t: 'n', f: val };
+      else if (type === 's') ws[ref] = { t: 's', v: val };
+      else if (typeof val === 'number') ws[ref] = { t: 'n', v: val };
+      else ws[ref] = { t: 's', v: val || '' };
+    };
+
+    // Column letters for boilers: B=B1, C=B2, D=B3, E=B4, F=B5, G=Future#6, H=Future#7, I=TOTALS
+    const bCols = ['B','C','D','E','F'];
+
+    // Row 1: Title
+    setCell('A1', 'WSU Steam Plant — UP Report: ' + monthName, 's');
+
+    // Row 2: Headers
+    setCell('A2', 'Description', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '2', UP_BOILER_LABELS[i], 's');
+    setCell('G2', 'Future #6', 's');
+    setCell('H2', 'Future #7', 's');
+    setCell('I2', 'TOTALS', 's');
+
+    // Row 3: Boiler Days (auto hours / 24)
+    setCell('A3', 'Boiler Days', 's');
+    const dayVals = [a.b1_days, a.b2_days, a.b3_days, a.b4_days, a.b5_days];
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '3', dayVals[i]);
+    setCell('I3', 'SUM(B3:H3)', 'f');
+
+    // Row 4: Total Lbs Steam = Steam Gas + Steam Oil (formula)
+    setCell('A4', 'Total Lbs Steam', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '4', bCols[i] + '5+' + bCols[i] + '6', 'f');
+    setCell('I4', 'SUM(B4:H4)', 'f');
+
+    // Row 5: Lbs Steam Gas (auto values)
+    setCell('A5', 'Lbs Steam Gas', 's');
+    const steamGasVals = [a.b1_steam, a.b2_steam, a.b3_steam, a.b4_steam, a.b5_steam];
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '5', steamGasVals[i]);
+    setCell('I5', 'SUM(B5:H5)', 'f');
+
+    // Row 6: Lbs Steam Oil (0 for B1/B2, auto for B3-B5)
+    setCell('A6', 'Lbs Steam Oil', 's');
+    const steamOilVals = [0, 0, a.b3_steam_oil || 0, a.b4_steam_oil || 0, a.b5_steam_oil || 0];
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '6', steamOilVals[i]);
+    setCell('I6', 'SUM(B6:H6)', 'f');
+
+    // Row 7: Oil Burned (gal)
+    setCell('A7', 'Oil Burned (gal)', 's');
+    const oilVals = [0, 0, a.b3_oil || 0, a.b4_oil || 0, a.b5_oil || 0];
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '7', oilVals[i]);
+    setCell('I7', 'SUM(B7:H7)', 'f');
+    setCell('J7', 'I7*0.14', 'f');
+
+    // Row 8: Gas Delivered Therms (MMBTU * 10)
+    setCell('A8', 'Gas Delivered (Therms)', 's');
+    const gasMmbtu = mv('up_gas_mmbtu');
+    setCell('I8', gasMmbtu * 10);
+
+    // Row 9: Gas Use Therms (formula: BTU/cuft * SCF / 100000)
+    setCell('A9', 'Gas Use (Therms)', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '9', '$D$24*' + bCols[i] + '10/100000', 'f');
+    setCell('I9', 'SUM(B9:H9)', 'f');
+
+    // Row 10: Gas Use SCF (auto values)
+    setCell('A10', 'Gas Use (SCF)', 's');
+    const gasSCF = [a.b1_gas, a.b2_gas, a.b3_gas, a.b4_gas, a.b5_gas];
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '10', gasSCF[i]);
+    setCell('I10', 'SUM(B10:H10)', 'f');
+
+    // Row 11: Generator Gas SCF — gen1 in C11, gen2 in E11
+    setCell('A11', 'Gen Gas (SCF)', 's');
+    setCell('C11', a.gen1_gas);
+    setCell('E11', a.gen2_gas);
+    setCell('I11', '(C11+E11)*D24/100000', 'f');
+
+    // Row 12: Internal Gas = Delivered - Boiler gas - Gen gas
+    setCell('A12', 'Internal Gas (Therms)', 's');
+    setCell('I12', 'I8-I9-I11', 'f');
+
+    // Row 13: Section header (Efficiency)
+    setCell('A13', 'EFFICIENCY', 's');
+
+    // Row 14: Lbs/gal oil (B3-B5 only, formula)
+    setCell('A14', 'Lbs per Gallon Oil', 's');
+    for (let i = 2; i < 5; i++) setCell(bCols[i] + '14', 'IF(' + bCols[i] + '7=0,0,' + bCols[i] + '6/' + bCols[i] + '7)', 'f');
+
+    // Row 15: Lbs/therm gas (all boilers, formula)
+    setCell('A15', 'Lbs per Therm Gas', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '15', 'IF(' + bCols[i] + '9=0,0,' + bCols[i] + '5/' + bCols[i] + '9)', 'f');
+
+    // Row 16: Section header (Fuel Costs)
+    setCell('A16', 'FUEL COSTS', 's');
+
+    // Row 17: Oil cost = gal * oil cost/gal (formula)
+    setCell('A17', 'Oil Cost ($)', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '17', bCols[i] + '7*$D$26', 'f');
+    setCell('I17', 'SUM(B17:H17)', 'f');
+
+    // Row 18: Gas cost = therms * gas cost/therm (formula)
+    setCell('A18', 'Gas Cost ($)', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '18', bCols[i] + '9*$D$25', 'f');
+    setCell('I18', 'SUM(B18:H18)', 'f');
+
+    // Row 19: Total fuel cost = oil + gas (formula)
+    setCell('A19', 'Total Fuel Cost ($)', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '19', bCols[i] + '17+' + bCols[i] + '18', 'f');
+    setCell('I19', 'SUM(B19:H19)', 'f');
+
+    // Row 20: Section header (Cost per 1000 lbs)
+    setCell('A20', 'COST PER 1,000 LBS STEAM', 's');
+
+    // Row 21: Oil cost/1000 lbs (B3-B5 only)
+    setCell('A21', 'Oil Cost / 1,000 lbs', 's');
+    for (let i = 2; i < 5; i++) setCell(bCols[i] + '21', 'IF(' + bCols[i] + '17=0,0,' + bCols[i] + '17/' + bCols[i] + '6*1000)', 'f');
+
+    // Row 22: Gas cost/1000 lbs (all boilers)
+    setCell('A22', 'Gas Cost / 1,000 lbs', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '22', 'IF(' + bCols[i] + '18=0,0,' + bCols[i] + '18/' + bCols[i] + '5*1000)', 'f');
+
+    // Row 23: Section header (Weather & Stats)
+    setCell('A23', 'WEATHER & STATS', 's');
+
+    // Row 24: HDD, BTU/cuft, Labor
+    setCell('A24', 'Heating Degree Days', 's');
+    setCell('B24', mv('up_hdd'));
+    setCell('C24', 'Gas Btu/Cuft', 's');
+    setCell('D24', mv('up_btu_cuft'));
+    setCell('E24', 'St Plant Labor', 's');
+    setCell('F24', mv('up_labor'));
+
+    // Row 25: CDD, Gas Cost/Therm, G&S
+    setCell('A25', 'Cooling Degree Days', 's');
+    setCell('B25', mv('up_cdd'));
+    setCell('C25', 'Gas Cost/Therm', 's');
+    setCell('D25', mv('up_gas_cost_therm'));
+    setCell('E25', 'Goods & Srvcs', 's');
+    setCell('F25', mv('up_gs'));
+
+    // Row 26: Max lbs/hr, Oil Cost/Gallon, Fuel Cost (formula)
+    setCell('A26', 'Max Lbs/Hr Steam', 's');
+    setCell('B26', mv('up_max_lbs_hr'));
+    setCell('C26', 'Oil Cost/Gallon', 's');
+    setCell('D26', mv('up_oil_cost_gal'));
+    setCell('E26', 'Fuel Cost', 's');
+    setCell('F26', 'I19', 'f');
+
+    // Row 27: Min lbs/hr, Make Up Water, Total Prod. Cost
+    setCell('A27', 'Min Lbs/Hr Steam', 's');
+    setCell('B27', mv('up_min_lbs_hr'));
+    setCell('C27', 'Make Up Water', 's');
+    setCell('E27', 'Total Prod. Cost', 's');
+    setCell('F27', 'SUM(F24:F26)', 'f');
+
+    // Row 28: Section header (Fresh Water)
+    setCell('A28', 'FRESH WATER', 's');
+
+    // Row 29: Column headers for wells
+    setCell('A29', 'Well', 's');
+    setCell('B29', 'Gal Pumped', 's');
+
+    // Rows 30-33: Wells
+    setCell('A30', 'Well #4', 's'); setCell('B30', mv('up_well4'));
+    setCell('A31', 'Well #6', 's'); setCell('B31', mv('up_well6'));
+    setCell('A32', 'Well #7', 's'); setCell('B32', mv('up_well7'));
+    setCell('A33', 'Well #8', 's'); setCell('B33', mv('up_well8'));
+
+    // Row 34: Total wells
+    setCell('A34', 'Total Gal Pumped', 's');
+    setCell('B34', 'SUM(B30:B33)', 'f');
+
+    // Row 38: Chlorine
+    setCell('A38', 'Lbs Chlorine', 's');
+    setCell('B38', mv('up_chlorine'));
+
+    // Row 43: Section header (Electric)
+    setCell('A43', 'ELECTRIC', 's');
+
+    // Row 44: Circuit names
+    const circNames = ['MP-A','MP-C','MP-D','MP-E','MP-G'];
+    const circIDs = ['TUR-111','SPU124+TVW131','SPU-122','TUR-115','SPU-125'];
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '44', circNames[i], 's');
+    setCell('G44', 'Total', 's');
+    setCell('I44', 'Biotech', 's');
+
+    // Row 45: Circuit IDs
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '45', circIDs[i], 's');
+
+    // Row 46-48: Generator kWh
+    setCell('A46', 'Gen #1 kWh', 's'); setCell('H46', a.gen1_kwh); setCell('I46', a.gen1_kwh);
+    setCell('A47', 'Gen #2 kWh', 's'); setCell('H47', a.gen2_kwh); setCell('I47', a.gen2_kwh);
+    setCell('A48', 'Gen #3 kWh', 's'); setCell('H48', a.gen3_kwh); setCell('I48', a.gen3_kwh);
+
+    // Circuit data from DOM
+    const circKwh = Array.from(document.querySelectorAll('.up-circ-kwh')).map(el => el.value ? parseFloat(el.value) : 0);
+    const circCost = Array.from(document.querySelectorAll('.up-circ-cost')).map(el => el.value ? parseFloat(el.value) : 0);
+    const circKva = Array.from(document.querySelectorAll('.up-circ-kva')).map(el => el.value ? parseFloat(el.value) : 0);
+
+    // Row 46 also: Peak KVA
+    setCell('A46', 'Peak KVA', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '46', circKva[i]);
+
+    // Row 49: kWh Received
+    setCell('A49', 'kWh Received', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '49', circKwh[i]);
+    setCell('G49', 'SUM(B49:F49)', 'f');
+    setCell('I49', mv('up_biotech_kwh'));
+
+    // Row 50: Total Cost
+    setCell('A50', 'Total Cost ($)', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '50', circCost[i]);
+    setCell('G50', 'SUM(B50:F50)', 'f');
+
+    // Row 51: Cost per kWh (formula)
+    setCell('A51', 'Cost per kWh', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '51', 'IF(' + bCols[i] + '49=0,0,' + bCols[i] + '50/' + bCols[i] + '49)', 'f');
+    setCell('G51', 'IF(G49=0,0,G50/G49)', 'f');
+
+    // Row 52: Account numbers
+    setCell('A52', 'Account #', 's');
+    const acctNums = ['3192-40612-5310','3192-40612-5310','3192-40612-5310','3192-40612-5310','3192-40612-5310'];
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '52', acctNums[i], 's');
+
+    // Sheet properties
+    ws['!ref'] = 'A1:K53';
+    ws['!merges'] = [
+      { s:{r:0,c:0}, e:{r:0,c:8} },
+      { s:{r:12,c:0}, e:{r:12,c:8} },
+      { s:{r:15,c:0}, e:{r:15,c:8} },
+      { s:{r:19,c:0}, e:{r:19,c:8} },
+      { s:{r:22,c:0}, e:{r:22,c:8} },
+      { s:{r:27,c:0}, e:{r:27,c:8} },
+    ];
+    ws['!cols'] = [
+      {wch:38}, {wch:14}, {wch:14}, {wch:14}, {wch:14}, {wch:14},
+      {wch:10}, {wch:10}, {wch:16}, {wch:12}, {wch:12}
+    ];
+
+    // Build workbook and download
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'UP' + mmyy);
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    downloadBlob(new Blob([wbout], { type: 'application/octet-stream' }), 'UP' + mmyy + '.xlsx');
+    console.log('UP Report Excel generated: UP' + mmyy + '.xlsx');
+  } catch(e) {
+    console.error('generateUPExcel error:', e);
+    alert('Error generating Excel: ' + e.message);
+  }
+}
 
 function renderAutoTable(auto) {
   // Build header row
@@ -1729,7 +1992,267 @@ function loadUPManual(monthStr) {
 
   UP_CURRENT.manual = {};
 }
-function renderUPPreview() { document.getElementById('upPreviewWrap').innerHTML = '<p style="color:var(--text-light);">Preview will appear here.</p>'; }
+function renderUPPreview() {
+  if (!UP_CURRENT) {
+    document.getElementById('upPreviewWrap').innerHTML = '<p style="color:var(--text-light);">Load a month first.</p>';
+    return;
+  }
+  const a = UP_CURRENT.auto;
+
+  // Manual field reader — always read live from DOM
+  const mv = (id) => {
+    if (UP_CURRENT.manual && UP_CURRENT.manual[id] != null) return UP_CURRENT.manual[id];
+    const el = document.getElementById(id);
+    return el && el.value ? parseFloat(el.value) : 0;
+  };
+
+  // Cell formatting helpers
+  const fmtC = (v, dec, cls) => '<td class="' + cls + '" style="text-align:right;">' + (v ? fmt(v, dec || 0) : '&mdash;') + '</td>';
+  const fmtA = (v, dec) => fmtC(v, dec, 'up-auto');
+  const fmtM = (v, dec) => fmtC(v, dec, 'up-manual');
+  const fmtF = (v, dec) => fmtC(v, dec, 'up-calc');
+
+  // Read manual values
+  const gasMmbtu = mv('up_gas_mmbtu');
+  const btuCuft = mv('up_btu_cuft');
+  const gasCostTherm = mv('up_gas_cost_therm');
+  const oilCostGal = mv('up_oil_cost_gal');
+  const hdd = mv('up_hdd');
+  const cdd = mv('up_cdd');
+  const maxLbsHr = mv('up_max_lbs_hr');
+  const minLbsHr = mv('up_min_lbs_hr');
+  const labor = mv('up_labor');
+  const gs = mv('up_gs');
+  const biotechKwh = mv('up_biotech_kwh');
+
+  // Boiler arrays (indexed 0-4 for B1-B5)
+  const days = [a.b1_days, a.b2_days, a.b3_days, a.b4_days, a.b5_days];
+  const steamGas = [a.b1_steam, a.b2_steam, a.b3_steam, a.b4_steam, a.b5_steam];
+  const steamOil = [0, 0, a.b3_steam_oil || 0, a.b4_steam_oil || 0, a.b5_steam_oil || 0];
+  const totalSteam = steamGas.map((g, i) => g + steamOil[i]);
+  const oilGal = [0, 0, a.b3_oil || 0, a.b4_oil || 0, a.b5_oil || 0];
+  const gasSCF = [a.b1_gas, a.b2_gas, a.b3_gas, a.b4_gas, a.b5_gas];
+
+  // Derived calculations
+  const gasDeliveredTherms = gasMmbtu * 10;
+  const gasTherms = gasSCF.map(scf => btuCuft * scf / 100000);
+  const totalGasTherms = sum(gasTherms);
+  const genGasTherms = btuCuft * (a.gen1_gas + a.gen2_gas) / 100000;
+  const internalGas = gasDeliveredTherms - totalGasTherms - genGasTherms;
+
+  // Efficiency
+  const lbsPerGalOil = oilGal.map((g, i) => g ? steamOil[i] / g : 0);
+  const lbsPerThermGas = gasTherms.map((t, i) => t ? steamGas[i] / t : 0);
+
+  // Fuel costs
+  const oilCost = oilGal.map(g => g * oilCostGal);
+  const gasCost = gasTherms.map(t => t * gasCostTherm);
+  const totalFuelCost = oilCost.map((o, i) => o + gasCost[i]);
+  const totalOilCost = sum(oilCost);
+  const totalGasCost = sum(gasCost);
+  const totalFuel = totalOilCost + totalGasCost;
+
+  // Cost per 1000 lbs
+  const oilCostPer1k = oilCost.map((c, i) => steamOil[i] ? (c / steamOil[i]) * 1000 : 0);
+  const gasCostPer1k = gasCost.map((c, i) => steamGas[i] ? (c / steamGas[i]) * 1000 : 0);
+
+  // Circuit data
+  const circKwh = Array.from(document.querySelectorAll('.up-circ-kwh')).map(el => el.value ? parseFloat(el.value) : 0);
+  const circCost = Array.from(document.querySelectorAll('.up-circ-cost')).map(el => el.value ? parseFloat(el.value) : 0);
+  const circKva = Array.from(document.querySelectorAll('.up-circ-kva')).map(el => el.value ? parseFloat(el.value) : 0);
+  const totalCircKwh = sum(circKwh);
+  const totalCircCost = sum(circCost);
+
+  // Well data
+  const well4 = mv('up_well4');
+  const well6 = mv('up_well6');
+  const well7 = mv('up_well7');
+  const well8 = mv('up_well8');
+  const totalWells = well4 + well6 + well7 + well8;
+  const chlorine = mv('up_chlorine');
+
+  // Section header helper
+  const secRow = (label) => '<tr><td colspan="8" style="background:var(--primary);color:#fff;font-weight:700;padding:6px 8px;font-size:0.85rem;">' + label + '</td></tr>';
+
+  // Header
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">';
+  html += '<thead><tr><th style="text-align:left;min-width:180px;"></th>';
+  for (let i = 0; i < 5; i++) html += '<th style="text-align:right;">' + UP_BOILER_LABELS[i] + '</th>';
+  html += '<th style="text-align:right;">Future #6</th><th style="text-align:right;">TOTALS</th></tr></thead>';
+  html += '<tbody>';
+
+  // === STEAM PRODUCTION ===
+  html += secRow('STEAM PRODUCTION');
+
+  // Row 3: Boiler Days
+  html += '<tr><td>Boiler Days</td>';
+  for (let i = 0; i < 5; i++) html += fmtA(days[i], 1);
+  html += '<td></td>' + fmtF(a.total_days, 1) + '</tr>';
+
+  // Row 4: Total Lbs Steam
+  html += '<tr><td>Total Lbs Steam</td>';
+  for (let i = 0; i < 5; i++) html += fmtF(totalSteam[i], 0);
+  html += '<td></td>' + fmtF(sum(totalSteam), 0) + '</tr>';
+
+  // Row 5: Lbs Steam Gas
+  html += '<tr><td>Lbs Steam (Gas)</td>';
+  for (let i = 0; i < 5; i++) html += fmtA(steamGas[i], 0);
+  html += '<td></td>' + fmtF(a.total_steam_gas, 0) + '</tr>';
+
+  // Row 6: Lbs Steam Oil (B1/B2 = 0)
+  html += '<tr><td>Lbs Steam (Oil)</td>';
+  for (let i = 0; i < 5; i++) html += (i < 2 ? fmtC(0, 0, 'up-calc') : fmtA(steamOil[i], 0));
+  html += '<td></td>' + fmtF(a.total_steam_oil, 0) + '</tr>';
+
+  // Row 7: Oil Burned gal
+  html += '<tr><td>Oil Burned (gal)</td>';
+  for (let i = 0; i < 5; i++) html += (i < 2 ? fmtC(0, 0, 'up-calc') : fmtA(oilGal[i], 0));
+  html += '<td></td>' + fmtF(a.total_oil_gal, 0) + '</tr>';
+
+  // Row 8: Gas Delivered (Therms) — manual MMBTU * 10
+  html += '<tr><td>Gas Delivered (Therms)</td>';
+  for (let i = 0; i < 5; i++) html += '<td></td>';
+  html += '<td></td>' + fmtF(gasDeliveredTherms, 0) + '</tr>';
+
+  // Row 9: Gas Use Therms (calculated)
+  html += '<tr><td>Gas Use (Therms)</td>';
+  for (let i = 0; i < 5; i++) html += fmtF(gasTherms[i], 0);
+  html += '<td></td>' + fmtF(totalGasTherms, 0) + '</tr>';
+
+  // Row 10: Gas Use SCF (auto)
+  html += '<tr><td>Gas Use (SCF)</td>';
+  for (let i = 0; i < 5; i++) html += fmtA(gasSCF[i], 0);
+  html += '<td></td>' + fmtF(a.total_gas_scf, 0) + '</tr>';
+
+  // Row 11: Generator Gas SCF
+  html += '<tr><td>Gen Gas (SCF)</td>';
+  html += fmtC(0, 0, 'up-calc');
+  html += fmtA(a.gen1_gas, 0);
+  html += fmtC(0, 0, 'up-calc');
+  html += fmtA(a.gen2_gas, 0);
+  html += fmtC(0, 0, 'up-calc');
+  html += '<td></td>' + fmtF(genGasTherms, 0) + '</tr>';
+
+  // Row 12: Internal Gas
+  html += '<tr><td>Internal Gas (Therms)</td>';
+  for (let i = 0; i < 5; i++) html += '<td></td>';
+  html += '<td></td>' + fmtF(internalGas, 0) + '</tr>';
+
+  // === EFFICIENCY ===
+  html += secRow('EFFICIENCY');
+
+  // Row 14: Lbs/gal oil (B3-B5 only)
+  html += '<tr><td>Lbs per Gallon Oil</td>';
+  for (let i = 0; i < 5; i++) html += (i < 2 ? '<td></td>' : fmtF(lbsPerGalOil[i], 1));
+  html += '<td></td><td></td></tr>';
+
+  // Row 15: Lbs/therm gas
+  html += '<tr><td>Lbs per Therm Gas</td>';
+  for (let i = 0; i < 5; i++) html += fmtF(lbsPerThermGas[i], 1);
+  html += '<td></td><td></td></tr>';
+
+  // === FUEL COSTS ===
+  html += secRow('FUEL COSTS');
+
+  // Row 17: Oil cost
+  html += '<tr><td>Oil Cost ($)</td>';
+  for (let i = 0; i < 5; i++) html += (i < 2 ? fmtC(0, 2, 'up-calc') : fmtF(oilCost[i], 2));
+  html += '<td></td>' + fmtF(totalOilCost, 2) + '</tr>';
+
+  // Row 18: Gas cost
+  html += '<tr><td>Gas Cost ($)</td>';
+  for (let i = 0; i < 5; i++) html += fmtF(gasCost[i], 2);
+  html += '<td></td>' + fmtF(totalGasCost, 2) + '</tr>';
+
+  // Row 19: Total fuel cost
+  html += '<tr><td style="font-weight:700;">Total Fuel Cost ($)</td>';
+  for (let i = 0; i < 5; i++) html += fmtF(totalFuelCost[i], 2);
+  html += '<td></td>' + fmtF(totalFuel, 2) + '</tr>';
+
+  // === COST PER 1000 LBS ===
+  html += secRow('COST PER 1,000 LBS STEAM');
+
+  // Row 21: Oil cost / 1000 lbs
+  html += '<tr><td>Oil Cost / 1,000 lbs</td>';
+  for (let i = 0; i < 5; i++) html += (i < 2 ? '<td></td>' : fmtF(oilCostPer1k[i], 2));
+  html += '<td></td><td></td></tr>';
+
+  // Row 22: Gas cost / 1000 lbs
+  html += '<tr><td>Gas Cost / 1,000 lbs</td>';
+  for (let i = 0; i < 5; i++) html += fmtF(gasCostPer1k[i], 2);
+  html += '<td></td><td></td></tr>';
+
+  // === WEATHER & STATS ===
+  html += secRow('WEATHER &amp; STATS');
+
+  html += '<tr><td>Heating Degree Days</td>' + fmtM(hdd, 0) + '<td colspan="6"></td></tr>';
+  html += '<tr><td>Cooling Degree Days</td>' + fmtM(cdd, 0) + '<td colspan="6"></td></tr>';
+  html += '<tr><td>Max Lbs/Hr Steam</td>' + fmtM(maxLbsHr, 0) + '<td colspan="6"></td></tr>';
+  html += '<tr><td>Min Lbs/Hr Steam</td>' + fmtM(minLbsHr, 0) + '<td colspan="6"></td></tr>';
+  html += '<tr><td>Gas BTU/cu ft</td>' + fmtM(btuCuft, 0) +
+    '<td>Gas Cost/Therm</td>' + fmtM(gasCostTherm, 4) +
+    '<td>St Plant Labor</td>' + fmtM(labor, 2) + '<td></td></tr>';
+  html += '<tr><td>Gas Delivered (MMBTU)</td>' + fmtM(gasMmbtu, 0) +
+    '<td>Oil Cost/Gallon</td>' + fmtM(oilCostGal, 4) +
+    '<td>Goods &amp; Srvcs</td>' + fmtM(gs, 2) + '<td></td></tr>';
+  html += '<tr><td></td><td></td>' +
+    '<td></td><td></td>' +
+    '<td>Fuel Cost</td>' + fmtF(totalFuel, 2) + '<td></td></tr>';
+  html += '<tr><td></td><td></td>' +
+    '<td>Make Up Water</td><td></td>' +
+    '<td>Total Prod. Cost</td>' + fmtF(labor + gs + totalFuel, 2) + '<td></td></tr>';
+
+  // === FRESH WATER ===
+  html += secRow('FRESH WATER');
+  html += '<tr><td>Well #4</td>' + fmtM(well4, 0) + '<td colspan="6"></td></tr>';
+  html += '<tr><td>Well #6</td>' + fmtM(well6, 0) + '<td colspan="6"></td></tr>';
+  html += '<tr><td>Well #7</td>' + fmtM(well7, 0) + '<td colspan="6"></td></tr>';
+  html += '<tr><td>Well #8</td>' + fmtM(well8, 0) + '<td colspan="6"></td></tr>';
+  html += '<tr><td style="font-weight:700;">Total Gal Pumped</td>' + fmtF(totalWells, 0) + '<td colspan="6"></td></tr>';
+  html += '<tr><td>Lbs Chlorine</td>' + fmtM(chlorine, 0) + '<td colspan="6"></td></tr>';
+
+  // === ELECTRIC ===
+  html += secRow('ELECTRIC');
+  const circNames = ['MP-A','MP-C','MP-D','MP-E','MP-G'];
+  const circIDs = ['TUR-111','SPU124+TVW131','SPU-122','TUR-115','SPU-125'];
+  html += '<tr><td></td>';
+  for (let i = 0; i < 5; i++) html += '<th style="text-align:right;font-size:0.78rem;">' + circNames[i] + '</th>';
+  html += '<th style="text-align:right;">Total</th><th style="text-align:right;">Biotech</th></tr>';
+
+  // kWh Received
+  html += '<tr><td>kWh Received</td>';
+  for (let i = 0; i < 5; i++) html += fmtM(circKwh[i], 0);
+  html += fmtF(totalCircKwh, 0) + fmtM(biotechKwh, 0) + '</tr>';
+
+  // Total Cost
+  html += '<tr><td>Total Cost ($)</td>';
+  for (let i = 0; i < 5; i++) html += fmtM(circCost[i], 2);
+  html += fmtF(totalCircCost, 2) + '<td></td></tr>';
+
+  // Cost per kWh
+  html += '<tr><td>Cost per kWh</td>';
+  for (let i = 0; i < 5; i++) {
+    const cpk = circKwh[i] ? circCost[i] / circKwh[i] : 0;
+    html += fmtF(cpk, 4);
+  }
+  const totalCpk = totalCircKwh ? totalCircCost / totalCircKwh : 0;
+  html += fmtF(totalCpk, 4) + '<td></td></tr>';
+
+  // Peak KVA
+  html += '<tr><td>Peak KVA</td>';
+  for (let i = 0; i < 5; i++) html += fmtM(circKva[i], 0);
+  html += '<td></td><td></td></tr>';
+
+  // Generator kWh
+  html += '<tr><td colspan="8" style="padding-top:8px;font-weight:600;">Generator kWh</td></tr>';
+  html += '<tr><td>Gen #1</td>' + fmtA(a.gen1_kwh, 0) +
+    '<td>Gen #2</td>' + fmtA(a.gen2_kwh, 0) +
+    '<td>Gen #3</td>' + fmtA(a.gen3_kwh, 0) +
+    '<td>Total</td>' + fmtF(a.total_gen_kwh, 0) + '</tr>';
+
+  html += '</tbody></table>';
+  document.getElementById('upPreviewWrap').innerHTML = html;
+}
 
 // ============================================================
 //  TAB 6: DATA MANAGEMENT
