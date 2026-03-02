@@ -1491,11 +1491,242 @@ function renderUPTab() {
   document.getElementById('upGenBtn').addEventListener('click', generateUPExcel);
 }
 
-function loadUPMonth() { console.log('loadUPMonth stub'); }
-function saveUPManual() { console.log('saveUPManual stub'); }
+function loadUPMonth() {
+  const monthStr = document.getElementById('upMonth').value;
+  if (!monthStr) return;
+  const row = DATA.monthly.find(m => m.month === monthStr);
+  if (!row) { document.getElementById('upStatus').textContent = 'No data for ' + monthLabel(monthStr); return; }
+
+  // Resolve auto-populated fields from UP_AUTO config
+  const auto = {};
+  for (const [field, cfg] of Object.entries(UP_AUTO)) {
+    let val = cfg.delta ? (row[cfg.key + '_delta'] || 0) : (row[cfg.key] || 0);
+    if (cfg.divide) val = val / cfg.divide;
+    auto[field] = val;
+  }
+
+  // Compute totals
+  auto.total_steam_gas = auto.b1_steam + auto.b2_steam + auto.b3_steam + auto.b4_steam + auto.b5_steam;
+  auto.total_steam_oil = (auto.b3_steam_oil || 0) + (auto.b4_steam_oil || 0) + (auto.b5_steam_oil || 0);
+  auto.total_steam = auto.total_steam_gas + auto.total_steam_oil;
+  auto.total_oil_gal = (auto.b3_oil || 0) + (auto.b4_oil || 0) + (auto.b5_oil || 0);
+  auto.total_gas_scf = auto.b1_gas + auto.b2_gas + auto.b3_gas + auto.b4_gas + auto.b5_gas;
+  auto.total_days = auto.b1_days + auto.b2_days + auto.b3_days + auto.b4_days + auto.b5_days;
+  auto.total_gen_kwh = auto.gen1_kwh + auto.gen2_kwh + auto.gen3_kwh;
+  auto.total_gen_gas = auto.gen1_gas + auto.gen2_gas;
+
+  // Attempt to load HDD from energy cost projection data
+  let hddVal = null;
+  try {
+    if (ENERGY_DATA && ENERGY_DATA.hdd) {
+      const fyIdx = fyMonthIndex(monthStr);
+      const [y, m] = monthStr.split('-').map(Number);
+      const fyKey = 'fy' + (m >= 7 ? String(y + 1).slice(2) : String(y).slice(2));
+      if (ENERGY_DATA.hdd[fyKey] && ENERGY_DATA.hdd[fyKey][fyIdx] != null) {
+        hddVal = ENERGY_DATA.hdd[fyKey][fyIdx];
+      }
+    }
+  } catch(e) { console.warn('HDD lookup failed:', e); }
+
+  // Store result
+  UP_CURRENT = { month: monthStr, auto: auto, manual: {} };
+
+  // Render auto table and load manual entries
+  renderAutoTable(auto);
+  loadUPManual(monthStr);
+
+  // Show cards
+  document.getElementById('upAutoCard').style.display = '';
+  document.getElementById('upManualCard').style.display = '';
+  document.getElementById('upPreviewCard').style.display = '';
+
+  // Update status
+  document.getElementById('upStatus').textContent = monthLabel(monthStr) + ' loaded';
+
+  // Populate HDD if found
+  if (hddVal != null) {
+    document.getElementById('up_hdd').value = hddVal;
+  }
+
+  // Wire up input listeners on manual card (remove old to avoid duplicates)
+  document.getElementById('upManualCard').querySelectorAll('input').forEach(inp => {
+    inp.removeEventListener('input', renderUPPreview);
+    inp.addEventListener('input', renderUPPreview);
+  });
+
+  // Render preview
+  renderUPPreview();
+}
+
+function saveUPManual() {
+  if (!UP_CURRENT) return;
+  const data = {};
+
+  // Collect scalar fields
+  UP_MANUAL_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value !== '') {
+      data[id] = parseFloat(el.value);
+    } else {
+      data[id] = null;
+    }
+  });
+
+  // Collect circuit table values
+  data.circ_kwh = Array.from(document.querySelectorAll('.up-circ-kwh')).map(el => el.value !== '' ? parseFloat(el.value) : null);
+  data.circ_cost = Array.from(document.querySelectorAll('.up-circ-cost')).map(el => el.value !== '' ? parseFloat(el.value) : null);
+  data.circ_kva = Array.from(document.querySelectorAll('.up-circ-kva')).map(el => el.value !== '' ? parseFloat(el.value) : null);
+
+  // Save to localStorage
+  localStorage.setItem('wsu_up_manual_' + UP_CURRENT.month, JSON.stringify(data));
+
+  // Persist oil cost as static value that carries forward to new months
+  const staticData = {};
+  try { Object.assign(staticData, JSON.parse(localStorage.getItem('wsu_up_static') || '{}')); } catch(e) {}
+  if (data.up_oil_cost_gal != null) staticData.up_oil_cost_gal = data.up_oil_cost_gal;
+  localStorage.setItem('wsu_up_static', JSON.stringify(staticData));
+
+  // Update in-memory state
+  UP_CURRENT.manual = data;
+
+  // Show confirmation
+  const now = new Date();
+  const ts = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('upSaveStatus').textContent = 'Saved at ' + ts;
+
+  renderUPPreview();
+}
+
 function generateUPExcel() { console.log('generateUPExcel stub'); }
-function renderAutoTable(auto) { console.log('renderAutoTable stub'); }
-function loadUPManual(monthStr) { console.log('loadUPManual stub'); }
+
+function renderAutoTable(auto) {
+  // Build header row
+  const hdr = '<tr><th style="text-align:left;min-width:140px;">Metric</th>' +
+    UP_BOILER_LABELS.map(l => '<th>' + l + '</th>').join('') +
+    '<th style="font-weight:700;">Total</th></tr>';
+  document.getElementById('upAutoHead').innerHTML = hdr;
+
+  const c = 'class="up-auto" style="text-align:right;"';
+  const dash = '<td style="text-align:right;color:var(--text-light);">&mdash;</td>';
+
+  // Helper to build a row
+  function bRow(label, vals, dec, total) {
+    let html = '<tr><td style="font-weight:600;">' + label + '</td>';
+    vals.forEach(v => {
+      if (v === null) html += dash;
+      else html += '<td ' + c + '>' + fmt(v, dec) + '</td>';
+    });
+    html += '<td ' + c + ' style="text-align:right;font-weight:700;">' + fmt(total, dec) + '</td>';
+    html += '</tr>';
+    return html;
+  }
+
+  let body = '';
+
+  // Boiler Days (all 5, decimal 1)
+  body += bRow('Boiler Days',
+    [auto.b1_days, auto.b2_days, auto.b3_days, auto.b4_days, auto.b5_days],
+    1, auto.total_days);
+
+  // Lbs Steam (Gas) (all 5, decimal 0)
+  body += bRow('Lbs Steam (Gas)',
+    [auto.b1_steam, auto.b2_steam, auto.b3_steam, auto.b4_steam, auto.b5_steam],
+    0, auto.total_steam_gas);
+
+  // Lbs Steam (Oil) (dash for B1/B2, values for B3-B5, decimal 0)
+  body += bRow('Lbs Steam (Oil)',
+    [null, null, auto.b3_steam_oil, auto.b4_steam_oil, auto.b5_steam_oil],
+    0, auto.total_steam_oil);
+
+  // Oil Burned (gal) (dash for B1/B2, values for B3-B5, decimal 0)
+  body += bRow('Oil Burned (gal)',
+    [null, null, auto.b3_oil, auto.b4_oil, auto.b5_oil],
+    0, auto.total_oil_gal);
+
+  // Gas Use (SCF) (all 5, decimal 0)
+  body += bRow('Gas Use (SCF)',
+    [auto.b1_gas, auto.b2_gas, auto.b3_gas, auto.b4_gas, auto.b5_gas],
+    0, auto.total_gas_scf);
+
+  // Separator row
+  body += '<tr><td colspan="7" style="border-top:2px solid var(--border);padding:4px 0;font-weight:700;color:var(--text-light);font-size:0.8rem;">Generators</td></tr>';
+
+  // Generator kWh row: Gen1, Gen2, Gen3 in first 3 cols, blanks for cols 4-5, total
+  body += '<tr><td style="font-weight:600;">Generator kWh</td>';
+  body += '<td ' + c + '>' + fmt(auto.gen1_kwh, 0) + '</td>';
+  body += '<td ' + c + '>' + fmt(auto.gen2_kwh, 0) + '</td>';
+  body += '<td ' + c + '>' + fmt(auto.gen3_kwh, 0) + '</td>';
+  body += dash + dash;
+  body += '<td ' + c + ' style="text-align:right;font-weight:700;">' + fmt(auto.total_gen_kwh, 0) + '</td>';
+  body += '</tr>';
+
+  // Generator Gas SCF row: Gen1, Gen2 in first 2 cols, blanks for 3-5, total
+  body += '<tr><td style="font-weight:600;">Generator Gas (SCF)</td>';
+  body += '<td ' + c + '>' + fmt(auto.gen1_gas, 0) + '</td>';
+  body += '<td ' + c + '>' + fmt(auto.gen2_gas, 0) + '</td>';
+  body += dash + dash + dash;
+  body += '<td ' + c + ' style="text-align:right;font-weight:700;">' + fmt(auto.total_gen_gas, 0) + '</td>';
+  body += '</tr>';
+
+  // Gen3 Fuel (gal) row
+  body += '<tr><td style="font-weight:600;">Gen3 Fuel (gal)</td>';
+  body += dash + dash;
+  body += '<td ' + c + '>' + fmt(auto.gen3_fuel, 0) + '</td>';
+  body += dash + dash;
+  body += '<td ' + c + ' style="text-align:right;font-weight:700;">' + fmt(auto.gen3_fuel, 0) + '</td>';
+  body += '</tr>';
+
+  document.getElementById('upAutoBody').innerHTML = body;
+}
+
+function loadUPManual(monthStr) {
+  const saved = localStorage.getItem('wsu_up_manual_' + monthStr);
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+
+      // Restore scalar fields
+      UP_MANUAL_FIELDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = (data[id] != null) ? data[id] : '';
+      });
+
+      // Restore circuit table values
+      if (data.circ_kwh) {
+        const els = document.querySelectorAll('.up-circ-kwh');
+        data.circ_kwh.forEach((v, i) => { if (els[i]) els[i].value = (v != null) ? v : ''; });
+      }
+      if (data.circ_cost) {
+        const els = document.querySelectorAll('.up-circ-cost');
+        data.circ_cost.forEach((v, i) => { if (els[i]) els[i].value = (v != null) ? v : ''; });
+      }
+      if (data.circ_kva) {
+        const els = document.querySelectorAll('.up-circ-kva');
+        data.circ_kva.forEach((v, i) => { if (els[i]) els[i].value = (v != null) ? v : ''; });
+      }
+
+      UP_CURRENT.manual = data;
+      return;
+    } catch(e) { console.warn('Failed to parse saved manual data:', e); }
+  }
+
+  // No saved data: clear all fields
+  UP_MANUAL_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.querySelectorAll('.up-circ-kwh, .up-circ-cost, .up-circ-kva').forEach(el => { el.value = ''; });
+
+  // Try loading static values (oil cost carries forward)
+  try {
+    const staticData = JSON.parse(localStorage.getItem('wsu_up_static') || '{}');
+    if (staticData.up_oil_cost_gal != null) {
+      document.getElementById('up_oil_cost_gal').value = staticData.up_oil_cost_gal;
+    }
+  } catch(e) {}
+
+  UP_CURRENT.manual = {};
+}
 function renderUPPreview() { document.getElementById('upPreviewWrap').innerHTML = '<p style="color:var(--text-light);">Preview will appear here.</p>'; }
 
 // ============================================================
