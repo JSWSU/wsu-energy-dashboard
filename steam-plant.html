@@ -533,7 +533,9 @@
     </div>
     <div class="card">
       <h2>Export Data</h2>
+      <div class="info-box">Export daily data in the exact same format as the original WSU Energy Data Combined Excel workbook. JSON and CSV exports use the dashboard's internal short key names.</div>
       <div class="btn-row">
+        <button class="btn primary" id="exportExcel">Download Excel (.xlsx)</button>
         <button class="btn secondary" id="exportJSON">Download JSON (Daily+Monthly)</button>
         <button class="btn secondary" id="exportCSV">Download Daily CSV</button>
       </div>
@@ -1491,6 +1493,19 @@ function renderDataManagement() {
     });
     downloadBlob(new Blob([csv], { type: 'text/csv' }), 'steam_plant_daily.csv');
   });
+
+  // Export Excel — exact match to WSU_Energy_Data_FY21-FY26_Combined.xlsx format
+  document.getElementById('exportExcel').addEventListener('click', () => {
+    if (typeof XLSX === 'undefined') {
+      alert('SheetJS library not loaded. Cannot export Excel.');
+      return;
+    }
+    if (!DATA.daily || DATA.daily.length === 0) {
+      alert('No daily data to export.');
+      return;
+    }
+    exportExcel();
+  });
 }
 
 function downloadBlob(blob, filename) {
@@ -1499,6 +1514,111 @@ function downloadBlob(blob, filename) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// Excel export — column order and headers match WSU_Energy_Data_FY21-FY26_Combined.xlsx exactly
+const EXCEL_COLUMNS = [
+  // [jsonKey, excelHeader]
+  [null,              'Day'],
+  ['date',            'Date'],
+  ['b1_gas',          'Boiler 1 - hourly total gas (scf)'],
+  ['b1_steam_gas',    'Boiler 1 - hourly steam gas (lbs)'],
+  ['b1_econ_in',      'Boiler 1 - economizer inlet temp (\u2070F)'],
+  ['b1_econ_out',     'Boiler 1 - economizer outlet temp (\u2070F)'],
+  ['b1_runtime',      'Boiler 1 - runtime total (hrs)'],
+  ['b2_gas',          'Boiler 2 - hourly total gas (scf)'],
+  ['b2_steam_gas',    'Boiler 2 - hourly steam gas (lbs)'],
+  ['b2_econ_in',      'Boiler 2 - economizer inlet temp (\u2070F)'],
+  ['b2_econ_out',     'Boiler 2 - economizer outlet temp (\u2070F)'],
+  ['b2_runtime',      'Boiler 2 - runtime total (hrs)'],
+  ['b3_gas',          'Boiler 3 - hourly total gas (scf)'],
+  ['b3_oil',          'Boiler 3 - hourly total oil (lbs)'],
+  ['b3_steam_gas',    'Boiler 3 - hourly steam gas (lbs)'],
+  ['b3_steam_oil',    'Boiler 3 - hourly steam oil (lbs)'],
+  ['b3_econ_in',      'Boiler 3 - economizer inlet temp (\u2070F)'],
+  ['b3_econ_out',     'Boiler 3 - economizer outlet temp (\u2070F)'],
+  ['b3_steam_total',  'Boiler 3 - hourly total steam (lbs)'],
+  ['b3_runtime_gas',  'Boiler 3 - runtime gas total (hrs)'],
+  ['b3_runtime_oil',  'Boiler 3 - runtime oil total (hrs)'],
+  ['b3_runtime_total','Boiler 3 - runtime total (hrs)'],
+  ['b4_gas',          'Boiler 4 - hourly total gas (scf)'],
+  ['b4_oil',          'Boiler 4 - hourly total oil (lbs)'],
+  ['b4_steam_gas',    'Boiler 4 - hourly steam gas (lbs)'],
+  ['b4_steam_oil',    'Boiler 4 - hourly steam oil (lbs)'],
+  ['b4_econ_in',      'Boiler 4 - economizer inlet temp (\u2070F)'],
+  ['b4_econ_out',     'Boiler 4 - economizer outlet temp (\u2070F)'],
+  ['b4_steam_total',  'Boiler 4 - hourly total steam'],
+  ['b4_runtime_gas',  'Boiler 4 - runtime gas total (hrs)'],
+  ['b4_runtime_oil',  'Boiler 4 - runtime oil total (hrs)'],
+  ['b4_runtime_total','Boiler 4 - runtime total (hrs)'],
+  ['b5_gas',          'Boiler 5 - hourly total gas (scf)'],
+  ['b5_oil',          'Boiler 5 - hourly total oil (lbs)'],
+  ['b5_steam_gas',    'Boiler 5 - hourly steam gas (lbs)'],
+  ['b5_steam_oil',    'Boiler 5 - hourly steam oil (lbs)'],
+  ['b5_econ_in',      'Boiler 5 - economizer inlet temp (\u2070F)'],
+  ['b5_econ_out',     'Boiler 5 - economizer outlet temp (\u2070F)'],
+  ['b5_steam_total',  'Boiler 5 - hourly total steam'],
+  ['b5_runtime_gas',  'Boiler 5 - runtime gas total (hrs)'],
+  ['b5_runtime_oil',  'Boiler 5 - runtime oil total (hrs)'],
+  ['b5_runtime_total','Boiler 5 - runtime total (hrs)'],
+  ['casp_gas',        'CASP - daily total gas (scf)'],
+  ['gwsp_gas',        'GWSP - daily total gas (scf)'],
+  ['campus_gas',      'CAMPUS - daily total gas (scf)'],
+  ['gwsp_oil',        'GWSP - daily total oil (lbs)'],
+  ['casp_steam',      'CASP - daily total steam (lbs)'],
+  ['gwsp_steam',      'GWSP - daily total steam (lbs)'],
+  ['campus_steam',    'CAMPUS - daily total steam (lbs)'],
+  ['gwsp_tunnel_steam','GWSP - daily tunnel steam (kpph)'],
+  ['fuel_oil_level',  'FUEL OIL TANK - inH2O ("Oil)'],
+  ['fuel_oil_gal',    'FUEL OIL TANK - Gallons TOT (gal)'],
+  ['fuel_oil_change', 'FUEL OIL TANK - Change in Tank (gal)'],
+  ['gwsp_raw_water',  'GWSP Raw Water - gallons total (gal x 1000)'],
+  ['gwsp_potable',    'GWSP Potable - gallons total (gal x 100)'],
+  ['gwsp_makeup_temp_c','GWSP - Makeup water temp (\u2070C)'],
+  ['gwsp_makeup_temp_f','GWSP - Makeup water temp (\u2070F)'],
+  ['gwsp_permeate',   'GWSP Permeate'],
+  ['casp_east_water', 'CASP East Water - gallons total (gal x 100)'],
+  ['casp_west_water', 'CASP West Water - gallons total (gal x 100)'],
+  ['gwsp_waste_water','GWSP Waste Water'],
+  ['gen1_runtime',    'Gen 1 - runtime total (hrs)'],
+  ['gen1_gas',        'Gen 1 - hourly gas (scf)'],
+  ['gen1_kwh',        'Gen 1 - hourly kWh'],
+  ['gen2_runtime',    'Gen 2 - runtime total (hrs)'],
+  ['gen2_gas',        'Gen 2 - hourly gas (scf)'],
+  ['gen2_kwh',        'Gen 2 - hourly kWh'],
+  ['gen3_fuel_rate',  'Gen 3 - Fuel Rate (Gallons)'],
+  ['gen3_runtime',    'Gen 3 - runtime total (hrs)'],
+  ['gen3_kwh',        'Gen 3 - hourly kWh'],
+  ['gen3_fuel_gal',   'Gen 3 - fuel gallons (gallons)'],
+];
+
+function exportExcel() {
+  const headers = EXCEL_COLUMNS.map(c => c[1]);
+  const rows = [headers];
+  let dayNum = 0;
+  let prevMonth = '';
+  DATA.daily.forEach(d => {
+    const curMonth = d.date.slice(0, 7);
+    if (curMonth !== prevMonth) { dayNum = 1; prevMonth = curMonth; } else { dayNum++; }
+    const row = EXCEL_COLUMNS.map(([key]) => {
+      if (key === null) return dayNum;
+      if (key === 'date') return new Date(d.date + 'T00:00:00');
+      return d[key] ?? 0;
+    });
+    rows.push(row);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Set date column format
+  const dateCol = 1; // column B
+  for (let r = 1; r < rows.length; r++) {
+    const cell = XLSX.utils.encode_cell({ r: r, c: dateCol });
+    if (ws[cell]) ws[cell].t = 'd';
+  }
+  // Set column widths
+  ws['!cols'] = EXCEL_COLUMNS.map((_, i) => ({ wch: i <= 1 ? 12 : 18 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Daily Data');
+  XLSX.writeFile(wb, 'WSU_Energy_Data_Export.xlsx');
 }
 
 // Aggregation keys for monthly rollup in JS (matches Python logic)
@@ -1514,7 +1634,9 @@ const MAX_KEYS = new Set([
   'b3_runtime_gas','b3_runtime_oil','b3_runtime_total',
   'b4_runtime_gas','b4_runtime_oil','b4_runtime_total',
   'b5_runtime_gas','b5_runtime_oil','b5_runtime_total',
-  'gen1_runtime','gen2_runtime','gen3_runtime'
+  'gen1_runtime','gen2_runtime','gen3_runtime',
+  'gen1_kwh','gen2_kwh','gen3_kwh',
+  'gen1_gas','gen2_gas','gen3_fuel_gal'
 ]);
 
 function buildMonthlyRollup(dailyRows) {
