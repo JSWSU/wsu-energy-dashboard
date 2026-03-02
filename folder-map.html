@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Energy Group Folder Map</title>
+<script src="chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.1.0"></script>
+<style>
+  :root {
+    --primary: #981e32;
+    --primary-dark: #7a1828;
+    --secondary: #5f6b6d;
+    --accent: #c69214;
+    --bg: #f5f5f5;
+    --card-bg: #fff;
+    --text: #2d2d2d;
+    --text-light: #6b7280;
+    --border: #e5e7eb;
+    --green: #059669;
+    --red: #dc2626;
+    --blue: #2563eb;
+    --table-head-bg: #f9fafb;
+    --table-hover: #f9fafb;
+    --total-row-bg: #f0f4ff;
+    --info-bg: #f0f9ff;
+    --info-border: #bae6fd;
+    --info-text: #0c4a6e;
+  }
+  html.dark {
+    --bg: #111827;
+    --card-bg: #1f2937;
+    --text: #e5e7eb;
+    --text-light: #9ca3af;
+    --border: #374151;
+    --secondary: #9ca3af;
+    --green: #34d399;
+    --red: #f87171;
+    --table-head-bg: #1a2332;
+    --table-hover: #253347;
+    --total-row-bg: #1e293b;
+    --info-bg: #1e293b;
+    --info-border: #334155;
+    --info-text: #7dd3fc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; padding: 1.5rem 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .header-text { flex: 1; min-width: 0; }
+  .header-text h1 { font-size: 1.6rem; font-weight: 700; }
+  .header-text p { opacity: 0.85; font-size: 0.9rem; margin-top: 0.25rem; }
+  .header-actions { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+  .header-actions a {
+    color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.82rem;
+    padding: 0.4rem 0.8rem; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .header-actions a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .dark-toggle { display: flex; align-items: center; gap: 0.5rem; }
+  .dark-toggle-label { font-size: 0.75rem; opacity: 0.85; color: #fff; }
+  .dark-toggle-switch {
+    position: relative; width: 40px; height: 22px; background: rgba(255,255,255,0.25);
+    border-radius: 11px; cursor: pointer; transition: background 0.3s; border: none; padding: 0;
+  }
+  .dark-toggle-switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+    background: #fff; border-radius: 50%; transition: transform 0.3s;
+  }
+  html.dark .dark-toggle-switch { background: var(--accent); }
+  html.dark .dark-toggle-switch::after { transform: translateX(18px); }
+  .container { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
+  /* Nav Tabs */
+  .nav-tabs {
+    display: flex; gap: 0.25rem; background: var(--card-bg); border-radius: 8px;
+    padding: 0.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto;
+  }
+  .nav-tab {
+    padding: 0.6rem 1.2rem; border: none; background: transparent; border-radius: 6px;
+    cursor: pointer; font-size: 0.85rem; font-weight: 500; color: var(--text-light);
+    white-space: nowrap; transition: all 0.2s;
+  }
+  .nav-tab:hover { background: var(--table-hover); color: var(--text); }
+  .nav-tab.active { background: var(--primary); color: #fff; }
+  /* KPI */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card {
+    background: var(--card-bg); border-radius: 10px; padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary);
+    transition: box-shadow 0.2s ease, transform 0.15s ease; position: relative;
+  }
+  .kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-2px); }
+  .kpi-label { font-size: 0.78rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.05em; }
+  .kpi-value { font-size: 1.8rem; font-weight: 700; margin: 0.25rem 0; }
+  .kpi-sub { font-size: 0.8rem; color: var(--text-light); }
+  .kpi-tooltip {
+    visibility: hidden; opacity: 0; position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); background: #1f2937; color: #fff; font-size: 0.75rem;
+    line-height: 1.4; padding: 0.5rem 0.75rem; border-radius: 6px; white-space: normal;
+    width: max-content; max-width: 260px; z-index: 100; pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .kpi-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #1f2937;
+  }
+  .kpi-card:hover .kpi-tooltip { visibility: visible; opacity: 1; }
+  .kpi-card.size-card { border-left-color: var(--blue); }
+  .kpi-card.files-card { border-left-color: var(--green); }
+  .kpi-card.depth-card { border-left-color: var(--accent); }
+  .kpi-card.date-card { border-left-color: var(--red); }
+  /* Cards */
+  .card {
+    background: var(--card-bg); border-radius: 10px; padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem;
+  }
+  .card h2 {
+    font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--primary);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  html.dark .card h2 { color: var(--accent); }
+  /* Treemap */
+  .treemap-container { position: relative; width: 100%; height: 500px; }
+  .breadcrumb {
+    display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.75rem;
+    font-size: 0.85rem; flex-wrap: wrap;
+  }
+  .breadcrumb-item {
+    color: var(--blue); cursor: pointer; text-decoration: none;
+    padding: 0.2rem 0.4rem; border-radius: 4px; transition: background 0.2s;
+  }
+  .breadcrumb-item:hover { background: var(--table-hover); text-decoration: underline; }
+  .breadcrumb-item.current { color: var(--text); cursor: default; font-weight: 600; }
+  .breadcrumb-item.current:hover { background: transparent; text-decoration: none; }
+  .breadcrumb-sep { color: var(--text-light); font-size: 0.75rem; }
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th {
+    background: var(--table-head-bg); padding: 0.6rem 0.75rem; text-align: left;
+    font-weight: 600; color: var(--secondary); border-bottom: 2px solid var(--border); white-space: nowrap;
+    cursor: pointer; user-select: none;
+  }
+  thead th .sort-arrows { margin-left: 0.3rem; font-size: 0.7rem; color: var(--text-light); }
+  thead th.asc .sort-arrows, thead th.desc .sort-arrows { color: var(--primary); }
+  tbody td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+  tbody td.right { text-align: right; }
+  tbody tr:hover { background: var(--table-hover); }
+  tbody tr.total-row { font-weight: 700; background: var(--total-row-bg); border-top: 2px solid var(--primary); }
+  /* Sections */
+  .section { display: none; }
+  .section.active { display: block; }
+  /* Search */
+  .search-bar {
+    width: 100%; padding: 0.65rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+    background: var(--card-bg); color: var(--text); margin-bottom: 1rem;
+  }
+  .search-bar:focus { border-color: var(--primary); }
+  .search-bar::placeholder { color: var(--text-light); }
+  /* Filter buttons */
+  .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .filter-btn {
+    padding: 0.4rem 0.9rem; border: 1px solid var(--border); background: var(--card-bg);
+    border-radius: 6px; font-size: 0.82rem; cursor: pointer; color: var(--text); transition: all 0.2s;
+  }
+  .filter-btn:hover { border-color: var(--primary); }
+  .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  /* Status pills */
+  .status-pill {
+    display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px;
+    font-size: 0.72rem; font-weight: 600; white-space: nowrap;
+  }
+  .pill-duplicate { background: #fef3c7; color: #92400e; }
+  .pill-deep { background: #fce7f3; color: #9d174d; }
+  .pill-legacy { background: #fee2e2; color: #991b1b; }
+  .pill-large { background: #dbeafe; color: #1e40af; }
+  .pill-empty { background: #e5e7eb; color: #374151; }
+  .pill-old { background: #f3e8ff; color: #6b21a8; }
+  html.dark .pill-duplicate { background: #78350f; color: #fde68a; }
+  html.dark .pill-deep { background: #831843; color: #fbcfe8; }
+  html.dark .pill-legacy { background: #7f1d1d; color: #fecaca; }
+  html.dark .pill-large { background: #1e3a5f; color: #93c5fd; }
+  html.dark .pill-empty { background: #374151; color: #d1d5db; }
+  html.dark .pill-old { background: #4c1d95; color: #e9d5ff; }
+  /* Info box */
+  .info-box {
+    background: var(--info-bg); border: 1px solid var(--info-border); border-radius: 8px;
+    padding: 1rem 1.25rem; font-size: 0.82rem; color: var(--info-text); margin-bottom: 1rem;
+  }
+  .info-box code {
+    background: rgba(0,0,0,0.06); padding: 0.1rem 0.4rem; border-radius: 3px;
+    font-size: 0.78rem; font-family: 'Courier New', monospace;
+  }
+  html.dark .info-box code { background: rgba(255,255,255,0.08); }
+  /* Audit summary */
+  .audit-summary {
+    font-size: 0.85rem; color: var(--text-light); margin-bottom: 0.75rem;
+  }
+  .audit-summary strong { color: var(--text); }
+  /* Row limit message */
+  .row-limit-msg {
+    font-size: 0.82rem; color: var(--text-light); margin-top: 0.75rem;
+    font-style: italic;
+  }
+  /* Footer */
+  footer {
+    text-align: center; padding: 1.5rem; color: var(--text-light); font-size: 0.78rem;
+    border-top: 1px solid var(--border); margin-top: 2rem;
+  }
+  footer a { color: var(--primary); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  /* Print */
+  @media print {
+    @page { size: landscape; margin: 0.5in; }
+    * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+    body { background: #fff !important; }
+    html.dark { --bg:#f5f5f5; --card-bg:#fff; --text:#2d2d2d; --text-light:#6b7280; --border:#e5e7eb; }
+    header, .nav-tabs, .dark-toggle, .header-actions, .filter-bar, .search-bar { display: none !important; }
+    .section { display: block !important; page-break-inside: avoid; }
+    .card { box-shadow: none; border: 1px solid #e5e7eb; }
+  }
+  /* Responsive */
+  @media (max-width: 768px) {
+    header { flex-direction: column; text-align: center; }
+    .header-actions { flex-wrap: wrap; justify-content: center; }
+    .treemap-container { height: 350px; }
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 480px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-text">
+    <h1>Energy Group Folder Map</h1>
+    <p>\\fais007\ENERGY GROUP &mdash; Scanned 2026-03-02</p>
+  </div>
+  <div class="header-actions">
+    <a href="metering.html">Metering</a>
+    <a href="water-conservation.html">Water Conservation</a>
+    <div class="dark-toggle">
+      <span class="dark-toggle-label">Dark Mode</span>
+      <button class="dark-toggle-switch" id="darkToggle" aria-label="Toggle dark mode"></button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Nav Tabs -->
+  <div class="nav-tabs" id="navTabs">
+    <button class="nav-tab active" data-tab="map">Storage Map</button>
+    <button class="nav-tab" data-tab="audit">Audit Findings</button>
+  </div>
+
+  <!-- ==================== STORAGE MAP TAB ==================== -->
+  <div class="section active" id="sec-map">
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="kpi-card size-card">
+        <div class="kpi-label">Total Size</div>
+        <div class="kpi-value" id="kpiSize">--</div>
+        <div class="kpi-sub" id="kpiSizeSub"></div>
+        <div class="kpi-tooltip">Total storage consumed by the ENERGY GROUP shared drive</div>
+      </div>
+      <div class="kpi-card files-card">
+        <div class="kpi-label">Total Files</div>
+        <div class="kpi-value" id="kpiFiles">--</div>
+        <div class="kpi-sub" id="kpiFilesSub"></div>
+        <div class="kpi-tooltip">Total number of files across all folders</div>
+      </div>
+      <div class="kpi-card depth-card">
+        <div class="kpi-label">Max Depth</div>
+        <div class="kpi-value" id="kpiDepth">--</div>
+        <div class="kpi-sub">levels deep</div>
+        <div class="kpi-tooltip">Deepest folder nesting level found during scan</div>
+      </div>
+      <div class="kpi-card date-card">
+        <div class="kpi-label">Date Span</div>
+        <div class="kpi-value" id="kpiDates">--</div>
+        <div class="kpi-sub" id="kpiDatesSub"></div>
+        <div class="kpi-tooltip">Range from oldest to newest file modification date</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Folder Treemap</h2>
+      <div class="info-box">
+        Click any folder to drill down. Use the breadcrumb path above the chart to navigate back up.
+        Folder size is proportional to area. Hover for details.
+      </div>
+      <div class="breadcrumb" id="breadcrumb"></div>
+      <div class="treemap-container">
+        <canvas id="treemapCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== AUDIT FINDINGS TAB ==================== -->
+  <div class="section" id="sec-audit">
+    <div class="card">
+      <h2>Audit Findings</h2>
+      <div class="info-box">
+        Automated scan results identifying potential cleanup opportunities: duplicate folder names,
+        deep nesting, legacy file formats, oversized files, empty folders, and old files.
+      </div>
+      <input type="text" class="search-bar" id="auditSearch" placeholder="Search by path...">
+      <div class="filter-bar" id="auditFilterBar">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="duplicate">Duplicates</button>
+        <button class="filter-btn" data-filter="deep">Deep Nesting</button>
+        <button class="filter-btn" data-filter="legacy">Legacy Formats</button>
+        <button class="filter-btn" data-filter="large">Large Files</button>
+        <button class="filter-btn" data-filter="empty">Empty Folders</button>
+        <button class="filter-btn" data-filter="old">Old Files</button>
+      </div>
+      <div class="audit-summary" id="auditSummary"></div>
+      <div class="table-wrap">
+        <table id="auditTable">
+          <thead>
+            <tr>
+              <th data-col="category">Category <span class="sort-arrows">&#x25B4;&#x25BE;</span></th>
+              <th data-col="path">Path <span class="sort-arrows">&#x25B4;&#x25BE;</span></th>
+              <th data-col="size">Size <span class="sort-arrows">&#x25B4;&#x25BE;</span></th>
+              <th data-col="files">Files <span class="sort-arrows">&#x25B4;&#x25BE;</span></th>
+              <th data-col="modified">Last Modified <span class="sort-arrows">&#x25B4;&#x25BE;</span></th>
+              <th data-col="details">Details</th>
+            </tr>
+          </thead>
+          <tbody id="auditBody"></tbody>
+        </table>
+      </div>
+      <div class="row-limit-msg" id="rowLimitMsg" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  WSU Facilities Services &bull; Energy Group Folder Map &bull;
+  <a href="https://github.com/jswsu/wsu-energy-dashboard" target="_blank">GitHub</a>
+</footer>
+
+<script>
+// ============================================================
+// SCAN DATA
+// ============================================================
+const SCAN_DATA = {
+  scanDate: "2026-03-02",
+  root: "\\\\fais007\\ENERGY GROUP",
+  totalSize: 34500000000,
+  totalFiles: 58162,
+  maxDepth: 14,
+  dateRange: { oldest: "1985", newest: "2026" },
+  tree: {
+    name: "ENERGY GROUP",
+    size: 34500000000,
+    files: 58162,
+    modified: "2026-02-05",
+    children: [
+      { name: "Energy Services Admin", size: 27000000000, files: 47033, modified: "2025-12-15",
+        children: [
+          { name: "ECS Enercon SCADA", size: 12000000000, files: 20000, modified: "2024-06-01",
+            children: [
+              { name: "Energy Files", size: 8000000000, files: 15000, modified: "2024-01-15", children: [] },
+              { name: "Billing", size: 3000000000, files: 4000, modified: "2024-06-01", children: [] },
+              { name: "(other)", size: 1000000000, files: 1000, modified: "2023-09-10", children: [] }
+            ]
+          },
+          { name: "Network Meters", size: 5000000000, files: 8000, modified: "2025-12-15", children: [] },
+          { name: "Terry Ryan", size: 3000000000, files: 5000, modified: "2020-03-01", children: [] },
+          { name: "(other)", size: 7000000000, files: 14033, modified: "2025-06-01", children: [] }
+        ]
+      },
+      { name: "Skyspark", size: 1600000000, files: 5, modified: "2024-04-08", children: [] },
+      { name: "Energy Data By Year", size: 606000000, files: 8892, modified: "2025-07-24",
+        children: [
+          { name: "2001", size: 100000000, files: 500, modified: "2002-06-18", children: [] },
+          { name: "2010", size: 80000000, files: 600, modified: "2011-01-15", children: [] },
+          { name: "(other)", size: 426000000, files: 7792, modified: "2025-07-24", children: [] }
+        ]
+      },
+      { name: "Loc Vo", size: 430000000, files: 652, modified: "2016-07-29", children: [] },
+      { name: "Meter Data work files", size: 157000000, files: 9, modified: "2026-02-16", children: [] },
+      { name: "Energy Files", size: 129000000, files: 239, modified: "2024-04-08", children: [] },
+      { name: "energy RFP GAS Elect", size: 70000000, files: 5, modified: "2024-04-08", children: [] },
+      { name: "Wilson-Stadium Pics", size: 61000000, files: 241, modified: "2024-04-08", children: [] },
+      { name: "CHP Analysis 2015", size: 57000000, files: 34, modified: "2024-04-08", children: [] },
+      { name: "Energy Data By Building", size: 44000000, files: 1198, modified: "2024-04-08", children: [] },
+      { name: "Trend spreadsheets", size: 33000000, files: 60, modified: "2024-04-08", children: [] },
+      { name: "Avista Energy reports", size: 26000000, files: 117, modified: "2025-12-08", children: [] },
+      { name: "0 - Meter+Billing Process Docs", size: 22000000, files: 47, modified: "2024-04-08", children: [] },
+      { name: "AimEnergy", size: 17000000, files: 8, modified: "2024-04-08", children: [] },
+      { name: "Utility Manager 3.0 - Old Copy", size: 14000000, files: 55, modified: "2024-04-08", children: [] },
+      { name: "0 - ESPC Process Flows", size: 3400000, files: 16, modified: "2024-04-08", children: [] },
+      { name: "Building Ownership", size: 2100000, files: 5, modified: "2025-03-14", children: [] },
+      { name: "Diesel Delivery Log", size: 2000000, files: 6, modified: "2024-04-08", children: [] },
+      { name: "Croyle", size: 1800000, files: 2, modified: "2024-04-08", children: [] },
+      { name: "Steam Plant Files - Temp", size: 1500000, files: 6, modified: "2024-04-08", children: [] },
+      { name: "Steam Trap Report", size: 1500000, files: 9, modified: "2024-04-08", children: [] },
+      { name: "Utility tax", size: 136000, files: 3, modified: "2024-04-26", children: [] },
+      { name: "Plant growth", size: 24000, files: 1, modified: "2024-04-08", children: [] },
+      { name: "Waller Hall", size: 0, files: 0, modified: "2017-06-06", children: [] }
+    ]
+  },
+  audit: {
+    duplicates: [
+      { name: "Energy Files", count: 7, paths: ["Energy Files", "Energy Services Admin/ECS Enercon SCADA/Energy Files"], size: 8000000000, files: 15000, details: "Folder name appears 7 times" }
+    ],
+    deepNesting: [
+      { path: "Energy Services Admin/ECS Enercon SCADA/Energy Files/Avista agreements/Energy Files/Billing/Recharge Rates", depth: 8, size: 500000000, files: 200, modified: "2023-01-15" }
+    ],
+    legacyFormats: [
+      { path: "Energy Services Admin/Network Meters/meter-config.KVA", extension: "KVA", size: 45000, modified: "2012-07-03" },
+      { path: "Energy Data By Year/1995/budget.WKS", extension: "WKS", size: 32000, modified: "1995-06-15" }
+    ],
+    largeFiles: [
+      { path: "RTACSetup.exe", size: 1613401008, modified: "2024-03-13" },
+      { path: "AcSELerator Quickset SEL-5030-Setup.exe", size: 1136901096, modified: "2022-07-19" },
+      { path: "Energy Services Admin/Network Meters/Water Meters 2015/Water Meter Information (1-15-14).pdf", size: 57200000, modified: "2015-01-15" }
+    ],
+    emptyFolders: [
+      { path: "Waller Hall", modified: "2017-06-06" }
+    ],
+    oldFiles: [
+      { path: "Energy Services Admin/Terry Ryan/sel-5030.exe", size: 93284352, modified: "2006-01-18" },
+      { path: "Energy Data By Year/1983/budget.xls", size: 125000, modified: "1985-03-15" }
+    ]
+  }
+};
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function fmtBytes(bytes) {
+  if (bytes >= 1e12) return (bytes / 1e12).toFixed(1) + ' TB';
+  if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + ' GB';
+  if (bytes >= 1e6) return (bytes / 1e6).toFixed(1) + ' MB';
+  if (bytes >= 1e3) return (bytes / 1e3).toFixed(1) + ' KB';
+  return bytes + ' B';
+}
+const fmtNum = v => v.toLocaleString('en-US');
+
+// ============================================================
+// CHART.JS SETUP
+// ============================================================
+const chartInstances = [];
+
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.padding = 16;
+
+function applyChartTheme() {
+  const dark = document.documentElement.classList.contains('dark');
+  Chart.defaults.color = dark ? '#9ca3af' : '#6b7280';
+  Chart.defaults.borderColor = dark ? '#374151' : '#e5e7eb';
+}
+
+// ============================================================
+// DARK MODE
+// ============================================================
+function initDarkMode() {
+  const saved = localStorage.getItem('wsuFolderMapDark');
+  if (saved === 'on') document.documentElement.classList.add('dark');
+  applyChartTheme();
+
+  document.getElementById('darkToggle').addEventListener('click', function() {
+    document.documentElement.classList.toggle('dark');
+    const isDark = document.documentElement.classList.contains('dark');
+    localStorage.setItem('wsuFolderMapDark', isDark ? 'on' : 'off');
+    applyChartTheme();
+    chartInstances.forEach(c => c.update());
+  });
+}
+
+// ============================================================
+// TAB NAVIGATION
+// ============================================================
+function initTabs() {
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      this.classList.add('active');
+      document.getElementById('sec-' + this.dataset.tab).classList.add('active');
+    });
+  });
+}
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+function populateKPIs() {
+  document.getElementById('kpiSize').textContent = fmtBytes(SCAN_DATA.totalSize);
+  document.getElementById('kpiSizeSub').textContent = fmtNum(SCAN_DATA.totalSize) + ' bytes';
+  document.getElementById('kpiFiles').textContent = fmtNum(SCAN_DATA.totalFiles);
+  document.getElementById('kpiFilesSub').textContent = 'across all folders';
+  document.getElementById('kpiDepth').textContent = SCAN_DATA.maxDepth;
+  document.getElementById('kpiDates').textContent = SCAN_DATA.dateRange.oldest + ' - ' + SCAN_DATA.dateRange.newest;
+  document.getElementById('kpiDatesSub').textContent = (parseInt(SCAN_DATA.dateRange.newest) - parseInt(SCAN_DATA.dateRange.oldest)) + ' years of files';
+}
+
+// ============================================================
+// TREEMAP
+// ============================================================
+const TREEMAP_COLORS = [
+  '#981e32', '#c69214', '#2563eb', '#059669', '#7c3aed',
+  '#dc2626', '#0891b2', '#ca8a04', '#6366f1', '#16a34a',
+  '#e11d48', '#0d9488', '#9333ea', '#ea580c', '#4f46e5'
+];
+
+function nodeColor(name, depth) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i);
+  const idx = Math.abs(hash) % TREEMAP_COLORS.length;
+  return TREEMAP_COLORS[idx] + (depth === 0 ? 'cc' : depth === 1 ? 'aa' : '88');
+}
+
+let treemapChart = null;
+let treemapPath = []; // stack of nodes for drill-down
+
+function getCurrentNode() {
+  if (treemapPath.length === 0) return SCAN_DATA.tree;
+  return treemapPath[treemapPath.length - 1];
+}
+
+function getTreemapData(node) {
+  if (!node.children || node.children.length === 0) {
+    // Leaf node: show the node itself as a single block
+    return [{ name: node.name, size: node.size || 1, files: node.files, modified: node.modified, hasChildren: false }];
+  }
+  return node.children.map(c => ({
+    name: c.name,
+    size: c.size || 1, // prevent zero-size from being invisible
+    files: c.files,
+    modified: c.modified,
+    hasChildren: c.children && c.children.length > 0
+  }));
+}
+
+function findChildByName(node, name) {
+  if (!node.children) return null;
+  return node.children.find(c => c.name === name) || null;
+}
+
+function updateBreadcrumb() {
+  const el = document.getElementById('breadcrumb');
+  let html = '';
+  // Root
+  html += '<span class="breadcrumb-item' + (treemapPath.length === 0 ? ' current' : '') + '" data-depth="-1">' + SCAN_DATA.tree.name + '</span>';
+  treemapPath.forEach((node, i) => {
+    html += '<span class="breadcrumb-sep">/</span>';
+    const isCurrent = i === treemapPath.length - 1;
+    html += '<span class="breadcrumb-item' + (isCurrent ? ' current' : '') + '" data-depth="' + i + '">' + node.name + '</span>';
+  });
+  el.innerHTML = html;
+
+  // Click handlers
+  el.querySelectorAll('.breadcrumb-item:not(.current)').forEach(item => {
+    item.addEventListener('click', function() {
+      const depth = parseInt(this.dataset.depth);
+      if (depth === -1) {
+        treemapPath = [];
+      } else {
+        treemapPath = treemapPath.slice(0, depth + 1);
+      }
+      renderTreemap();
+      updateBreadcrumb();
+    });
+  });
+}
+
+function renderTreemap() {
+  const currentNode = getCurrentNode();
+  const data = getTreemapData(currentNode);
+  const ctx = document.getElementById('treemapCanvas').getContext('2d');
+  const depth = treemapPath.length;
+
+  if (treemapChart) {
+    treemapChart.destroy();
+    const idx = chartInstances.indexOf(treemapChart);
+    if (idx > -1) chartInstances.splice(idx, 1);
+  }
+
+  treemapChart = new Chart(ctx, {
+    type: 'treemap',
+    data: {
+      datasets: [{
+        tree: data,
+        key: 'size',
+        groups: ['name'],
+        spacing: 2,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.5)',
+        backgroundColor: function(ctx) {
+          if (ctx.raw && ctx.raw._data) {
+            return nodeColor(ctx.raw._data.name, depth);
+          }
+          return '#cccccc';
+        },
+        labels: {
+          display: true,
+          align: 'left',
+          position: 'top',
+          color: '#ffffff',
+          font: { size: 13, weight: 'bold', family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" },
+          overflow: 'hidden',
+          formatter: function(ctx) {
+            if (ctx.raw && ctx.raw._data) {
+              const d = ctx.raw._data;
+              return [d.name, fmtBytes(d.size)];
+            }
+            return '';
+          }
+        }
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: function(items) {
+              if (items.length && items[0].raw && items[0].raw._data) {
+                return items[0].raw._data.name;
+              }
+              return '';
+            },
+            label: function(item) {
+              if (item.raw && item.raw._data) {
+                const d = item.raw._data;
+                const lines = [
+                  'Size: ' + fmtBytes(d.size),
+                  'Files: ' + fmtNum(d.files || 0),
+                  'Modified: ' + (d.modified || 'N/A')
+                ];
+                if (d.hasChildren) lines.push('Click to drill down');
+                return lines;
+              }
+              return '';
+            }
+          }
+        }
+      },
+      onClick: function(event, elements) {
+        if (elements.length > 0) {
+          const el = elements[0];
+          const raw = el.element.$context.raw;
+          if (raw && raw._data) {
+            const clickedName = raw._data.name;
+            const currentNode = getCurrentNode();
+            const child = findChildByName(currentNode, clickedName);
+            if (child && child.children && child.children.length > 0) {
+              treemapPath.push(child);
+              renderTreemap();
+              updateBreadcrumb();
+            }
+          }
+        }
+      }
+    }
+  });
+  chartInstances.push(treemapChart);
+}
+
+// ============================================================
+// AUDIT TABLE
+// ============================================================
+let auditRows = [];
+let auditSortCol = 'category';
+let auditSortDir = 'asc';
+let auditFilter = 'all';
+let auditSearchTerm = '';
+const ROW_LIMIT = 500;
+
+function buildAuditRows() {
+  const rows = [];
+  const a = SCAN_DATA.audit;
+
+  // Duplicates
+  (a.duplicates || []).forEach(d => {
+    rows.push({
+      category: 'duplicate',
+      categoryLabel: 'Duplicates',
+      path: (d.paths || []).join(', ') || d.name,
+      size: d.size || 0,
+      files: d.files || 0,
+      modified: '',
+      details: d.details || ('Folder "' + d.name + '" appears ' + d.count + ' times')
+    });
+  });
+
+  // Deep Nesting
+  (a.deepNesting || []).forEach(d => {
+    rows.push({
+      category: 'deep',
+      categoryLabel: 'Deep Nesting',
+      path: d.path,
+      size: d.size || 0,
+      files: d.files || 0,
+      modified: d.modified || '',
+      details: 'Depth: ' + d.depth + ' levels'
+    });
+  });
+
+  // Legacy Formats
+  (a.legacyFormats || []).forEach(d => {
+    rows.push({
+      category: 'legacy',
+      categoryLabel: 'Legacy Formats',
+      path: d.path,
+      size: d.size || 0,
+      files: 1,
+      modified: d.modified || '',
+      details: 'Extension: .' + d.extension
+    });
+  });
+
+  // Large Files
+  (a.largeFiles || []).forEach(d => {
+    rows.push({
+      category: 'large',
+      categoryLabel: 'Large Files',
+      path: d.path,
+      size: d.size || 0,
+      files: 1,
+      modified: d.modified || '',
+      details: fmtBytes(d.size)
+    });
+  });
+
+  // Empty Folders
+  (a.emptyFolders || []).forEach(d => {
+    rows.push({
+      category: 'empty',
+      categoryLabel: 'Empty Folders',
+      path: d.path,
+      size: 0,
+      files: 0,
+      modified: d.modified || '',
+      details: 'No files'
+    });
+  });
+
+  // Old Files
+  (a.oldFiles || []).forEach(d => {
+    rows.push({
+      category: 'old',
+      categoryLabel: 'Old Files',
+      path: d.path,
+      size: d.size || 0,
+      files: 1,
+      modified: d.modified || '',
+      details: 'Last modified: ' + d.modified
+    });
+  });
+
+  return rows;
+}
+
+function getFilteredSortedRows() {
+  let rows = auditRows.slice();
+
+  // Filter by category
+  if (auditFilter !== 'all') {
+    rows = rows.filter(r => r.category === auditFilter);
+  }
+
+  // Filter by search
+  if (auditSearchTerm) {
+    const term = auditSearchTerm.toLowerCase();
+    rows = rows.filter(r => r.path.toLowerCase().includes(term) || r.details.toLowerCase().includes(term));
+  }
+
+  // Sort
+  rows.sort((a, b) => {
+    let va = a[auditSortCol];
+    let vb = b[auditSortCol];
+    if (auditSortCol === 'size' || auditSortCol === 'files') {
+      va = Number(va) || 0;
+      vb = Number(vb) || 0;
+    } else {
+      va = String(va).toLowerCase();
+      vb = String(vb).toLowerCase();
+    }
+    if (va < vb) return auditSortDir === 'asc' ? -1 : 1;
+    if (va > vb) return auditSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  return rows;
+}
+
+function renderAuditTable() {
+  const rows = getFilteredSortedRows();
+  const tbody = document.getElementById('auditBody');
+  const limitMsg = document.getElementById('rowLimitMsg');
+  const summary = document.getElementById('auditSummary');
+
+  // Summary
+  const totalSize = rows.reduce((s, r) => s + (r.size || 0), 0);
+  summary.innerHTML = '<strong>' + fmtNum(rows.length) + '</strong> finding' + (rows.length !== 1 ? 's' : '') +
+    ' &bull; <strong>' + fmtBytes(totalSize) + '</strong> total size';
+
+  // Limit
+  const limited = rows.length > ROW_LIMIT;
+  const displayRows = limited ? rows.slice(0, ROW_LIMIT) : rows;
+
+  if (limited) {
+    limitMsg.textContent = 'Showing first ' + ROW_LIMIT + ' of ' + fmtNum(rows.length) + ' results. Use search or filters to narrow down.';
+    limitMsg.style.display = 'block';
+  } else {
+    limitMsg.style.display = 'none';
+  }
+
+  // Render rows
+  let html = '';
+  displayRows.forEach(r => {
+    html += '<tr>';
+    html += '<td><span class="status-pill pill-' + r.category + '">' + r.categoryLabel + '</span></td>';
+    html += '<td>' + escHtml(r.path) + '</td>';
+    html += '<td class="right">' + (r.size ? fmtBytes(r.size) : '--') + '</td>';
+    html += '<td class="right">' + (r.files ? fmtNum(r.files) : '--') + '</td>';
+    html += '<td>' + escHtml(r.modified || '--') + '</td>';
+    html += '<td>' + escHtml(r.details) + '</td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+
+  // Update sort arrows
+  document.querySelectorAll('#auditTable thead th').forEach(th => {
+    th.classList.remove('asc', 'desc');
+    if (th.dataset.col === auditSortCol) {
+      th.classList.add(auditSortDir);
+      const arrows = th.querySelector('.sort-arrows');
+      if (arrows) arrows.innerHTML = auditSortDir === 'asc' ? '&#x25B2;' : '&#x25BC;';
+    } else {
+      const arrows = th.querySelector('.sort-arrows');
+      if (arrows) arrows.innerHTML = '&#x25B4;&#x25BE;';
+    }
+  });
+}
+
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function initAuditTable() {
+  auditRows = buildAuditRows();
+
+  // Sort handlers
+  document.querySelectorAll('#auditTable thead th[data-col]').forEach(th => {
+    th.addEventListener('click', function() {
+      const col = this.dataset.col;
+      if (col === 'details') return; // not sortable
+      if (auditSortCol === col) {
+        auditSortDir = auditSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        auditSortCol = col;
+        auditSortDir = 'asc';
+      }
+      renderAuditTable();
+    });
+  });
+
+  // Filter handlers
+  document.querySelectorAll('#auditFilterBar .filter-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#auditFilterBar .filter-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      auditFilter = this.dataset.filter;
+      renderAuditTable();
+    });
+  });
+
+  // Search handler
+  document.getElementById('auditSearch').addEventListener('input', function() {
+    auditSearchTerm = this.value.trim();
+    renderAuditTable();
+  });
+
+  renderAuditTable();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+  initDarkMode();
+  initTabs();
+  populateKPIs();
+  updateBreadcrumb();
+  renderTreemap();
+  initAuditTable();
+});
+</script>
+</body>
+</html>
