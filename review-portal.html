@@ -984,13 +984,14 @@ function pollAnalysis(jobId) {
           status.style.color = 'var(--text-light)';
         }
       } else if (resp.status === 404) {
-        // Analysis not ready yet — check if job failed
+        // Analysis not ready yet — check if job failed or already finished
         const jobResp = await apiFetch('/api/jobs');
         if (jobResp.ok) {
           const jobData = await jobResp.json();
           const jobs = Array.isArray(jobData) ? jobData : (jobData.jobs || []);
           const job = jobs.find(j => j.id === jobId);
-          if (job && job.status === 'Failed') {
+          if (!job || (job && job.status !== 'Analyzing')) {
+            // Job doesn't exist, already completed, or in unexpected state — stop polling
             clearInterval(analysisPoller);
             analysisPoller = null;
             currentAnalysisJobId = null;
@@ -1000,9 +1001,15 @@ function pollAnalysis(jobId) {
             btn.classList.remove('loading');
             btn.textContent = 'Analyze PDF';
             const status = document.getElementById('submitStatus');
-            status.textContent = 'Analysis failed: ' + (job.error || 'Unknown error');
-            status.className = 'submit-status has-error';
-            status.style.color = 'var(--red)';
+            if (!job) {
+              status.textContent = 'Job ' + jobId + ' not found. It may have been cleaned up.';
+            } else if (job.status === 'Failed') {
+              status.textContent = 'Analysis failed: ' + (job.error || 'Unknown error');
+              status.className = 'submit-status has-error';
+            } else {
+              status.textContent = 'Job ' + jobId + ' is ' + job.status + '. No analysis pending.';
+            }
+            status.style.color = 'var(--text-light)';
           }
         }
       }
