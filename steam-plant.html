@@ -393,9 +393,10 @@
 
   <!-- ==================== OVERVIEW TAB ==================== -->
   <div class="section active" id="sec-overview">
-    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
+    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
       <label for="fySelect" style="font-weight:600; font-size:0.9rem; color:var(--text);">Fiscal Year:</label>
       <select id="fySelect" style="padding:0.4rem 0.8rem; border:2px solid var(--border); border-radius:6px; font-size:0.85rem; background:var(--card-bg); color:var(--text); cursor:pointer;"></select>
+      <span id="fyPeriodInfo" style="font-size:0.85rem; color:var(--text-light); margin-left:0.5rem;"></span>
     </div>
     <div class="kpi-grid" id="kpiOverview"></div>
     <div class="chart-row">
@@ -1003,14 +1004,11 @@ function renderOverviewTab(M, labels) {
       };
     });
 
-    // Data period KPI
-    kpis.push({
-      label: 'Data Period', value: fy + ' (' + monthsElapsed + ' of 12 mo)',
-      sub: fyMonths.length > 0 ? monthLabel(fyMonths[0].month) + ' \u2013 ' + monthLabel(fyMonths[fyMonths.length-1].month) : 'No data',
-      cls: 'info', tip: DATA.meta.dayCount + ' daily rows total in dataset'
-    });
-
     renderKPIs('kpiOverview', kpis);
+
+    // Data period inline next to FY selector
+    const periodRange = fyMonths.length > 0 ? monthLabel(fyMonths[0].month) + ' \u2013 ' + monthLabel(fyMonths[fyMonths.length-1].month) : 'No data';
+    document.getElementById('fyPeriodInfo').textContent = monthsElapsed + ' of 12 months \u00B7 ' + periodRange;
 
     // --- Charts ---
     // Destroy existing overview charts
