@@ -1326,6 +1326,26 @@ function applyQueueFilters() {
   renderQueue(filtered);
 }
 
+async function downloadFile(url, filename) {
+  try {
+    const resp = await apiFetch(url);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      alert('Download failed: ' + (err.error || resp.statusText));
+      return;
+    }
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+  } catch (e) {
+    alert('Download error: ' + e.message);
+  }
+}
+
 async function deleteJob(jobId, name) {
   if (!confirm('Delete job ' + jobId + (name ? ' (' + name + ')' : '') + '?\n\nThis permanently removes all files.')) return;
   try {
@@ -1358,7 +1378,7 @@ function renderQueue(jobs) {
     if (sc === 'complete' && j.outputFiles && j.outputFiles.length) {
       dl = '<div class="download-links">' +
         j.outputFiles.map(f =>
-          '<a href="/api/download/' + esc(j.id) + '/' + esc(f) + '" target="_blank">' + esc(f) + '</a>'
+          '<a href="#" onclick="event.preventDefault();downloadFile(\'/api/download/' + esc(j.id) + '/' + esc(f) + '\',\'' + esc(f) + '\')">' + esc(f) + '</a>'
         ).join('') + '</div>';
     } else if (sc === 'failed') {
       const errId = 'err-' + j.id;
@@ -1376,7 +1396,7 @@ function renderQueue(jobs) {
       failHtml += '<div class="error-full" id="' + errId + '">' + esc(j.error) + '</div>';
       if (j.errorLogs && j.errorLogs.length) {
         failHtml += '<div class="log-links">' +
-          j.errorLogs.map(f => '<a href="/api/logs/' + esc(j.id) + '/' + esc(f) + '" target="_blank">' + esc(f) + '</a>').join('') +
+          j.errorLogs.map(f => '<a href="#" onclick="event.preventDefault();downloadFile(\'/api/logs/' + esc(j.id) + '/' + esc(f) + '\',\'' + esc(f) + '\')">' + esc(f) + '</a>').join('') +
           '</div>';
       }
       dl = failHtml;
