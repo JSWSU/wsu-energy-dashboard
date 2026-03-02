@@ -204,13 +204,15 @@ AVG_KEYS = {
     'fuel_oil_level',     # tank level — average
 }
 
-# Keys that should take MAX (cumulative counters — runtime)
+# Keys that should take MAX (cumulative counters — runtime, kWh, gas, fuel)
 MAX_KEYS = {
     'b1_runtime', 'b2_runtime',
     'b3_runtime_gas', 'b3_runtime_oil', 'b3_runtime_total',
     'b4_runtime_gas', 'b4_runtime_oil', 'b4_runtime_total',
     'b5_runtime_gas', 'b5_runtime_oil', 'b5_runtime_total',
     'gen1_runtime', 'gen2_runtime', 'gen3_runtime',
+    'gen1_kwh', 'gen2_kwh', 'gen3_kwh',
+    'gen1_gas', 'gen2_gas', 'gen3_fuel_gal',
 }
 
 # Column metadata for the JSON
