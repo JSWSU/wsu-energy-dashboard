@@ -338,6 +338,9 @@
     color: var(--text-light); padding: 0.25rem;
   }
   .drill-close:hover { color: var(--text); }
+  .btn-sm { display:inline-block; padding:6px 16px; font-size:0.85rem; border:none; border-radius:6px; cursor:pointer; background:var(--secondary); color:#fff; }
+  .btn-sm.primary { background:var(--primary); }
+  .btn-sm.primary:hover { background:var(--primary-dark); }
   .up-field { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; }
   .up-field label { min-width:160px; font-size:0.85rem; color:var(--text); }
   .up-field input, #upElecTable input { width:100%; max-width:160px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card-bg); color:var(--text); font-size:0.85rem; }
@@ -1609,11 +1612,12 @@ function generateUPExcel() {
     const mmyy = mo + yr.slice(2);
     const monthName = monthLabel(UP_CURRENT.month);
 
-    // Manual field reader
+    // Manual field reader — always read live DOM first
     const mv = (id) => {
-      if (UP_CURRENT.manual && UP_CURRENT.manual[id] != null) return UP_CURRENT.manual[id];
       const el = document.getElementById(id);
-      return el && el.value ? parseFloat(el.value) : 0;
+      if (el && el.value !== '') return parseFloat(el.value);
+      if (UP_CURRENT && UP_CURRENT.manual && UP_CURRENT.manual[id] != null) return UP_CURRENT.manual[id];
+      return 0;
     };
 
     const ws = {};
@@ -1802,25 +1806,32 @@ function generateUPExcel() {
     // Row 45: Circuit IDs
     for (let i = 0; i < 5; i++) setCell(bCols[i] + '45', circIDs[i], 's');
 
-    // Row 46-48: Generator kWh
-    setCell('A46', 'Gen #1 kWh', 's'); setCell('H46', a.gen1_kwh); setCell('I46', a.gen1_kwh);
-    setCell('A47', 'Gen #2 kWh', 's'); setCell('H47', a.gen2_kwh); setCell('I47', a.gen2_kwh);
-    setCell('A48', 'Gen #3 kWh', 's'); setCell('H48', a.gen3_kwh); setCell('I48', a.gen3_kwh);
-
     // Circuit data from DOM
     const circKwh = Array.from(document.querySelectorAll('.up-circ-kwh')).map(el => el.value ? parseFloat(el.value) : 0);
     const circCost = Array.from(document.querySelectorAll('.up-circ-cost')).map(el => el.value ? parseFloat(el.value) : 0);
     const circKva = Array.from(document.querySelectorAll('.up-circ-kva')).map(el => el.value ? parseFloat(el.value) : 0);
 
-    // Row 46 also: Peak KVA
-    setCell('A46', 'Peak KVA', 's');
-    for (let i = 0; i < 5; i++) setCell(bCols[i] + '46', circKva[i]);
+    // Row 46: Date of Peak Demand (B-F left blank for manual entry) + Gen 1 kWh (H-I)
+    setCell('A46', 'Date of Peak Demand', 's');
+    setCell('H46', 'Gen 1', 's'); setCell('I46', a.gen1_kwh);
 
-    // Row 49: kWh Received
+    // Row 47: Time of Peak Demand (B-F left blank for manual entry) + Gen 2 kWh (H-I)
+    setCell('A47', 'Time of Peak Demand', 's');
+    setCell('H47', 'Gen 2', 's'); setCell('I47', a.gen2_kwh);
+
+    // Row 48: Demand Peak KVA (B-F) + Gen 3 kWh (H-I)
+    setCell('A48', 'Demand Peak KVA', 's');
+    for (let i = 0; i < 5; i++) setCell(bCols[i] + '48', circKva[i]);
+    setCell('H48', 'Gen 3', 's'); setCell('I48', a.gen3_kwh);
+
+    // Row 49: Biotech gen kWh + Total Gen kWh
+    setCell('H49', 'Biotech', 's'); setCell('I49', mv('up_biotech_kwh'));
+    setCell('H50', 'Total Gen kWh:', 's'); setCell('I50', 'SUM(I46:I49)', 'f');
+
+    // Row 49: kWh Received (A-G, H-I already used by gen kWh above)
     setCell('A49', 'kWh Received', 's');
     for (let i = 0; i < 5; i++) setCell(bCols[i] + '49', circKwh[i]);
     setCell('G49', 'SUM(B49:F49)', 'f');
-    setCell('I49', mv('up_biotech_kwh'));
 
     // Row 50: Total Cost
     setCell('A50', 'Total Cost ($)', 's');
@@ -1834,7 +1845,7 @@ function generateUPExcel() {
 
     // Row 52: Account numbers
     setCell('A52', 'Account #', 's');
-    const acctNums = ['3192-40612-5310','3192-40612-5310','3192-40612-5310','3192-40612-5310','3192-40612-5310'];
+    const acctNums = ['15400-44701-0', '15400-45902-0', '15400-44201-1', '15400-43001-2', '15400-44801-0'];
     for (let i = 0; i < 5; i++) setCell(bCols[i] + '52', acctNums[i], 's');
 
     // Sheet properties
@@ -1999,15 +2010,16 @@ function renderUPPreview() {
   }
   const a = UP_CURRENT.auto;
 
-  // Manual field reader — always read live from DOM
+  // Manual field reader — always read live DOM first
   const mv = (id) => {
-    if (UP_CURRENT.manual && UP_CURRENT.manual[id] != null) return UP_CURRENT.manual[id];
     const el = document.getElementById(id);
-    return el && el.value ? parseFloat(el.value) : 0;
+    if (el && el.value !== '') return parseFloat(el.value);
+    if (UP_CURRENT && UP_CURRENT.manual && UP_CURRENT.manual[id] != null) return UP_CURRENT.manual[id];
+    return 0;
   };
 
   // Cell formatting helpers
-  const fmtC = (v, dec, cls) => '<td class="' + cls + '" style="text-align:right;">' + (v ? fmt(v, dec || 0) : '&mdash;') + '</td>';
+  const fmtC = (v, dec, cls) => '<td class="' + cls + '" style="text-align:right;">' + (v != null ? fmt(v, dec || 0) : '&mdash;') + '</td>';
   const fmtA = (v, dec) => fmtC(v, dec, 'up-auto');
   const fmtM = (v, dec) => fmtC(v, dec, 'up-manual');
   const fmtF = (v, dec) => fmtC(v, dec, 'up-calc');
