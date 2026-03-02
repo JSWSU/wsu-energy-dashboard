@@ -338,6 +338,17 @@
     color: var(--text-light); padding: 0.25rem;
   }
   .drill-close:hover { color: var(--text); }
+  .up-field { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; }
+  .up-field label { min-width:160px; font-size:0.85rem; color:var(--text); }
+  .up-field input, #upElecTable input { width:100%; max-width:160px; padding:4px 8px; border:1px solid var(--border); border-radius:4px; background:var(--card-bg); color:var(--text); font-size:0.85rem; }
+  .up-field input:focus, #upElecTable input:focus { border-color:var(--primary); outline:none; }
+  #upElecTable input { max-width:110px; }
+  .up-auto { background:#dcfce7; }
+  html.dark .up-auto { background:#064e3b; }
+  .up-manual { background:#dbeafe; }
+  html.dark .up-manual { background:#1e3a5f; }
+  .up-calc { background:#f3f4f6; }
+  html.dark .up-calc { background:#1f2937; }
 </style>
 </head>
 <body>
@@ -389,6 +400,7 @@
     <button class="nav-tab" data-tab="runtime">Runtime &amp; Availability</button>
     <button class="nav-tab" data-tab="water">Plant Water</button>
     <button class="nav-tab" data-tab="data">Data Management</button>
+    <button class="nav-tab" data-tab="up">UP Report</button>
     <button class="nav-tab" data-tab="help">Help</button>
   </div>
 
@@ -544,6 +556,96 @@
     <div class="card">
       <h2>Data Inventory</h2>
       <div class="table-wrap"><table id="tblInventory"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ==================== UP REPORT TAB ==================== -->
+  <div class="section" id="sec-up">
+    <div class="card">
+      <h2>Utilities Production (UP) Report Generator</h2>
+      <div class="info-box" style="margin-bottom:1rem;">
+        Select a month to auto-populate steam production, gas consumption, and generator data from the Steam Plant database. Fill in manual fields (gas costs, electric, water) from invoices, then generate the Excel report.
+      </div>
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+        <label for="upMonth" style="font-weight:600;">Report Month:</label>
+        <select id="upMonth" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card-bg);color:var(--text);font-size:0.95rem;"></select>
+        <button id="upLoadBtn" class="btn-sm primary">Load Data</button>
+        <span id="upStatus" style="color:var(--text-light);font-size:0.85rem;"></span>
+      </div>
+    </div>
+
+    <div class="card" id="upAutoCard" style="display:none;">
+      <h2>Auto-Populated Data <span style="font-size:0.75rem;color:var(--green);font-weight:400;">(from Steam Plant database)</span></h2>
+      <div class="table-wrap">
+        <table id="upAutoTable" class="data-table" style="font-size:0.85rem;">
+          <thead id="upAutoHead"></thead>
+          <tbody id="upAutoBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" id="upManualCard" style="display:none;">
+      <h2>Manual Entry Fields <span style="font-size:0.75rem;color:var(--blue);font-weight:400;">(from invoices &amp; reports)</span></h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;">
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:1rem;">
+          <legend style="font-weight:600;color:var(--primary);padding:0 0.5rem;">Gas &amp; Fuel Costs</legend>
+          <div class="up-field"><label>Gas Delivered (MMBTU):</label><input type="number" id="up_gas_mmbtu" step="any" placeholder="From Kintec bill"></div>
+          <div class="up-field"><label>Gas BTU/cuft:</label><input type="number" id="up_btu_cuft" step="any" placeholder="From BTU report"></div>
+          <div class="up-field"><label>Gas Cost/Therm ($):</label><input type="number" id="up_gas_cost_therm" step="any" placeholder="From Kintec invoice"></div>
+          <div class="up-field"><label>Oil Cost/Gallon ($):</label><input type="number" id="up_oil_cost_gal" step="any" placeholder="From Coleman invoice"></div>
+        </fieldset>
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:1rem;">
+          <legend style="font-weight:600;color:var(--primary);padding:0 0.5rem;">Weather &amp; Steam Stats</legend>
+          <div class="up-field"><label>Heating Degree Days:</label><input type="number" id="up_hdd" step="any" placeholder="Auto-filled if available"></div>
+          <div class="up-field"><label>Cooling Degree Days:</label><input type="number" id="up_cdd" step="any" placeholder="Auto-filled if available"></div>
+          <div class="up-field"><label>Max Lbs/Hr Steam:</label><input type="number" id="up_max_lbs_hr" step="any" placeholder="From operator log"></div>
+          <div class="up-field"><label>Min Lbs/Hr Steam:</label><input type="number" id="up_min_lbs_hr" step="any" placeholder="From operator log"></div>
+        </fieldset>
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:1rem;">
+          <legend style="font-weight:600;color:var(--primary);padding:0 0.5rem;">Avista Electric (per circuit)</legend>
+          <div class="table-wrap">
+            <table style="width:100%;font-size:0.85rem;" id="upElecTable">
+              <thead><tr><th>Circuit</th><th>kWh</th><th>Cost ($)</th><th>Peak KVA</th></tr></thead>
+              <tbody>
+                <tr><td>MP-A (TUR-111)</td><td><input type="number" class="up-circ-kwh" step="any"></td><td><input type="number" class="up-circ-cost" step="any"></td><td><input type="number" class="up-circ-kva" step="any"></td></tr>
+                <tr><td>MP-C (SPU124+TVW131)</td><td><input type="number" class="up-circ-kwh" step="any"></td><td><input type="number" class="up-circ-cost" step="any"></td><td><input type="number" class="up-circ-kva" step="any"></td></tr>
+                <tr><td>MP-D (SPU-122)</td><td><input type="number" class="up-circ-kwh" step="any"></td><td><input type="number" class="up-circ-cost" step="any"></td><td><input type="number" class="up-circ-kva" step="any"></td></tr>
+                <tr><td>MP-E (TUR-115)</td><td><input type="number" class="up-circ-kwh" step="any"></td><td><input type="number" class="up-circ-cost" step="any"></td><td><input type="number" class="up-circ-kva" step="any"></td></tr>
+                <tr><td>MP-G (SPU-125)</td><td><input type="number" class="up-circ-kwh" step="any"></td><td><input type="number" class="up-circ-cost" step="any"></td><td><input type="number" class="up-circ-kva" step="any"></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="up-field" style="margin-top:0.75rem;"><label>Biotech kWh:</label><input type="number" id="up_biotech_kwh" step="any" placeholder="Route A meter"></div>
+        </fieldset>
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:1rem;">
+          <legend style="font-weight:600;color:var(--primary);padding:0 0.5rem;">Fresh Water (well readings)</legend>
+          <div class="up-field"><label>Well #4 (gal):</label><input type="number" id="up_well4" step="any"></div>
+          <div class="up-field"><label>Well #6 (gal):</label><input type="number" id="up_well6" step="any"></div>
+          <div class="up-field"><label>Well #7 (gal):</label><input type="number" id="up_well7" step="any"></div>
+          <div class="up-field"><label>Well #8 (gal):</label><input type="number" id="up_well8" step="any"></div>
+          <div class="up-field"><label>Lbs Chlorine:</label><input type="number" id="up_chlorine" step="any"></div>
+        </fieldset>
+        <fieldset style="border:1px solid var(--border);border-radius:8px;padding:1rem;">
+          <legend style="font-weight:600;color:var(--primary);padding:0 0.5rem;">Budget &amp; Labor</legend>
+          <div class="up-field"><label>Steam Plant Labor ($):</label><input type="number" id="up_labor" step="any"></div>
+          <div class="up-field"><label>Goods &amp; Services ($):</label><input type="number" id="up_gs" step="any"></div>
+        </fieldset>
+      </div>
+      <div style="margin-top:1.5rem;display:flex;gap:1rem;flex-wrap:wrap;">
+        <button id="upSaveBtn" class="btn-sm primary">Save Manual Entries</button>
+        <button id="upGenBtn" class="btn-sm primary" style="background:#059669;">Generate UP Report Excel</button>
+        <span id="upSaveStatus" style="color:var(--green);font-size:0.85rem;"></span>
+      </div>
+    </div>
+
+    <div class="card" id="upPreviewCard" style="display:none;">
+      <h2>Report Preview</h2>
+      <div class="info-box" style="margin-bottom:1rem;">
+        <span style="display:inline-block;width:12px;height:12px;background:#dcfce7;border:1px solid #86efac;border-radius:2px;margin-right:4px;"></span> Auto-filled &nbsp;
+        <span style="display:inline-block;width:12px;height:12px;background:#dbeafe;border:1px solid #93c5fd;border-radius:2px;margin-right:4px;"></span> Manual entry &nbsp;
+        <span style="display:inline-block;width:12px;height:12px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:2px;margin-right:4px;"></span> Calculated
+      </div>
+      <div class="table-wrap" id="upPreviewWrap"></div>
     </div>
   </div>
 
@@ -718,6 +820,53 @@ const COLORS = {
   gen1: '#6366f1', gen2: '#ec4899', gen3: '#f97316',
   water: '#3b82f6', oil: '#92400e'
 };
+
+/* ── UP Report constants ────────────────────────────────────────── */
+const UP_BOILERS = ['b1','b2','b3','b4','b5'];
+const UP_BOILER_LABELS = ['Boiler #1','Boiler #2','Boiler #3','Boiler #4','Boiler #5'];
+
+const UP_AUTO = {
+  b1_days: { key: 'b1_runtime', delta: true, divide: 24 },
+  b2_days: { key: 'b2_runtime', delta: true, divide: 24 },
+  b3_days: { key: 'b3_runtime_total', delta: true, divide: 24 },
+  b4_days: { key: 'b4_runtime_total', delta: true, divide: 24 },
+  b5_days: { key: 'b5_runtime_total', delta: true, divide: 24 },
+  b1_steam: { key: 'b1_steam_gas' },
+  b2_steam: { key: 'b2_steam_gas' },
+  b3_steam: { key: 'b3_steam_gas' },
+  b4_steam: { key: 'b4_steam_gas' },
+  b5_steam: { key: 'b5_steam_gas' },
+  b3_steam_oil: { key: 'b3_steam_oil' },
+  b4_steam_oil: { key: 'b4_steam_oil' },
+  b5_steam_oil: { key: 'b5_steam_oil' },
+  b3_oil: { key: 'b3_oil' },
+  b4_oil: { key: 'b4_oil' },
+  b5_oil: { key: 'b5_oil' },
+  b1_gas: { key: 'b1_gas' },
+  b2_gas: { key: 'b2_gas' },
+  b3_gas: { key: 'b3_gas' },
+  b4_gas: { key: 'b4_gas' },
+  b5_gas: { key: 'b5_gas' },
+  gen1_gas: { key: 'gen1_gas', delta: true },
+  gen2_gas: { key: 'gen2_gas', delta: true },
+  gen1_kwh: { key: 'gen1_kwh', delta: true },
+  gen2_kwh: { key: 'gen2_kwh', delta: true },
+  gen3_kwh: { key: 'gen3_kwh', delta: true },
+  gen3_fuel: { key: 'gen3_fuel_gal', delta: true }
+};
+
+const UP_MANUAL_FIELDS = [
+  'up_gas_mmbtu', 'up_btu_cuft', 'up_gas_cost_therm', 'up_oil_cost_gal',
+  'up_hdd', 'up_cdd', 'up_max_lbs_hr', 'up_min_lbs_hr',
+  'up_biotech_kwh',
+  'up_well4', 'up_well6', 'up_well7', 'up_well8', 'up_chlorine',
+  'up_labor', 'up_gs'
+];
+
+function fyMonthIndex(monthStr) {
+  const m = parseInt(monthStr.split('-')[1]);
+  return m >= 7 ? m - 7 : m + 5;
+}
 
 function applyChartTheme() {
   const dark = document.documentElement.classList.contains('dark');
@@ -921,6 +1070,7 @@ function renderKPIs(containerId, kpis) {
 //  DATA STORE
 // ============================================================
 let DATA = null; // { meta, columns, monthly, daily }
+let ENERGY_DATA = null;
 
 async function loadData() {
   const resp = await fetch('data/steam_plant.json');
@@ -939,6 +1089,11 @@ async function init() {
     return;
   }
   document.getElementById('loading').style.display = 'none';
+
+  try {
+    const eresp = await fetch('data.json');
+    if (eresp.ok) ENERGY_DATA = await eresp.json();
+  } catch(e) { console.warn('data.json not loaded — UP Report electric/weather fields will be empty'); }
 
   const M = DATA.monthly;
   const labels = M.map(m => monthLabel(m.month));
@@ -968,6 +1123,7 @@ async function init() {
   renderRuntimeTab(M, labels);
   renderWaterTab(M, labels);
   renderDataManagement();
+  renderUPTab();
   buildPrintSummary(M);
 }
 
@@ -1313,6 +1469,34 @@ function renderWaterTab(M, labels) {
     { label: 'CASP West', data: M.map(m => m.casp_west_water || 0), backgroundColor: '#8b5cf6cc' },
   ]);
 }
+
+// ============================================================
+//  UP REPORT TAB
+// ============================================================
+let UP_CURRENT = null;
+
+function renderUPTab() {
+  const M = DATA.monthly;
+  const sel = document.getElementById('upMonth');
+  sel.innerHTML = '';
+  const months = M.map(m => m.month).reverse();
+  months.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = monthLabel(m);
+    sel.appendChild(opt);
+  });
+  document.getElementById('upLoadBtn').addEventListener('click', loadUPMonth);
+  document.getElementById('upSaveBtn').addEventListener('click', saveUPManual);
+  document.getElementById('upGenBtn').addEventListener('click', generateUPExcel);
+}
+
+function loadUPMonth() { console.log('loadUPMonth stub'); }
+function saveUPManual() { console.log('saveUPManual stub'); }
+function generateUPExcel() { console.log('generateUPExcel stub'); }
+function renderAutoTable(auto) { console.log('renderAutoTable stub'); }
+function loadUPManual(monthStr) { console.log('loadUPManual stub'); }
+function renderUPPreview() { document.getElementById('upPreviewWrap').innerHTML = '<p style="color:var(--text-light);">Preview will appear here.</p>'; }
 
 // ============================================================
 //  TAB 6: DATA MANAGEMENT
