@@ -192,6 +192,154 @@ def list_standards_source_files(base_dir, group):
     return files
 
 
+def build_worker_prompt(job, group, active_divs, page_text, standards_text, standards_name):
+    """Build a self-contained worker prompt with embedded page text and standards."""
+    divs_str = ', '.join(active_divs)
+    divs_json = ', '.join(f'"{d}"' for d in active_divs)
+
+    prompt = f"""You are reviewing construction drawings for WSU design standards compliance.
+Project: {job['projectName']}
+Phase: {job['reviewPhase']}
+Construction type: {job['constructionType']}
+
+DISCIPLINE: {group['name']} (Divisions {divs_str})
+Standards section: {standards_name}
+
+=== DRAWING PAGES ===
+{page_text}
+
+=== WSU DESIGN STANDARDS ({standards_name}) ===
+{standards_text}
+
+=== INSTRUCTIONS ===
+Review EVERY numbered requirement, clause, and sub-clause in the standards
+section above against the drawing pages. For each requirement, assign status:
+  [C] Compliant - requirement is met in the drawings
+  [D] Deviation - requirement is partially met or met differently
+  [O] Omission - requirement is not addressed in the drawings
+  [X] Concern - requirement needs clarification or further review
+  [NA] Not Applicable - requirement does not apply at this review phase
+
+OUTPUT FORMAT:
+Return a single JSON object:
+{{
+  "discipline": "{group['key']}",
+  "standards_section": "{standards_name}",
+  "divisions_reviewed": [{divs_json}],
+  "summary": {{
+    "total_requirements": N,
+    "compliant": N,
+    "deviations": N,
+    "omissions": N,
+    "concerns": N,
+    "not_applicable": N
+  }},
+  "requirements": [
+    // For COMPLIANT or NA items, use 4-field minimal format:
+    {{ "csi_code": "09 21 16", "requirement": "Short description", "status": "C", "drawing_sheet": "A-301" }},
+
+    // For NON-COMPLIANT items (D, O, X), use full format:
+    {{
+      "division": "09",
+      "csi_code": "09 21 16",
+      "requirement": "Full requirement text",
+      "status": "D",
+      "severity": "Critical|Major|Minor",
+      "finding_id": "F-{group['key']}-NNN",
+      "pdf_reference": "Sheet A-301, Detail 4",
+      "standard_reference": "Section 09 21 16.3.B",
+      "issue": "Description of the non-compliance",
+      "required_action": "What needs to change",
+      "drawing_sheet": "A-301",
+      "notes": "Additional context"
+    }}
+  ]
+}}
+
+RULES:
+- Summary counts MUST match: total = compliant + deviations + omissions + concerns + not_applicable
+- Compliant and NA items MUST use 4-field minimal format
+- Every non-compliant finding MUST have severity, issue, and required_action
+- Properly escape all quotes in JSON strings. Use "in." not raw inch marks.
+- Be thorough. Check EVERY requirement. Depth over speed.
+"""
+    return prompt
+
+
+def plan_workers(job_dir, job, analysis, base_dir):
+    """Plan all workers across all disciplines. Returns list of worker configs."""
+    selected = set(job.get('divisions', []))
+    workers = []
+
+    for group in DISCIPLINE_GROUPS:
+        # Filter to groups that have user-selected divisions
+        active_divs = [d for d in group['divs'] if d in selected]
+        if not active_divs:
+            continue
+
+        # Get page text for this discipline
+        page_text, page_nums = get_page_text_for_discipline(job_dir, analysis, group['key'])
+
+        # Get individual standards source files
+        standards_files = list_standards_source_files(base_dir, group)
+
+        if not standards_files:
+            log(f"  WARNING: No standards files found for {group['name']}", job_dir)
+            continue
+
+        # One worker per source file (aggressive splitting)
+        for std_relpath, std_content in standards_files:
+            prompt_text = build_worker_prompt(
+                job=job,
+                group=group,
+                active_divs=active_divs,
+                page_text=page_text,
+                standards_text=std_content,
+                standards_name=std_relpath,
+            )
+
+            total_tokens = estimate_tokens(prompt_text)
+
+            if total_tokens > MAX_TOKENS_PER_WORKER:
+                # Split pages into halves and create 2 workers
+                mid = len(page_nums) // 2
+                for half_idx, half_pages in enumerate([page_nums[:mid], page_nums[mid:]], 1):
+                    half_text = '\n\n'.join(
+                        f'--- Page {pg} ---\n{load_page_text(job_dir, pg)[1]}'
+                        for pg in half_pages
+                        if load_page_text(job_dir, pg)[1].strip()
+                    )
+                    half_prompt = build_worker_prompt(
+                        job=job,
+                        group=group,
+                        active_divs=active_divs,
+                        page_text=half_text,
+                        standards_text=std_content,
+                        standards_name=std_relpath,
+                    )
+                    worker_key = f"{group['key']}-{Path(std_relpath).stem}-pg{half_idx}"
+                    workers.append({
+                        'key': worker_key,
+                        'discipline': group['key'],
+                        'discipline_name': group['name'],
+                        'standards_file': std_relpath,
+                        'prompt': half_prompt,
+                        'tokens_est': estimate_tokens(half_prompt),
+                    })
+            else:
+                worker_key = f"{group['key']}-{Path(std_relpath).stem}"
+                workers.append({
+                    'key': worker_key,
+                    'discipline': group['key'],
+                    'discipline_name': group['name'],
+                    'standards_file': std_relpath,
+                    'prompt': prompt_text,
+                    'tokens_est': total_tokens,
+                })
+
+    return workers
+
+
 def estimate_tokens(text):
     """Estimate token count from character count."""
     return len(text) // CHARS_PER_TOKEN
