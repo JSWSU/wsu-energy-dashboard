@@ -340,6 +340,223 @@ def plan_workers(job_dir, job, analysis, base_dir):
     return workers
 
 
+def find_claude_exe():
+    """Find the claude.exe CLI path."""
+    # Check common locations
+    appdata = os.environ.get('APPDATA', '')
+    claude_dir = os.path.join(appdata, 'Claude', 'claude-code')
+    if os.path.isdir(claude_dir):
+        for ver_dir in sorted(os.listdir(claude_dir), reverse=True):
+            exe = os.path.join(claude_dir, ver_dir, 'claude.exe')
+            if os.path.isfile(exe):
+                return exe
+    # Fallback: assume it's on PATH
+    return 'claude'
+
+
+def run_worker(worker, output_dir, claude_path):
+    """Execute a single worker. Returns (worker_key, success, json_data_or_none)."""
+    key = worker['key']
+    out_file = os.path.join(output_dir, f'worker-{key}-findings.json')
+    stdout_log = os.path.join(output_dir, f'worker-{key}-stdout.log')
+    stderr_log = os.path.join(output_dir, f'worker-{key}-stderr.log')
+
+    try:
+        result = subprocess.run(
+            [claude_path, '-p', worker['prompt'],
+             '--model', 'sonnet',
+             '--output-format', 'text',
+             '--dangerously-skip-permissions'],
+            capture_output=True, text=True, timeout=WORKER_TIMEOUT,
+            env={**os.environ, 'CLAUDE_CODE_MAX_OUTPUT_TOKENS': '16000'}
+        )
+
+        # Save logs
+        with open(stdout_log, 'w', encoding='utf-8') as f:
+            f.write(result.stdout or '')
+        with open(stderr_log, 'w', encoding='utf-8') as f:
+            f.write(result.stderr or '')
+
+        # Try to parse JSON from stdout
+        raw = result.stdout.strip()
+        json_data = extract_json(raw)
+
+        if json_data:
+            with open(out_file, 'w', encoding='utf-8') as f:
+                json.dump(json_data, f, indent=2, ensure_ascii=False)
+            return (key, True, json_data)
+        else:
+            return (key, False, None)
+
+    except subprocess.TimeoutExpired:
+        with open(stderr_log, 'w', encoding='utf-8') as f:
+            f.write(f'TIMEOUT after {WORKER_TIMEOUT}s\n')
+        return (key, False, None)
+    except Exception as e:
+        with open(stderr_log, 'w', encoding='utf-8') as f:
+            f.write(f'ERROR: {e}\n')
+        return (key, False, None)
+
+
+def extract_json(raw):
+    """Extract and parse JSON from raw CLI output. Returns parsed dict or None."""
+    if not raw:
+        return None
+
+    # Try direct parse first
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # Find JSON object boundaries
+    start = raw.find('{')
+    if start < 0:
+        return None
+    # Find matching closing brace
+    depth = 0
+    end = -1
+    in_string = False
+    escape = False
+    for i in range(start, len(raw)):
+        ch = raw[i]
+        if escape:
+            escape = False
+            continue
+        if ch == '\\' and in_string:
+            escape = True
+            continue
+        if ch == '"' and not escape:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+
+    if end > start:
+        try:
+            return json.loads(raw[start:end])
+        except json.JSONDecodeError:
+            pass
+
+    # Last resort: try repair_json.py approach
+    try:
+        from repair_json import repair
+        obj, err = repair(raw)
+        if obj:
+            return obj
+    except ImportError:
+        pass
+
+    return None
+
+
+def execute_phase1(workers, output_dir, job_dir, claude_path):
+    """Execute all workers with parallel batching and retry.
+    Returns dict of {discipline_key: [findings_data, ...]}."""
+    results = {}  # key -> json_data
+    failed = []
+
+    total = len(workers)
+    log(f"Phase 1: Launching {total} workers ({MAX_CONCURRENT_WORKERS} concurrent)...", job_dir)
+
+    # First pass
+    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_WORKERS) as executor:
+        futures = {}
+        for w in workers:
+            future = executor.submit(run_worker, w, output_dir, claude_path)
+            futures[future] = w
+
+        for future in as_completed(futures):
+            w = futures[future]
+            key, success, data = future.result()
+            if success:
+                results[key] = data
+                log(f"  {key}: OK ({w['tokens_est']}t est.)")
+            else:
+                failed.append(w)
+                log(f"  {key}: FAILED ({w['tokens_est']}t est.)")
+
+    log(f"Phase 1 first pass: {len(results)}/{total} succeeded, {len(failed)} failed.", job_dir)
+
+    # Retry pass
+    if failed and RETRY_LIMIT > 0:
+        log(f"Retrying {len(failed)} failed workers...", job_dir)
+        retry_failed = []
+
+        with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_WORKERS) as executor:
+            futures = {}
+            for w in failed:
+                future = executor.submit(run_worker, w, output_dir, claude_path)
+                futures[future] = w
+
+            for future in as_completed(futures):
+                w = futures[future]
+                key, success, data = future.result()
+                if success:
+                    results[key] = data
+                    log(f"  Retry {key}: OK")
+                else:
+                    retry_failed.append(w)
+                    log(f"  Retry {key}: FAILED")
+
+        failed = retry_failed
+        log(f"After retry: {len(results)}/{total} succeeded, {len(failed)} still failed.", job_dir)
+
+    # Report final failures
+    for w in failed:
+        log(f"  PERMANENT FAILURE: {w['key']} ({w['discipline_name']} / {w['standards_file']})", job_dir)
+
+    return results, failed
+
+
+def merge_worker_results(results, output_dir):
+    """Merge worker results by discipline into discipline-{key}-findings.json files.
+    Returns list of (discipline_key, merged_data) tuples."""
+    # Group by discipline
+    by_discipline = {}
+    for worker_key, data in results.items():
+        disc = data.get('discipline', worker_key.split('-')[0])
+        by_discipline.setdefault(disc, []).append(data)
+
+    merged = []
+    for disc_key, parts in sorted(by_discipline.items()):
+        all_reqs = []
+        total_summary = {
+            'total_requirements': 0, 'compliant': 0, 'deviations': 0,
+            'omissions': 0, 'concerns': 0, 'not_applicable': 0,
+        }
+
+        for part in parts:
+            reqs = part.get('requirements', [])
+            all_reqs.extend(reqs)
+
+            summary = part.get('summary', {})
+            for k in total_summary:
+                total_summary[k] += summary.get(k, 0)
+
+        merged_data = {
+            'discipline': disc_key,
+            'summary': total_summary,
+            'requirements': all_reqs,
+        }
+
+        out_path = os.path.join(output_dir, f'discipline-{disc_key}-findings.json')
+        with open(out_path, 'w', encoding='utf-8') as f:
+            json.dump(merged_data, f, indent=2, ensure_ascii=False)
+
+        merged.append((disc_key, merged_data))
+        print(f"  Merged {disc_key}: {len(all_reqs)} requirements from {len(parts)} workers")
+
+    return merged
+
+
 def estimate_tokens(text):
     """Estimate token count from character count."""
     return len(text) // CHARS_PER_TOKEN
