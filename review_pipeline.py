@@ -177,7 +177,7 @@ def list_standards_source_files(base_dir, group):
             for fname in sorted(os.listdir(div_dir)):
                 if fname.endswith('.md'):
                     fpath = os.path.join(div_dir, fname)
-                    with open(fpath, 'r', encoding='utf-8') as f:
+                    with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
                         content = f.read()
                     files.append((f'division-{div}/{fname}', content))
 
@@ -185,7 +185,7 @@ def list_standards_source_files(base_dir, group):
     for supp_rel in group.get('supp', []):
         fpath = os.path.join(base_dir, supp_rel)
         if os.path.isfile(fpath):
-            with open(fpath, 'r', encoding='utf-8') as f:
+            with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
                 content = f.read()
             files.append((supp_rel, content))
 
