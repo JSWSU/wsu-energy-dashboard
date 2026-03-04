@@ -98,7 +98,7 @@ def merge_split_discipline_parts(output_dir):
                 print(f"  WARNING: Could not read part file {pf}: {e}", file=sys.stderr)
 
         # Recompute summary counts
-        counts = {'C': 0, 'D': 0, 'O': 0, 'X': 0}
+        counts = {'C': 0, 'D': 0, 'O': 0, 'X': 0, 'NA': 0}
         for r in all_reqs:
             st = r.get('status', 'C')
             if st in counts:
@@ -109,7 +109,7 @@ def merge_split_discipline_parts(output_dir):
             'divisions_reviewed': divs_reviewed,
             'summary': {
                 'total_requirements': len(all_reqs),
-                'compliant': counts['C'],
+                'compliant': counts['C'] + counts['NA'],
                 'deviations': counts['D'],
                 'omissions': counts['O'],
                 'concerns': counts['X'],
@@ -149,8 +149,8 @@ def normalize_item_fields(item):
     ALIASES = {
         'issue':              ['description', 'issue_description', 'finding_description'],
         'required_action':    ['recommendation', 'action', 'corrective_action', 'action_required'],
-        'standard_reference': ['standard_citation', 'standard', 'reference'],
-        'finding_id':         ['id', 'finding_number'],
+        'standard_reference': ['standard_citation', 'standard', 'reference', 'section'],
+        'finding_id':         ['id', 'finding_number', 'finding_ref'],
         'requirement':        ['requirement_text', 'req_text', 'title'],
         'pdf_reference':      ['drawing_reference', 'page_reference', 'sheet_reference'],
         'drawing_sheet':      ['sheet', 'drawing'],
@@ -171,7 +171,7 @@ def normalize_item_fields(item):
 
     # Handle slim compliant items (4-field minimal format)
     # Extract division from csi_code if missing, set absent fields to None
-    if item.get('status') == 'C':
+    if item.get('status') in ('C', 'NA'):
         if not item.get('division') and item.get('csi_code'):
             # Extract first 2 digits from csi_code (e.g., "09 21 16" -> "09")
             csi = item['csi_code'].strip()
@@ -376,12 +376,12 @@ def merge_findings(all_disciplines):
             'discipline': f['_discipline'],
             'division': f.get('division', ''),
             'csi_code': f.get('csi_code', ''),
-            'title': f.get('issue', '') or '',
+            'title': f.get('issue') or '',
             'severity': f.get('severity') or 'Minor',
             'status': f.get('status', 'D'),
             'pdf_reference': f.get('pdf_reference', ''),
             'standard_reference': f.get('standard_reference', ''),
-            'issue': f.get('issue', ''),
+            'issue': f.get('issue') or '',
             'required_action': f.get('required_action', ''),
         }
         findings.append(finding)
@@ -618,7 +618,7 @@ def write_synthesis_stats(output_dir, data):
         for f in findings:
             if f.get('severity') == 'Critical':
                 lines.append(f"  {f['id']}: [{f.get('status','')}] Div {f.get('division','')} — "
-                             f"{(f.get('title','') or f.get('issue',''))[:100]}")
+                             f"{(f.get('title') or f.get('issue') or '')[:100]}")
 
     stats_path = os.path.join(output_dir, 'synthesis-stats.txt')
     with open(stats_path, 'w', encoding='utf-8') as fh:
@@ -684,7 +684,7 @@ def main():
         reqs = disc_data.get('requirements', [])
 
         # Recompute summary from actual requirement statuses
-        counts = {'C': 0, 'D': 0, 'O': 0, 'X': 0}
+        counts = {'C': 0, 'D': 0, 'O': 0, 'X': 0, 'NA': 0}
         for req in reqs:
             st = req.get('status', 'C')
             if st in counts:
@@ -696,7 +696,7 @@ def main():
             'divisions_reviewed': divs,
             'summary': {
                 'total_requirements': len(reqs),
-                'compliant': counts['C'],
+                'compliant': counts['C'] + counts['NA'],
                 'deviations': counts['D'],
                 'omissions': counts['O'],
                 'concerns': counts['X'],
