@@ -278,8 +278,8 @@ def write_annotations(doc, page_idx, findings, coordinates):
             label,
             fontsize=7,
             fill_color=colors['fill'],
-            border_color=colors['border'],
         )
+        annot.border = {"width": 1, "color": colors['border']}
         annot.set_info(title="WSU Design Review")
         annot.update()
 
