@@ -117,13 +117,19 @@ def call_vision_for_coordinates(page_image_path, findings_for_page, claude_path=
     )
 
     try:
+        # Build clean env: strip CLAUDECODE to avoid nested-session detection
+        vision_env = {k: v for k, v in os.environ.items() if k != 'CLAUDECODE'}
+        vision_env['CLAUDE_CODE_MAX_OUTPUT_TOKENS'] = '16000'
+        # Pipe prompt via stdin (Windows has ~32K char command-line limit)
         result = subprocess.run(
-            [claude_path, '-p', prompt, '--model', 'sonnet',
+            [claude_path, '-p',
+             '--model', 'sonnet',
              '--output-format', 'text',
              '--allowedTools', 'Read',
              '--dangerously-skip-permissions'],
-            capture_output=True, text=True, timeout=120,
-            env={**os.environ, 'CLAUDE_CODE_MAX_OUTPUT_TOKENS': '16000'}
+            input=prompt,
+            capture_output=True, text=True, encoding='utf-8',
+            timeout=120, env=vision_env,
         )
         raw = result.stdout.strip()
         # Try to parse JSON from response
@@ -231,7 +237,8 @@ def annotate_pdf(job_dir, claude_path='claude'):
     all_findings = review_data.get('findings', [])
     if not all_findings:
         # Try requirements array if findings is empty
-        all_findings = [r for r in review_data.get('requirements', []) if r.get('status') != 'C']
+        all_findings = [r for r in review_data.get('requirements', [])
+                        if r.get('status') not in ('C', 'NA')]
     if not all_findings:
         print("  No non-compliant findings to annotate")
         # Still create a copy as review-markup.pdf

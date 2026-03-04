@@ -374,8 +374,8 @@ def run_worker(worker, output_dir, claude_path):
              '--output-format', 'text',
              '--dangerously-skip-permissions'],
             input=worker['prompt'],
-            capture_output=True, text=True, timeout=WORKER_TIMEOUT,
-            env=worker_env,
+            capture_output=True, text=True, encoding='utf-8',
+            timeout=WORKER_TIMEOUT, env=worker_env,
         )
 
         # Save logs
@@ -708,9 +708,8 @@ def main():
              '--dangerously-skip-permissions',
              '--output-format', 'text'],
             input=exec_prompt,
-            capture_output=True, text=True, timeout=300,
-            cwd=output_dir,
-            env=haiku_env,
+            capture_output=True, text=True, encoding='utf-8',
+            timeout=300, cwd=output_dir, env=haiku_env,
         )
         with open(os.path.join(output_dir, 'executive-summary.txt'), 'w') as f:
             f.write(ret.stdout or '')
@@ -737,9 +736,14 @@ def main():
     log("Phase 4: Generating annotated PDF...", job_dir)
     annotate_script = os.path.join(base_dir, 'annotate_pdf.py')
     ret = subprocess.run([python, annotate_script, job_dir],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding='utf-8')
     if ret.returncode != 0:
         log(f"WARNING: PDF annotation failed (exit {ret.returncode})", job_dir)
+        phase4_log = os.path.join(output_dir, 'annotate-stderr.log')
+        with open(phase4_log, 'w', encoding='utf-8') as f:
+            f.write(ret.stderr or '')
+            f.write('\n--- stdout ---\n')
+            f.write(ret.stdout or '')
     write_timing(timing_log, 'phase4_end', int(time.time()))
 
     log("Pipeline complete.", job_dir)

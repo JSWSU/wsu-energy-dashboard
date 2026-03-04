@@ -134,9 +134,9 @@ def validate(data, findings):
                 f"= {row_c+row_d+row_o+row_x+row_na} != Total({row_total})"
             )
 
-    # Findings must have at least 1 entry
-    if len(findings) == 0:
-        errors.append("No findings in findings array")
+    # Zero findings is valid (100% compliance) — only warn if disc_nc > 0
+    if len(findings) == 0 and disc_nc > 0:
+        errors.append(f"No findings but disciplines report {disc_nc} non-compliant")
 
     # Findings cannot exceed discipline non-compliant total
     if len(findings) > disc_nc and disc_nc > 0:
