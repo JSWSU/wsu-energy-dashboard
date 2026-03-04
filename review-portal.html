@@ -90,7 +90,7 @@ html.dark .dark-toggle-switch { background: var(--accent); }
 html.dark .dark-toggle-switch::after { transform: translateX(18px); }
 
 /* Container & Cards */
-.container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+.container { max-width: 1600px; margin: 0 auto; padding: 1.5rem; }
 .card {
   background: var(--card-bg); border-radius: 12px; padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-bottom: 1.5rem;
@@ -277,7 +277,7 @@ html.dark .job-status.queued { background: #78350f; color: #fbbf24; }
 .email-icon.sent { color: var(--green); }
 .email-icon.error { color: var(--red); }
 /* Progress bar tracker */
-.tracker { position: relative; margin-top: .5rem; min-width: 320px; }
+.tracker { position: relative; margin-top: .5rem; min-width: 260px; }
 .tracker-bar {
   position: relative; height: 24px; background: var(--border); border-radius: 4px;
   overflow: hidden;
@@ -632,7 +632,7 @@ footer {
               <th>Phase</th>
               <th>Divisions</th>
               <th>Submitted</th>
-              <th style="min-width:340px">Status</th>
+              <th style="min-width:280px">Status</th>
               <th>Downloads</th>
               <th></th>
             </tr>
@@ -1408,10 +1408,10 @@ function renderQueue(jobs) {
     const delBtn = '<button class="btn-delete" onclick="deleteJob(\'' + esc(j.id) + '\',\'' +
       esc((j.projectName || '').replace(/'/g,'')) + '\')" title="Delete job">\uD83D\uDDD1</button>';
     return '<tr' + rowCls + '>' +
-      '<td style="font-size:.75rem;white-space:nowrap">' + esc(j.id) + '</td>' +
-      '<td>' + esc(j.projectName) + '</td>' +
-      '<td>' + esc(j.reviewPhase) + '</td>' +
-      '<td style="font-size:.75rem">' + esc(divs) + '</td>' +
+      '<td style="font-size:.72rem;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis" title="' + esc(j.id) + '">' + esc(j.id.substring(0,8)) + '</td>' +
+      '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(j.projectName) + '">' + esc(j.projectName) + '</td>' +
+      '<td style="white-space:nowrap">' + esc(j.reviewPhase) + '</td>' +
+      '<td style="font-size:.72rem;max-width:100px;overflow:hidden;text-overflow:ellipsis" title="' + esc(divs) + '">' + esc(divs) + '</td>' +
       '<td style="font-size:.75rem;white-space:nowrap">' + time + '</td>' +
       '<td><span class="job-status ' + sc + '">' + esc(j.status) + '</span>' +
         (isStalled ? '<span class="stalled-badge">Stalled</span>' : '') +
