@@ -360,6 +360,25 @@ sub _mark_spawn_failed {
     }
 }
 
+sub _find_python {
+    my $user = $ENV{USERNAME} || $ENV{USER} || '';
+    my @candidates = (
+        "/c/Users/$user/AppData/Local/Programs/Python/Python313/python.exe",
+        "/c/Users/$user/AppData/Local/Programs/Python/Python312/python.exe",
+        "/c/Users/$user/AppData/Local/Programs/Python/Python311/python.exe",
+        "/c/Python313/python.exe",
+        "/c/Python312/python.exe",
+    );
+    for my $p (@candidates) {
+        return $p if -x $p;
+    }
+    # Try which
+    my $found = `which python3 2>/dev/null` || `which python 2>/dev/null` || `which py 2>/dev/null`;
+    chomp $found if $found;
+    return $found if $found && -x $found;
+    return undef;
+}
+
 sub read_job_json {
     my ($job_id) = @_;
     my $path = "$REVIEWS_DIR/$job_id/job.json";
@@ -1406,442 +1425,38 @@ sub spawn_review {
         }
     }
 
-    # --- Write review bash script ---
-    my $script = "$job_dir/run-review.sh";
-    my $expected_count = scalar @scan_units;
-    my $discipline_keys_str = join(' ', map { $_->{key} } @scan_units);
-    open my $fh, '>', $script or do {
-        warn "Cannot write $script: $!\n";
-        _mark_spawn_failed($job_id, $job, "Cannot write review script: $!");
+    # --- Launch Python pipeline orchestrator ---
+    my $pipeline_script = "$ROOT/review_pipeline.py";
+    unless (-f $pipeline_script) {
+        warn "Cannot find review_pipeline.py at $pipeline_script\n";
+        _mark_spawn_failed($job_id, $job, "review_pipeline.py not found");
         return;
-    };
-
-    # Script header
-    print $fh "#!/bin/bash\n";
-    print $fh "# Multi-phase parallel review: $job_id\n";
-    print $fh "# Phase 0:  PDF text extraction (one-time, pdfplumber)\n";
-    print $fh "# Phase 1:  $expected_count parallel discipline scans (Sonnet) -> JSON\n";
-    print $fh "# Phase 2a: Python synthesis -> review-data.json (zero tokens)\n";
-    print $fh "# Phase 2b: Claude Haiku -> executive-summary.txt\n";
-    print $fh "# Phase 3:  Local Python -> .docx + .xlsx + .txt (zero tokens)\n";
-    print $fh "# Phase 4:  Vision markup -> review-markup.pdf\n\n";
-    print $fh "unset CLAUDECODE\n";
-
-    # Dynamic Git Bash discovery for CLAUDE_CODE_GIT_BASH_PATH
-    print $fh "GIT_BASH=\"\"\n";
-    print $fh "for candidate in \\\n";
-    print $fh "  \"\$PROGRAMFILES/Git/bin/bash.exe\" \\\n";
-    print $fh "  \"/c/Program Files/Git/bin/bash.exe\" \\\n";
-    print $fh "  \"\$LOCALAPPDATA/Programs/Git/bin/bash.exe\" \\\n";
-    print $fh "  \"/c/Users/\$USERNAME/AppData/Local/Programs/Git/bin/bash.exe\"; do\n";
-    print $fh "  [ -f \"\$candidate\" ] && { GIT_BASH=\"\$candidate\"; break; }\n";
-    print $fh "done\n";
-    print $fh "if [ -n \"\$GIT_BASH\" ]; then\n";
-    # Claude CLI on Windows needs a clean Windows path (no mixed separators)
-    print $fh "  GIT_BASH=\$(cygpath -w \"\$GIT_BASH\" 2>/dev/null || echo \"\$GIT_BASH\")\n";
-    print $fh "  export CLAUDE_CODE_GIT_BASH_PATH=\"\$GIT_BASH\"\n";
-    print $fh "fi\n\n";
-
-    print $fh "export CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000\n\n";
-
-    print $fh "cd \"$ROOT\"\n\n";
-
-    # Write PID file for recovery daemon's job-specific process detection
-    print $fh "echo \$\$ > \"$output_dir/pipeline.pid\"\n\n";
-
-    print $fh "DISCIPLINE_TIMEOUT=$CFG{disciplineTimeoutSec}\n\n";
-
-    print $fh "TIMING_LOG=\"$output_dir/timing.log\"\n\n";
-
-    # Orphan cleanup function: Claude CLIs with --dangerously-skip-permissions can
-    # spawn child processes (e.g. pdfplumber) that survive after the parent exits.
-    # This function kills any orphaned python.exe children spawned by our CLIs.
-    print $fh "# --- Orphan process cleanup ---\n";
-    print $fh "# Claude CLI can spawn python/pdfplumber subprocesses that outlive the parent.\n";
-    print $fh "# Track PIDs per wave and kill stragglers after wait completes.\n";
-    print $fh "WAVE_PIDS=\"\"\n";
-    print $fh "cleanup_wave() {\n";
-    print $fh "  for pid in \$WAVE_PIDS; do\n";
-    print $fh "    # Kill the process tree rooted at each background PID\n";
-    print $fh "    if kill -0 \$pid 2>/dev/null; then\n";
-    print $fh "      echo \"Cleaning up orphaned process tree for PID \$pid\"\n";
-    print $fh "      # Get all descendants via procps or taskkill\n";
-    print $fh "      taskkill //PID \$pid //T //F > /dev/null 2>&1\n";
-    print $fh "    fi\n";
-    print $fh "  done\n";
-    print $fh "  WAVE_PIDS=\"\"\n";
-    print $fh "}\n";
-    print $fh "trap 'cleanup_wave' EXIT\n\n";
-
-    # Python discovery (Step 7)
-    print $fh "# --- Python discovery ---\n";
-    print $fh "PYUSER=\"\${USERNAME:-\$USER}\"\n";
-    print $fh "PYTHON=\"\"\n";
-    print $fh "for p in \\\n";
-    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python313/python.exe\" \\\n";
-    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python312/python.exe\" \\\n";
-    print $fh "  \"/c/Users/\$PYUSER/AppData/Local/Programs/Python/Python311/python.exe\" \\\n";
-    print $fh "  \"/c/Python313/python.exe\" \"/c/Python312/python.exe\" \\\n";
-    print $fh "  \"\$(command -v python3 2>/dev/null)\" \\\n";
-    print $fh "  \"\$(command -v python 2>/dev/null)\" \\\n";
-    print $fh "  \"\$(command -v py 2>/dev/null)\"; do\n";
-    print $fh "  [ -n \"\$p\" ] && [ -x \"\$p\" ] && { PYTHON=\"\$p\"; break; }\n";
-    print $fh "done\n";
-    print $fh "if [ -z \"\$PYTHON\" ]; then\n";
-    print $fh "  echo \"ERROR: Python not found. Install Python 3.11+ and ensure it is on PATH.\" > \"$output_dir/FAILED\"\n";
-    print $fh "  exit 1\n";
-    print $fh "fi\n";
-    print $fh "echo \"Using Python: \$PYTHON\"\n";
-    print $fh "\"\$PYTHON\" -m pip install --quiet openpyxl python-docx pdfplumber 2>/dev/null\n\n";
-
-    # Phase 0: One-time PDF text extraction (skip if pages already extracted by analysis phase)
-    print $fh "# === PHASE 0: One-time PDF text extraction ===\n";
-    print $fh "echo \"phase0_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
-    print $fh "if [ -f \"$job_dir/pages/manifest.txt\" ]; then\n";
-    print $fh "  echo \"Phase 0: Skipped (pages already extracted by analysis phase).\" >> \"$output_dir/progress.log\"\n";
-    print $fh "else\n";
-    print $fh "  echo \"Phase 0: Extracting PDF text...\" >> \"$output_dir/progress.log\"\n";
-    print $fh "  \"\$PYTHON\" \"$ROOT/extract_pdf.py\" \"$job_dir/input.pdf\" \"$job_dir/pages\"\n";
-    print $fh "  if [ \$? -ne 0 ]; then\n";
-    print $fh "    echo \"ERROR: extract_pdf.py failed. Check that pdfplumber is installed.\" > \"$output_dir/FAILED\"\n";
-    print $fh "    exit 1\n";
-    print $fh "  fi\n";
-    print $fh "  echo \"Phase 0 complete.\" >> \"$output_dir/progress.log\"\n";
-    print $fh "fi\n";
-    print $fh "echo \"phase0_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
-    print $fh "echo \"phase0_pages=\$(ls \"$job_dir/pages\" 2>/dev/null | wc -l)\" >> \"\$TIMING_LOG\"\n\n";
-
-    # Phase 1: parallel discipline CLIs (all 8 run simultaneously — API-bound, not CPU-bound)
-    # Wave priority kept for ordering; with MAX_PARALLEL=8, all fit in a single wave.
-    my %wave_priority = (
-        'communications' => 1,   # Wave 1 - slow (399KB standards)
-        'plumbing'       => 1,   # Wave 1 - fast (49KB)
-        'fire-protection' => 1,  # Wave 1 - fast (57KB)
-        'civil-site'     => 2,   # Wave 2 - slow (281KB)
-        'arch-finishes'  => 2,   # Wave 2 - fast (91KB)
-        'electrical'     => 2,   # Wave 2 - medium (100KB)
-        'hvac-controls'  => 3,   # Wave 3 - medium (196KB)
-        'arch-structure'  => 3,  # Wave 3 - medium (163KB)
-    );
-    my $MAX_PARALLEL = $CFG{maxParallelDisciplines};  # all disciplines run simultaneously (API-bound, not CPU-bound)
-
-    # Sort @scan_units into waves based on priority (use parent key for split disciplines)
-    my @sorted = sort { ($wave_priority{$a->{parent} || $a->{key}} || 99) <=> ($wave_priority{$b->{parent} || $b->{key}} || 99) } @scan_units;
-
-    # Chunk into waves of MAX_PARALLEL
-    my @waves;
-    while (@sorted) {
-        push @waves, [ splice @sorted, 0, $MAX_PARALLEL ];
-    }
-    my $num_waves = scalar @waves;
-
-    print $fh "# === PHASE 1: $expected_count parallel discipline scans ===\n";
-    print $fh "echo \"phase1_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
-    print $fh "echo \"Phase 1: Launching $expected_count discipline scans (all parallel)...\" >> \"$output_dir/progress.log\"\n\n";
-
-    for my $wi (0 .. $#waves) {
-        my $wave = $waves[$wi];
-        my $wave_num = $wi + 1;
-        my $wave_count = scalar @$wave;
-        my $wave_names = join(', ', map { $_->{name} } @$wave);
-
-        print $fh "# --- Batch $wave_num of $num_waves ($wave_count disciplines: $wave_names) ---\n";
-        print $fh "WAVE_PIDS=\"\"\n";
-        print $fh "echo \"Launching $wave_count disciplines: $wave_names\"\n";
-        print $fh "echo \"Launching: $wave_names\" >> \"$output_dir/progress.log\"\n\n";
-
-        my $wave_size = scalar @$wave;
-        my $grp_idx = 0;
-        for my $grp (@$wave) {
-            my $pfile   = "$job_dir/prompt-$grp->{key}.txt";
-            my $stdout  = "$output_dir/$grp->{key}-stdout.log";
-            my $stderr  = "$output_dir/$grp->{key}-stderr.log";
-
-            (my $var_key = uc($grp->{key})) =~ s/-/_/g;
-            print $fh "# Discipline: $grp->{name}\n";
-            print $fh "echo \"  Launching: $grp->{name}...\"\n";
-            print $fh "PROMPT_${var_key}=\$(cat \"$pfile\")\n";
-            print $fh "timeout \$DISCIPLINE_TIMEOUT \"$CLAUDE_PATH\" -p \"\$PROMPT_${var_key}\" \\\n";
-            print $fh "  --model sonnet \\\n";
-            print $fh "  --allowedTools Read Write \\\n";
-            print $fh "  --dangerously-skip-permissions \\\n";
-            print $fh "  --output-format text \\\n";
-            print $fh "  > \"$stdout\" \\\n";
-            print $fh "  2> \"$stderr\" &\n";
-            print $fh "WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n";
-            $grp_idx++;
-            # Stagger launches to avoid API rate limiting
-            if ($grp_idx < $wave_size) {
-                print $fh "sleep 3\n";
-            }
-            print $fh "\n";
-        }
-
-        print $fh "# Wait for batch $wave_num to complete, then kill orphaned children\n";
-        print $fh "echo \"Waiting for $wave_count disciplines...\"\n";
-        print $fh "wait\n";
-        print $fh "cleanup_wave\n";
-        print $fh "echo \"Batch $wave_num/$num_waves complete (timeout=\${DISCIPLINE_TIMEOUT}s per discipline).\" >> \"$output_dir/progress.log\"\n\n";
     }
 
-    print $fh "echo \"Phase 1 complete ($expected_count disciplines).\" >> \"$output_dir/progress.log\"\n";
-    print $fh "echo \"phase1_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
-    print $fh "echo \"phase1_disciplines=$expected_count\" >> \"\$TIMING_LOG\"\n\n";
-
-    # JSON sanitization: fix unescaped quotes in measurement strings
-    print $fh "# --- Post-process: fix common JSON errors ---\n";
-    print $fh "echo \"Sanitizing JSON output...\" >> \"$output_dir/progress.log\"\n";
-    print $fh "for jf in \"$output_dir\"/discipline-*-findings.json; do\n";
-    print $fh "  [ -f \"\$jf\" ] || continue\n";
-    print $fh "  if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
-    print $fh "    continue\n";
-    print $fh "  fi\n";
-    print $fh "  echo \"Repairing malformed JSON: \$(basename \$jf)\"\n";
-    print $fh "  \"\$PYTHON\" - \"\$jf\" <<'PYEOF'\n";
-    print $fh 'import re, json, sys, shutil' . "\n";
-    print $fh 'src = sys.argv[1]' . "\n";
-    print $fh 'bak = src + ".bak"' . "\n";
-    print $fh 'shutil.copy2(src, bak)' . "\n";
-    print $fh 'with open(src, "r", encoding="utf-8") as f:' . "\n";
-    print $fh '    text = f.read()' . "\n";
-    print $fh '# Fix unescaped inch marks inside JSON string values.' . "\n";
-    print $fh '# Only match: digit + " + space + word-char (e.g. 24" wide -> 24 in. wide)' . "\n";
-    print $fh 'fixed = re.sub(r\'(\d)"(\s+\w)\', r\'\\1 in.\\2\', text)' . "\n";
-    print $fh '# Fix fraction inch marks: digit/digit + " (e.g. 3/4" -> 3/4 in.)' . "\n";
-    print $fh 'fixed = re.sub(r\'(\d/\d+)"\', r\'\\1 in.\', fixed)' . "\n";
-    print $fh '# Fix foot-inch: digit\'-digit" (e.g. 5\'-0" -> 5 ft-0 in.)' . "\n";
-    print $fh "fixed = re.sub(r\"(\\d+)'-(\\d+)\\\"\", r\"\\1 ft-\\2 in.\", fixed)\n";
-    print $fh 'try:' . "\n";
-    print $fh '    json.loads(fixed)' . "\n";
-    print $fh '    with open(src, "w", encoding="utf-8") as f:' . "\n";
-    print $fh '        f.write(fixed)' . "\n";
-    print $fh '    print("  Repaired successfully")' . "\n";
-    print $fh '    import os; os.remove(bak)' . "\n";
-    print $fh 'except json.JSONDecodeError as e:' . "\n";
-    print $fh '    shutil.move(bak, src)  # restore original' . "\n";
-    print $fh '    print(f"  Could not auto-repair: {e}", file=sys.stderr)' . "\n";
-    print $fh "PYEOF\n";
-    print $fh "done\n\n";
-
-    # Validate Phase 1 output and retry failed disciplines
-    print $fh "# === Validate and retry failed disciplines ===\n";
-    print $fh "FOUND=0\n";
-    print $fh "MISSING=\"\"\n";
-    print $fh "for key in $discipline_keys_str; do\n";
-    print $fh "  jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
-    print $fh "  if [ -f \"\$jf\" ]; then\n";
-    print $fh "    if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
-    print $fh "      FOUND=\$((FOUND + 1))\n";
-    print $fh "    else\n";
-    print $fh "      echo \"Invalid JSON for \$key after sanitization — will retry\"\n";
-    print $fh "      rm \"\$jf\"\n";
-    print $fh "      MISSING=\"\$MISSING \$key\"\n";
-    print $fh "    fi\n";
-    print $fh "  else\n";
-    print $fh "    echo \"Missing output for \$key — will retry\"\n";
-    print $fh "    MISSING=\"\$MISSING \$key\"\n";
-    print $fh "  fi\n";
-    print $fh "done\n\n";
-
-    # === JSON repair pass: try to salvage broken output before retrying ===
-    print $fh "if [ -n \"\$MISSING\" ]; then\n";
-    print $fh "  echo \"Attempting JSON repair for:\$MISSING\" >> \"$output_dir/progress.log\"\n";
-    print $fh "  STILL_MISSING=\"\"\n";
-    print $fh "  for key in \$MISSING; do\n";
-    print $fh "    # Check stdout log for salvageable JSON\n";
-    print $fh "    stdout_log=\"$output_dir/\${key}-stdout.log\"\n";
-    print $fh "    jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
-    print $fh "    if [ -f \"\$stdout_log\" ] && [ -s \"\$stdout_log\" ]; then\n";
-    print $fh "      echo \"  Repairing \$key from stdout log...\"\n";
-    print $fh "      if \"\$PYTHON\" \"$ROOT/repair_json.py\" \"\$stdout_log\" \"\$jf\" 2>/dev/null; then\n";
-    print $fh "        FOUND=\$((FOUND + 1))\n";
-    print $fh "        echo \"  Repair succeeded for \$key\" >> \"$output_dir/progress.log\"\n";
-    print $fh "        echo \"  Repair succeeded for \$key\"\n";
-    print $fh "      else\n";
-    print $fh "        echo \"  Repair failed for \$key — will retry\"\n";
-    print $fh "        STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
-    print $fh "      fi\n";
-    print $fh "    else\n";
-    print $fh "      echo \"  No stdout log for \$key — will retry\"\n";
-    print $fh "      STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
-    print $fh "    fi\n";
-    print $fh "  done\n";
-    print $fh "  MISSING=\"\$STILL_MISSING\"\n";
-    print $fh "fi\n\n";
-
-    # === Retry remaining failed disciplines (max 1 round) ===
-    print $fh "if [ -n \"\$MISSING\" ]; then\n";
-    print $fh "  echo \"Retrying failed disciplines:\$MISSING\" >> \"$output_dir/progress.log\"\n";
-    print $fh "  for attempt in 1; do\n";
-    print $fh "    [ -z \"\$MISSING\" ] && break\n";
-    print $fh "    echo \"  Retry attempt \$attempt/1 for:\$MISSING\"\n";
-    print $fh "    echo \"  Retry attempt \$attempt/1 for:\$MISSING\" >> \"$output_dir/progress.log\"\n";
-    print $fh "    WAVE_PIDS=\"\"\n";
-    # Launch all missing disciplines in parallel
-    print $fh "    for key in \$MISSING; do\n";
-    print $fh "      PROMPT_VAR=\$(cat \"$job_dir/prompt-\${key}.txt\")\n";
-    print $fh "      timeout \$DISCIPLINE_TIMEOUT \"$CLAUDE_PATH\" -p \"\$PROMPT_VAR\" \\\n";
-    print $fh "        --model sonnet \\\n";
-    print $fh "        --allowedTools Read Write \\\n";
-    print $fh "        --dangerously-skip-permissions \\\n";
-    print $fh "        --output-format text \\\n";
-    print $fh "        > \"$output_dir/\${key}-retry-stdout.log\" \\\n";
-    print $fh "        2> \"$output_dir/\${key}-retry-stderr.log\" &\n";
-    print $fh "      WAVE_PIDS=\"\$WAVE_PIDS \$!\"\n";
-    print $fh "      sleep 3\n";
-    print $fh "    done\n";
-    print $fh "    wait\n";
-    print $fh "    cleanup_wave\n";
-    # Check which succeeded, try repair on failures
-    print $fh "    STILL_MISSING=\"\"\n";
-    print $fh "    for key in \$MISSING; do\n";
-    print $fh "      jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
-    print $fh "      if [ -f \"\$jf\" ]; then\n";
-    print $fh "        if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
-    print $fh "          FOUND=\$((FOUND + 1))\n";
-    print $fh "          echo \"  Retry succeeded for \$key\" >> \"$output_dir/progress.log\"\n";
-    print $fh "          echo \"  Retry succeeded for \$key\"\n";
-    print $fh "        else\n";
-    print $fh "          echo \"  Retry: invalid JSON for \$key — attempting repair\"\n";
-    print $fh "          rm \"\$jf\"\n";
-    print $fh "          STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
-    print $fh "        fi\n";
-    print $fh "      else\n";
-    print $fh "        echo \"  Retry: no output for \$key\"\n";
-    print $fh "        STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
-    print $fh "      fi\n";
-    print $fh "    done\n";
-    print $fh "    MISSING=\"\$STILL_MISSING\"\n";
-    print $fh "  done\n";
-    # Post-retry repair pass on retry stdout logs
-    print $fh "  if [ -n \"\$MISSING\" ]; then\n";
-    print $fh "    STILL_MISSING=\"\"\n";
-    print $fh "    for key in \$MISSING; do\n";
-    print $fh "      stdout_log=\"$output_dir/\${key}-retry-stdout.log\"\n";
-    print $fh "      jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
-    print $fh "      if [ -f \"\$stdout_log\" ] && [ -s \"\$stdout_log\" ]; then\n";
-    print $fh "        if \"\$PYTHON\" \"$ROOT/repair_json.py\" \"\$stdout_log\" \"\$jf\" 2>/dev/null; then\n";
-    print $fh "          FOUND=\$((FOUND + 1))\n";
-    print $fh "          echo \"  Post-retry repair succeeded for \$key\" >> \"$output_dir/progress.log\"\n";
-    print $fh "          echo \"  Post-retry repair succeeded for \$key\"\n";
-    print $fh "        else\n";
-    print $fh "          STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
-    print $fh "        fi\n";
-    print $fh "      else\n";
-    print $fh "        STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
-    print $fh "      fi\n";
-    print $fh "    done\n";
-    print $fh "    MISSING=\"\$STILL_MISSING\"\n";
-    print $fh "  fi\n";
-    # Report any still-missing after repair + retry
-    print $fh "  if [ -n \"\$MISSING\" ]; then\n";
-    print $fh "    for key in \$MISSING; do\n";
-    print $fh "      echo \"  FAILED: \$key after repair + 1 retry\" >> \"$output_dir/progress.log\"\n";
-    print $fh "    done\n";
-    print $fh "  fi\n";
-    print $fh "fi\n\n";
-
-    print $fh "echo \"Phase 1 produced \$FOUND of $expected_count valid findings files.\" >> \"$output_dir/progress.log\"\n";
-    print $fh "echo \"Phase 1 produced \$FOUND of $expected_count valid findings files.\"\n";
-    print $fh "if [ \"\$FOUND\" -lt 1 ]; then\n";
-    print $fh "  echo \"ERROR: No valid discipline findings produced. Check stderr logs.\" > \"$output_dir/FAILED\"\n";
-    print $fh "  exit 1\n";
-    print $fh "fi\n";
-    print $fh "if [ \"\$FOUND\" -lt \"$expected_count\" ]; then\n";
-    print $fh "  echo \"WARNING: Only \$FOUND of $expected_count disciplines produced results. Missing:\$MISSING\" >> \"$output_dir/progress.log\"\n";
-    print $fh "  echo \"WARNING: Continuing with partial results (\$FOUND/$expected_count). Missing disciplines:\$MISSING\"\n";
-    print $fh "fi\n\n";
-
-    # Phase 2a: Python synthesis (JSON merge + renumber, zero tokens)
-    print $fh "# === PHASE 2a: Python synthesis -> review-data.json ===\n";
-    print $fh "echo \"phase2a_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
-    print $fh "echo \"Phase 2a: Synthesizing (Python)...\" >> \"$output_dir/progress.log\"\n";
-    my $synth_stdout = "$output_dir/synthesis-stdout.log";
-    my $synth_stderr = "$output_dir/synthesis-stderr.log";
-    print $fh "\"\$PYTHON\" \"$ROOT/synthesize.py\" \"$output_dir\" \\\n";
-    print $fh "  > \"$synth_stdout\" \\\n";
-    print $fh "  2> \"$synth_stderr\"\n\n";
-
-    print $fh "if [ ! -f \"$output_dir/review-data.json\" ]; then\n";
-    print $fh "  echo \"ERROR: synthesize.py did not produce review-data.json. Check synthesis-stderr.log\" > \"$output_dir/FAILED\"\n";
-    print $fh "  exit 1\n";
-    print $fh "fi\n";
-    print $fh "echo \"Phase 2a complete: review-data.json produced.\" >> \"$output_dir/progress.log\"\n";
-    print $fh "echo \"phase2a_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
-
-    # Phase 2b: Claude executive summary (Haiku, small + fast)
-    my $exec_prompt = "$job_dir/prompt-exec-summary.txt";
-    my $exec_stdout = "$output_dir/executive-summary.txt";
-    my $exec_stderr = "$output_dir/summary-stderr.log";
-    print $fh "# === PHASE 2b: Claude executive summary (Haiku) ===\n";
-    print $fh "echo \"phase2b_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
-    print $fh "echo \"Phase 2b: Generating executive summary...\" >> \"$output_dir/progress.log\"\n";
-    print $fh "EXEC_PROMPT=\$(cat \"$exec_prompt\")\n";
-    print $fh "cd \"$output_dir\"\n";
-    print $fh "timeout 300 \"$CLAUDE_PATH\" -p \"\$EXEC_PROMPT\" \\\n";
-    print $fh "  --model haiku \\\n";
-    print $fh "  --allowedTools Read Write \\\n";
-    print $fh "  --dangerously-skip-permissions \\\n";
-    print $fh "  --output-format text \\\n";
-    print $fh "  > \"$exec_stdout\" \\\n";
-    print $fh "  2> \"$exec_stderr\"\n";
-    print $fh "cd \"$ROOT\"\n";
-    print $fh "echo \"Phase 2b complete.\" >> \"$output_dir/progress.log\"\n";
-    print $fh "echo \"phase2b_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
-
-    # Phase 3: local Python report generation
-    print $fh "# === PHASE 3: Local report generation (zero tokens) ===\n";
-    print $fh "echo \"phase3_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
-    print $fh "echo \"Phase 3: Generating reports...\" >> \"$output_dir/progress.log\"\n";
-    print $fh "\"\$PYTHON\" \"$ROOT/generate_reports.py\" \"$output_dir/review-data.json\"\n";
-    print $fh "PYEXIT=\$?\n";
-    print $fh "if [ \"\$PYEXIT\" -ne 0 ]; then\n";
-    print $fh "  echo \"ERROR: generate_reports.py failed (exit code \$PYEXIT)\" >> \"$output_dir/progress.log\"\n";
-    print $fh "  # FAILED file already written by generate_reports.py if validation failed\n";
-    print $fh "  [ ! -f \"$output_dir/FAILED\" ] && echo \"generate_reports.py exited with code \$PYEXIT\" > \"$output_dir/FAILED\"\n";
-    print $fh "  exit 1\n";
-    print $fh "fi\n\n";
-
-    print $fh "echo \"phase3_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
-
-    # Phase 4: Vision-based PDF annotation
-    print $fh "# === PHASE 4: Vision markup -> review-markup.pdf ===\n";
-    print $fh "echo \"phase4_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
-    print $fh "echo \"Phase 4: Generating annotated PDF...\" >> \"$output_dir/progress.log\"\n";
-    print $fh "\"\$PYTHON\" \"$ROOT/annotate_pdf.py\" \"$job_dir\" 2>> \"$output_dir/progress.log\"\n";
-    print $fh "ANNOTATE_EXIT=\$?\n";
-    print $fh "if [ \"\$ANNOTATE_EXIT\" -ne 0 ]; then\n";
-    print $fh "  echo \"WARNING: PDF annotation failed (exit \$ANNOTATE_EXIT)\" >> \"$output_dir/progress.log\"\n";
-    print $fh "  echo \"WARNING: PDF annotation failed but other deliverables are ready.\"\n";
-    print $fh "fi\n";
-    print $fh "echo \"phase4_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
-
-    print $fh "echo \"Pipeline complete.\" >> \"$output_dir/progress.log\"\n";
-
-    close $fh;
-    chmod 0755, $script;
+    # Find Python
+    my $python = _find_python();
+    unless ($python) {
+        _mark_spawn_failed($job_id, $job, "Python not found");
+        return;
+    }
 
     my $group_names = join(', ', map { $_->{name} } @scan_units);
-    print "[" . localtime() . "] Spawning pipeline for job $job_id\n";
-    print "  Phase 1:  " . scalar(@scan_units) . " CLIs, all parallel (Sonnet) -> JSON\n";
-    print "  Phase 2a: Python synthesis -> review-data.json\n";
-    print "  Phase 2b: Claude Haiku -> executive-summary.txt\n";
-    print "  Phase 3:  Local Python -> reports\n";
-    print "  Phase 4:  Vision markup -> annotated PDF\n";
+    print "  Pipeline: review_pipeline.py\n";
+    print "  Python: $python\n";
     print "  Groups: $group_names\n";
-    print "  Script: $script\n";
-    # Write a tiny launcher that nohup's the main script in background.
-    # MSYS Perl's system() goes through cmd.exe which doesn't support &,
-    # so we create a launcher script that bash can run and background properly.
-    (my $script_bash = $script) =~ s{\\}{/}g;
+
+    # Write a tiny launcher that nohup's the pipeline in background
     my $launcher = "$job_dir/launch.sh";
     open my $lfh, '>', $launcher or do {
         warn "Cannot write launcher: $!\n";
-        _mark_spawn_failed($job_id, $job, "Cannot write review launcher: $!");
+        _mark_spawn_failed($job_id, $job, "Cannot write launcher: $!");
         return;
     };
+    (my $job_dir_bash = $job_dir) =~ s{\\}{/}g;
+    (my $python_bash = $python) =~ s{\\}{/}g;
+    (my $script_bash = $pipeline_script) =~ s{\\}{/}g;
     print $lfh "#!/bin/bash\n";
-    print $lfh "nohup bash \"$script_bash\" > /dev/null 2>&1 &\n";
+    print $lfh "nohup \"$python_bash\" \"$script_bash\" \"$job_dir_bash\" > /dev/null 2>&1 &\n";
     close $lfh;
     chmod 0755, $launcher;
     system("bash \"$launcher\"");
