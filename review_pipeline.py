@@ -722,12 +722,14 @@ def main():
     write_timing(timing_log, 'phase3_start', int(time.time()))
     log("Phase 3: Generating reports...", job_dir)
     report_script = os.path.join(base_dir, 'generate_reports.py')
-    ret = subprocess.run([python, report_script, review_data_path])
+    ret = subprocess.run([python, report_script, review_data_path],
+                         capture_output=True, text=True, encoding='utf-8')
     if ret.returncode != 0:
+        err_detail = (ret.stderr or ret.stdout or '').strip()
         log(f"ERROR: generate_reports.py failed (exit code {ret.returncode})", job_dir)
         if not os.path.exists(os.path.join(output_dir, 'FAILED')):
             with open(os.path.join(output_dir, 'FAILED'), 'w') as f:
-                f.write(f'generate_reports.py exited with code {ret.returncode}')
+                f.write(f'generate_reports.py exited with code {ret.returncode}\n{err_detail}')
         sys.exit(1)
     write_timing(timing_log, 'phase3_end', int(time.time()))
 
@@ -735,7 +737,7 @@ def main():
     write_timing(timing_log, 'phase4_start', int(time.time()))
     log("Phase 4: Generating annotated PDF...", job_dir)
     annotate_script = os.path.join(base_dir, 'annotate_pdf.py')
-    ret = subprocess.run([python, annotate_script, job_dir],
+    ret = subprocess.run([python, annotate_script, job_dir, claude_path],
                          capture_output=True, text=True, encoding='utf-8')
     if ret.returncode != 0:
         log(f"WARNING: PDF annotation failed (exit {ret.returncode})", job_dir)

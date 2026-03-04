@@ -4,7 +4,7 @@ WSU Design Standards Review — PDF Annotation Generator
 
 Reads review-data.json and the original uploaded PDF, then:
 1. Groups non-compliant findings by drawing sheet
-2. Maps sheet IDs to PDF page indices using analysis.json
+2. Maps sheet IDs to PDF page indices by scanning extracted page text
 3. Renders each page as a 72 DPI image
 4. Sends page image + findings list to Claude vision for coordinate identification
 5. Writes FreeText callout annotations via PyMuPDF
@@ -15,8 +15,8 @@ Usage:
 
 Expects:
     <job-dir>/output/review-data.json
-    <job-dir>/analysis.json
-    <job-dir>/upload/<original>.pdf
+    <job-dir>/pages/page-NNNN.txt (extracted page text)
+    <job-dir>/input.pdf
 """
 
 import fitz  # PyMuPDF
@@ -26,6 +26,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -37,15 +38,12 @@ SEVERITY_COLORS = {
 }
 DEFAULT_COLOR = {'fill': (0.9, 0.9, 0.9), 'border': (0.5, 0.5, 0.5)}
 
+# Sheet ID pattern: letter(s) + digit + dot + digit(s), e.g., G1.0, A1.1, M2.01
+SHEET_RE = re.compile(r'\b([A-Z]{1,2}\d\.\d{1,2})\b')
+
 
 def load_review_data(job_dir):
     path = os.path.join(job_dir, 'output', 'review-data.json')
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-
-def load_analysis(job_dir):
-    path = os.path.join(job_dir, 'analysis.json')
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
@@ -64,28 +62,90 @@ def find_uploaded_pdf(job_dir):
     return None
 
 
-def build_sheet_page_map(analysis):
-    """Map sheet IDs (e.g., 'M-201') to 0-based PDF page indices."""
+def build_sheet_page_map(job_dir, total_pages):
+    """Map sheet IDs to 0-based page indices by scanning extracted page text.
+
+    Heuristic: each page's 'primary' sheet ID is the one that appears on that
+    page but on the fewest OTHER pages (most unique to that page).  Page 1
+    (the cover/index) is skipped as it references all sheets.
+    """
+    pages_dir = os.path.join(job_dir, 'pages')
+    if not os.path.isdir(pages_dir):
+        return {}
+
+    # Collect sheet IDs per page
+    page_sheets = {}  # page_idx -> set of sheet IDs
+    global_counts = Counter()  # sheet_id -> how many pages mention it
+
+    for page_idx in range(total_pages):
+        fname = f'page-{page_idx + 1:04d}.txt'
+        fpath = os.path.join(pages_dir, fname)
+        if not os.path.isfile(fpath):
+            continue
+        with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
+            text = f.read().upper()
+        ids = set(SHEET_RE.findall(text))
+        page_sheets[page_idx] = ids
+        for sid in ids:
+            global_counts[sid] += 1
+
+    # For each page, find the most unique sheet ID
     sheet_map = {}
-    pages = analysis.get('pages', [])
-    for page_info in pages:
-        page_idx = page_info.get('pageIndex', page_info.get('page', 0))
-        sheet_id = page_info.get('sheetId', '')
-        if sheet_id:
-            sheet_map[sheet_id.upper()] = page_idx
+    for page_idx in range(total_pages):
+        ids = page_sheets.get(page_idx, set())
+        if not ids:
+            continue
+        # Pick the ID that appears on the fewest pages (most unique)
+        best = min(ids, key=lambda sid: global_counts[sid])
+        if best not in sheet_map:
+            sheet_map[best] = page_idx
+
     return sheet_map
 
 
-def group_findings_by_sheet(findings):
-    """Group non-compliant findings by their drawing_sheet value."""
-    groups = {}
+def parse_sheet_refs(ref_str):
+    """Parse comma-separated sheet references, returning clean sheet IDs.
+
+    Input: 'A1.2, A3.1' or 'G1.0, A1.1, A1.2, A3.1' or 'N/A - no scope'
+    Output: ['A1.2', 'A3.1'] (skips N/A entries)
+    """
+    if not ref_str:
+        return []
+    ids = SHEET_RE.findall(ref_str.upper())
+    return ids
+
+
+def group_findings_by_page(findings, sheet_map):
+    """Group non-compliant findings by PDF page index.
+
+    Uses pdf_reference or drawing_sheet field, parses comma-separated sheet IDs,
+    maps each to a page via sheet_map. A finding may appear on multiple pages.
+    """
+    groups = {}  # page_idx -> list of findings
+    unmapped = 0
+
     for f in findings:
-        if f.get('status') == 'C':
+        status = f.get('status', '')
+        if status in ('C', 'NA'):
             continue
-        sheet = (f.get('drawing_sheet') or '').strip().upper()
-        if not sheet:
+        # Try pdf_reference first, then drawing_sheet
+        ref = f.get('pdf_reference') or f.get('drawing_sheet') or ''
+        sheet_ids = parse_sheet_refs(ref)
+        if not sheet_ids:
+            unmapped += 1
             continue
-        groups.setdefault(sheet, []).append(f)
+        placed = False
+        for sid in sheet_ids:
+            page_idx = sheet_map.get(sid)
+            if page_idx is not None:
+                groups.setdefault(page_idx, []).append(f)
+                placed = True
+                break  # Place on first matching page only
+        if not placed:
+            unmapped += 1
+
+    if unmapped:
+        print(f"  {unmapped} findings could not be mapped to a PDF page")
     return groups
 
 
@@ -99,7 +159,8 @@ def render_page_image(doc, page_idx, dpi=72):
 def call_vision_for_coordinates(page_image_path, findings_for_page, claude_path='claude'):
     """Send page image + findings to Claude vision, get back coordinates."""
     findings_text = "\n".join(
-        f"- {f.get('finding_id', '?')}: {f.get('issue', f.get('requirement', 'Unknown issue'))}"
+        f"- {f.get('id', f.get('finding_id', '?'))}: "
+        f"{f.get('issue', f.get('requirement', 'Unknown issue'))}"
         for f in findings_for_page
     )
 
@@ -108,15 +169,16 @@ def call_vision_for_coordinates(page_image_path, findings_for_page, claude_path=
         "You are analyzing a construction drawing sheet. "
         "The following design review findings were identified on this sheet:\n\n"
         f"{findings_text}\n\n"
-        "For each finding, identify the specific location on the drawing where the issue exists. "
-        "Return a JSON array with one object per finding:\n"
+        "For each finding, identify the specific location on the drawing where "
+        "the issue exists. Return a JSON array with one object per finding:\n"
         "[\n"
         '  { "finding_id": "F-001", "x_pct": 45.2, "y_pct": 62.8 }\n'
         "]\n\n"
-        "x_pct and y_pct are percentages (0-100) of the page width and height respectively, "
-        "measured from the TOP-LEFT corner.\n\n"
-        "If you cannot identify a specific location for a finding (e.g., something is missing "
-        "from the drawing entirely), set x_pct and y_pct to -1.\n\n"
+        "x_pct and y_pct are percentages (0-100) of the page width and height "
+        "respectively, measured from the TOP-LEFT corner.\n\n"
+        "If you cannot identify a specific location for a finding (e.g., "
+        "something is missing from the drawing entirely), set x_pct and y_pct "
+        "to -1.\n\n"
         "Return ONLY the JSON array, no other text."
     )
 
@@ -140,7 +202,6 @@ def call_vision_for_coordinates(page_image_path, findings_for_page, claude_path=
         idx = raw.find('[')
         if idx >= 0:
             raw = raw[idx:]
-        # Find the closing bracket
         end_idx = raw.rfind(']')
         if end_idx >= 0:
             raw = raw[:end_idx + 1]
@@ -167,11 +228,10 @@ def write_annotations(doc, page_idx, findings, coordinates):
     used_y_positions = []
 
     for i, f in enumerate(findings):
-        fid = f.get('finding_id', f'F-{i}')
+        fid = f.get('id', f.get('finding_id', f'F-{i}'))
         severity = f.get('severity', 'Minor')
         colors = SEVERITY_COLORS.get(severity, DEFAULT_COLOR)
         issue = f.get('issue', f.get('requirement', 'Review finding'))
-        # Truncate issue text for annotation
         if len(issue) > 120:
             issue = issue[:117] + '...'
         label = f"[{fid}] {issue}"
@@ -181,8 +241,10 @@ def write_annotations(doc, page_idx, findings, coordinates):
         y_pct = coord.get('y_pct', -1)
 
         if x_pct < 0 or y_pct < 0:
-            # Fallback: place sticky note in title block area (bottom-right)
-            note_point = fitz.Point(pw * 0.85, ph * (0.92 - i * 0.03))
+            # Fallback: place sticky note in right margin, stacked vertically
+            note_point = fitz.Point(pw * 0.85, ph * (0.10 + i * 0.04))
+            if note_point.y > ph * 0.90:
+                note_point = fitz.Point(pw * 0.70, ph * (0.10 + (i - 20) * 0.04))
             annot = page.add_text_annot(note_point, label)
             annot.set_info(title="WSU Design Review", content=label)
             annot.update()
@@ -196,19 +258,16 @@ def write_annotations(doc, page_idx, findings, coordinates):
         box_w = min(200, pw * 0.15)
         box_h = 36
 
-        # Place box to the right or left of target, shifting down to avoid overlap
         box_x = target_x + 30
         if box_x + box_w > pw - 20:
             box_x = target_x - box_w - 30
 
         box_y = target_y - box_h / 2
-        # Shift down if overlapping with existing annotations
         for used_y in used_y_positions:
             if abs(box_y - used_y) < box_h + 5:
                 box_y = used_y + box_h + 5
         used_y_positions.append(box_y)
 
-        # Clamp to page bounds
         box_y = max(10, min(box_y, ph - box_h - 10))
         box_x = max(10, min(box_x, pw - box_w - 10))
 
@@ -230,92 +289,87 @@ def annotate_pdf(job_dir, claude_path='claude'):
     print("Phase 4: PDF Annotation")
 
     review_data = load_review_data(job_dir)
-    analysis = load_analysis(job_dir)
     pdf_path = find_uploaded_pdf(job_dir)
 
     if not pdf_path:
         print("  ERROR: No uploaded PDF found", file=sys.stderr)
         return False
 
-    # Get all findings (non-compliant only)
+    doc = fitz.open(pdf_path)
+    total_pages = len(doc)
+    output_path = os.path.join(job_dir, 'output', 'review-markup.pdf')
+
+    # Get all non-compliant findings
     all_findings = review_data.get('findings', [])
     if not all_findings:
-        # Try requirements array if findings is empty
         all_findings = [r for r in review_data.get('requirements', [])
                         if r.get('status') not in ('C', 'NA')]
     if not all_findings:
         print("  No non-compliant findings to annotate")
-        # Still create a copy as review-markup.pdf
-        doc = fitz.open(pdf_path)
-        output_path = os.path.join(job_dir, 'output', 'review-markup.pdf')
         doc.save(output_path)
         doc.close()
         print(f"  Saved (unannotated): {output_path}")
         return True
 
-    sheet_map = build_sheet_page_map(analysis)
-    findings_by_sheet = group_findings_by_sheet(all_findings)
+    # Build sheet-to-page mapping from extracted page text
+    sheet_map = build_sheet_page_map(job_dir, total_pages)
+    print(f"  Sheet map: {len(sheet_map)} sheets mapped to pages")
+    for sid, pidx in sorted(sheet_map.items()):
+        print(f"    {sid} -> page {pidx + 1}")
 
-    doc = fitz.open(pdf_path)
-    output_path = os.path.join(job_dir, 'output', 'review-markup.pdf')
+    # Group findings by page
+    findings_by_page = group_findings_by_page(all_findings, sheet_map)
+    if not findings_by_page:
+        print("  No findings could be mapped to PDF pages")
+        doc.save(output_path)
+        doc.close()
+        print(f"  Saved (unannotated): {output_path}")
+        return True
+
+    total_findings = sum(len(v) for v in findings_by_page.values())
+    print(f"  {len(findings_by_page)} pages to annotate, {total_findings} findings")
 
     # Render page images and dispatch vision calls
-    vision_tasks = {}
     temp_dir = tempfile.mkdtemp(prefix='wsu_vision_')
+    vision_tasks = {}
 
-    for sheet_id, sheet_findings in findings_by_sheet.items():
-        page_idx = sheet_map.get(sheet_id)
-        if page_idx is None:
-            # Try fuzzy match (strip leading zeros, case insensitive)
-            for map_id, map_idx in sheet_map.items():
-                if map_id.replace('-0', '-') == sheet_id.replace('-0', '-'):
-                    page_idx = map_idx
-                    break
-        if page_idx is None or page_idx >= len(doc):
-            print(f"  WARNING: Sheet {sheet_id} not found in PDF, skipping {len(sheet_findings)} findings")
-            continue
-
-        # Render page image
+    for page_idx, page_findings in findings_by_page.items():
         img_bytes = render_page_image(doc, page_idx)
         img_path = os.path.join(temp_dir, f'page_{page_idx}.png')
         with open(img_path, 'wb') as f:
             f.write(img_bytes)
-
-        vision_tasks[sheet_id] = {
-            'page_idx': page_idx,
-            'findings': sheet_findings,
+        vision_tasks[page_idx] = {
+            'findings': page_findings,
             'img_path': img_path,
         }
 
-    print(f"  {len(vision_tasks)} pages to annotate, {sum(len(v['findings']) for v in vision_tasks.values())} findings")
-
-    # Run vision calls in parallel (max 4 concurrent to avoid rate limits)
+    # Run vision calls in parallel (max 4 concurrent)
     results = {}
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {}
-        for sheet_id, task in vision_tasks.items():
+        for page_idx, task in vision_tasks.items():
             future = executor.submit(
                 call_vision_for_coordinates,
                 task['img_path'],
                 task['findings'],
                 claude_path
             )
-            futures[future] = sheet_id
+            futures[future] = page_idx
 
         for future in as_completed(futures):
-            sheet_id = futures[future]
+            page_idx = futures[future]
             try:
                 coords = future.result()
-                results[sheet_id] = coords
-                print(f"  {sheet_id}: {len(coords)} coordinates returned")
+                results[page_idx] = coords
+                print(f"  Page {page_idx + 1}: {len(coords)} coordinates returned")
             except Exception as e:
-                print(f"  {sheet_id}: vision failed: {e}", file=sys.stderr)
-                results[sheet_id] = []
+                print(f"  Page {page_idx + 1}: vision failed: {e}", file=sys.stderr)
+                results[page_idx] = []
 
     # Write annotations
-    for sheet_id, task in vision_tasks.items():
-        coords = results.get(sheet_id, [])
-        write_annotations(doc, task['page_idx'], task['findings'], coords)
+    for page_idx, task in vision_tasks.items():
+        coords = results.get(page_idx, [])
+        write_annotations(doc, page_idx, task['findings'], coords)
 
     doc.save(output_path)
     doc.close()
@@ -331,10 +385,11 @@ def annotate_pdf(job_dir, claude_path='claude'):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python annotate_pdf.py <job-dir>", file=sys.stderr)
+        print("Usage: python annotate_pdf.py <job-dir> [claude-path]", file=sys.stderr)
         sys.exit(1)
     job_dir = sys.argv[1]
-    success = annotate_pdf(job_dir)
+    claude_path = sys.argv[2] if len(sys.argv) > 2 else 'claude'
+    success = annotate_pdf(job_dir, claude_path=claude_path)
     sys.exit(0 if success else 1)
 
 

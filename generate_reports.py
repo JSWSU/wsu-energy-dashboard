@@ -1052,7 +1052,7 @@ def main():
     # Override executive_summary from executive-summary.txt if present
     summary_file = os.path.join(output_dir, "executive-summary.txt")
     if os.path.isfile(summary_file):
-        with open(summary_file, "r", encoding="utf-8") as f:
+        with open(summary_file, "r", encoding="utf-8", errors="replace") as f:
             text = f.read().strip()
             if text and text != "PLACEHOLDER":
                 data.setdefault("narratives", {})["executive_summary"] = text
