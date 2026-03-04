@@ -557,6 +557,188 @@ def merge_worker_results(results, output_dir):
     return merged
 
 
+def find_python():
+    """Find Python executable (same logic as the bash script)."""
+    candidates = [
+        os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python313\python.exe'),
+        os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python312\python.exe'),
+        os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python311\python.exe'),
+    ]
+    for p in candidates:
+        if os.path.isfile(p):
+            return p
+    # Fallback: try PATH
+    import shutil
+    for name in ('python3', 'python', 'py'):
+        found = shutil.which(name)
+        if found:
+            return found
+    return sys.executable  # Last resort: this Python
+
+
+def write_timing(timing_log, key, value):
+    """Append a timing entry."""
+    with open(timing_log, 'a') as f:
+        f.write(f'{key}={value}\n')
+
+
+def escalate_to_subagent(worker_config, failure_log):
+    """Future: Launch a Claude Code session with Task tool to adaptively
+    retry a persistently failing worker."""
+    raise NotImplementedError("Tier 2 escalation - future feature")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python review_pipeline.py <job-dir>", file=sys.stderr)
+        sys.exit(1)
+
+    job_dir = os.path.abspath(sys.argv[1])
+    output_dir = os.path.join(job_dir, 'output')
+    os.makedirs(output_dir, exist_ok=True)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Write PID
+    with open(os.path.join(output_dir, 'pipeline.pid'), 'w') as f:
+        f.write(str(os.getpid()))
+
+    timing_log = os.path.join(output_dir, 'timing.log')
+
+    # Load job metadata
+    job = load_job(job_dir)
+    analysis = load_analysis(job_dir)
+
+    python = find_python()
+    claude_path = find_claude_exe()
+    log(f"Using Python: {python}")
+    log(f"Using Claude: {claude_path}")
+
+    # === PHASE 0: PDF text extraction ===
+    write_timing(timing_log, 'phase0_start', int(time.time()))
+    manifest = os.path.join(job_dir, 'pages', 'manifest.txt')
+    if os.path.exists(manifest):
+        log("Phase 0: Skipped (pages already extracted).", job_dir)
+    else:
+        log("Phase 0: Extracting PDF text...", job_dir)
+        extract_script = os.path.join(base_dir, 'extract_pdf.py')
+        input_pdf = os.path.join(job_dir, 'input.pdf')
+        pages_dir = os.path.join(job_dir, 'pages')
+        ret = subprocess.run([python, extract_script, input_pdf, pages_dir])
+        if ret.returncode != 0:
+            with open(os.path.join(output_dir, 'FAILED'), 'w') as f:
+                f.write('extract_pdf.py failed')
+            sys.exit(1)
+        log("Phase 0 complete.", job_dir)
+
+    write_timing(timing_log, 'phase0_end', int(time.time()))
+    pages_dir = os.path.join(job_dir, 'pages')
+    page_count = len([f for f in os.listdir(pages_dir) if f.endswith('.txt')]) if os.path.isdir(pages_dir) else 0
+    write_timing(timing_log, 'phase0_pages', page_count)
+
+    # === PHASE 1: Discipline reviews ===
+    write_timing(timing_log, 'phase1_start', int(time.time()))
+
+    # Plan workers
+    workers = plan_workers(job_dir, job, analysis, base_dir)
+    log(f"Phase 1: Planned {len(workers)} workers across disciplines.", job_dir)
+    for w in workers:
+        log(f"  {w['key']}: {w['tokens_est']}t est. ({w['standards_file']})")
+
+    # Execute workers
+    results, failed = execute_phase1(workers, output_dir, job_dir, claude_path)
+
+    # Merge by discipline
+    log("Merging worker results by discipline...", job_dir)
+    merged = merge_worker_results(results, output_dir)
+
+    write_timing(timing_log, 'phase1_end', int(time.time()))
+    write_timing(timing_log, 'phase1_workers', len(workers))
+    write_timing(timing_log, 'phase1_succeeded', len(results))
+    write_timing(timing_log, 'phase1_failed', len(failed))
+
+    if not merged:
+        with open(os.path.join(output_dir, 'FAILED'), 'w') as f:
+            f.write('No discipline findings produced. All workers failed.')
+        sys.exit(1)
+
+    log(f"Phase 1 complete: {len(merged)} disciplines, {len(results)}/{len(workers)} workers.", job_dir)
+
+    # === PHASE 2a: Python synthesis ===
+    write_timing(timing_log, 'phase2a_start', int(time.time()))
+    log("Phase 2a: Synthesizing (Python)...", job_dir)
+    synth_script = os.path.join(base_dir, 'synthesize.py')
+    ret = subprocess.run(
+        [python, synth_script, output_dir],
+        capture_output=True, text=True,
+    )
+    with open(os.path.join(output_dir, 'synthesis-stdout.log'), 'w') as f:
+        f.write(ret.stdout or '')
+    with open(os.path.join(output_dir, 'synthesis-stderr.log'), 'w') as f:
+        f.write(ret.stderr or '')
+
+    review_data_path = os.path.join(output_dir, 'review-data.json')
+    if not os.path.exists(review_data_path):
+        with open(os.path.join(output_dir, 'FAILED'), 'w') as f:
+            f.write('synthesize.py did not produce review-data.json')
+        sys.exit(1)
+    log("Phase 2a complete: review-data.json produced.", job_dir)
+    write_timing(timing_log, 'phase2a_end', int(time.time()))
+
+    # === PHASE 2b: Executive summary (Haiku) ===
+    write_timing(timing_log, 'phase2b_start', int(time.time()))
+    log("Phase 2b: Generating executive summary...", job_dir)
+    exec_prompt_path = os.path.join(job_dir, 'prompt-exec-summary.txt')
+    if os.path.exists(exec_prompt_path):
+        with open(exec_prompt_path, 'r') as f:
+            exec_prompt = f.read()
+        # Run Haiku in the output dir so it can read review-data.json
+        ret = subprocess.run(
+            [claude_path, '-p', exec_prompt,
+             '--model', 'haiku',
+             '--allowedTools', 'Read', 'Write',
+             '--dangerously-skip-permissions',
+             '--output-format', 'text'],
+            capture_output=True, text=True, timeout=300,
+            cwd=output_dir,
+            env={**os.environ, 'CLAUDE_CODE_MAX_OUTPUT_TOKENS': '16000'}
+        )
+        with open(os.path.join(output_dir, 'executive-summary.txt'), 'w') as f:
+            f.write(ret.stdout or '')
+        with open(os.path.join(output_dir, 'summary-stderr.log'), 'w') as f:
+            f.write(ret.stderr or '')
+    log("Phase 2b complete.", job_dir)
+    write_timing(timing_log, 'phase2b_end', int(time.time()))
+
+    # === PHASE 3: Report generation ===
+    write_timing(timing_log, 'phase3_start', int(time.time()))
+    log("Phase 3: Generating reports...", job_dir)
+    report_script = os.path.join(base_dir, 'generate_reports.py')
+    ret = subprocess.run([python, report_script, review_data_path])
+    if ret.returncode != 0:
+        log(f"ERROR: generate_reports.py failed (exit code {ret.returncode})", job_dir)
+        if not os.path.exists(os.path.join(output_dir, 'FAILED')):
+            with open(os.path.join(output_dir, 'FAILED'), 'w') as f:
+                f.write(f'generate_reports.py exited with code {ret.returncode}')
+        sys.exit(1)
+    write_timing(timing_log, 'phase3_end', int(time.time()))
+
+    # === PHASE 4: PDF annotation (non-fatal) ===
+    write_timing(timing_log, 'phase4_start', int(time.time()))
+    log("Phase 4: Generating annotated PDF...", job_dir)
+    annotate_script = os.path.join(base_dir, 'annotate_pdf.py')
+    ret = subprocess.run([python, annotate_script, job_dir],
+                         capture_output=True, text=True)
+    if ret.returncode != 0:
+        log(f"WARNING: PDF annotation failed (exit {ret.returncode})", job_dir)
+    write_timing(timing_log, 'phase4_end', int(time.time()))
+
+    log("Pipeline complete.", job_dir)
+
+
 def estimate_tokens(text):
     """Estimate token count from character count."""
     return len(text) // CHARS_PER_TOKEN
+
+
+if __name__ == '__main__':
+    main()
