@@ -51,6 +51,7 @@ LIGHT_ORANGE  = "FEF3C7"
 LIGHT_YELLOW  = "FEF9C3"
 LIGHT_GREEN   = "DCFCE7"
 LIGHT_BLUE    = "EFF6FF"
+LIGHT_GRAY    = "F3F4F6"
 ALT_ROW       = "F9FAFB"
 
 SEVERITY_ORDER = {"Critical": 0, "Major": 1, "Minor": 2}
@@ -122,14 +123,15 @@ def validate(data, findings):
         row_o = s.get("omissions", 0)
         row_x = s.get("concerns", 0)
         row_c = s.get("compliant", 0)
+        row_na = s.get("not_applicable", 0)
         row_total = s.get("total_requirements", 0)
         disc_nc += row_d + row_o + row_x
         disc_total_req += row_total
-        # Per-row balance
-        if row_c + row_d + row_o + row_x != row_total:
+        # Per-row balance (NA items may be folded into compliant or separate)
+        if row_c + row_d + row_o + row_x + row_na != row_total:
             errors.append(
-                f"Discipline {d['key']}: C({row_c})+D({row_d})+O({row_o})+X({row_x}) "
-                f"= {row_c+row_d+row_o+row_x} != Total({row_total})"
+                f"Discipline {d['key']}: C({row_c})+D({row_d})+O({row_o})+X({row_x})+NA({row_na}) "
+                f"= {row_c+row_d+row_o+row_x+row_na} != Total({row_total})"
             )
 
     # Findings must have at least 1 entry
@@ -366,10 +368,10 @@ def generate_xlsx(data, findings, output_dir):
     ws.cell(row=row, column=2, value="FINDINGS BY DISCIPLINE").font = section_font
     row += 1
     disc_headers = ["Division", "Description", "Total Req.", "Compliant",
-                    "Deviations", "Omissions", "Concerns", "Compliance %"]
+                    "Deviations", "Omissions", "Concerns", "N/A", "Compliance %"]
     for c, h in enumerate(disc_headers, 2):
         ws.cell(row=row, column=c, value=h)
-    style_header(ws, row, 9)
+    style_header(ws, row, 10)
 
     # Build per-division rows from disciplines
     div_rows = []
@@ -384,6 +386,7 @@ def generate_xlsx(data, findings, output_dir):
                 d_d = sum(1 for r in div_reqs if r.get("status") == "D")
                 d_o = sum(1 for r in div_reqs if r.get("status") == "O")
                 d_x = sum(1 for r in div_reqs if r.get("status") == "X")
+                d_na = sum(1 for r in div_reqs if r.get("status") == "NA")
             else:
                 # Fallback: use discipline summary (not per-division)
                 d_total = s.get("total_requirements", 0)
@@ -391,10 +394,11 @@ def generate_xlsx(data, findings, output_dir):
                 d_d = s.get("deviations", 0)
                 d_o = s.get("omissions", 0)
                 d_x = s.get("concerns", 0)
+                d_na = s.get("not_applicable", 0)
             div_rows.append({
                 "div": div,
                 "desc": DIVISION_NAMES.get(div, "Unknown"),
-                "total": d_total, "c": d_c, "d": d_d, "o": d_o, "x": d_x,
+                "total": d_total, "c": d_c, "d": d_d, "o": d_o, "x": d_x, "na": d_na,
             })
 
     # Deduplicate and sort
@@ -405,21 +409,22 @@ def generate_xlsx(data, findings, output_dir):
             seen.add(dr["div"])
             unique_rows.append(dr)
 
-    totals = {"total": 0, "c": 0, "d": 0, "o": 0, "x": 0}
+    totals = {"total": 0, "c": 0, "d": 0, "o": 0, "x": 0, "na": 0}
     for dr in unique_rows:
         row += 1
         vals = [dr["div"], dr["desc"], dr["total"], dr["c"], dr["d"], dr["o"], dr["x"],
-                pct(dr["c"], dr["total"])]
+                dr.get("na", 0), pct(dr["c"], dr["total"])]
         for c, v in enumerate(vals, 2):
             cell = ws.cell(row=row, column=c, value=v)
             style_body_cell(cell, "center" if c > 3 else "left")
-        for k in ["total", "c", "d", "o", "x"]:
-            totals[k] += dr[k]
+        for k in ["total", "c", "d", "o", "x", "na"]:
+            totals[k] += dr.get(k, 0)
 
     # Total row
     row += 1
     total_vals = ["TOTAL", "", totals["total"], totals["c"], totals["d"],
-                  totals["o"], totals["x"], pct(totals["c"], totals["total"])]
+                  totals["o"], totals["x"], totals["na"],
+                  pct(totals["c"], totals["total"])]
     for c, v in enumerate(total_vals, 2):
         cell = ws.cell(row=row, column=c, value=v)
         cell.font = bold_font
@@ -509,7 +514,7 @@ def generate_xlsx(data, findings, output_dir):
     style_header(ws3, 1, 8)
     ws3.auto_filter.ref = f"A1:H{len(requirements) + 1}"
 
-    status_fill = {"C": LIGHT_GREEN, "D": LIGHT_RED, "O": LIGHT_ORANGE, "X": LIGHT_YELLOW}
+    status_fill = {"C": LIGHT_GREEN, "D": LIGHT_RED, "O": LIGHT_ORANGE, "X": LIGHT_YELLOW, "NA": LIGHT_GRAY}
     for i, r in enumerate(requirements, 2):
         st = r.get("status", "C")
         vals = [i - 1, r.get("division", ""), r.get("csi_code", ""),
@@ -799,29 +804,31 @@ def generate_docx(data, findings, output_dir):
 
     # Discipline table
     doc.add_heading("Findings by Discipline", level=2)
-    disc_headers = ["Division", "Description", "Total", "Compliant", "Dev.", "Omis.", "Concerns", "Comp. %"]
+    disc_headers = ["Division", "Description", "Total", "Compliant", "Dev.", "Omis.", "Concerns", "N/A", "Comp. %"]
     # Collect unique divisions from requirements
     div_data = {}
     for r in requirements:
         div = r.get("division", "")
         if div not in div_data:
-            div_data[div] = {"total": 0, "c": 0, "d": 0, "o": 0, "x": 0}
+            div_data[div] = {"total": 0, "c": 0, "d": 0, "o": 0, "x": 0, "na": 0}
         div_data[div]["total"] += 1
         st = r.get("status", "C")
         if st == "C": div_data[div]["c"] += 1
         elif st == "D": div_data[div]["d"] += 1
         elif st == "O": div_data[div]["o"] += 1
         elif st == "X": div_data[div]["x"] += 1
+        elif st == "NA": div_data[div]["na"] += 1
 
     sorted_divs = sorted(div_data.keys())
-    t = doc.add_table(rows=len(sorted_divs) + 2, cols=8)
+    t = doc.add_table(rows=len(sorted_divs) + 2, cols=9)
     t.style = "Table Grid"
     for c, h in enumerate(disc_headers):
         t.rows[0].cells[c].text = h
     for i, div in enumerate(sorted_divs, 1):
         d = div_data[div]
         vals = [div, DIVISION_NAMES.get(div, ""), str(d["total"]), str(d["c"]),
-                str(d["d"]), str(d["o"]), str(d["x"]), pct(d["c"], d["total"])]
+                str(d["d"]), str(d["o"]), str(d["x"]), str(d["na"]),
+                pct(d["c"], d["total"])]
         for c, v in enumerate(vals):
             t.rows[i].cells[c].text = v
     # Total row
@@ -831,6 +838,7 @@ def generate_docx(data, findings, output_dir):
               str(sum(d["d"] for d in div_data.values())),
               str(sum(d["o"] for d in div_data.values())),
               str(sum(d["x"] for d in div_data.values())),
+              str(sum(d["na"] for d in div_data.values())),
               pct(sum(d["c"] for d in div_data.values()),
                   sum(d["total"] for d in div_data.values()))]
     for c, v in enumerate(t_vals):
