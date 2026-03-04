@@ -47,10 +47,90 @@ SEVERITY_ORDER = {'Critical': 0, 'Major': 1, 'Minor': 2}
 # ---------------------------------------------------------------------------
 # Discovery & loading
 # ---------------------------------------------------------------------------
+def merge_split_discipline_parts(output_dir):
+    """Merge discipline-<key>-part*-findings.json into discipline-<key>-findings.json.
+
+    For disciplines that were split into sub-groups, concatenate their requirements
+    arrays and recompute summary counts into a single merged file.
+    """
+    part_pattern = os.path.join(output_dir, 'discipline-*-part*-findings.json')
+    part_files = sorted(glob.glob(part_pattern))
+    if not part_files:
+        return
+
+    # Group by parent discipline key
+    part_groups = {}
+    for pf in part_files:
+        basename = os.path.basename(pf)
+        m = re.match(r'^discipline-(.+)-part\d+-findings\.json$', basename)
+        if m:
+            parent_key = m.group(1)
+            part_groups.setdefault(parent_key, []).append(pf)
+
+    for parent_key, files in part_groups.items():
+        merged_path = os.path.join(output_dir, f'discipline-{parent_key}-findings.json')
+
+        # Skip if merged file already exists and is valid
+        if os.path.exists(merged_path):
+            try:
+                with open(merged_path, 'r', encoding='utf-8') as f:
+                    json.load(f)
+                continue  # already valid
+            except (json.JSONDecodeError, IOError):
+                pass  # overwrite with merged parts
+
+        all_reqs = []
+        discipline_val = parent_key
+        divs_reviewed = []
+
+        for pf in sorted(files):
+            try:
+                with open(pf, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                reqs = data.get('requirements', data.get('findings', []))
+                all_reqs.extend(reqs)
+                if data.get('discipline'):
+                    discipline_val = data['discipline']
+                for d in data.get('divisions_reviewed', []):
+                    if d not in divs_reviewed:
+                        divs_reviewed.append(d)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"  WARNING: Could not read part file {pf}: {e}", file=sys.stderr)
+
+        # Recompute summary counts
+        counts = {'C': 0, 'D': 0, 'O': 0, 'X': 0}
+        for r in all_reqs:
+            st = r.get('status', 'C')
+            if st in counts:
+                counts[st] += 1
+
+        merged = {
+            'discipline': discipline_val,
+            'divisions_reviewed': divs_reviewed,
+            'summary': {
+                'total_requirements': len(all_reqs),
+                'compliant': counts['C'],
+                'deviations': counts['D'],
+                'omissions': counts['O'],
+                'concerns': counts['X'],
+            },
+            'requirements': all_reqs,
+        }
+
+        with open(merged_path, 'w', encoding='utf-8') as f:
+            json.dump(merged, f, indent=2, ensure_ascii=False)
+        print(f"  Merged {len(files)} parts into {os.path.basename(merged_path)} ({len(all_reqs)} requirements)")
+
+
 def discover_discipline_files(output_dir):
     """Glob for discipline-*-findings.json, return sorted list of paths."""
+    # First merge any split discipline parts
+    merge_split_discipline_parts(output_dir)
+
     pattern = os.path.join(output_dir, 'discipline-*-findings.json')
     files = sorted(glob.glob(pattern))
+    # Exclude part files from the result
+    files = [f for f in files if not re.search(r'-part\d+-findings\.json$', f)]
     if not files:
         print(f"ERROR: No discipline findings files found in {output_dir}", file=sys.stderr)
     return files
@@ -88,6 +168,19 @@ def normalize_item_fields(item):
     st = item.get('status', '')
     if isinstance(st, str) and st.startswith('[') and st.endswith(']'):
         item['status'] = st[1:-1]
+
+    # Handle slim compliant items (4-field minimal format)
+    # Extract division from csi_code if missing, set absent fields to None
+    if item.get('status') == 'C':
+        if not item.get('division') and item.get('csi_code'):
+            # Extract first 2 digits from csi_code (e.g., "09 21 16" -> "09")
+            csi = item['csi_code'].strip()
+            if len(csi) >= 2:
+                item['division'] = csi[:2]
+        for field in ('severity', 'finding_id', 'issue', 'required_action',
+                      'pdf_reference', 'standard_reference', 'notes'):
+            if field not in item:
+                item[field] = None
 
     # Fix double-encoded UTF-8 in text fields
     for field in ('issue', 'required_action', 'standard_reference', 'requirement', 'notes'):

@@ -394,26 +394,76 @@ sub build_combined_standards {
     push @files, grep { -f "$ROOT/$_" } @{$group->{supp}};
     @files = sort @files;
 
-    my $outfile = "$outdir/combined-$group->{key}.md";
-    open my $fh, '>', $outfile or return '';
-    print $fh "# Combined WSU Standards: $group->{name}\n";
-    print $fh "# This file contains ALL standard files for this discipline group.\n";
-    print $fh "# Total files: " . scalar(@files) . "\n\n";
-
+    # Read all source files and their sizes
+    my @chunks;  # [{file => relpath, content => text, size => bytes}]
     for my $f (@files) {
         my $path = "$ROOT/$f";
         if (open my $sfh, '<', $path) {
-            print $fh "\n" . ("=" x 60) . "\n";
-            print $fh "# SOURCE: $f\n";
-            print $fh ("=" x 60) . "\n\n";
             local $/;
             my $content = <$sfh>;
-            print $fh $content;
             close $sfh;
+            my $header = "\n" . ("=" x 60) . "\n# SOURCE: $f\n" . ("=" x 60) . "\n\n";
+            push @chunks, { file => $f, content => $header . $content, size => length($header . $content) };
         }
     }
+
+    my $total_size = 0;
+    $total_size += $_->{size} for @chunks;
+    my $preamble_size = 120;  # approximate header lines size
+
+    my $SIZE_LIMIT = 150_000;
+
+    if ($total_size + $preamble_size <= $SIZE_LIMIT) {
+        # Single file — no splitting needed
+        my $outfile = "$outdir/combined-$group->{key}.md";
+        open my $fh, '>', $outfile or return 1;
+        print $fh "# Combined WSU Standards: $group->{name}\n";
+        print $fh "# This file contains ALL standard files for this discipline group.\n";
+        print $fh "# Total files: " . scalar(@chunks) . "\n\n";
+        print $fh $_->{content} for @chunks;
+        close $fh;
+        return 1;
+    }
+
+    # Split into sub-groups at file boundaries, each under SIZE_LIMIT
+    my @parts;
+    my @current_part;
+    my $current_size = $preamble_size;
+
+    for my $chunk (@chunks) {
+        if ($current_size + $chunk->{size} > $SIZE_LIMIT && @current_part > 0) {
+            push @parts, [@current_part];
+            @current_part = ();
+            $current_size = $preamble_size;
+        }
+        push @current_part, $chunk;
+        $current_size += $chunk->{size};
+    }
+    push @parts, [@current_part] if @current_part;
+
+    my $num_parts = scalar @parts;
+    for my $i (0 .. $#parts) {
+        my $part_num = $i + 1;
+        my $outfile = "$outdir/combined-$group->{key}-part${part_num}.md";
+        open my $fh, '>', $outfile or next;
+        print $fh "# Combined WSU Standards: $group->{name} (Part $part_num of $num_parts)\n";
+        print $fh "# This file contains a subset of standard files for this discipline group.\n";
+        print $fh "# Files in this part: " . scalar(@{$parts[$i]}) . " of " . scalar(@chunks) . " total\n\n";
+        print $fh $_->{content} for @{$parts[$i]};
+        close $fh;
+    }
+
+    # Also write the single combined file for reference/repair usage
+    my $outfile = "$outdir/combined-$group->{key}.md";
+    open my $fh, '>', $outfile or return $num_parts;
+    print $fh "# Combined WSU Standards: $group->{name}\n";
+    print $fh "# This file contains ALL standard files for this discipline group.\n";
+    print $fh "# Total files: " . scalar(@chunks) . "\n";
+    print $fh "# NOTE: This discipline was split into $num_parts parts for scanning.\n\n";
+    print $fh $_->{content} for @chunks;
     close $fh;
-    return $outfile;
+
+    return $num_parts;
 }
 
 # --- Email notification -----------------------------------------------------
@@ -778,10 +828,8 @@ sub check_job_status {
         # Only list final deliverables (not intermediate discipline files, scripts, etc.)
         # Supports both old (.md) and new (.txt) naming for backward compatibility
         my @deliverables = qw(
-            checklist.txt findings.txt notes.txt
-            checklist.md  findings.md  notes.md
             report.docx report.xlsx
-            review-data.json executive-summary.txt
+            review-markup.pdf
             timing.json
         );
         my @out = grep { -f "$job_dir/output/$_" } @deliverables;
@@ -842,7 +890,7 @@ sub check_job_status {
         write_job_json($job_id, $job);
     }
     else {
-        # Progress milestones (Phase 1 gets most of the bar since it's ~36 min):
+        # Progress milestones (Phase 1 gets most of the bar since it's ~10-20 min):
         # Phase 1: discipline scans (5% -> 80%)
         #   5%  = Job submitted
         #   7%  = stdout logs exist (CLIs launched, scanning)
@@ -851,12 +899,11 @@ sub check_job_status {
         # Phase 2: synthesis (82% -> 90%)
         #  82%  = synthesis started
         #  90%  = review-data.json exists
-        # Phase 3: local generation (92% -> 99%)
+        # Phase 3: report generation (92% -> 94%)
         #  92%  = report.docx exists
         #  94%  = report.xlsx exists
-        #  96%  = checklist.txt exists
-        #  98%  = findings.txt exists
-        #  99%  = notes.txt / all deliverables exist
+        # Phase 4: vision annotation (96%)
+        #  96%  = review-markup.pdf exists
         # 100%  = COMPLETE
 
         my $pct = 5;
@@ -896,7 +943,7 @@ sub check_job_status {
             }
         }
 
-        # Phase 3: local report generation (92% to 98%)
+        # Phase 3: report generation (92% to 94%)
         if (-f "$job_dir/output/review-data.json") {
             $pct = 90 unless $pct > 90;
             $detail = "Generating reports..." unless $pct > 90;
@@ -904,23 +951,11 @@ sub check_job_status {
                 $pct = 92; $detail = "Generating reports...";
             }
             if (-f "$job_dir/output/report.xlsx") {
-                $pct = 94; $detail = "Generating reports...";
+                $pct = 94; $detail = "Annotating drawings...";
             }
-            if (-f "$job_dir/output/checklist.txt") {
-                $pct = 96; $detail = "Generating reports...";
-            }
-            if (-f "$job_dir/output/findings.txt") {
-                $pct = 98; $detail = "Finalizing...";
-            }
-            if (-f "$job_dir/output/notes.txt") {
-                $pct = 99; $detail = "Finalizing...";
-            }
-            if (-f "$job_dir/output/report.xlsx"
-                && -f "$job_dir/output/report.docx"
-                && -f "$job_dir/output/notes.txt"
-                && -f "$job_dir/output/findings.txt"
-                && -f "$job_dir/output/checklist.txt") {
-                $pct = 99; $detail = "Finalizing...";
+            # Phase 4: vision annotation (96%)
+            if (-f "$job_dir/output/review-markup.pdf") {
+                $pct = 96; $detail = "Finalizing...";
             }
         }
 
@@ -955,7 +990,7 @@ sub check_job_status {
         # Phase-aware stall detection + auto-fail
         # Phase 1 (pct < 82): stall 45min, auto-fail 60min
         # Phase 2 (pct 82-91): stall 30min, auto-fail 45min
-        # Phase 3 (pct >= 92): stall 15min, auto-fail 30min
+        # Phase 3/4 (pct >= 92): stall 15min, auto-fail 30min
         my $newest_mtime = 0;
         if (opendir my $dh2, "$job_dir/output") {
             for my $f (readdir $dh2) {
@@ -976,7 +1011,7 @@ sub check_job_status {
                 $phase_name = 'Phase 2 (synthesis)';
             } else {
                 $stall_thresh = $CFG{stallThresholds}{phase3WarnMin}; $fail_thresh = $CFG{stallThresholds}{phase3FailMin};
-                $phase_name = 'Phase 3 (report generation)';
+                $phase_name = 'Phase 3/4 (reports + annotation)';
             }
 
             if ($idle >= $fail_thresh) {
@@ -1197,7 +1232,8 @@ sub spawn_review {
 
     # --- Build pre-concatenated standards per discipline ---
     for my $grp (@active) {
-        build_combined_standards($job_dir, $grp);
+        my $num_parts = build_combined_standards($job_dir, $grp);
+        $grp->{parts} = $num_parts;
     }
 
     # --- Write per-discipline prompt files (Phase 1) ---
@@ -1206,94 +1242,121 @@ sub spawn_review {
         . "Phase: $job->{reviewPhase}\n"
         . "Construction type: $job->{constructionType}\n\n";
 
+    # Build a flat list of scan units (1 per discipline, or N per split discipline)
+    my @scan_units;
+
     for my $grp (@active) {
+        my $num_parts = $grp->{parts} || 1;
         my $divs_str = join(', ', @{$grp->{active_divs}});
-        my $combined_file = "reviews/$job_id/combined/combined-$grp->{key}.md";
-
-        my $p = "You are reviewing construction drawings for WSU design standards compliance.\n";
-        $p .= $common_header;
-
-        $p .= "DISCIPLINE: $grp->{name} (Divisions $divs_str)\n";
-        $p .= "Focus on: $grp->{desc}\n\n";
-
-        # Add page hints from analysis data if available
-        if ($analysis && $analysis->{recommended_disciplines} && $analysis->{recommended_disciplines}{$grp->{key}}) {
-            my $disc_info = $analysis->{recommended_disciplines}{$grp->{key}};
-            my @pages = @{$disc_info->{pages} || []};
-            my @sids  = @{$disc_info->{sheet_ids} || []};
-            if (@pages) {
-                my $page_list = join(', ', map { "page-" . sprintf('%04d', $_) . ".txt" } @pages);
-                $p .= "PAGE HINTS (from automated sheet analysis):\n";
-                $p .= "  Relevant pages for this discipline: $page_list\n";
-                if (@sids) {
-                    $p .= "  Detected sheet IDs: " . join(', ', @sids) . "\n";
-                }
-                $p .= "  Start with these pages but still review all pages for context.\n\n";
-            }
-        }
-
-        $p .= "INSTRUCTIONS:\n";
-        $p .= "1. Read the extracted page text files in $job_rel/pages/.\n";
-        $p .= "   Start by reading $job_rel/pages/manifest.txt for the page list.\n";
-        $p .= "   Focus on pages relevant to this discipline but review all pages for context.\n";
-        $p .= "   These are pre-extracted text from the construction drawings PDF.\n";
-        $p .= "2. Read the combined standards file at $combined_file.\n";
-        $p .= "   This file contains ALL WSU standards for this discipline — read it IN ITS ENTIRETY.\n";
-        $p .= "3. For EVERY numbered requirement, clause, and sub-clause in the standards:\n";
-        $p .= "   - Locate the relevant drawing sheet(s) in the PDF\n";
-        $p .= "   - Assign status: [C] Compliant, [D] Deviation, [O] Omission, [X] Concern\n";
-        $p .= "4. Write a SINGLE JSON file to: reviews/$job_id/output/discipline-$grp->{key}-findings.json\n";
-        $p .= "   CRITICAL: Use exactly this filename. Do NOT split into multiple files. One file, all divisions.\n\n";
-
         my $divs_json = join(', ', map { "\"$_\"" } @{$grp->{active_divs}});
 
-        $p .= "OUTPUT FORMAT:\n";
-        $p .= "Write a single valid JSON file matching this exact schema:\n";
-        $p .= "{\n";
-        $p .= "  \"discipline\": \"$grp->{key}\",\n";
-        $p .= "  \"divisions_reviewed\": [$divs_json],\n";
-        $p .= "  \"summary\": {\n";
-        $p .= "    \"total_requirements\": N,\n";
-        $p .= "    \"compliant\": N,\n";
-        $p .= "    \"deviations\": N,\n";
-        $p .= "    \"omissions\": N,\n";
-        $p .= "    \"concerns\": N\n";
-        $p .= "  },\n";
-        $p .= "  \"requirements\": [\n";
-        $p .= "    {\n";
-        $p .= "      \"division\": \"XX\",\n";
-        $p .= "      \"csi_code\": \"XX XX XX\",\n";
-        $p .= "      \"requirement\": \"Description of standard requirement\",\n";
-        $p .= "      \"status\": \"C|D|O|X\",\n";
-        $p .= "      \"severity\": \"Critical|Major|Minor|null\",\n";
-        $p .= "      \"finding_id\": \"F-$grp->{key}-NNN or null\",\n";
-        $p .= "      \"pdf_reference\": \"Page N (Sheet-ID)\",\n";
-        $p .= "      \"standard_reference\": \"WSU section citation\",\n";
-        $p .= "      \"issue\": \"Description or null\",\n";
-        $p .= "      \"required_action\": \"Action or null\",\n";
-        $p .= "      \"drawing_sheet\": \"Sheet reference or null\",\n";
-        $p .= "      \"notes\": \"\"\n";
-        $p .= "    }\n";
-        $p .= "  ]\n";
-        $p .= "}\n\n";
-        $p .= "CRITICAL: Output MUST be valid JSON. Include ALL requirements (both compliant and non-compliant).\n";
-        $p .= "CRITICAL: Properly escape all double quotes inside JSON string values.\n";
-        $p .= "   Architectural measurements must NOT contain unescaped quotes.\n";
-        $p .= "   WRONG: \"5'-0\\\" from wall\"   CORRECT: \"5 ft-0 in. from wall\"\n";
-        $p .= "   WRONG: \"3/4\\\" pipe\"         CORRECT: \"3/4 in. pipe\"\n";
-        $p .= "For compliant requirements: status=\"C\", severity=null, finding_id=null, issue=null, required_action=null.\n";
-        $p .= "Summary counts MUST match: total_requirements = compliant + deviations + omissions + concerns.\n\n";
+        for my $part_idx (1 .. $num_parts) {
+            my $is_split = ($num_parts > 1);
+            my $unit_key = $is_split ? "$grp->{key}-part${part_idx}" : $grp->{key};
+            my $combined_file = $is_split
+                ? "reviews/$job_id/combined/combined-$grp->{key}-part${part_idx}.md"
+                : "reviews/$job_id/combined/combined-$grp->{key}.md";
+            my $output_file = "reviews/$job_id/output/discipline-${unit_key}-findings.json";
+            my $part_label = $is_split ? " (Part $part_idx of $num_parts)" : "";
 
-        $p .= "RULES:\n";
-        $p .= "- Every non-compliant finding MUST have both a PDF page/sheet citation AND a WSU standard section citation.\n";
-        $p .= "- Severity: Critical = life safety or code violation; Major = significant WSU standard non-compliance; Minor = best-practice deviation.\n";
-        $p .= "- If the discipline has no sheets in the drawings, note which requirements cannot be verified.\n";
-        $p .= "- Be thorough — check EVERY requirement. Depth over speed.\n";
+            my $p = "You are reviewing construction drawings for WSU design standards compliance.\n";
+            $p .= $common_header;
 
-        my $pfile = "$job_dir/prompt-$grp->{key}.txt";
-        open my $pf, '>', $pfile or next;
-        print $pf $p;
-        close $pf;
+            $p .= "DISCIPLINE: $grp->{name}${part_label} (Divisions $divs_str)\n";
+            $p .= "Focus on: $grp->{desc}\n\n";
+
+            # Add page hints from analysis data if available
+            if ($analysis && $analysis->{recommended_disciplines} && $analysis->{recommended_disciplines}{$grp->{key}}) {
+                my $disc_info = $analysis->{recommended_disciplines}{$grp->{key}};
+                my @pages = @{$disc_info->{pages} || []};
+                my @sids  = @{$disc_info->{sheet_ids} || []};
+                if (@pages) {
+                    my $page_list = join(', ', map { "page-" . sprintf('%04d', $_) . ".txt" } @pages);
+                    $p .= "PAGE HINTS (from automated sheet analysis):\n";
+                    $p .= "  Relevant pages for this discipline: $page_list\n";
+                    if (@sids) {
+                        $p .= "  Detected sheet IDs: " . join(', ', @sids) . "\n";
+                    }
+                    $p .= "  Start with these pages but still review all pages for context.\n\n";
+                }
+            }
+
+            $p .= "INSTRUCTIONS:\n";
+            $p .= "1. Read the extracted page text files in $job_rel/pages/.\n";
+            $p .= "   Start by reading $job_rel/pages/manifest.txt for the page list.\n";
+            $p .= "   Focus on pages relevant to this discipline but review all pages for context.\n";
+            $p .= "   These are pre-extracted text from the construction drawings PDF.\n";
+            $p .= "2. Read the standards file at $combined_file.\n";
+            if ($is_split) {
+                $p .= "   This file contains a SUBSET of WSU standards for this discipline (part $part_idx of $num_parts).\n";
+                $p .= "   Only check requirements from the standards in THIS file.\n";
+            } else {
+                $p .= "   This file contains ALL WSU standards for this discipline — read it IN ITS ENTIRETY.\n";
+            }
+            $p .= "3. For EVERY numbered requirement, clause, and sub-clause in the standards:\n";
+            $p .= "   - Locate the relevant drawing sheet(s) in the PDF\n";
+            $p .= "   - Assign status: [C] Compliant, [D] Deviation, [O] Omission, [X] Concern\n";
+            $p .= "4. Write a SINGLE JSON file to: $output_file\n";
+            $p .= "   CRITICAL: Use exactly this filename. Do NOT split into multiple files.\n\n";
+
+            $p .= "OUTPUT FORMAT:\n";
+            $p .= "Return a single JSON object with this structure:\n";
+            $p .= "{\n";
+            $p .= "  \"discipline\": \"$grp->{key}\",\n";
+            $p .= "  \"divisions_reviewed\": [$divs_json],\n";
+            $p .= "  \"summary\": {\n";
+            $p .= "    \"total_requirements\": N,\n";
+            $p .= "    \"compliant\": N,\n";
+            $p .= "    \"deviations\": N,\n";
+            $p .= "    \"omissions\": N,\n";
+            $p .= "    \"concerns\": N\n";
+            $p .= "  },\n";
+            $p .= "  \"requirements\": [\n";
+            $p .= "    // For COMPLIANT items (status C), use this MINIMAL 4-field format:\n";
+            $p .= "    { \"csi_code\": \"09 21 16\", \"requirement\": \"Short description\", \"status\": \"C\", \"drawing_sheet\": \"A-301\" },\n\n";
+            $p .= "    // For NON-COMPLIANT items (status D, O, or X), use this FULL format:\n";
+            $p .= "    {\n";
+            $p .= "      \"division\": \"09\",\n";
+            $p .= "      \"csi_code\": \"09 21 16\",\n";
+            $p .= "      \"requirement\": \"Full requirement text\",\n";
+            $p .= "      \"status\": \"D\",\n";
+            $p .= "      \"severity\": \"Critical|Major|Minor\",\n";
+            $p .= "      \"finding_id\": \"F-$grp->{key}-NNN\",\n";
+            $p .= "      \"pdf_reference\": \"Sheet A-301, Detail 4\",\n";
+            $p .= "      \"standard_reference\": \"Section 09 21 16.3.B\",\n";
+            $p .= "      \"issue\": \"Description of the non-compliance\",\n";
+            $p .= "      \"required_action\": \"What needs to change\",\n";
+            $p .= "      \"drawing_sheet\": \"A-301\",\n";
+            $p .= "      \"notes\": \"Additional context\"\n";
+            $p .= "    }\n";
+            $p .= "  ]\n";
+            $p .= "}\n\n";
+            $p .= "CRITICAL: Output MUST be valid JSON. Include ALL requirements (both compliant and non-compliant).\n";
+            $p .= "CRITICAL: Compliant items MUST use the 4-field minimal format to keep output size manageable.\n";
+            $p .= "CRITICAL: Properly escape all double quotes inside JSON string values.\n";
+            $p .= "   Architectural measurements must NOT contain unescaped quotes.\n";
+            $p .= "   WRONG: \"5'-0\\\" from wall\"   CORRECT: \"5 ft-0 in. from wall\"\n";
+            $p .= "   WRONG: \"3/4\\\" pipe\"         CORRECT: \"3/4 in. pipe\"\n";
+            $p .= "Summary counts MUST match: total_requirements = compliant + deviations + omissions + concerns.\n\n";
+
+            $p .= "RULES:\n";
+            $p .= "- Compliant items MUST use the 4-field minimal format. Do NOT include severity, finding_id, issue, etc. for compliant items.\n";
+            $p .= "- Every non-compliant finding MUST have both a PDF page/sheet citation AND a WSU standard section citation.\n";
+            $p .= "- Severity: Critical = life safety or code violation; Major = significant WSU standard non-compliance; Minor = best-practice deviation.\n";
+            $p .= "- If the discipline has no sheets in the drawings, note which requirements cannot be verified.\n";
+            $p .= "- Be thorough — check EVERY requirement. Depth over speed.\n";
+
+            my $pfile = "$job_dir/prompt-${unit_key}.txt";
+            open my $pf, '>', $pfile or next;
+            print $pf $p;
+            close $pf;
+
+            push @scan_units, {
+                key    => $unit_key,
+                name   => "$grp->{name}${part_label}",
+                parent => $grp->{key},
+            };
+        }
     }
 
     # --- Write executive summary prompt (Phase 2b) ---
@@ -1322,11 +1385,11 @@ sub spawn_review {
         if ($dbg) {
             print $dbg "=== PIPELINE ARCHITECTURE ===\n";
             print $dbg "Phase 0: PDF text extraction (one-time, pdfplumber)\n";
-            print $dbg "Phase 1: " . scalar(@active) . " parallel Claude CLIs (Sonnet) -> JSON findings\n";
+            print $dbg "Phase 1: " . scalar(@scan_units) . " parallel Claude CLIs (Sonnet) -> JSON findings\n";
             print $dbg "Phase 2a: Python synthesize.py -> review-data.json (zero tokens)\n";
             print $dbg "Phase 2b: Claude CLI (Haiku) -> executive-summary.txt\n";
             print $dbg "Phase 3: Local Python (generate_reports.py) -> .docx + .xlsx + .txt\n\n";
-            for my $grp (@active) {
+            for my $grp (@scan_units) {
                 print $dbg "--- prompt-$grp->{key}.txt ---\n";
                 if (open my $rf, '<', "$job_dir/prompt-$grp->{key}.txt") {
                     local $/; my $c = <$rf>; print $dbg $c; close $rf;
@@ -1345,8 +1408,8 @@ sub spawn_review {
 
     # --- Write review bash script ---
     my $script = "$job_dir/run-review.sh";
-    my $expected_count = scalar @active;
-    my $discipline_keys_str = join(' ', map { $_->{key} } @active);
+    my $expected_count = scalar @scan_units;
+    my $discipline_keys_str = join(' ', map { $_->{key} } @scan_units);
     open my $fh, '>', $script or do {
         warn "Cannot write $script: $!\n";
         _mark_spawn_failed($job_id, $job, "Cannot write review script: $!");
@@ -1360,7 +1423,8 @@ sub spawn_review {
     print $fh "# Phase 1:  $expected_count parallel discipline scans (Sonnet) -> JSON\n";
     print $fh "# Phase 2a: Python synthesis -> review-data.json (zero tokens)\n";
     print $fh "# Phase 2b: Claude Haiku -> executive-summary.txt\n";
-    print $fh "# Phase 3:  Local Python -> .docx + .xlsx + .txt (zero tokens)\n\n";
+    print $fh "# Phase 3:  Local Python -> .docx + .xlsx + .txt (zero tokens)\n";
+    print $fh "# Phase 4:  Vision markup -> review-markup.pdf\n\n";
     print $fh "unset CLAUDECODE\n";
 
     # Dynamic Git Bash discovery for CLAUDE_CODE_GIT_BASH_PATH
@@ -1461,8 +1525,8 @@ sub spawn_review {
     );
     my $MAX_PARALLEL = $CFG{maxParallelDisciplines};  # all disciplines run simultaneously (API-bound, not CPU-bound)
 
-    # Sort @active into waves based on priority (unrecognized keys go to last wave)
-    my @sorted = sort { ($wave_priority{$a->{key}} || 99) <=> ($wave_priority{$b->{key}} || 99) } @active;
+    # Sort @scan_units into waves based on priority (use parent key for split disciplines)
+    my @sorted = sort { ($wave_priority{$a->{parent} || $a->{key}} || 99) <=> ($wave_priority{$b->{parent} || $b->{key}} || 99) } @scan_units;
 
     # Chunk into waves of MAX_PARALLEL
     my @waves;
@@ -1579,13 +1643,39 @@ sub spawn_review {
     print $fh "  fi\n";
     print $fh "done\n\n";
 
+    # === JSON repair pass: try to salvage broken output before retrying ===
+    print $fh "if [ -n \"\$MISSING\" ]; then\n";
+    print $fh "  echo \"Attempting JSON repair for:\$MISSING\" >> \"$output_dir/progress.log\"\n";
+    print $fh "  STILL_MISSING=\"\"\n";
+    print $fh "  for key in \$MISSING; do\n";
+    print $fh "    # Check stdout log for salvageable JSON\n";
+    print $fh "    stdout_log=\"$output_dir/\${key}-stdout.log\"\n";
+    print $fh "    jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
+    print $fh "    if [ -f \"\$stdout_log\" ] && [ -s \"\$stdout_log\" ]; then\n";
+    print $fh "      echo \"  Repairing \$key from stdout log...\"\n";
+    print $fh "      if \"\$PYTHON\" \"$ROOT/repair_json.py\" \"\$stdout_log\" \"\$jf\" 2>/dev/null; then\n";
+    print $fh "        FOUND=\$((FOUND + 1))\n";
+    print $fh "        echo \"  Repair succeeded for \$key\" >> \"$output_dir/progress.log\"\n";
+    print $fh "        echo \"  Repair succeeded for \$key\"\n";
+    print $fh "      else\n";
+    print $fh "        echo \"  Repair failed for \$key — will retry\"\n";
+    print $fh "        STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
+    print $fh "      fi\n";
+    print $fh "    else\n";
+    print $fh "      echo \"  No stdout log for \$key — will retry\"\n";
+    print $fh "      STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
+    print $fh "    fi\n";
+    print $fh "  done\n";
+    print $fh "  MISSING=\"\$STILL_MISSING\"\n";
+    print $fh "fi\n\n";
+
+    # === Retry remaining failed disciplines (max 1 round) ===
     print $fh "if [ -n \"\$MISSING\" ]; then\n";
     print $fh "  echo \"Retrying failed disciplines:\$MISSING\" >> \"$output_dir/progress.log\"\n";
-    print $fh "  for attempt in 1 2 3; do\n";
+    print $fh "  for attempt in 1; do\n";
     print $fh "    [ -z \"\$MISSING\" ] && break\n";
-    print $fh "    echo \"  Retry attempt \$attempt/3 for:\$MISSING\"\n";
-    print $fh "    echo \"  Retry attempt \$attempt/3 for:\$MISSING\" >> \"$output_dir/progress.log\"\n";
-    print $fh "    [ \"\$attempt\" -gt 1 ] && sleep 10\n";
+    print $fh "    echo \"  Retry attempt \$attempt/1 for:\$MISSING\"\n";
+    print $fh "    echo \"  Retry attempt \$attempt/1 for:\$MISSING\" >> \"$output_dir/progress.log\"\n";
     print $fh "    WAVE_PIDS=\"\"\n";
     # Launch all missing disciplines in parallel
     print $fh "    for key in \$MISSING; do\n";
@@ -1602,31 +1692,51 @@ sub spawn_review {
     print $fh "    done\n";
     print $fh "    wait\n";
     print $fh "    cleanup_wave\n";
-    # Check which succeeded
+    # Check which succeeded, try repair on failures
     print $fh "    STILL_MISSING=\"\"\n";
     print $fh "    for key in \$MISSING; do\n";
     print $fh "      jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
     print $fh "      if [ -f \"\$jf\" ]; then\n";
     print $fh "        if \"\$PYTHON\" -c \"import json,sys; json.load(open(sys.argv[1]))\" \"\$jf\" 2>/dev/null; then\n";
     print $fh "          FOUND=\$((FOUND + 1))\n";
-    print $fh "          echo \"  Retry \$attempt succeeded for \$key\" >> \"$output_dir/progress.log\"\n";
-    print $fh "          echo \"  Retry \$attempt succeeded for \$key\"\n";
+    print $fh "          echo \"  Retry succeeded for \$key\" >> \"$output_dir/progress.log\"\n";
+    print $fh "          echo \"  Retry succeeded for \$key\"\n";
     print $fh "        else\n";
-    print $fh "          echo \"  Retry \$attempt: invalid JSON for \$key\"\n";
+    print $fh "          echo \"  Retry: invalid JSON for \$key — attempting repair\"\n";
     print $fh "          rm \"\$jf\"\n";
     print $fh "          STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
     print $fh "        fi\n";
     print $fh "      else\n";
-    print $fh "        echo \"  Retry \$attempt: no output for \$key\"\n";
+    print $fh "        echo \"  Retry: no output for \$key\"\n";
     print $fh "        STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
     print $fh "      fi\n";
     print $fh "    done\n";
     print $fh "    MISSING=\"\$STILL_MISSING\"\n";
     print $fh "  done\n";
-    # Report any still-missing after all retries
+    # Post-retry repair pass on retry stdout logs
+    print $fh "  if [ -n \"\$MISSING\" ]; then\n";
+    print $fh "    STILL_MISSING=\"\"\n";
+    print $fh "    for key in \$MISSING; do\n";
+    print $fh "      stdout_log=\"$output_dir/\${key}-retry-stdout.log\"\n";
+    print $fh "      jf=\"$output_dir/discipline-\${key}-findings.json\"\n";
+    print $fh "      if [ -f \"\$stdout_log\" ] && [ -s \"\$stdout_log\" ]; then\n";
+    print $fh "        if \"\$PYTHON\" \"$ROOT/repair_json.py\" \"\$stdout_log\" \"\$jf\" 2>/dev/null; then\n";
+    print $fh "          FOUND=\$((FOUND + 1))\n";
+    print $fh "          echo \"  Post-retry repair succeeded for \$key\" >> \"$output_dir/progress.log\"\n";
+    print $fh "          echo \"  Post-retry repair succeeded for \$key\"\n";
+    print $fh "        else\n";
+    print $fh "          STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
+    print $fh "        fi\n";
+    print $fh "      else\n";
+    print $fh "        STILL_MISSING=\"\$STILL_MISSING \$key\"\n";
+    print $fh "      fi\n";
+    print $fh "    done\n";
+    print $fh "    MISSING=\"\$STILL_MISSING\"\n";
+    print $fh "  fi\n";
+    # Report any still-missing after repair + retry
     print $fh "  if [ -n \"\$MISSING\" ]; then\n";
     print $fh "    for key in \$MISSING; do\n";
-    print $fh "      echo \"  FAILED: \$key after 3 retries\" >> \"$output_dir/progress.log\"\n";
+    print $fh "      echo \"  FAILED: \$key after repair + 1 retry\" >> \"$output_dir/progress.log\"\n";
     print $fh "    done\n";
     print $fh "  fi\n";
     print $fh "fi\n\n";
@@ -1692,18 +1802,32 @@ sub spawn_review {
     print $fh "  exit 1\n";
     print $fh "fi\n\n";
 
-    print $fh "echo \"phase3_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
+    print $fh "echo \"phase3_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
+
+    # Phase 4: Vision-based PDF annotation
+    print $fh "# === PHASE 4: Vision markup -> review-markup.pdf ===\n";
+    print $fh "echo \"phase4_start=\$(date +%s)\" >> \"\$TIMING_LOG\"\n";
+    print $fh "echo \"Phase 4: Generating annotated PDF...\" >> \"$output_dir/progress.log\"\n";
+    print $fh "\"\$PYTHON\" \"$ROOT/annotate_pdf.py\" \"$job_dir\" 2>> \"$output_dir/progress.log\"\n";
+    print $fh "ANNOTATE_EXIT=\$?\n";
+    print $fh "if [ \"\$ANNOTATE_EXIT\" -ne 0 ]; then\n";
+    print $fh "  echo \"WARNING: PDF annotation failed (exit \$ANNOTATE_EXIT)\" >> \"$output_dir/progress.log\"\n";
+    print $fh "  echo \"WARNING: PDF annotation failed but other deliverables are ready.\"\n";
+    print $fh "fi\n";
+    print $fh "echo \"phase4_end=\$(date +%s)\" >> \"\$TIMING_LOG\"\n\n";
+
     print $fh "echo \"Pipeline complete.\" >> \"$output_dir/progress.log\"\n";
 
     close $fh;
     chmod 0755, $script;
 
-    my $group_names = join(', ', map { $_->{name} } @active);
+    my $group_names = join(', ', map { $_->{name} } @scan_units);
     print "[" . localtime() . "] Spawning pipeline for job $job_id\n";
-    print "  Phase 1:  " . scalar(@active) . " CLIs, all parallel (Sonnet) -> JSON\n";
+    print "  Phase 1:  " . scalar(@scan_units) . " CLIs, all parallel (Sonnet) -> JSON\n";
     print "  Phase 2a: Python synthesis -> review-data.json\n";
     print "  Phase 2b: Claude Haiku -> executive-summary.txt\n";
     print "  Phase 3:  Local Python -> reports\n";
+    print "  Phase 4:  Vision markup -> annotated PDF\n";
     print "  Groups: $group_names\n";
     print "  Script: $script\n";
     # Write a tiny launcher that nohup's the main script in background.
@@ -2346,13 +2470,6 @@ while (!$shutdown) {
             send_json($c, 404, { error => 'Job not found' });
             close $c; next;
         }
-        # Check ownership (admin bypass)
-        my $requester_email = $headers{'x-user-email'} || '';
-        my $is_admin = grep { lc($_) eq lc($requester_email) } @{$CFG{auth}{adminEmails} || []};
-        if (!$is_admin && $job->{pmEmail} && lc($requester_email) ne lc($job->{pmEmail})) {
-            send_json($c, 403, { error => 'You do not have access to this job' });
-            close $c; next;
-        }
         my $file = "$REVIEWS_DIR/$id/output/$filename";
         if (-f $file) {
             open my $fh, '<:raw', $file or do {
@@ -2383,13 +2500,6 @@ while (!$shutdown) {
         my $job = read_job_json($id);
         if (!$job) {
             send_json($c, 404, { error => 'Job not found' });
-            close $c; next;
-        }
-        # Check ownership (admin bypass)
-        my $requester_email = $headers{'x-user-email'} || '';
-        my $is_admin = grep { lc($_) eq lc($requester_email) } @{$CFG{auth}{adminEmails} || []};
-        if (!$is_admin && $job->{pmEmail} && lc($requester_email) ne lc($job->{pmEmail})) {
-            send_json($c, 403, { error => 'You do not have access to this job' });
             close $c; next;
         }
         my $file = "$REVIEWS_DIR/$id/output/$filename";

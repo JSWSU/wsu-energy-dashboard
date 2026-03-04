@@ -666,12 +666,11 @@ footer {
       <div class="help-section">
         <h3>Understanding the Reports</h3>
         <div class="info-box">
-          Two companion deliverables: <strong>report.docx</strong> (narrative Word report) and <strong>report.xlsx</strong> (structured Excel workbook). Finding numbers (F-001, F-002, ...) match exactly between both files. Print the Excel Summary tab for meetings — it fits on one 8.5x11" landscape page.
+          Three deliverables: <strong>Review Report</strong> (report.docx), <strong>Annotated Drawings</strong> (review-markup.pdf), and <strong>Audit Spreadsheet</strong> (report.xlsx). Finding numbers (F-001, F-002, ...) match across all files.
         </div>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>report.docx</strong> — Word document with executive summary, detailed findings by discipline, variance requests, priority action matrix, and next steps. The full narrative review report.</p>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>report.xlsx</strong> — Excel workbook with 5 tabs: Summary (executive overview, prints to one page), Findings (sortable/filterable), Checklist (all requirements), Variances (items needing WSU approval), and Notes (methodology).</p>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>checklist.txt</strong> — Plain-text checklist showing compliance status for each WSU standard requirement.</p>
-        <p style="font-size:.82rem;margin-top:.5rem"><strong>findings.txt</strong> — Plain-text findings log with CSI codes, drawing references, and standard citations.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>Review Report</strong> (report.docx) — Page 1 is a standalone executive summary with compliance score, severity breakdown, and top findings. Page 2+ contains the full audit report with detailed findings by discipline, variance requests, and next steps.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>Annotated Drawings</strong> (review-markup.pdf) — Original uploaded PDF with color-coded callout annotations placed at the exact location of each finding. Red = Critical, Orange = Major, Yellow = Minor. Compatible with Bluebeam Revu.</p>
+        <p style="font-size:.82rem;margin-top:.5rem"><strong>Audit Spreadsheet</strong> (report.xlsx) — Excel workbook with 5 tabs: Summary (executive overview, prints to one page), Findings (sortable/filterable), Checklist (all requirements), Variances (items needing WSU approval), and Notes (methodology).</p>
       </div>
 
       <div class="help-section">
@@ -1234,8 +1233,8 @@ function buildTracker(pct, stalled, detail, stalledPhase) {
     {at: 7,   label: 'Scanning'},
     {at: 80,  label: 'Scanned'},
     {at: 82,  label: 'Synthesizing'},
-    {at: 90,  label: 'Reports'},
-    {at: 99,  label: 'Finalizing'},
+    {at: 92,  label: 'Reports'},
+    {at: 94,  label: 'Annotating'},
     {at: 100, label: 'Complete'}
   ];
   // Map raw pct to visual position so bar fill aligns with evenly-spaced milestones
@@ -1375,10 +1374,15 @@ function renderQueue(jobs) {
     const divs = (j.divisions || []).join(', ');
     const time = j.submitted ? new Date(j.submitted).toLocaleString() : '-';
     let dl = '-';
+    const FILE_LABELS = {
+      'report.docx': 'Review Report',
+      'review-markup.pdf': 'Annotated Drawings',
+      'report.xlsx': 'Audit Spreadsheet',
+    };
     if (sc === 'complete' && j.outputFiles && j.outputFiles.length) {
       dl = '<div class="download-links">' +
-        j.outputFiles.map(f =>
-          '<a href="#" onclick="event.preventDefault();downloadFile(\'/api/download/' + esc(j.id) + '/' + esc(f) + '\',\'' + esc(f) + '\')">' + esc(f) + '</a>'
+        j.outputFiles.filter(f => f !== 'timing.json').map(f =>
+          '<a href="#" onclick="event.preventDefault();downloadFile(\'/api/download/' + esc(j.id) + '/' + esc(f) + '\',\'' + esc(f) + '\')">' + esc(FILE_LABELS[f] || f) + '</a>'
         ).join('') + '</div>';
     } else if (sc === 'failed') {
       const errId = 'err-' + j.id;

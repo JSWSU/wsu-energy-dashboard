@@ -641,56 +641,8 @@ def generate_docx(data, findings, output_dir):
                 if ri % 2 == 0:
                     set_cell_shading(cell, ALT_ROW)
 
-    # ── Cover Page ─────────────────────────────────────────────────────────
-    for _ in range(6):
-        doc.add_paragraph("")
-
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run("WASHINGTON STATE UNIVERSITY")
-    run.font.size = Pt(24)
-    run.font.bold = True
-    run.font.color.rgb = RGBColor(0x98, 0x1E, 0x32)
-
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run("Facilities Services")
-    run.font.size = Pt(14)
-    run.font.color.rgb = RGBColor(0x5F, 0x6B, 0x6D)
-
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run("Design Standards Compliance Review")
-    run.font.size = Pt(18)
-    run.font.bold = True
-    run.font.color.rgb = RGBColor(0x37, 0x41, 0x51)
-
-    add_crimson_rule()
-
-    # Project info table (no borders)
-    info_fields = [
-        ("Project:", proj.get("name", "")),
-        ("Review Phase:", proj.get("phase", "")),
-        ("Construction Type:", proj.get("constructionType", "")),
-        ("Review Date:", proj.get("reviewDate", "")),
-        ("Prepared by:", "WSU Facilities Services - Automated Compliance Review"),
-    ]
-    t = doc.add_table(rows=len(info_fields), cols=2)
-    t.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for i, (label, val) in enumerate(info_fields):
-        t.rows[i].cells[0].text = label
-        t.rows[i].cells[1].text = val
-        for run in t.rows[i].cells[0].paragraphs[0].runs:
-            run.font.bold = True
-            run.font.size = Pt(12)
-        for run in t.rows[i].cells[1].paragraphs[0].runs:
-            run.font.size = Pt(12)
-
-    doc.add_page_break()
-
-    # ── Section 2: Executive Summary ───────────────────────────────────────
-    doc.add_heading("Executive Summary", level=1)
-    add_crimson_rule()
+    # ── Page 1: Standalone Executive Summary ─────────────────────────────
+    # Compute summary stats upfront
     sev = {"Critical": 0, "Major": 0, "Minor": 0}
     for f in findings:
         s = f.get("severity", "Minor")
@@ -699,15 +651,115 @@ def generate_docx(data, findings, output_dir):
     total_nc = sum(sev.values())
     total_req = sum(d.get("summary", {}).get("total_requirements", 0) for d in disciplines)
     total_compliant = sum(d.get("summary", {}).get("compliant", 0) for d in disciplines)
+    compliance_pct = (total_compliant / total_req * 100) if total_req > 0 else 0
 
-    exec_text = narr.get("executive_summary", "")
-    if not exec_text:
-        exec_text = (
-            f"This review evaluated {total_req} requirements across {len(disciplines)} "
-            f"disciplines. {total_compliant / total_req * 100:.1f}% of requirements are compliant. "
-            f"{sev['Critical']} critical findings require immediate attention."
-        )
-    doc.add_paragraph(exec_text)
+    # Project name (large, crimson)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run(proj.get("name", "Design Standards Compliance Review"))
+    run.font.size = Pt(20)
+    run.font.bold = True
+    run.font.color.rgb = RGBColor(0x98, 0x1E, 0x32)
+
+    # Subtitle line
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run("WSU Design Standards Compliance Review")
+    run.font.size = Pt(12)
+    run.font.color.rgb = RGBColor(0x5F, 0x6B, 0x6D)
+
+    # Meta line: date, phase, disciplines
+    meta_parts = []
+    if proj.get("reviewDate"):
+        meta_parts.append(proj["reviewDate"])
+    if proj.get("phase"):
+        meta_parts.append(proj["phase"])
+    meta_parts.append(f"{len(disciplines)} disciplines reviewed")
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run("  |  ".join(meta_parts))
+    run.font.size = Pt(10)
+    run.font.color.rgb = RGBColor(0x5F, 0x6B, 0x6D)
+
+    add_crimson_rule()
+
+    # Compliance score (large centered)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.space_before = Pt(8)
+    run = p.add_run(f"{compliance_pct:.1f}%")
+    run.font.size = Pt(36)
+    run.font.bold = True
+    run.font.color.rgb = RGBColor(0x98, 0x1E, 0x32)
+
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.space_after = Pt(8)
+    run = p.add_run(f"Overall Compliance ({total_compliant:,} of {total_req:,} requirements)")
+    run.font.size = Pt(10)
+    run.font.color.rgb = RGBColor(0x5F, 0x6B, 0x6D)
+
+    # Severity summary table (1 row of counts)
+    doc.add_heading("Findings by Severity", level=2)
+    t = doc.add_table(rows=2, cols=4)
+    t.style = "Table Grid"
+    sev_headers = ["Critical", "Major", "Minor", "Total"]
+    sev_counts = [sev["Critical"], sev["Major"], sev["Minor"], total_nc]
+    sev_fills = [LIGHT_RED, LIGHT_ORANGE, LIGHT_YELLOW, "F0F4FF"]
+    for c, h in enumerate(sev_headers):
+        t.rows[0].cells[c].text = h
+    for c, count in enumerate(sev_counts):
+        cell = t.rows[1].cells[c]
+        cell.text = str(count)
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        set_cell_shading(cell, sev_fills[c])
+        for run in cell.paragraphs[0].runs:
+            run.font.size = Pt(14)
+            run.font.bold = True
+    format_table(t)
+
+    # Top critical/major findings table
+    top_findings = [f for f in findings if f.get("severity") in ("Critical", "Major")]
+    top_findings.sort(key=lambda x: (0 if x.get("severity") == "Critical" else 1))
+    top_findings = top_findings[:6]  # limit to 6
+
+    if top_findings:
+        doc.add_heading("Top Findings Requiring Action", level=2)
+        t = doc.add_table(rows=len(top_findings) + 1, cols=4)
+        t.style = "Table Grid"
+        for c, h in enumerate(["ID", "Discipline", "Issue", "Required Action"]):
+            t.rows[0].cells[c].text = h
+        for i, tf in enumerate(top_findings, 1):
+            t.rows[i].cells[0].text = tf.get("id", "")
+            div_key = tf.get("division", "")
+            t.rows[i].cells[1].text = DIVISION_NAMES.get(div_key, div_key)
+            issue_text = tf.get("issue", tf.get("title", ""))
+            if len(issue_text) > 80:
+                issue_text = issue_text[:77] + "..."
+            t.rows[i].cells[2].text = issue_text
+            action_text = tf.get("required_action", "")
+            if len(action_text) > 80:
+                action_text = action_text[:77] + "..."
+            t.rows[i].cells[3].text = action_text
+            # Color-code severity
+            fill = LIGHT_RED if tf.get("severity") == "Critical" else LIGHT_ORANGE
+            set_cell_shading(t.rows[i].cells[0], fill)
+        format_table(t)
+        # Set column widths for readability
+        for row in t.rows:
+            row.cells[0].width = Inches(0.6)
+            row.cells[1].width = Inches(1.2)
+            row.cells[2].width = Inches(2.6)
+            row.cells[3].width = Inches(2.1)
+
+    # Footer note
+    p = doc.add_paragraph()
+    p.space_before = Pt(12)
+    run = p.add_run("Full audit details follow. Annotated drawings: review-markup.pdf")
+    run.font.size = Pt(9)
+    run.font.italic = True
+    run.font.color.rgb = RGBColor(0x5F, 0x6B, 0x6D)
+
     doc.add_page_break()
 
     # ── Section 3: Scope & Methodology ────────────────────────────────────
