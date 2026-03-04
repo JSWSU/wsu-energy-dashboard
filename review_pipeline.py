@@ -362,13 +362,20 @@ def run_worker(worker, output_dir, claude_path):
     stderr_log = os.path.join(output_dir, f'worker-{key}-stderr.log')
 
     try:
+        # Build clean env: unset CLAUDECODE to avoid nested-session detection,
+        # and set max output tokens
+        worker_env = {k: v for k, v in os.environ.items() if k != 'CLAUDECODE'}
+        worker_env['CLAUDE_CODE_MAX_OUTPUT_TOKENS'] = '16000'
+
+        # Pipe prompt via stdin (Windows has ~32K char command-line limit)
         result = subprocess.run(
-            [claude_path, '-p', worker['prompt'],
+            [claude_path, '-p',
              '--model', 'sonnet',
              '--output-format', 'text',
              '--dangerously-skip-permissions'],
+            input=worker['prompt'],
             capture_output=True, text=True, timeout=WORKER_TIMEOUT,
-            env={**os.environ, 'CLAUDE_CODE_MAX_OUTPUT_TOKENS': '16000'}
+            env=worker_env,
         )
 
         # Save logs
@@ -692,15 +699,18 @@ def main():
         with open(exec_prompt_path, 'r') as f:
             exec_prompt = f.read()
         # Run Haiku in the output dir so it can read review-data.json
+        haiku_env = {k: v for k, v in os.environ.items() if k != 'CLAUDECODE'}
+        haiku_env['CLAUDE_CODE_MAX_OUTPUT_TOKENS'] = '16000'
         ret = subprocess.run(
-            [claude_path, '-p', exec_prompt,
+            [claude_path, '-p',
              '--model', 'haiku',
              '--allowedTools', 'Read', 'Write',
              '--dangerously-skip-permissions',
              '--output-format', 'text'],
+            input=exec_prompt,
             capture_output=True, text=True, timeout=300,
             cwd=output_dir,
-            env={**os.environ, 'CLAUDE_CODE_MAX_OUTPUT_TOKENS': '16000'}
+            env=haiku_env,
         )
         with open(os.path.join(output_dir, 'executive-summary.txt'), 'w') as f:
             f.write(ret.stdout or '')
