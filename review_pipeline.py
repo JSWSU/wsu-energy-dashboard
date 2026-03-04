@@ -24,7 +24,7 @@ from pathlib import Path
 MAX_TOKENS_PER_WORKER = 120_000   # Target max (Sonnet has 200K)
 CHARS_PER_TOKEN = 4               # Conservative estimate
 MAX_CHARS_PER_WORKER = MAX_TOKENS_PER_WORKER * CHARS_PER_TOKEN  # 480KB
-WORKER_TIMEOUT = 300              # 5 min (no tool calls = fast)
+WORKER_TIMEOUT = 600              # 10 min (larger prompts need more time)
 MAX_CONCURRENT_WORKERS = 8
 RETRY_LIMIT = 1
 

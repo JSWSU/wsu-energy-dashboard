@@ -51,12 +51,16 @@ def load_analysis(job_dir):
 
 
 def find_uploaded_pdf(job_dir):
+    # Check for input.pdf at job root (current server convention)
+    root_pdf = os.path.join(job_dir, 'input.pdf')
+    if os.path.isfile(root_pdf):
+        return root_pdf
+    # Fallback: check upload/ subdirectory
     upload_dir = os.path.join(job_dir, 'upload')
-    if not os.path.isdir(upload_dir):
-        return None
-    for fname in os.listdir(upload_dir):
-        if fname.lower().endswith('.pdf'):
-            return os.path.join(upload_dir, fname)
+    if os.path.isdir(upload_dir):
+        for fname in os.listdir(upload_dir):
+            if fname.lower().endswith('.pdf'):
+                return os.path.join(upload_dir, fname)
     return None
 
 
