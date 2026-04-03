@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sensus AMR Water Meter Reading — Standard Operating Procedure</title>
+<style>
+  @page {
+    size: letter;
+    margin: 0.6in 0.7in;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #2d2d2d;
+    background: #fff;
+  }
+
+  /* WSU Header Bar */
+  .wsu-header {
+    background: #981e32;
+    color: #fff;
+    padding: 20px 30px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    page-break-inside: avoid;
+  }
+  .wsu-header .logo {
+    font-size: 28pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .wsu-header .logo span {
+    color: #c69214;
+  }
+  .wsu-header .dept {
+    font-size: 10pt;
+    opacity: 0.9;
+    border-left: 2px solid rgba(255,255,255,0.3);
+    padding-left: 20px;
+  }
+
+  /* Title Block */
+  .title-block {
+    background: #f8f4f0;
+    border-bottom: 3px solid #c69214;
+    padding: 24px 30px;
+    page-break-inside: avoid;
+  }
+  .title-block h1 {
+    font-size: 18pt;
+    color: #981e32;
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .title-block .subtitle {
+    font-size: 10pt;
+    color: #5f6b6d;
+  }
+  .title-block .meta {
+    margin-top: 10px;
+    font-size: 9pt;
+    color: #5f6b6d;
+  }
+
+  /* Content */
+  .content { padding: 20px 30px 40px; }
+
+  /* Phase Headers */
+  .phase-header {
+    background: #981e32;
+    color: #fff;
+    padding: 10px 16px;
+    font-size: 12pt;
+    font-weight: 700;
+    margin: 28px 0 16px;
+    page-break-after: avoid;
+    border-left: 5px solid #c69214;
+  }
+
+  /* Section Headers */
+  .section-header {
+    background: #f0ebe8;
+    border-left: 4px solid #981e32;
+    padding: 8px 14px;
+    font-size: 11pt;
+    font-weight: 700;
+    color: #981e32;
+    margin: 20px 0 12px;
+    page-break-after: avoid;
+  }
+
+  /* Sub-section Headers */
+  h3 {
+    font-size: 10.5pt;
+    color: #981e32;
+    font-weight: 700;
+    margin: 16px 0 8px;
+    page-break-after: avoid;
+  }
+
+  p { margin-bottom: 8px; }
+
+  /* Ordered/Unordered Lists */
+  ol, ul {
+    margin: 6px 0 12px 24px;
+  }
+  ol li, ul li {
+    margin-bottom: 4px;
+  }
+  ol ol, ul ul, ol ul, ul ol {
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+
+  /* File paths */
+  .path {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 9.5pt;
+    background: #f5f0ed;
+    border: 1px solid #e0d8d2;
+    padding: 2px 6px;
+    border-radius: 3px;
+    word-break: break-all;
+    display: inline;
+  }
+  .path-block {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 9.5pt;
+    background: #f5f0ed;
+    border: 1px solid #e0d8d2;
+    padding: 8px 12px;
+    border-radius: 3px;
+    margin: 6px 0 10px;
+    word-break: break-all;
+    display: block;
+  }
+
+  /* Warning/Important Boxes */
+  .warning {
+    background: #fef3c7;
+    border-left: 4px solid #c69214;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  .warning strong { color: #92400e; }
+
+  .info {
+    background: #f0f9ff;
+    border-left: 4px solid #3b82f6;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #981e32;
+    color: #fff;
+    text-align: left;
+    padding: 6px 10px;
+    font-weight: 600;
+    font-size: 9.5pt;
+  }
+  td {
+    padding: 5px 10px;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #faf8f6; }
+
+  /* Checklist */
+  .checklist {
+    list-style: none;
+    margin-left: 0;
+    padding-left: 0;
+  }
+  .checklist li {
+    padding: 4px 0 4px 28px;
+    position: relative;
+    margin-bottom: 2px;
+  }
+  .checklist li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #981e32;
+    border-radius: 2px;
+    background: #fff;
+  }
+  .checklist-label {
+    font-weight: 700;
+    color: #981e32;
+    margin: 14px 0 6px;
+    font-size: 10.5pt;
+  }
+
+  /* Folder tree */
+  .tree {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 9pt;
+    line-height: 1.6;
+    background: #f9f7f5;
+    border: 1px solid #e0d8d2;
+    padding: 12px 16px;
+    margin: 8px 0 14px;
+    white-space: pre;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+
+  /* Troubleshooting */
+  .ts-item {
+    margin-bottom: 12px;
+    page-break-inside: avoid;
+  }
+  .ts-problem {
+    font-weight: 700;
+    color: #981e32;
+    margin-bottom: 2px;
+  }
+  .ts-solution {
+    margin-left: 16px;
+  }
+
+  /* Footer */
+  .wsu-footer {
+    margin-top: 30px;
+    padding: 12px 30px;
+    background: #981e32;
+    color: rgba(255,255,255,0.7);
+    font-size: 8pt;
+    text-align: center;
+  }
+
+  /* Print */
+  @media print {
+    body { font-size: 10pt; }
+    .wsu-header { padding: 14px 20px; }
+    .title-block { padding: 16px 20px; }
+    .content { padding: 14px 20px 20px; }
+    .phase-header { margin: 20px 0 12px; }
+    .section-header { margin: 16px 0 8px; }
+    .wsu-footer { position: fixed; bottom: 0; left: 0; right: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- WSU Header -->
+<div class="wsu-header">
+  <div class="logo">WSU</div>
+  <div class="dept">
+    <strong>Facilities Services</strong><br>
+    Energy Group
+  </div>
+</div>
+
+<!-- Title Block -->
+<div class="title-block">
+  <h1>Sensus AMR Water Meter Reading</h1>
+  <div class="subtitle">Standard Operating Procedure</div>
+  <div class="meta">
+    Last Updated: April 2026 &nbsp;|&nbsp;
+    Original Author: Jeff Lannigan (March 2021) &nbsp;|&nbsp;
+    Updated by: Kent Overby (April 2025), John Slagboom (April 2026)
+  </div>
+</div>
+
+<div class="content">
+
+<!-- WHAT IS THIS -->
+<div class="section-header">What Is This?</div>
+<p>WSU has about 165 water meters buried in pits and vaults across the Pullman campus. Every month we read all of them using a radio system called Sensus AMR (Automated Meter Reading). A person drives around campus with a tablet and a small blue radio box. The radio box talks to transmitters on the meters and collects the readings automatically. Then we bring the data back to the office, pull it into a PC, and export it as a file.</p>
+<p>This document tells you exactly how to do every step of that process.</p>
+
+<!-- EQUIPMENT -->
+<div class="section-header">Equipment You Need</div>
+<p>You will be working with three pieces of equipment:</p>
+
+<h3>1. Android Tablet</h3>
+<ul>
+  <li>Has the FieldLogic app installed (icon looks like three green bars)</li>
+  <li>This is what you carry in the field</li>
+  <li>It talks to the Command Link via Bluetooth</li>
+  <li>Screen lock PIN: <strong>123456</strong></li>
+</ul>
+
+<h3>2. One Command Link (CL)</h3>
+<ul>
+  <li>Small blue box</li>
+  <li>It communicates with the tablet via Bluetooth and with the water meters via radio frequency (RF)</li>
+  <li>Power button is hidden under a white square on the side</li>
+  <li>When communicating, a blue "LINK" lamp lights up</li>
+  <li>Bluetooth pairing password: <strong>0000</strong></li>
+</ul>
+
+<h3>3. Office PC (Slagboom's PC)</h3>
+<ul>
+  <li>Has two programs installed:
+    <ol type="a">
+      <li><strong>AutoRead</strong> &mdash; imports routes to and exports data from the tablet</li>
+      <li><strong>FieldLogic Hub</strong> &mdash; sets up meter types and system configuration<br>
+        Login: <strong>Admin</strong> &nbsp;/&nbsp; Password: <strong>Sensus123!</strong></li>
+    </ol>
+  </li>
+</ul>
+
+<p>All data files live on the shared drive at:</p>
+<div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\</div>
+
+<div class="info">WSU has its own factory-set radio frequency so we don't accidentally pick up the City of Pullman's Sensus meters.</div>
+
+<!-- ================================================================ -->
+<!-- PHASE 1 -->
+<!-- ================================================================ -->
+<div class="phase-header">Phase 1: Prepare the Route (Office &mdash; Before Going to the Field)</div>
+
+<div class="section-header">Step 1 &mdash; Update the Route File (only if meters were added/removed/changed)</div>
+
+<p>The master route file is an Excel spreadsheet. We keep it in Excel because Excel preserves leading zeros in building numbers (like 0358C). If you open the CSV version in Excel, it destroys those zeros.</p>
+
+<p>Master Excel file:</p>
+<div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Routes\import_amr.rte</div>
+
+<div class="info">Yes, the .rte file IS a CSV file &mdash; AutoRead just needs that extension.</div>
+
+<p>If you need to add, remove, or change a meter:</p>
+<ol>
+  <li>Open the Excel version of the route (or edit the .rte in a text editor like Notepad &mdash; <strong>NOT</strong> in Excel, which drops leading zeros).</li>
+  <li>Make your changes (see <em>Route File Maintenance</em> section below).</li>
+  <li>Save.</li>
+  <li><strong>IMMEDIATELY</strong> make a backup copy in:
+    <div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Routes\Do not screw this file up\</div>
+    Name it: <span class="path">import_amr - Master Backup M-D-YY.rte</span>
+  </li>
+</ol>
+
+<p>If no meters changed since last month, skip this step entirely.</p>
+
+
+<div class="section-header">Step 2 &mdash; Connect the Tablet to the PC via WiFi</div>
+
+<p>The tablet connects to the PC wirelessly, <strong>NOT</strong> by USB cable.</p>
+
+<ol>
+  <li><strong>On the office PC, turn on the Mobile Hotspot:</strong>
+    <ul>
+      <li>Open Windows Settings &gt; Network &amp; Internet &gt; Mobile hotspot</li>
+      <li>Turn it ON</li>
+      <li>Note the network name and password shown</li>
+    </ul>
+  </li>
+  <li><strong>On the Android tablet:</strong>
+    <ul>
+      <li>Open Settings &gt; Wi-Fi</li>
+      <li>Connect to the PC's hotspot network using the password above</li>
+    </ul>
+  </li>
+  <li><strong>Verify the connection:</strong>
+    <ul>
+      <li>Open AutoRead on the PC:
+        <ol type="a">
+          <li>Open File Explorer</li>
+          <li>Navigate to <span class="path">C:\AutoRead\</span></li>
+          <li>Double-click <strong>AutoRead.exe</strong></li>
+        </ol>
+        (There is no desktop shortcut &mdash; you must open it from this folder.)
+      </li>
+      <li>In the left-hand menu, click <strong>"Ethernet/Wi-Fi (FieldLogic)"</strong></li>
+      <li>The tablet should appear in the list</li>
+      <li>If it does NOT appear:
+        <ol type="a">
+          <li>Make sure the PC hotspot is ON</li>
+          <li>Make sure the tablet is connected to that hotspot (not some other Wi-Fi network)</li>
+          <li>On the tablet, close the FieldLogic app completely and reopen it</li>
+          <li>Try again</li>
+        </ol>
+      </li>
+    </ul>
+  </li>
+</ol>
+
+
+<div class="section-header">Step 3 &mdash; Clear, Import, and Load the Route</div>
+
+<p>Open AutoRead on the PC (<span class="path">C:\AutoRead\AutoRead.exe</span> &mdash; see Step 2 above).</p>
+
+<ol>
+  <li><strong>In the left-hand tree menu, navigate to:</strong><br>
+    Route Processing &gt; Handheld &gt; HHD003 CSV</li>
+
+  <li><strong>CLEAR old readings:</strong>
+    <ul>
+      <li>From the Function dropdown at the top, select <strong>"Clear"</strong></li>
+      <li>Click <strong>Execute</strong></li>
+      <li>This wipes last month's readings from the system</li>
+    </ul>
+    <div class="warning"><strong>IMPORTANT:</strong> Before you do this, make sure last month's data has already been exported and saved! Once you clear, it's gone.</div>
+  </li>
+
+  <li><strong>IMPORT the route:</strong>
+    <ul>
+      <li>From the Function dropdown, select <strong>"Import"</strong></li>
+      <li>Click <strong>Execute</strong></li>
+      <li>This loads the route file from:
+        <div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Routes\import_amr.rte</div>
+      </li>
+      <li>AutoRead now has all ~165 meter accounts with building info, meter IDs, and MXU (radio) IDs, but no current readings yet</li>
+    </ul>
+  </li>
+
+  <li><strong>LOAD the route to the tablet:</strong>
+    <ul>
+      <li>From the Function dropdown, select <strong>"Load Data"</strong></li>
+      <li>Click <strong>Execute</strong></li>
+      <li>This copies the route from AutoRead to the tablet over WiFi</li>
+      <li>CHECK: Look at the meter count on the tablet screen. It should be around 165. If it's way off, something went wrong with the import.</li>
+      <li>If there are import errors, you can drill into them in AutoRead to see which meters failed and why.</li>
+    </ul>
+  </li>
+</ol>
+
+
+<!-- ================================================================ -->
+<!-- PHASE 2 -->
+<!-- ================================================================ -->
+<div class="phase-header">Phase 2: Collect Readings in the Field</div>
+
+<div class="section-header">Step 4 &mdash; Read the Meters</div>
+
+<ol>
+  <li>Make sure the Command Link is charged and powered ON. (Press the hidden button under the white square on the side.)</li>
+  <li>On the tablet, open the <strong>FieldLogic Tools</strong> app (three green bars icon).</li>
+  <li>Open the route you just loaded.</li>
+  <li>Tap <strong>"Start Read."</strong></li>
+  <li>Make sure the Command Link shows a blue <strong>"LINK"</strong> light &mdash; this means it's connected to the tablet via Bluetooth.</li>
+  <li>Drive around campus. The tablet will automatically pick up readings from meters via the Command Link as you drive within range.
+    <ul>
+      <li>By default, meters drop off the screen once they're read.</li>
+      <li>To see ALL meters (read and unread), tap the funnel icon in the upper-right corner of the screen and change the filter to <strong>"None."</strong></li>
+    </ul>
+  </li>
+  <li>Most meters will read from inside the car. Known exceptions:
+    <ul>
+      <li><strong>Vogel Plant</strong> &mdash; may need to get closer</li>
+      <li><strong>ITB</strong> &mdash; sometimes doesn't read from the car</li>
+    </ul>
+  </li>
+  <li>If a meter won't read via radio, you can enter the reading manually on the tablet. Go to the meter pit/vault, read the register, and type it in.</li>
+  <li>When you're done, check the tablet to make sure all meters have readings. Any still showing as unread need attention.</li>
+</ol>
+
+
+<!-- ================================================================ -->
+<!-- PHASE 3 -->
+<!-- ================================================================ -->
+<div class="phase-header">Phase 3: Export the Data (Office &mdash; After Returning from the Field)</div>
+
+<div class="section-header">Step 5 &mdash; Connect the Tablet and Pull Data into AutoRead</div>
+
+<ol>
+  <li>Connect the tablet to the PC via WiFi hotspot (same as Step 2).</li>
+  <li>Open AutoRead on the PC (<span class="path">C:\AutoRead\AutoRead.exe</span> &mdash; see Step 2).</li>
+  <li>In the left-hand tree menu, navigate to:<br>
+    Route Processing &gt; Handheld &gt; HHD003 CSV</li>
+  <li>Verify the tablet appears under <strong>"Ethernet/Wi-Fi (FieldLogic)"</strong> in the left menu. If it doesn't, troubleshoot the WiFi connection (see Step 2 above).</li>
+  <li>From the Function dropdown, select <strong>"Read Data"</strong> and click <strong>Execute</strong>.
+    <ul>
+      <li>This pulls the readings from the tablet into AutoRead.</li>
+      <li>A window may ask: Overwrite, Append, or Skip? <strong>SELECT "OVERWRITE."</strong></li>
+    </ul>
+  </li>
+  <li>AutoRead will automatically prompt you to save two PDF reports:
+    <ol type="a">
+      <li><strong>MASTER ROUTE REPORT</strong>
+        <ul>
+          <li>This shows every meter with its current reading</li>
+          <li>Save it with a dated name to:
+            <div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Master Route Report 7-6-23\Master Route Report M-D-YY.pdf</div>
+            Example: <span class="path">Master Route Report 4-3-26.pdf</span>
+          </li>
+        </ul>
+      </li>
+      <li><strong>ROUTE STATISTICAL SUMMARY REPORT</strong>
+        <ul>
+          <li>This shows summary statistics (how many meters read, skipped, etc.)</li>
+          <li>Save to the same folder:
+            <div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Master Route Report 7-6-23\Route Statistical Summary Report M-D-YY.pdf</div>
+          </li>
+          <li>Unless you're troubleshooting issues, you can overwrite the previous version of this report.</li>
+        </ul>
+      </li>
+    </ol>
+    Both PDFs will open automatically so you can eyeball the data.
+  </li>
+</ol>
+
+
+<div class="section-header">Step 6 &mdash; Export Readings to a File</div>
+
+<ol>
+  <li>From the Function dropdown in AutoRead, select <strong>"Export"</strong> and click <strong>Execute</strong>.</li>
+  <li>A window will ask: Overwrite, Append, or Skip? <strong>SELECT "OVERWRITE."</strong></li>
+  <li>AutoRead saves the file as:
+    <div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Output\latestread_amr.dat</div>
+    <div class="info">Yes, it's a .dat file. The data inside is plain comma-separated text &mdash; the extension is just what AutoRead uses by default.</div>
+  </li>
+</ol>
+
+
+<div class="section-header">Step 7 &mdash; Convert the Exported File from .DAT to .CSV</div>
+
+<ol>
+  <li>Open File Explorer and navigate to:
+    <div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Output\</div>
+  </li>
+  <li>Find the file called <strong>"latestread_amr.dat"</strong></li>
+  <li>Right-click the file and select <strong>"Open with"</strong> &gt; <strong>Notepad</strong>.</li>
+  <li>Glance at the data &mdash; make sure you see building numbers, readings, and dates. If it's empty or garbled, something went wrong with the export.</li>
+  <li>In Notepad, click <strong>File</strong> &gt; <strong>Save As...</strong></li>
+  <li>In the Save As dialog:
+    <ol type="a">
+      <li>In the <strong>"Save as type"</strong> dropdown, select <strong>"All Files (*.*)"</strong></li>
+      <li>Change the file name to: <span class="path">AMRoutputYYYYMMDD.csv</span><br>
+        where YYYYMMDD is today's date.<br>
+        Example: <span class="path">AMRoutput20260403.csv</span></li>
+      <li>Make sure you are still in the same Output folder:
+        <div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Output\</div>
+      </li>
+      <li>Click <strong>Save</strong>.</li>
+    </ol>
+  </li>
+  <li>Delete the original <span class="path">latestread_amr.dat</span> file (you now have the .csv version).</li>
+</ol>
+
+
+<div class="section-header">Step 8 &mdash; Archive Last Month's File</div>
+
+<ol>
+  <li>In the same Output folder, you should see last month's CSV file (e.g., <span class="path">AMRoutput20260303.csv</span>).</li>
+  <li>Move (cut and paste) last month's file into:
+    <div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Output\Old Outputs\</div>
+  </li>
+  <li>When you're done, the Output folder should have <strong>ONLY</strong>:
+    <ul>
+      <li>Your new CSV file (e.g., <span class="path">AMRoutput20260403.csv</span>)</li>
+      <li>The README text files (leave those alone)</li>
+    </ul>
+  </li>
+</ol>
+
+<div class="warning"><strong>RULE:</strong> Only ONE month's data file should be in the Output root folder at a time. Everything else goes in Old Outputs.</div>
+
+
+<!-- ================================================================ -->
+<!-- PHASE 4 -->
+<!-- ================================================================ -->
+<div class="phase-header">Phase 4: New Meter Onboarding (Only When Installing a New Meter)</div>
+
+<div class="section-header">Step 9 &mdash; Activate a New Meter in the Field</div>
+
+<p>This is only done when a brand new meter is physically installed.</p>
+
+<ol>
+  <li><strong>BEFORE</strong> going into the building, start the tablet outside and wait for it to get a GPS fix. FieldLogic won't let you add a meter without recent GPS coordinates.</li>
+  <li>Place the Command Link in physical contact with the meter's radio transmitter (MXU). Sometimes it's sensitive to position &mdash; if it doesn't connect, try moving the CL around on the transmitter.</li>
+  <li>On the tablet in FieldLogic, press <strong>"Connect."</strong></li>
+  <li>The app will walk through the connection process. What happens next depends on whether this meter type is already configured:
+    <ul>
+      <li><strong>If the meter type IS already set up:</strong>
+        <ol type="a">
+          <li>You may get a prompt &mdash; select <strong>"Activate"</strong></li>
+          <li>The app may ask you to confirm the physical installation is complete &mdash; if it is, tap OK</li>
+          <li>You should see <strong>"Activation Success"</strong> &mdash; tap OK, then <strong>"Disconnect"</strong></li>
+        </ol>
+      </li>
+      <li><strong>If the meter type is NOT set up:</strong><br>
+        You need to configure it in FieldLogic Hub first (see the <em>AutoRead Software Configuration</em> section below).
+      </li>
+    </ul>
+  </li>
+  <li>After activation, add the meter to the route file:
+    <ul>
+      <li>Edit the route file (see <em>Route File Maintenance</em> below)</li>
+      <li>Add a new row with the meter's Account ID, Building #, MXU ID, Meter ID, and other details</li>
+      <li>The new meter will be included in the next month's reading</li>
+    </ul>
+  </li>
+</ol>
+
+<div class="warning"><strong>IMPORTANT &mdash; METER IDS:</strong>
+<ul style="margin:6px 0 0 16px;">
+  <li>Every meter needs a <strong>UNIQUE</strong> Meter ID number</li>
+  <li>Every radio transmitter needs a <strong>UNIQUE</strong> MXU ID (radio ID) number</li>
+  <li>Sensus meters come with their own factory-assigned IDs</li>
+  <li>Neptune meters may NOT have unique IDs &mdash; this has been a known issue. Double-check that IDs don't conflict with existing meters.</li>
+</ul>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- ROUTE FILE MAINTENANCE -->
+<!-- ================================================================ -->
+<div class="phase-header">Route File Maintenance</div>
+
+<div class="section-header">The Route File Explained</div>
+
+<p>The route is a CSV file with 27 comma-separated fields per line. The first line is a header row. Each subsequent line is one meter.</p>
+
+<p>File location:</p>
+<div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Routes\import_amr.rte</div>
+
+<h3>Key Fields</h3>
+<table>
+  <tr><th>Column</th><th>Field</th><th>Description</th></tr>
+  <tr><td>1</td><td>Account ID</td><td>Unique number (e.g., 200001)</td></tr>
+  <tr><td>6</td><td>Building #</td><td>WSU building number (e.g., 0358C)</td></tr>
+  <tr><td>7</td><td>Service Address</td><td>Building name (e.g., CHEM STO)</td></tr>
+  <tr><td>8</td><td>Location Desc</td><td>Where the meter is (e.g., Ext Vlt, Mech Rm)</td></tr>
+  <tr><td>9</td><td>Meter Number</td><td>WSU meter ID (e.g., 0358CDW_001)</td></tr>
+  <tr><td>10</td><td>Service Type</td><td>Always W (Water)</td></tr>
+  <tr><td>17</td><td>MXU ID</td><td>Radio transmitter serial number</td></tr>
+  <tr><td>18</td><td>Meter ID</td><td>Meter register serial number</td></tr>
+  <tr><td>19</td><td>Meter Type</td><td>B = Sensus, P = Neptune, M = Manual</td></tr>
+  <tr><td>20</td><td>MXU Type</td><td>C = Commercial MXU, B = Battery MXU</td></tr>
+  <tr><td>25</td><td>System</td><td>DW = Domestic Water, IR = Irrigation</td></tr>
+  <tr><td>26</td><td>Multiplier</td><td>1, 100, or 1000 (converts raw reading to gallons)</td></tr>
+</table>
+
+<h3>Adding a New Meter</h3>
+<ol>
+  <li>Open <span class="path">import_amr.rte</span> in Notepad (<strong>NOT</strong> Excel &mdash; Excel drops leading zeros).</li>
+  <li>Go to the last line of data.</li>
+  <li>Add a new line with the next Account ID (e.g., if last is 200165, use 200166).</li>
+  <li>Fill in all the fields following the format above.</li>
+  <li>Leave columns 12&ndash;13 (readings) and 21&ndash;22 (date/time) BLANK.</li>
+  <li>Save the file.</li>
+  <li>Make a backup copy in:
+    <div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Routes\Do not screw this file up\</div>
+    Name it: <span class="path">import_amr - Master Backup M-D-YY.rte</span>
+  </li>
+</ol>
+
+<h3>Removing a Meter</h3>
+<ol>
+  <li>Open <span class="path">import_amr.rte</span> in Notepad.</li>
+  <li>Find the line for the meter (search for the Account ID or Building #).</li>
+  <li>Delete the entire line.</li>
+  <li>Save and make a backup (same folder as above).</li>
+</ol>
+
+<h3>Changing Meter Hardware (radio or register replaced)</h3>
+<ol>
+  <li>Open <span class="path">import_amr.rte</span> in Notepad.</li>
+  <li>Find the meter's line.</li>
+  <li>Update the MXU ID (column 17) and/or Meter ID (column 18).</li>
+  <li>Update Meter Type (column 19) if the brand changed.</li>
+  <li>Save and make a backup.</li>
+</ol>
+
+<div class="warning"><strong>ALSO UPDATE THE MASTER SPREADSHEET:</strong> Whenever you change the route file, also update:
+<div class="path-block" style="margin-top:6px;">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Sensus Exhibit A Spread Sheet Master.xlsx</div>
+</div>
+
+
+<div class="section-header">Radio Wiring Reference</div>
+
+<p>If you're wiring a meter transmitter, the wire colors differ by brand:</p>
+
+<table>
+  <tr><th>Function</th><th>Sensus Radio</th><th>Neptune ProCoder</th></tr>
+  <tr><td>Signal</td><td>Black</td><td>White or Green</td></tr>
+  <tr><td>Power</td><td>Red</td><td>Black</td></tr>
+  <tr><td>Ground</td><td>Green</td><td>Red</td></tr>
+</table>
+
+
+<!-- ================================================================ -->
+<!-- AUTOREAD CONFIG -->
+<!-- ================================================================ -->
+<div class="phase-header">AutoRead Software Configuration</div>
+
+<div class="info">These settings are already configured on Slagboom's PC. Do NOT change them unless you know what you're doing. They are documented here for reference and disaster recovery.</div>
+
+<table>
+  <tr><th colspan="2">Detail Tab</th></tr>
+  <tr><td>Export Control</td><td>Overwrite</td></tr>
+  <tr><td>Reset/Clear Control</td><td>Confirm</td></tr>
+  <tr><td>Route Backup Path</td><td><span class="path">C:\AutoRead\Backup_System\</span></td></tr>
+  <tr><td>Reports</td><td>Enabled (checked)</td></tr>
+  <tr><td>Device ID</td><td>001</td></tr>
+  <tr><td>Device Type</td><td>FieldLogic</td></tr>
+</table>
+
+<table>
+  <tr><th colspan="2">Import Tab</th></tr>
+  <tr><td>Type</td><td>Variable</td></tr>
+  <tr><td>File Name</td><td><span class="path">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Routes\import_amr.rte</span></td></tr>
+  <tr><td>Record Delimiter</td><td>Comma</td></tr>
+  <tr><td>Fields</td><td>27 fields mapped</td></tr>
+</table>
+
+<table>
+  <tr><th colspan="2">Export Tab</th></tr>
+  <tr><td>Type</td><td>Variable</td></tr>
+  <tr><td>File Name</td><td><span class="path">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Output\</span></td></tr>
+  <tr><td>Record Delimiter</td><td>Comma</td></tr>
+  <tr><td>Sort By</td><td>Account ID</td></tr>
+  <tr><td>Fields</td><td>26 fields exported (Notes field excluded)</td></tr>
+</table>
+
+<table>
+  <tr><th colspan="2">Reading Display Tab</th></tr>
+  <tr><td>Display Type</td><td>Formatted (with Multiplier and Units)</td></tr>
+  <tr><td>Units</td><td>04 &mdash; US Gallons</td></tr>
+</table>
+
+<table>
+  <tr><th colspan="2">Report Tab</th></tr>
+  <tr><td>Master Route</td><td>Enabled, Sequential sort, Bad Reads = Yes</td></tr>
+  <tr><td>Route Statistical Summary</td><td>Enabled</td></tr>
+  <tr><td>MXU Status</td><td>Enabled, Sequential sort, Bad Reads = Yes</td></tr>
+  <tr><td>Register Malfunction</td><td>Enabled, Sequential sort, Bad Reads = Yes</td></tr>
+</table>
+
+<table>
+  <tr><th colspan="2">FieldLogic Hub</th></tr>
+  <tr><td>Login</td><td><strong>Admin</strong></td></tr>
+  <tr><td>Password</td><td><strong>Sensus123!</strong></td></tr>
+  <tr><td>Installer</td><td><span class="path">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Sensus FieldLogic Hub Installer 7.4.2.36.exe</span></td></tr>
+  <tr><td>Android APK</td><td><span class="path">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Fieldlogic\FL INSTALL\Android\FieldLogicToolsXF.Android.apk</span></td></tr>
+</table>
+
+<p>AutoRead config screenshots (for visual reference):</p>
+<div class="path-block">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Fieldlogic\Autoread Man Rte setup\
+  Autoread Man Rte setup Details tab.PNG
+  Autoread Man Rte setup Reading Display tab.PNG
+  Autoread Man Rte setup Import tab.PNG
+  Autoread Man Rte setup Export tab.PNG
+  Autoread Man Rte setup Report tab.PNG</div>
+
+
+<!-- ================================================================ -->
+<!-- MONTHLY CHECKLIST -->
+<!-- ================================================================ -->
+<div class="phase-header">Monthly Checklist</div>
+
+<p>Print this page and check off each step as you go.</p>
+
+<div class="checklist-label">Before the Field</div>
+<ul class="checklist">
+  <li>Update route file if meters changed (Step 1)</li>
+  <li>Connect tablet to PC via WiFi hotspot (Step 2)</li>
+  <li>Open AutoRead &gt; Route Processing &gt; Handheld &gt; HHD003 CSV</li>
+  <li>Function &gt; Clear &gt; Execute (wipe last month's readings)</li>
+  <li>Function &gt; Import &gt; Execute (load route into AutoRead)</li>
+  <li>Function &gt; Load Data &gt; Execute (copy route to tablet)</li>
+  <li>Check meter count on tablet &mdash; should be ~165</li>
+</ul>
+
+<div class="checklist-label">In the Field</div>
+<ul class="checklist">
+  <li>Power on the Command Link</li>
+  <li>Open FieldLogic Tools on tablet &gt; Open route &gt; Start Read</li>
+  <li>Drive all meter routes &mdash; watch for blue LINK light</li>
+  <li>Manually read any meters that didn't pick up via radio</li>
+</ul>
+
+<div class="checklist-label">Back in the Office</div>
+<ul class="checklist">
+  <li>Connect tablet to PC via WiFi hotspot again (Step 2)</li>
+  <li>Function &gt; Read Data &gt; Execute &gt; select Overwrite</li>
+  <li>Save Master Route Report PDF (dated) to:<br>
+    <span class="path">\\fais007\...\SENSUS\Master Route Report 7-6-23\</span></li>
+  <li>Save Route Statistical Summary PDF to same folder</li>
+  <li>Function &gt; Export &gt; Execute &gt; select Overwrite</li>
+  <li>Convert latestread_amr.dat to AMRoutputYYYYMMDD.csv via Notepad Save As (Step 7)</li>
+  <li>Move last month's CSV to:<br>
+    <span class="path">\\fais007\...\SENSUS\Output\Old Outputs\</span></li>
+  <li>Update Sensus Exhibit A spreadsheet if meters changed</li>
+</ul>
+
+
+<!-- ================================================================ -->
+<!-- TROUBLESHOOTING -->
+<!-- ================================================================ -->
+<div class="phase-header">Troubleshooting</div>
+
+<div class="ts-item">
+  <div class="ts-problem">Tablet doesn't appear in AutoRead</div>
+  <div class="ts-solution">
+    <ol>
+      <li>Confirm PC Mobile Hotspot is ON.</li>
+      <li>Confirm tablet is connected to that hotspot (not campus WiFi or other).</li>
+      <li>Close FieldLogic app on tablet and reopen it.</li>
+      <li>Restart AutoRead on the PC.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="ts-item">
+  <div class="ts-problem">Command Link won't pair</div>
+  <div class="ts-solution">Bluetooth password is <strong>0000</strong>. Press the hidden power button (under white square on the side). Blue LINK lamp should glow.</div>
+</div>
+
+<div class="ts-item">
+  <div class="ts-problem">Meter won't read via radio</div>
+  <div class="ts-solution">
+    <ol>
+      <li>Drive closer to the meter.</li>
+      <li>Check that the MXU is powered and the antenna isn't damaged.</li>
+      <li>Enter the reading manually on tablet.</li>
+    </ol>
+    Known trouble spots: Vogel Plant, ITB.
+  </div>
+</div>
+
+<div class="ts-item">
+  <div class="ts-problem">Import shows errors in AutoRead</div>
+  <div class="ts-solution">Drill into the error list in AutoRead. Common cause: duplicate MXU ID or Meter ID in the route file. Each must be unique.</div>
+</div>
+
+<div class="ts-item">
+  <div class="ts-problem">Export produces latestread_amr.dat</div>
+  <div class="ts-solution">This is normal. Convert to .csv using the Notepad Save As method (see Step 7).</div>
+</div>
+
+<div class="ts-item">
+  <div class="ts-problem">Reading is zero or unchanged</div>
+  <div class="ts-solution">Possible stuck register. Compare against previous month. Physical inspection may be needed.</div>
+</div>
+
+<div class="ts-item">
+  <div class="ts-problem">Leading zeros missing after edit</div>
+  <div class="ts-solution">You opened the CSV in Excel. Excel destroys leading zeros. Always edit the route file in Notepad, never in Excel.</div>
+</div>
+
+<div class="ts-item">
+  <div class="ts-problem">Can't add a meter (GPS error)</div>
+  <div class="ts-solution">Start the tablet outside and wait for a GPS fix before going into the building.</div>
+</div>
+
+<div class="ts-item">
+  <div class="ts-problem">FieldLogic Hub won't open</div>
+  <div class="ts-solution">Login: <strong>Admin</strong> / Password: <strong>Sensus123!</strong><br>
+    Make sure FieldLogic Hub is installed (installer on the shared drive, see AutoRead Software Configuration above).</div>
+</div>
+
+<div class="ts-item">
+  <div class="ts-problem">Neptune meter ID conflict</div>
+  <div class="ts-solution">Neptune meters may share IDs with other meters. Assign a new unique ID before adding to the route.</div>
+</div>
+
+
+<!-- ================================================================ -->
+<!-- FOLDER STRUCTURE -->
+<!-- ================================================================ -->
+<div class="phase-header">Folder Structure</div>
+
+<div class="tree">\\fais007\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\
+|
+|-- Admin\
+|     Sensus Metering Procedures 211116.docx    (original procedures doc)
+|
+|-- AMR Google Earth file\
+|     AMR In-Ground Water Meters.kmz            (map of all meter locations)
+|
+|-- Fieldlogic\
+|     |-- Autoread Man Rte setup\               (screenshots of AutoRead config)
+|     |-- FieldLogic Android\                   (Android tablet config doc)
+|     |-- FL INSTALL\                           (software installers)
+|           |-- Setup.exe                        (Windows installer)
+|           |-- Android\                         (tablet APK + config)
+|           |     FieldLogicToolsXF.Android.apk
+|           |-- windows\                         (Windows config files)
+|           |-- 2577\                            (legacy handheld files)
+|
+|-- Master Route Report 7-6-23\                 (monthly PDF reports)
+|     Master Route Report M-D-YY.pdf
+|     Route Statistical Summary Report M-D-YY.pdf
+|
+|-- Master Route Reports\                       (older reports, pre-July 2023)
+|
+|-- Output\
+|     AMRoutputYYYYMMDD.csv                      (CURRENT month only)
+|     |-- Old Outputs\                           (all previous months)
+|     README HOW TO CONVERT DAT TO CSV.txt
+|     README HOW TO LOAD ROUTES TO TABLET.txt
+|
+|-- Routes\
+|     import_amr.rte                             (MASTER route file)
+|     |-- Backup\                                (periodic backups)
+|     |-- Do not screw this file up\             (CRITICAL backups)
+|     |     import_amr - Master Backup M-D-YY.rte
+|     |-- old\                                   (retired route versions)
+|     |-- Proceedures\                           (route creation docs)
+|           |-- Route creation procedures\
+|                 Route creation procedure.docx
+|                 Instructions for man read on Archer II handheld.docx
+|
+|-- Auxiliary Sensus meters As Builts.pdf        (as-built drawings, 36 MB)
+|-- Sensus Exhibit A Spread Sheet Master.xlsx    (master meter inventory)
+|-- Sensus FieldLogic Hub Installer 7.4.2.36.exe (software installer)</div>
+
+</div><!-- end content -->
+
+<!-- Footer -->
+<div class="wsu-footer">
+  Washington State University &nbsp;&bull;&nbsp; Facilities Services &nbsp;&bull;&nbsp; Energy Group &nbsp;&bull;&nbsp; Confidential
+</div>
+
+</body>
+</html>
