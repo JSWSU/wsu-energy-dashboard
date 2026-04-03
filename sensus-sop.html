@@ -7,7 +7,7 @@
 <style>
   @page {
     size: letter;
-    margin: 0.6in 0.7in;
+    margin: 0;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -258,7 +258,11 @@
     .content { padding: 14px 20px 20px; }
     .phase-header { margin: 20px 0 12px; }
     .section-header { margin: 16px 0 8px; }
-    .wsu-footer { position: fixed; bottom: 0; left: 0; right: 0; }
+    .wsu-footer { position: static; margin-top: 20px; }
+    .tree { white-space: pre-wrap; overflow-x: visible; }
+    .path, .path-block { word-break: break-all; }
+    table { word-break: break-word; }
+    ol, ul { overflow-wrap: break-word; }
   }
 </style>
 </head>
