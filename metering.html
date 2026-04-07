@@ -368,7 +368,7 @@
 <header>
   <div class="header-text">
     <h1>WSU Campus Metering Dashboard</h1>
-    <p>Jan 2025 &ndash; Feb 2026 &bull; 721 Sites &bull; Pullman Campus</p>
+    <p id="headerSubtitle">Loading...</p>
   </div>
   <div class="header-actions">
     <a href="water-conservation.html">Water Conservation</a>
@@ -427,7 +427,7 @@
       <div class="chart-container"><canvas id="chartElecTrend"></canvas></div>
     </div>
     <div class="card">
-      <h2>Top 15 Buildings &mdash; Electric (MMBtu, 14-mo Total)</h2>
+      <h2>Top 15 Buildings &mdash; Electric (MMBtu, <span class="mo-total-label">Total</span>)</h2>
       <div class="chart-container tall"><canvas id="chartElecTop"></canvas></div>
     </div>
     <div class="card">
@@ -500,18 +500,18 @@
     <div class="card">
       <h2>Data Sources</h2>
       <div class="info-box">
-        <p><strong>Data Period:</strong> January 2025 &ndash; February 2026 (14 months)</p>
+        <p><strong>Data Period:</strong> <span id="dataPeriod">Loading...</span></p>
         <p><strong>Source:</strong> SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code></p>
         <p><strong>Export Method:</strong> Existing <code>view_*</code> functions with Export Format, run via Shell</p>
       </div>
       <h2>Export Commands</h2>
       <div class="info-box">
         <p>Run these in the SkySpark Shell to refresh data:</p>
-        <p><code>view_elecMeters(2025-01-01..2026-02-28, "Energy (kWh)", "Site", "Export Format")</code></p>
-        <p><code>view_condensate(2025-01-01..2026-02-28, "Site", "Export Format")</code></p>
-        <p><code>view_water(2025-01-01..2026-02-28, "Site", "Domestic", "Export Format")</code></p>
-        <p><code>view_water(2025-01-01..2026-02-28, "Site", "Irrigation", "Export Format")</code></p>
-        <p><code>view_chwExport(2025-01-01..2026-02-28, "CHW (tonhr)", "Site", "Export Format")</code></p>
+        <p><code>view_elecMeters(<span class="export-dates">...</span>, "Energy (kWh)", "Site", "Export Format")</code></p>
+        <p><code>view_condensate(<span class="export-dates">...</span>, "Site", "Export Format")</code></p>
+        <p><code>view_water(<span class="export-dates">...</span>, "Site", "Domestic", "Export Format")</code></p>
+        <p><code>view_water(<span class="export-dates">...</span>, "Site", "Irrigation", "Export Format")</code></p>
+        <p><code>view_chwExport(<span class="export-dates">...</span>, "CHW (tonhr)", "Site", "Export Format")</code></p>
       </div>
       <h2>Unit Conversions</h2>
       <div class="info-box">
@@ -860,6 +860,24 @@ function getSortedMonths(data) {
   return [...all].sort();
 }
 
+function getDateRangeInfo(months) {
+  if (!months.length) return { shortRange: '', longRange: '', monthCount: 0, firstISO: '', lastEndISO: '' };
+  const first = months[0], last = months[months.length - 1];
+  const MS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const ML = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const [fy, fm] = first.split('-');
+  const [ly, lm] = last.split('-');
+  const fi = parseInt(fm, 10) - 1, li = parseInt(lm, 10) - 1;
+  const lastDay = new Date(parseInt(ly), parseInt(lm), 0).getDate();
+  return {
+    shortRange: MS[fi] + ' ' + fy + ' \u2013 ' + MS[li] + ' ' + ly,
+    longRange: ML[fi] + ' ' + fy + ' \u2013 ' + ML[li] + ' ' + ly,
+    monthCount: months.length,
+    firstISO: fy + '-' + fm + '-01',
+    lastEndISO: ly + '-' + lm + '-' + (lastDay < 10 ? '0' : '') + lastDay
+  };
+}
+
 // ============================================================
 //  CHART FACTORY
 // ============================================================
@@ -1173,6 +1191,20 @@ loadAllData().then(data => {
 
   const months = getSortedMonths(data);
   const monthLabels = months.map(monthLabel);
+  const dateInfo = getDateRangeInfo(months);
+  const moLabel = months.length + '-month';
+  const moLabelShort = months.length + '-mo';
+
+  // ---- Dynamic date labels ----
+  document.getElementById('headerSubtitle').textContent =
+    dateInfo.shortRange + ' \u2022 ' + data.sites.length + ' Sites \u2022 Pullman Campus';
+  document.getElementById('dataPeriod').textContent = dateInfo.longRange;
+  document.querySelectorAll('.export-dates').forEach(el => {
+    el.textContent = dateInfo.firstISO + '..' + dateInfo.lastEndISO;
+  });
+  document.querySelectorAll('.mo-total-label').forEach(el => {
+    el.textContent = moLabelShort + ' Total';
+  });
 
   // ---- Aggregations ----
   const elecByBldg = aggregateByBuilding(data.electric, kwhToMmbtu);
@@ -1254,10 +1286,10 @@ loadAllData().then(data => {
     { label: 'Total Sites', value: fmt(data.sites.length), sub: 'Campus buildings', cls: '',
       tooltip: data.sites.length + ' campus buildings from SkySpark site records',
       expandHtml: sitesExpand },
-    { label: 'Total Energy', value: fmt(totalEnergy, 0) + ' MMBtu', sub: '14-month total', cls: 'electric',
+    { label: 'Total Energy', value: fmt(totalEnergy, 0) + ' MMBtu', sub: moLabel + ' total', cls: 'electric',
       tooltip: 'Sum of Electric + Steam + CHW Energy, all converted to MMBtu',
       expandHtml: energyExpand },
-    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: '14-month total', cls: 'domestic',
+    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: moLabel + ' total', cls: 'domestic',
       tooltip: 'Sum of Domestic Water + Irrigation in thousand gallons (kGal)',
       expandHtml: waterExpand },
     { label: 'Connector Health', value: Math.round(connOk / data.connectors.length * 100) + '%', sub: connOk + ' OK / ' + connFault + ' Fault / ' + connDisabled + ' Disabled', cls: 'ok',
@@ -1348,7 +1380,7 @@ loadAllData().then(data => {
       tooltip: elecBldgs.size + ' buildings with electric usage > 0 out of ' + data.sites.length + ' total sites' },
     { label: 'Data Points', value: fmt(data.electric.length), sub: 'Row records', cls: 'electric',
       tooltip: 'Total rows in electric.json — one row per building per month' },
-    { label: 'Avg per Building', value: fmt(totalElec / Math.max(elecBldgs.size, 1), 0) + ' MMBtu', sub: '14-month average', cls: 'electric',
+    { label: 'Avg per Building', value: fmt(totalElec / Math.max(elecBldgs.size, 1), 0) + ' MMBtu', sub: moLabel + ' average', cls: 'electric',
       tooltip: 'Total Electric MMBtu \u00f7 ' + elecBldgs.size + ' active buildings' }
   ]);
 
@@ -1381,7 +1413,7 @@ loadAllData().then(data => {
     { label: 'Total CHW Energy', value: fmt(totalChwE, 0) + ' MMBtu', sub: chwEBldgs.size + ' buildings', cls: 'chw-energy',
       tooltip: 'Chilled water energy converted from ton-ref-hr to MMBtu (\u00d70.012)',
       expandHtml: singleExpand(chwEByMonth, totalChwE, 'MMBtu') },
-    { label: 'Combined Thermal', value: fmt(totalSteam + totalChwE, 0) + ' MMBtu', sub: '14-month total', cls: 'steam',
+    { label: 'Combined Thermal', value: fmt(totalSteam + totalChwE, 0) + ' MMBtu', sub: moLabel + ' total', cls: 'steam',
       tooltip: 'Steam + CHW Energy combined thermal load',
       expandHtml: thermalExpand },
     { label: 'Steam Records', value: fmt(data.condensate.length), sub: 'Condensate rows', cls: 'steam',
@@ -1417,7 +1449,7 @@ loadAllData().then(data => {
     { label: 'Irrigation', value: fmt(totalIrrig, 0) + ' kGal', sub: irrigBldgs.size + ' buildings', cls: 'irrigation',
       tooltip: 'Irrigation water consumption in thousand gallons (gal \u00f7 1,000)',
       expandHtml: singleExpand(irrigByMonth, totalIrrig, 'kGal') },
-    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: '14-month total', cls: 'domestic',
+    { label: 'Total Water', value: fmt(totalWater, 0) + ' kGal', sub: moLabel + ' total', cls: 'domestic',
       tooltip: 'Domestic + Irrigation water combined',
       expandHtml: waterExpand },
     { label: 'Data Records', value: fmt(data.domesticWater.length + data.irrigation.length), sub: 'Water rows', cls: 'domestic',
@@ -1490,7 +1522,7 @@ function buildUtilityTable(tableId, searchId, byBldg, months, unit) {
   const tbody = tbl.querySelector('tbody');
 
   // Header
-  let hdr = '<tr><th style="text-align:left">Bldg #</th><th style="text-align:left">Building Name</th><th>14-mo Total (' + unit + ')</th>';
+  let hdr = '<tr><th style="text-align:left">Bldg #</th><th style="text-align:left">Building Name</th><th>' + moLabelShort + ' Total (' + unit + ')</th>';
   months.forEach(m => { hdr += '<th>' + monthLabel(m) + ' (' + unit + ')</th>'; });
   hdr += '</tr>';
   thead.innerHTML = hdr;
