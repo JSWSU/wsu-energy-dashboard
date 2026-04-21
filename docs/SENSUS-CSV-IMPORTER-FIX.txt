@@ -1,0 +1,88 @@
+SKYSPARK CSV IMPORTER FIX -- SENSUS AMR ROW-SHIFT BUG
+=====================================================
+
+The SkySpark CSV Importer connector for Sensus AMR exports currently pairs rows
+by file POSITION instead of by Account #. When the upstream AMRoutputYYYYMMDD.csv
+changes row order (meters added, removed, or re-routed), SkySpark links the
+PREVIOUS snapshot of Building A to the NEW raw reading of Building B. The delta
+is computed across two different buildings' registers, producing impossible
+"usage" spikes measured in billions of gallons.
+
+
+HOW THIS WAS PROVEN (2026-04-21)
+--------------------------------
+
+Dashboard value for bldg 0109E, Feb 2026 = 11,891,829,000 gal.
+
+Arithmetic check:
+  0111's raw read on 04/03 (11,891,937)
+  minus 0109E's raw read on 02/09 (108)
+  times 0109E's multiplier (1000)
+  = 11,891,829,000
+
+Line positions in AMRoutputYYYYMMDD.csv:
+  02/09 export: 0109E at line 43, 0111 at line 46
+  04/03 export: 0109E at line 40, 0111 at line 43    <-- 0111 now sits where 0109E was
+  04/21 export: 0109E at line 43, 0111 at line 46
+
+Missing accounts in 04/03 (200015, 200022, 200027) shifted every downstream row
+up by three. The importer read row-40's current value and subtracted row-43's
+previous value, crossing building identities.
+
+
+THE FIX (SKYSPARK SIDE)
+-----------------------
+
+The CSV Importer for Sensus AMR must key each record by COLUMN 0 (Account #),
+not by row position. Row-keyed import is the default in many Haxall CSV
+connectors and must be explicitly overridden.
+
+Where to change it:
+  1. SkySpark Shell or Folio editor
+  2. Locate the connector record for the Sensus CSV Importer
+     (search folio for csvImport tag + anything referencing AMRoutput)
+  3. Find the rule / expression that pairs the current and previous snapshots
+  4. Change the key from "row index" or "position" to:
+         key: r["Account"]   (or whatever the Account # column is named)
+  5. Re-run the import for Jan 2026 through current to regenerate correct history
+
+
+VERIFICATION AFTER FIX
+----------------------
+
+Re-run the import for 2026-02-01..2026-03-31 and compare the dashboard's
+domestic_water.json + irrigation.json rows against the rebuild output from
+scripts/sensus-pipeline/_rebuild_feb_mar.py. They should match to within the
+prorating tolerance noted in the rebuild script header.
+
+Additionally, re-open the dashboard at
+https://jswsu.github.io/wsu-energy-dashboard/water-conservation.html and
+confirm the client-side sanitizer in water-conservation.html (added 2026-04-21
+in commit f68324e) does not flag any newly imported rows. The sanitizer logs
+nulled rows to the browser console under the tag [sanitizeOutliers].
+
+
+UNTIL THE FIX LANDS
+-------------------
+
+Every monthly export from Sensus must be validated before running
+update-data.sh. The two null-outlier scripts in scripts/sensus-pipeline/
+catch most instances:
+
+  py scripts/sensus-pipeline/_null_outliers.py
+  py scripts/sensus-pipeline/_null_outliers_v2.py
+
+These null any row whose value exceeds the building's own historical baseline
+by a margin large enough to be a data error rather than a leak. Commit the
+results and push to main.
+
+
+REFERENCES
+----------
+
+- Root cause memory: sensus-pipeline-row-shift-bug.md
+- Rebuild script: scripts/sensus-pipeline/_rebuild_feb_mar.py
+- Pass 1 null: scripts/sensus-pipeline/_null_outliers.py
+- Pass 2 null: scripts/sensus-pipeline/_null_outliers_v2.py
+- Client-side guard: water-conservation.html function sanitizeOutliers()
+- Fix deployed: commits 15897b0, ced127d, 4956774, f68324e, a7c5896 (2026-04-21)
