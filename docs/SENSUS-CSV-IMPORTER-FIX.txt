@@ -1,12 +1,17 @@
-SKYSPARK CSV IMPORTER FIX -- SENSUS AMR ROW-SHIFT BUG
-=====================================================
+SENSUS AMR ROW-SHIFT SPIKE -- POST-SKYSPARK SANITIZATION FIX
+============================================================
 
-The SkySpark CSV Importer connector for Sensus AMR exports currently pairs rows
-by file POSITION instead of by Account #. When the upstream AMRoutputYYYYMMDD.csv
-changes row order (meters added, removed, or re-routed), SkySpark links the
-PREVIOUS snapshot of Building A to the NEW raw reading of Building B. The delta
-is computed across two different buildings' registers, producing impossible
-"usage" spikes measured in billions of gallons.
+Every month the Sensus AMR system exports AMRoutputYYYYMMDD.csv and SkySpark's
+CSV Importer pairs consecutive snapshots to compute monthly usage deltas. When
+the CSV row order shifts between months (accounts dropped, added, or re-routed),
+SkySpark crosses building identities and produces impossible "usage" values in
+the billions of gallons. The Feb 2026 export nulled by this effect corrupted
+the water-conservation and campus-metering dashboards.
+
+Per project constraint (2026-04-21): the remediation lives ENTIRELY in the
+post-SkySpark processing pipeline. SkySpark itself is treated as an opaque
+source; its exported JSON is cleaned downstream before being served to
+dashboards.
 
 
 HOW THIS WAS PROVEN (2026-04-21)
@@ -30,59 +35,83 @@ up by three. The importer read row-40's current value and subtracted row-43's
 previous value, crossing building identities.
 
 
-THE FIX (SKYSPARK SIDE)
+FIX LOCATION (POST-SKYSPARK ONLY)
+---------------------------------
+
+The fix is implemented in four layers AFTER data leaves SkySpark. No SkySpark
+Folio, Axon, or CSV Importer changes are in scope.
+
+  Layer 1  merge-data.py          validates + merges new SkySpark exports
+  Layer 2  _null_outliers.py      20x baseline median guard (Jan-Oct 2025)
+  Layer 3  _null_outliers_v2.py   5x pre-gap max guard (Jan-Jul 2025)
+  Layer 4  sanitizeOutliers()     in-browser final guard at render time
+
+Layers 2 and 3 run automatically inside update-data.sh after merge, before
+push. Layer 4 runs inside the dashboard HTML itself on every page load and
+will null any row that slipped past 1-3 -- the belt-and-suspenders line.
+
+
+THE PIPELINE
+------------
+
+update-data.sh runs the following in order:
+
+  1. py merge-data.py data/new/              (existing)
+  2. py scripts/sensus-pipeline/_null_outliers.py     (pass 1 sweep)
+  3. py scripts/sensus-pipeline/_null_outliers_v2.py  (pass 2, data-gap bumps)
+  4. bash push-data.sh                       (existing)
+  5. rm data/new/*.json                      (existing)
+
+Each null script writes timestamped .bak files next to the JSON it modifies
+and only keeps the backup if rows were actually changed.
+
+
+WHAT EACH GUARD CATCHES
 -----------------------
 
-The CSV Importer for Sensus AMR must key each record by COLUMN 0 (Account #),
-not by row position. Row-keyed import is the default in many Haxall CSV
-connectors and must be explicitly overridden.
+_null_outliers.py
+  Groups rows by (bldgNo, service, meters). Computes the median of positive
+  Jan-Oct 2025 values. Nulls any Nov 2025 - Mar 2026 row > 20x that median
+  AND > 50,000. Skips groups with fewer than 4 baseline months or median < 100.
 
-Where to change it:
-  1. SkySpark Shell or Folio editor
-  2. Locate the connector record for the Sensus CSV Importer
-     (search folio for csvImport tag + anything referencing AMRoutput)
-  3. Find the rule / expression that pairs the current and previous snapshots
-  4. Change the key from "row index" or "position" to:
-         key: r["Account"]   (or whatever the Account # column is named)
-  5. Re-run the import for Jan 2026 through current to regenerate correct history
+_null_outliers_v2.py
+  Catches the post-Aug-2025 data-gap bump-ups that the 20x median missed:
+  many buildings had Aug-Oct 2025 nulls followed by a giant Nov 2025 catch-up
+  value. Nulls any Nov 2025 - Mar 2026 value > 5x the Jan-Jul 2025 max for
+  that meter, excluding CHW plants (seasonal by design).
 
-
-VERIFICATION AFTER FIX
-----------------------
-
-Re-run the import for 2026-02-01..2026-03-31 and compare the dashboard's
-domestic_water.json + irrigation.json rows against the rebuild output from
-scripts/sensus-pipeline/_rebuild_feb_mar.py. They should match to within the
-prorating tolerance noted in the rebuild script header.
-
-Additionally, re-open the dashboard at
-https://jswsu.github.io/wsu-energy-dashboard/water-conservation.html and
-confirm the client-side sanitizer in water-conservation.html (added 2026-04-21
-in commit f68324e) does not flag any newly imported rows. The sanitizer logs
-nulled rows to the browser console under the tag [sanitizeOutliers].
+sanitizeOutliers() (in metering.html + water-conservation.html)
+  Runtime sweep in the browser. Groups rows by (bldgNo + service + meters),
+  takes the Jan-Jul 2025 max, nulls any 2025/2026 value > 20x that max AND
+  > 100,000. Console-logs every nulled row under the tag [sanitizeOutliers]
+  so the dashboard still shows a gap, not a lie.
 
 
-UNTIL THE FIX LANDS
--------------------
+VERIFICATION AFTER MONTHLY UPDATE
+---------------------------------
 
-Every monthly export from Sensus must be validated before running
-update-data.sh. The two null-outlier scripts in scripts/sensus-pipeline/
-catch most instances:
+1. update-data.sh prints a summary from each null pass. Expect lines like:
+     fname.json: nulled N rows; backup -> fname.json.nullscan.YYYYMMDDT...bak
 
-  py scripts/sensus-pipeline/_null_outliers.py
-  py scripts/sensus-pipeline/_null_outliers_v2.py
+2. Open the dashboards and check the browser console for [sanitizeOutliers]
+   warnings. If any appear, layers 2-3 missed an outlier -- investigate the
+   source rows in the Sensus AMR export.
 
-These null any row whose value exceeds the building's own historical baseline
-by a margin large enough to be a data error rather than a leak. Commit the
-results and push to main.
+3. If new spike shapes appear (e.g., a row-shift pattern that the 20x/5x
+   thresholds don't catch), tune the constants in _null_outliers.py and
+   _null_outliers_v2.py. The thresholds are intentionally loose enough that
+   real peak months survive.
 
 
 REFERENCES
 ----------
 
 - Root cause memory: sensus-pipeline-row-shift-bug.md
-- Rebuild script: scripts/sensus-pipeline/_rebuild_feb_mar.py
-- Pass 1 null: scripts/sensus-pipeline/_null_outliers.py
-- Pass 2 null: scripts/sensus-pipeline/_null_outliers_v2.py
-- Client-side guard: water-conservation.html function sanitizeOutliers()
-- Fix deployed: commits 15897b0, ced127d, 4956774, f68324e, a7c5896 (2026-04-21)
+- Rebuild script (one-time Feb-Mar 2026 repair):
+    scripts/sensus-pipeline/_rebuild_feb_mar.py
+- Pass 1 null:  scripts/sensus-pipeline/_null_outliers.py
+- Pass 2 null:  scripts/sensus-pipeline/_null_outliers_v2.py
+- Client-side guard: function sanitizeOutliers() in
+    water-conservation.html and metering.html
+- Initial fix deployed: commits 15897b0, ced127d, 4956774, f68324e, a7c5896
+    (2026-04-21), post-SkySpark pipeline hardening same day

@@ -38,13 +38,25 @@ py "$SCRIPT_DIR/merge-data.py" "$NEW_DIR"
 
 echo ""
 
-# Step 2: Push
-echo "Step 2: Pushing to GitHub..."
+# Step 2: Sanitize -- null Sensus AMR row-shift spikes (post-SkySpark fix)
+echo "Step 2: Sanitizing row-shift spikes (pass 1 -- 20x baseline median)..."
+echo ""
+py "$SCRIPT_DIR/scripts/sensus-pipeline/_null_outliers.py"
+
+echo ""
+echo "Step 3: Sanitizing data-gap catch-up spikes (pass 2 -- 5x pre-gap max)..."
+echo ""
+py "$SCRIPT_DIR/scripts/sensus-pipeline/_null_outliers_v2.py"
+
+echo ""
+
+# Step 4: Push
+echo "Step 4: Pushing to GitHub..."
 echo ""
 bash "$SCRIPT_DIR/push-data.sh"
 
 echo ""
-echo "Step 3: Cleaning up staging folder..."
+echo "Step 5: Cleaning up staging folder..."
 rm -f "$NEW_DIR"/*.json
 echo "  Removed JSON files from data/new/"
 

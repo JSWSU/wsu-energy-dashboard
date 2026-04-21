@@ -799,7 +799,37 @@ async function loadJSON(url) {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('Failed to load ' + url);
   const data = await resp.json();
-  return data.rows || [];
+  return sanitizeOutliers(data.rows || [], url);
+}
+
+function sanitizeOutliers(rows, url) {
+  const groups = {};
+  rows.forEach(r => {
+    const key = (r.bldgNo || '') + '|' + (r.service || '') + '|' + (r.meters || '');
+    (groups[key] = groups[key] || []).push(r);
+  });
+  const preGap = new Set(['01-01-2025','02-01-2025','03-01-2025','04-01-2025','05-01-2025','06-01-2025','07-01-2025']);
+  let nulled = 0;
+  Object.values(groups).forEach(grp => {
+    const pre = grp.filter(r => preGap.has(r.startDate) && typeof r.usage === 'number' && r.usage > 0).map(r => r.usage);
+    if (pre.length < 3) return;
+    const preMax = Math.max.apply(null, pre);
+    if (preMax < 1000) return;
+    const limit = Math.max(100000, 20 * preMax);
+    grp.forEach(r => {
+      if (typeof r.usage !== 'number' || r.usage <= 0) return;
+      const sd = r.startDate || '';
+      if (!/2025|2026/.test(sd)) return;
+      if (preGap.has(sd)) return;
+      if (r.usage > limit) {
+        console.warn('[sanitizeOutliers]', url, r.bldgNo, sd, 'usage=', r.usage, 'preMax=', preMax, 'limit=', limit);
+        r.usage = null;
+        nulled++;
+      }
+    });
+  });
+  if (nulled > 0) console.warn('[sanitizeOutliers] nulled ' + nulled + ' row(s) in ' + url);
+  return rows;
 }
 
 async function loadAllData() {
