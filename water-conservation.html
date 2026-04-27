@@ -2392,7 +2392,7 @@ function renderTaskTab(filterStatus, searchQuery) {
       <td style="text-align:left">${t.service}</td>
       <td style="text-align:left"><select class="task-status" onchange="handleStatusChange('${t.issueId}', this.value)">${statusOpts}</select></td>
       <td style="text-align:left"><span class="editable" contenteditable="true" data-field="assignedTo" data-id="${t.issueId}" onblur="handleCellEdit(this)">${t.assignedTo || ''}</span></td>
-      <td style="text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(t.description || '').replace(/"/g, '&quot;')}">${t.description || ''}</td>
+      <td style="text-align:left;min-width:300px;max-width:520px;white-space:normal;word-wrap:break-word;overflow-wrap:anywhere;line-height:1.4;vertical-align:top;">${t.description || ''}</td>
       <td style="text-align:left"><span class="editable" contenteditable="true" data-field="actionNote" data-id="${t.issueId}" onblur="handleCellEdit(this)">${t.actionNote || ''}</span></td>
       <td>${t.entryDate || ''}</td>
       <td style="text-align:left"><span class="editable" contenteditable="true" data-field="wo" data-id="${t.issueId}" onblur="handleCellEdit(this)">${t.wo || ''}</span></td>
