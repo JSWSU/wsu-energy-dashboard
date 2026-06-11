@@ -622,8 +622,8 @@
       <h2><span id="anomalyHeading">All Sites</span> <span id="anomalyCount" style="font-weight:400;font-size:0.82rem;color:var(--text-light);"></span></h2>
       <div class="info-box">
         Shows all metered building/service pairs. Click any row to expand year-over-year charts.
-        Spike anomalies flag months with &gt;100% usage increase vs neighbor-month average (irrigation season excluded).
-        Winter irrigation flags any usage Nov&ndash;Feb.
+        Spike anomalies flag months (most recent 3 data months) where usage is more than 100% above the average of the same calendar month in prior years.
+        Winter irrigation flags irrigation usage of 1 kGal or more in any Nov to Feb month within that same window.
         Use <strong>Anomalies Only</strong> to filter to flagged buildings.
       </div>
       <div class="filter-bar" id="anomalyFilterBar" style="margin-bottom:1rem;">
@@ -742,27 +742,17 @@
     <!-- Section 2: Updating Data -->
     <div class="card help-section">
       <h2>Updating Data from SkySpark</h2>
-      <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Water data is exported from the SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code>. Run these commands in the SkySpark Shell to refresh the data files:</p>
-      <h3>Export Commands</h3>
-      <table class="help-table">
-        <thead><tr><th>File</th><th>SkySpark Shell Command</th></tr></thead>
-        <tbody>
-          <tr><td><code>domestic_water.json</code></td><td><code>view_water(2024-01-01..2026-02-28, "Site", "Domestic", "Export Format")</code></td></tr>
-          <tr><td><code>irrigation.json</code></td><td><code>view_water(2024-01-01..2026-02-28, "Site", "Irrigation", "Export Format")</code></td></tr>
-        </tbody>
-      </table>
-      <div class="info-box" style="margin-top:0.75rem;">
-        <strong>Tip:</strong> Update the end date in each command to include the latest complete month. For example, if it's March 2026, change the end date to <code>2026-03-31</code>.
-      </div>
-      <h3 style="margin-top:1rem;">After Export</h3>
+      <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Water data is exported from the SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code> and published through the update pipeline. Do not upload raw exports straight to GitHub: the pipeline merges new rows into the existing files and applies the outlier sanitization passes first.</p>
+      <h3>Update Steps</h3>
       <ol class="help-sync-steps">
-        <li>Save the Domestic export as <strong>domestic_water.json</strong></li>
-        <li>Save the Irrigation export as <strong>irrigation.json</strong></li>
-        <li>Upload both files to the <strong>data/</strong> folder on GitHub (replace existing files)</li>
-        <li>Wait ~1 minute for GitHub Pages to deploy, then hard-refresh the dashboard (Ctrl+Shift+R)</li>
+        <li>In the SkySpark Shell, run <code>task_exportToIO(2026-03-01..2026-05-31)</code> with the date range you need (overlapping months already loaded is safe; the merge fills gaps and never regresses good values)</li>
+        <li>Download the 7 JSON files from the SkySpark Files <code>io/</code> folder</li>
+        <li>Copy them into <code>C:\Users\john.slagboom\Desktop\Git\data\new\</code></li>
+        <li>From <code>C:\Users\john.slagboom\Desktop\Git\</code> run <code>bash update-data.sh</code> (merges, sanitizes, pushes to GitHub, clears staging)</li>
+        <li>Wait about a minute for GitHub Pages to deploy, then hard-refresh the dashboard (Ctrl+Shift+R)</li>
       </ol>
       <div class="info-box" style="margin-top:0.75rem;">
-        <strong>Note:</strong> Both files are shared with the <a href="metering.html">Campus Metering</a> dashboard. Updating them here updates metering data too. See the <strong>Data Info</strong> tab for data quality checks and verification after uploading.
+        <strong>Note:</strong> Both files are shared with the <a href="metering.html">Campus Metering</a> dashboard. Updating them here updates metering data too. See the <strong>Data Info</strong> tab for pipeline details and data quality checks after updating.
       </div>
     </div>
 
@@ -773,7 +763,7 @@
       <ol class="help-sync-steps">
         <li>Open Smartsheet and export the task list as a CSV file</li>
         <li>On the <strong>Task Tracker</strong> tab, click <strong>"Import from Smartsheet"</strong> and select the CSV</li>
-        <li>Review the import summary (e.g., "12 updated, 35 unchanged, 0 new")</li>
+        <li>Review the import summary (e.g., "Imported 47 rows: 0 new, 12 updated, 35 unchanged.")</li>
         <li>During the meeting, create new tasks and update existing ones on the dashboard</li>
         <li>After the meeting, click <strong>"Export to Smartsheet"</strong> to download the updated CSV</li>
         <li>Open Smartsheet and import the downloaded CSV to sync changes back</li>
@@ -805,7 +795,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Data Info</strong>
-          Data source details, SkySpark export commands, unit conversions, file inventory, and automated data quality checks with integrity verification.
+          Data source details, the data update pipeline steps, unit conversions, file inventory, and automated data quality checks with integrity verification.
         </div>
       </div>
     </div>
@@ -820,17 +810,17 @@
       <table class="help-table">
         <thead><tr><th>Severity</th><th>Color</th><th>Threshold</th></tr></thead>
         <tbody>
-          <tr><td><span class="sev-dot red"></span> High</td><td>Red left border</td><td>More than 200% above neighbor average</td></tr>
-          <tr><td><span class="sev-dot orange"></span> Medium</td><td>Orange left border</td><td>100% &ndash; 200% above neighbor average</td></tr>
+          <tr><td><span class="sev-dot red"></span> High</td><td>Red left border</td><td>More than 200% above prior-year same-month average</td></tr>
+          <tr><td><span class="sev-dot orange"></span> Medium</td><td>Orange left border</td><td>100% to 200% above prior-year same-month average</td></tr>
         </tbody>
       </table>
       <div class="info-box" style="margin-top:0.75rem;">
-        <strong>Irrigation season exclusion:</strong> Spikes on irrigation meters during May through September are intentionally excluded. Usage ramp-up during irrigation season is expected and not anomalous. Only off-season irrigation spikes are flagged.
+        <strong>Seasonal patterns:</strong> Comparing each month to the same calendar month in prior years accounts for expected seasonal swings, including the summer irrigation ramp-up, so no months are excluded from spike detection. Only the most recent 3 data months are checked, and a month is evaluated only when at least one prior year has usage for that same calendar month.
       </div>
 
       <h3 style="margin-top:1.25rem;">Winter Irrigation Alerts</h3>
       <p style="font-size:0.82rem;line-height:1.6;margin-bottom:0.5rem;">
-        Any irrigation water usage during <strong>November, December, January, or February</strong> is flagged. Irrigation systems should be winterized during these months, so any usage may indicate a leak or a valve left open.
+        Irrigation water usage of 1 kGal or more during <strong>November, December, January, or February</strong> is flagged when the month falls within the most recent 3 data months. Irrigation systems should be winterized during these months, so usage may indicate a leak or a valve left open.
       </p>
       <table class="help-table">
         <thead><tr><th>Type</th><th>Color</th><th>What It Means</th></tr></thead>
@@ -899,7 +889,7 @@
         <dd>Tasks are stored in browser localStorage. Import your most recent CSV backup: Task Tracker tab &rarr; "Import from Smartsheet".</dd>
 
         <dt>No anomalies detected</dt>
-        <dd>Data may have fewer than 3 months, or no buildings have spikes exceeding 100% of their neighbor-month average. Irrigation spikes during May&ndash;Sep are excluded by design.</dd>
+        <dd>Both detectors check only the most recent 3 data months. Spike detection also needs at least one prior year of usage for the same calendar month, and winter irrigation alerts can appear only when that window includes November to February. If those conditions are met, no building exceeded 100% above its prior-year same-month average and no winter irrigation reached 1 kGal.</dd>
 
         <dt>Filter shows "No anomalies match"</dt>
         <dd>Click "All Services" to reset the filter bar, then check each column header for active filters (highlighted menu icon). Clear column filters to see all anomalies.</dd>
@@ -915,16 +905,18 @@
       <div class="info-box">
         <p><strong>Data Period:</strong> <span id="diDateRange">Loading...</span></p>
         <p><strong>Source:</strong> SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code></p>
-        <p><strong>Export Method:</strong> Existing <code>view_water</code> function with Export Format, run via Shell</p>
+        <p><strong>Export Method:</strong> <code>task_exportToIO</code> Shell task exports all 7 dashboard JSON files (including <code>domestic_water.json</code> and <code>irrigation.json</code>) to the SkySpark <code>io/</code> folder</p>
       </div>
-      <h2>Export Commands</h2>
+      <h2>Data Update Pipeline</h2>
       <div class="info-box">
-        <p>Run these in the SkySpark Shell to refresh data:</p>
-        <p><code>view_water(2024-01-01..2026-02-28, "Site", "Domestic", "Export Format")</code></p>
-        <p><code>view_water(2024-01-01..2026-02-28, "Site", "Irrigation", "Export Format")</code></p>
+        <p><strong>Step 1:</strong> In the SkySpark Shell, run the export task as a single line with the desired date range:</p>
+        <p><code>task_exportToIO(2026-03-01..2026-05-31)</code></p>
+        <p><strong>Step 2:</strong> Download the 7 JSON files from the SkySpark Files <code>io/</code> folder.</p>
+        <p><strong>Step 3:</strong> Copy them into <code>C:\Users\john.slagboom\Desktop\Git\data\new\</code></p>
+        <p><strong>Step 4:</strong> From <code>C:\Users\john.slagboom\Desktop\Git\</code> run <code>bash update-data.sh</code></p>
       </div>
       <div class="info-box" style="margin-top:0.75rem;">
-        <strong>After export:</strong> Save each file as <code>domestic_water.json</code> and <code>irrigation.json</code>, then upload to the <code>data/</code> folder on GitHub.
+        <strong>What update-data.sh does:</strong> Merges the new rows into the existing <code>data/</code> files via <code>merge-data.py</code>, applies two outlier sanitization passes plus a known-bad-row fix pass, pushes the updated files to GitHub via <code>push-data.sh</code>, then clears the staging folder.
       </div>
       <h2>Unit Conversions</h2>
       <div class="info-box">
@@ -1240,13 +1232,6 @@ function isWinterMonth(monthKey) {
   return WINTER_MONTHS.includes(m);
 }
 
-const IRRIGATION_SEASON = [5, 6, 7, 8, 9]; // May-Sep
-function isIrrigationSeason(monthKey) {
-  if (!monthKey) return false;
-  const m = parseInt(monthKey.split('-')[1], 10);
-  return IRRIGATION_SEASON.includes(m);
-}
-
 function todayStr() {
   return new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
 }
@@ -1505,43 +1490,6 @@ function detectWinterIrrigation(byBldg, monthKeys) {
 }
 
 // Campus-level anomaly detection for chart markers (reuses metering pattern)
-function detectCampusAnomalies(campusData, monthKeys, byBldg) {
-  const threshold = 1.0;
-  var anomalies = [];
-  for (var i = 1; i < campusData.length - 1; i++) {
-    var val = campusData[i];
-    if (!val || val === 0) continue;
-    var neighbors = [campusData[i-1], campusData[i+1]].filter(v => v && v > 0);
-    if (neighbors.length === 0) continue;
-    var avg = neighbors.reduce((s,v) => s + v, 0) / neighbors.length;
-    if (avg === 0) continue;
-    var pctDev = (val - avg) / avg;
-    if (pctDev > threshold) {
-      var mk = monthKeys[i];
-      var drivers = [];
-      Object.values(byBldg).forEach(b => {
-        var bVal = b.months[mk] || 0;
-        var bPrev = b.months[monthKeys[i-1]] || 0;
-        var bNext = b.months[monthKeys[i+1]] || 0;
-        var bNeighbors = [bPrev, bNext].filter(v => v > 0);
-        if (bNeighbors.length === 0 || bVal === 0) return;
-        var bAvg = bNeighbors.reduce((s,v) => s + v, 0) / bNeighbors.length;
-        var delta = bVal - bAvg;
-        if (delta > 0) drivers.push({ bldgNo: b.bldgNo, bldgName: b.bldgName, delta });
-      });
-      drivers.sort((a,b) => b.delta - a.delta);
-      var topDriver = drivers.length > 0 ? drivers[0] : null;
-      var driverLabel = topDriver ? (topDriver.bldgNo + (topDriver.bldgName ? ' ' + topDriver.bldgName : '')) : '';
-      anomalies.push({
-        index: i, value: val, expected: avg, pctDev,
-        label: '+' + Math.round(pctDev * 100) + '% vs avg',
-        driver: driverLabel
-      });
-    }
-  }
-  return anomalies;
-}
-
 function detectCampusAnomaliesYoY(yearData, year, byBldg) {
   const threshold = 1.0;
   const anomalies = [];
