@@ -2,8 +2,8 @@
 
 Many buildings had Aug-Oct 2025 null readings, then a giant Nov 2025 value where
 accumulated usage landed in one month. This distorts the chart even though the
-total is real. Null any Nov 2025 - Mar 2026 value > 5x the max Jan-Jul 2025 value
-for that meter — exclude chiller plants (seasonal by design).
+total is real. Null any value from Nov 2025 onward > 5x the max Jan-Jul 2025
+value for that meter; exclude chiller plants (seasonal by design).
 """
 import json
 import shutil
@@ -13,7 +13,7 @@ from pathlib import Path
 DATA = Path(r"C:\Users\john.slagboom\Desktop\Git\data")
 FILES = ["domestic_water.json", "irrigation.json", "electric.json", "chw.json", "condensate.json"]
 
-SUSPECT = {"11-01-2025", "12-01-2025", "01-01-2026", "02-01-2026", "03-01-2026"}
+SUSPECT_START = (2025, 11)  # Nov 2025 onward, open-ended
 PRE_GAP = {f"{m:02d}-01-2025" for m in range(1, 8)}  # Jan-Jul 2025
 
 RATIO_LIMIT = 5
@@ -22,6 +22,14 @@ ABS_LIMIT = 100_000
 
 def is_num(x):
     return isinstance(x, (int, float))
+
+
+def is_suspect(start_date):
+    # startDate format MM-DD-YYYY; window is open-ended from SUSPECT_START
+    try:
+        return (int(start_date[6:10]), int(start_date[0:2])) >= SUSPECT_START
+    except (TypeError, ValueError):
+        return False
 
 
 def is_chw_plant(bldg_no, bldg_name):
@@ -82,7 +90,7 @@ def main():
                 continue
             limit = max(ABS_LIMIT, RATIO_LIMIT * pre_max)
             for r in rows:
-                if r.get("startDate") not in SUSPECT:
+                if not is_suspect(r.get("startDate")):
                     continue
                 u = r.get("usage")
                 if not is_num(u) or u <= 0:

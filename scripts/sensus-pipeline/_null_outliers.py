@@ -1,11 +1,11 @@
 """Null any (bldg, service) row where value exceeds 20x its Jan-Oct 2025 median baseline.
 
 Applies to all 5 metering JSON files. CSV importer row-shift bug can corrupt rows in any
-metering file — this is a defensive sweep for anything obviously anomalous vs baseline.
+metering file; this is a defensive sweep for anything obviously anomalous vs baseline.
 
 Rules:
 - Compute median of Jan-Oct 2025 positive values per (bldgNo, service, meters)
-- For any row in Nov 2025 - Mar 2026 with value > 20 * median AND > 50k, null it
+- For any row from Nov 2025 onward with value > 20 * median AND > 50k, null it
 - Require median > 100 to avoid amplifying noise on near-zero baseline
 - Require at least 4 baseline months to trust the median
 """
@@ -17,7 +17,7 @@ from pathlib import Path
 DATA = Path(r"C:\Users\john.slagboom\Desktop\Git\data")
 FILES = ["domestic_water.json", "irrigation.json", "electric.json", "chw.json", "condensate.json"]
 
-SUSPECT_MONTHS = {"11-01-2025", "12-01-2025", "01-01-2026", "02-01-2026", "03-01-2026"}
+SUSPECT_START = (2025, 11)  # Nov 2025 onward, open-ended
 BASELINE_2025 = {f"{m:02d}-01-2025" for m in range(1, 11)}
 
 THRESHOLD_RATIO = 20
@@ -26,6 +26,14 @@ THRESHOLD_ABSOLUTE = 50_000
 
 def is_num(x):
     return isinstance(x, (int, float))
+
+
+def is_suspect(start_date):
+    # startDate format MM-DD-YYYY; window is open-ended from SUSPECT_START
+    try:
+        return (int(start_date[6:10]), int(start_date[0:2])) >= SUSPECT_START
+    except (TypeError, ValueError):
+        return False
 
 
 def write_grid(path, grid):
@@ -82,7 +90,7 @@ def main():
                 continue
             limit = max(THRESHOLD_ABSOLUTE, THRESHOLD_RATIO * median)
             for r in rows:
-                if r.get("startDate") not in SUSPECT_MONTHS:
+                if not is_suspect(r.get("startDate")):
                     continue
                 u = r.get("usage")
                 if not is_num(u) or u <= 0:

@@ -7,5 +7,7 @@ email-config.json
 data/steam_plant_hourly.json
 data/new/
 data/backup/
+data/*.bak
+data/*.bak.*
 folder-scan.json
 sops/

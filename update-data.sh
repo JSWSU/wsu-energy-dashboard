@@ -49,14 +49,24 @@ echo ""
 py "$SCRIPT_DIR/scripts/sensus-pipeline/_null_outliers_v2.py"
 
 echo ""
-
-# Step 4: Push
-echo "Step 4: Pushing to GitHub..."
+echo "Step 4: Fixing known bad rows (CSV spikes, 0092 double-count, negatives)..."
 echo ""
-bash "$SCRIPT_DIR/push-data.sh"
+py "$SCRIPT_DIR/scripts/sensus-pipeline/_fix_known_rows.py"
 
 echo ""
-echo "Step 5: Cleaning up staging folder..."
+
+# Step 5: Push
+echo "Step 5: Pushing to GitHub..."
+echo ""
+if ! bash "$SCRIPT_DIR/push-data.sh"; then
+    echo ""
+    echo "Push reported failures. Keeping data/new/ staging files so the run can be repeated."
+    echo "Fix the problem (PAT, network), then run: bash update-data.sh"
+    exit 1
+fi
+
+echo ""
+echo "Step 6: Cleaning up staging folder..."
 rm -f "$NEW_DIR"/*.json
 echo "  Removed JSON files from data/new/"
 
