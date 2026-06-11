@@ -9,5 +9,7 @@ data/new/
 data/backup/
 data/*.bak
 data/*.bak.*
+skyspark-auth.json
+logs/
 folder-scan.json
 sops/

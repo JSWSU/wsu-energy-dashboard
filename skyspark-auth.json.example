@@ -1,0 +1,6 @@
+{
+  "base_url": "https://skyspark.fais.wsu.edu",
+  "project": "wsumeters",
+  "username": "PUT-YOUR-SKYSPARK-USERNAME-HERE",
+  "password": "PUT-YOUR-SKYSPARK-PASSWORD-HERE"
+}

@@ -67,6 +67,21 @@ Step 1: Update water data (run the full pipeline when new SkySpark data is avail
   is the most recent 3 DATA months, so skipped updates mean the dashboard
   silently reviews old months.
 
+  AUTOMATED UPDATES (since 06/11/2026): The Windows scheduled task
+  "WSU Dashboard Data Auto-Update" (Mondays 07:10, runs while logged on)
+  executes C:\Users\john.slagboom\Desktop\Git\auto-update-data.py, which
+  performs Steps 2 to 5 above automatically: it logs into SkySpark, runs
+  task_exportToIO over a rolling 3-month window, downloads the 7 files,
+  stages them, and runs update-data.sh. Weekly runs are safe: the merge
+  is idempotent and unchanged files are not re-pushed. Requirements: the
+  PC is on and logged in, and SkySpark credentials exist in the untracked
+  file C:\Users\john.slagboom\Desktop\Git\skyspark-auth.json (copy
+  skyspark-auth.json.example). Failures and stale data automatically open
+  a GitHub issue on jswsu/wsu-energy-dashboard, which emails John. Log:
+  C:\Users\john.slagboom\Desktop\Git\logs\auto-update-data.log. Validate
+  the setup once with: py auto-update-data.py --check
+  The manual steps above remain the fallback procedure.
+
 Step 2: Import latest tasks from Smartsheet
 
   1. Open Smartsheet and export the task list as CSV
