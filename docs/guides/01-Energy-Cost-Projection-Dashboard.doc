@@ -1,0 +1,608 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+p { margin: 6px 0; line-height: 1.6; }
+ul { margin: 6px 0 6px 24px; }
+li { margin-bottom: 4px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<h1>How to Read the Energy Cost Projection Dashboard</h1>
+<p><strong>Audience:</strong> Entry-level employees and anyone viewing this dashboard for the first time.<br>
+<strong>Purpose:</strong> This guide walks you through every screen of the Energy Cost Projection Dashboard so you can understand what you are looking at, what the numbers mean, and how to use the dashboard in meetings.</p>
+
+<!-- ============================================================ -->
+<h2>1. Getting Started</h2>
+<!-- ============================================================ -->
+
+<p>The Energy Cost Projection Dashboard tracks how much Washington State University (WSU) Facilities Services spends on electricity and natural gas each month. It compares what was actually spent against what was forecasted, so leadership can tell whether the university is on track with its energy budget for the fiscal year.</p>
+
+<h3>Opening the Dashboard</h3>
+
+<div class="step">
+<span class="step-num">Step 1:</span> Open your web browser (Chrome, Edge, or Firefox all work) and go to:<br>
+<strong>https://jswsu.github.io/wsu-energy-dashboard/</strong>
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A login screen with the WSU crimson header reading "WSU Energy Cost Projection" and a password field in the center of the page.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Type the password: <strong>Energy@WSU</strong> (case-sensitive, including the @ symbol) and click <strong>Sign In</strong>, or press Enter.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> The login screen disappears and you see the main dashboard with a crimson header bar, a row of tab buttons, summary cards with numbers, and charts below. If you see "Incorrect password," double-check the capitalization and the @ symbol.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> You will not need to enter the password again on this computer and browser unless you clear your browser data. The dashboard remembers your login.
+</div>
+
+<h3>What You See When You Log In</h3>
+<p>The dashboard is organized into sections, each accessible by clicking a <strong>tab</strong> along the top. The tabs are:</p>
+<table>
+<tr><th>Tab Name</th><th>What It Shows</th></tr>
+<tr><td>Dashboard</td><td>High-level summary with KPI cards and charts</td></tr>
+<tr><td>Monthly Detail</td><td>Month-by-month cost table (actual vs. forecast)</td></tr>
+<tr><td>Gas Analysis</td><td>Deep dive into natural gas costs and suppliers</td></tr>
+<tr><td>Energy Use</td><td>How much energy was consumed (not dollars, but units)</td></tr>
+<tr><td>Year-over-Year</td><td>Compare this fiscal year to last fiscal year</td></tr>
+<tr><td>Cumulative Summary</td><td>Running total of costs over the year</td></tr>
+<tr><td>Price vs Volume</td><td>Did costs change because of price or usage?</td></tr>
+<tr><td>HDD / Weather</td><td>Weather data that affects heating costs</td></tr>
+<tr><td>Data Sources</td><td>Where the numbers come from (utility accounts)</td></tr>
+</table>
+
+<p>The dashboard currently tracks <strong>FY2026</strong>, which stands for <strong>Fiscal Year 2026</strong> and runs from <strong>July 2025 through June 2026</strong>. WSU's fiscal year does not follow the calendar year &mdash; it starts in July and ends in June.</p>
+
+<!-- ============================================================ -->
+<h2>2. Understanding the Dashboard Tab (Main Tab)</h2>
+<!-- ============================================================ -->
+
+<p>The Dashboard tab is what you see first after logging in. It provides a quick snapshot of energy spending for the fiscal year.</p>
+
+<h3>The Budget Status Banner</h3>
+
+<div class="step">
+<span class="step-num">Step 1:</span> Look at the very top of the Dashboard tab, above the summary cards. There may be a colored banner showing the budget status.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> One of three colored banners:
+<ul>
+<li><strong>Green "Under Budget"</strong> &mdash; Actual spending is well below the forecast. This is good news.</li>
+<li><strong>Yellow "Watch"</strong> &mdash; Spending is slightly under forecast, but the margin is small. Keep an eye on it.</li>
+<li><strong>Red "Over Budget"</strong> &mdash; Actual spending has exceeded the forecast. This needs attention.</li>
+</ul>
+The banner also tells you how many of the 12 months have actual data (for example, "7 of 12 months actual").
+</div>
+
+<h3>The KPI Summary Cards</h3>
+
+<p>Below the banner, you will see eight summary cards arranged in two rows of four. KPI stands for <strong>Key Performance Indicator</strong> &mdash; these are the most important numbers at a glance.</p>
+
+<h3>Top Row Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Read the top row of cards from left to right:
+</div>
+
+<table>
+<tr><th>Card</th><th>What It Means</th><th>Color Code</th></tr>
+<tr><td><strong>FY2026 Actual + Forecast</strong></td><td>The total energy cost for the year so far. For months that have already happened, this shows the real amount paid. For future months, it fills in with the forecasted amount. Think of it as "our best estimate of the full year's total."</td><td>Crimson left border</td></tr>
+<tr><td><strong>FY2026 Forecast</strong></td><td>What we originally projected the full year would cost, based on historical growth trends and a price adjustment. This number was calculated before the year started and stays the same throughout the year.</td><td>Blue left border</td></tr>
+<tr><td><strong>Forecast vs Actual</strong></td><td>The difference between what we forecasted and what was actually spent. A <strong>positive number (green)</strong> means we are spending less than expected (under budget). A <strong>negative number (red)</strong> means we are spending more than expected (over budget).</td><td>Gold left border</td></tr>
+<tr><td><strong>Total Energy Use (YTD)</strong></td><td>How much energy was consumed year-to-date, measured in MMBTU (defined in the glossary below). This is not dollars &mdash; it is the physical quantity of energy used. The subtitle breaks it out by electricity and gas.</td><td>Green left border</td></tr>
+</table>
+
+<h3>Bottom Row Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Read the bottom row of cards:
+</div>
+
+<table>
+<tr><th>Card</th><th>What It Means</th></tr>
+<tr><td><strong>Electric Cost (YTD)</strong></td><td>Total dollars spent on electricity so far this fiscal year. The subtitle shows what percentage of total energy spending goes to electricity.</td></tr>
+<tr><td><strong>Gas Cost (YTD)</strong></td><td>Total dollars spent on natural gas so far. This combines both the Kintec commodity charge and the Avista distribution charge (both explained in the Gas Analysis section).</td></tr>
+<tr><td><strong>Avg Elec Rate</strong></td><td>The average price paid per MMBTU of electricity. Think of it like the "price per gallon" for electricity. The subtitle shows the forecasted rate for comparison.</td></tr>
+<tr><td><strong>Avg Gas Rate</strong></td><td>The average price paid per MMBTU of natural gas. The subtitle shows the forecasted rate for comparison.</td></tr>
+</table>
+
+<h3>Expanding a KPI Card</h3>
+
+<div class="step">
+<span class="step-num">Step 4:</span> Click on any KPI card to expand it. A small monthly breakdown table will slide open beneath the card.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A mini table appears inside the card showing 12 months of data plus a total row. Click the card again to collapse it. You can also hover over a card to see a tooltip description of what that number means.
+</div>
+
+<h3>The Charts</h3>
+
+<div class="step">
+<span class="step-num">Step 5:</span> Scroll down below the KPI cards to see four charts arranged in a 2x2 grid:
+</div>
+
+<table>
+<tr><th>Chart</th><th>What It Shows</th></tr>
+<tr><td><strong>Monthly Total Energy Cost</strong> (top left)</td><td>A bar chart with two bars per month: <strong>crimson bars = actual costs</strong>, <strong>light blue bars = forecasted costs</strong>. When a crimson bar is taller than the blue bar for the same month, actual spending was higher than forecast.</td></tr>
+<tr><td><strong>Cost Breakdown: Electric vs Gas</strong> (top right)</td><td>A stacked bar chart showing how much of each month's total cost is electricity vs. gas. Each month has two stacks side by side: actual and forecast.</td></tr>
+<tr><td><strong>Energy Use by Fuel Type (MMBTU)</strong> (bottom left)</td><td>A stacked bar chart showing physical energy consumption. Crimson = electric MMBTU, gold = gas MMBTU. This shows volume, not dollars.</td></tr>
+<tr><td><strong>FY2026 Cost Distribution</strong> (bottom right)</td><td>A doughnut (ring) chart showing the percentage split between electric, Kintec gas, and Avista gas costs for the year. Hover over a slice to see the dollar amount and percentage.</td></tr>
+</table>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Hover your mouse over any bar or data point in a chart to see the exact value in a tooltip. The charts are interactive &mdash; you can also click a label in the legend to show or hide that data series.
+</div>
+
+<!-- ============================================================ -->
+<h2>3. Monthly Detail Tab</h2>
+<!-- ============================================================ -->
+
+<div class="step">
+<span class="step-num">Step 1:</span> Click the <strong>Monthly Detail</strong> tab in the tab bar.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A single large table titled "FY2026 Actuals vs Forecasts" with a color legend showing bold text for actuals and blue italic text for forecasts.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Read the table. Each row is one month (July 2025 through June 2026). The columns are:
+</div>
+
+<table>
+<tr><th>Column</th><th>What It Means</th></tr>
+<tr><td><strong>Month</strong></td><td>The calendar month and year</td></tr>
+<tr><td><strong>Total Cost (Actual)</strong></td><td>What was actually paid in total for that month. For future months, this uses the forecast value.</td></tr>
+<tr><td><strong>Electric (Actual)</strong></td><td>The electricity portion of the actual cost</td></tr>
+<tr><td><strong>Gas (Actual)</strong></td><td>The natural gas portion of the actual cost</td></tr>
+<tr><td><strong>Total Cost (Forecast)</strong></td><td>What was originally projected for that month (shown in blue italic)</td></tr>
+<tr><td><strong>Electric (Forecast)</strong></td><td>The forecasted electricity cost</td></tr>
+<tr><td><strong>Gas (Forecast)</strong></td><td>The forecasted gas cost</td></tr>
+<tr><td><strong>Kintec Gas</strong></td><td>The commodity delivery charge from Kintec (the gas supplier)</td></tr>
+<tr><td><strong>Avista Gas</strong></td><td>The distribution charge from Avista (the gas utility)</td></tr>
+<tr><td><strong>Hedge %</strong></td><td>The price hedge/contingency percentage applied to forecasts</td></tr>
+</table>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Look at the row coloring. Rows with a light blue tint are <strong>forecast months</strong> (no actual data yet). Rows with a white background have <strong>actual data</strong>.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4:</span> Scroll to the bottom of the table to see the <strong>YTD TOTAL</strong> row, which sums all 12 months. This row has a bold font and a crimson top border.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> The total row shows year-to-date totals for every column. Compare the "Total Cost (Actual)" column to the "Total Cost (Forecast)" column to see whether the year as a whole is over or under forecast.
+</div>
+
+<!-- ============================================================ -->
+<h2>4. Gas Analysis Tab</h2>
+<!-- ============================================================ -->
+
+<p>Natural gas typically accounts for the largest share of WSU's energy costs, which is why it gets its own dedicated analysis tab.</p>
+
+<h3>Why Gas Has Its Own Tab</h3>
+<p>Gas costs are more complex than electric costs because they come from <strong>two separate charges</strong>:</p>
+<ul>
+<li><strong>Kintec</strong> is the commodity supplier. They deliver the physical natural gas. Their charge is based on <strong>Dekatherms</strong> (a unit of gas energy, where 1 Dekatherm = 1 MMBTU). Kintec invoices come monthly.</li>
+<li><strong>Avista</strong> is the local utility. Even though Kintec supplies the gas, Avista owns the pipes that deliver it to campus. Avista charges a <strong>distribution fee</strong> for using their infrastructure.</li>
+</ul>
+<p>So the total gas bill = Kintec commodity + Avista distribution.</p>
+
+<div class="step">
+<span class="step-num">Step 1:</span> Click the <strong>Gas Analysis</strong> tab.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A chart at the top showing FY2025 (the prior fiscal year) gas costs as gold bars with a crimson line overlaid for MMBTU consumption. Below that is a detail table, and below that a Kintec delivery chart.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Read the <strong>FY2025 Gas MMBTU / Cost</strong> chart. The gold bars (left axis, in dollars) show what was spent each month. The crimson line (right axis, in MMBTU) shows how much gas was consumed. This helps you see if cost tracks with usage.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Read the table below the chart. The columns are:
+</div>
+
+<table>
+<tr><th>Column</th><th>What It Means</th></tr>
+<tr><td><strong>Month</strong></td><td>The calendar month (prior fiscal year)</td></tr>
+<tr><td><strong>Gas Cost (Actual)</strong></td><td>Total gas dollars that month</td></tr>
+<tr><td><strong>Gas MMBTU</strong></td><td>Volume of gas consumed in MMBTU</td></tr>
+<tr><td><strong>Gas $/MMBTU</strong></td><td>Unit price: how much was paid per MMBTU of gas</td></tr>
+<tr><td><strong>Kintec $</strong></td><td>The commodity charge from Kintec</td></tr>
+<tr><td><strong>Avista $</strong></td><td>The distribution charge from Avista</td></tr>
+</table>
+
+<div class="step">
+<span class="step-num">Step 4:</span> Scroll down to the <strong>Kintec Gas Delivery (All Months)</strong> chart. This shows the full history of Kintec deliveries with gold bars for Dekatherms and a crimson cost line. This chart covers more months than just one fiscal year to show longer-term trends.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Gas usage peaks in winter months (November through February) and drops in summer. If the cost line rises faster than the bars, it means the unit price of gas is increasing.
+</div>
+
+<!-- ============================================================ -->
+<h2>5. Energy Use Tab</h2>
+<!-- ============================================================ -->
+
+<p>This tab focuses on <strong>consumption</strong> rather than cost. The difference is important: cost tells you how much money was spent, but consumption tells you how much energy was actually used. Costs can change because of price increases even if usage stays the same.</p>
+
+<div class="step">
+<span class="step-num">Step 1:</span> Click the <strong>Energy Use</strong> tab.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A chart titled "FY2026 Energy Use: Actual vs Forecast" showing stacked bars for electric and gas MMBTU, with a dashed blue line for the forecast. Below it is a detail table.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Read the chart. The stacked bars show actual consumption split by fuel type. The dashed blue line shows what consumption was forecasted to be. If the bars are above the line, more energy was used than expected.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Read the table columns:
+</div>
+
+<table>
+<tr><th>Column</th><th>What It Means</th></tr>
+<tr><td><strong>Total MMBTU (Actual)</strong></td><td>Total energy consumed that month, combining electric and gas, measured in MMBTU</td></tr>
+<tr><td><strong>Elec MMBTU (Actual)</strong></td><td>Electricity consumption converted to MMBTU so it can be compared to gas on the same scale</td></tr>
+<tr><td><strong>Gas MMBTU (Actual)</strong></td><td>Natural gas consumption in MMBTU</td></tr>
+<tr><td><strong>Total MMBTU (Forecast)</strong></td><td>What total consumption was projected to be (blue italic)</td></tr>
+<tr><td><strong>Total kWh</strong></td><td>Electricity consumption in its native unit: kilowatt-hours (kWh). This is what appears on the electric bill.</td></tr>
+<tr><td><strong>kWh $/Unit</strong></td><td>The average price per kWh for that month. This is useful for tracking whether electric rates are going up or down.</td></tr>
+</table>
+
+<h3>Understanding Units</h3>
+<p>Electricity is normally measured in <strong>kWh (kilowatt-hours)</strong> and gas is normally measured in <strong>MMBTU (Million British Thermal Units)</strong>. To compare them side by side, the dashboard converts electricity into MMBTU so both fuels use the same unit. One kWh equals approximately 0.003412 MMBTU.</p>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> In the table, the "Total kWh" column shows electricity in its raw unit while the "Elec MMBTU" column shows the same electricity converted to MMBTU for comparison with gas.
+</div>
+
+<!-- ============================================================ -->
+<h2>6. Year-over-Year Tab</h2>
+<!-- ============================================================ -->
+
+<p>This tab compares FY2025 (last fiscal year) with FY2026 (current fiscal year) so you can see whether energy use is trending up or down.</p>
+
+<div class="step">
+<span class="step-num">Step 1:</span> Click the <strong>Year-over-Year</strong> tab.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A line chart comparing the two fiscal years, with a blue line for FY2025 and a crimson line for FY2026. Below the chart is a comparison table and a notes section.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Read the chart. Each line plots total MMBTU consumption by month. Where the FY2026 crimson line is above the FY2025 blue line, the campus used more energy this year than last year for that month.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Read the table. It shows side-by-side MMBTU values for both years, broken out by Total, Electric, and Gas.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4:</span> Read the <strong>Year-over-Year Change</strong> note at the bottom. It states the percentage change for total energy, electricity, and gas. For example, "+3.5% total" means the campus used 3.5% more energy this year than last year.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> The notes section shows a summary like "FY26 vs FY25: +2.1% total, +1.5% electric, +3.2% gas." This tells you at a glance whether usage is growing or shrinking compared to the prior year.
+</div>
+
+<h3>What to Look For</h3>
+<ul>
+<li>If both electric and gas went up, campus-wide energy use is growing.</li>
+<li>If gas went up but electric stayed flat, the increase is likely weather-driven (colder winter = more heating).</li>
+<li>If both went down, conservation efforts or milder weather may be helping.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>7. Cumulative Summary Tab</h2>
+<!-- ============================================================ -->
+
+<p><strong>Cumulative</strong> means "running total." Instead of showing each month by itself, this tab adds up all the months so far. Think of it like a bank balance that grows each month as more costs come in.</p>
+
+<div class="step">
+<span class="step-num">Step 1:</span> Click the <strong>Cumulative Summary</strong> tab.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A line chart with two lines &mdash; a solid crimson line for cumulative actual costs and a dashed blue line for cumulative forecasted costs. Both lines slope upward from left to right. Below the chart is a detail table.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Read the chart. If the crimson "Actual" line stays below the dashed blue "Forecast" line, spending is under forecast (good). If it crosses above, spending has exceeded the forecast (needs attention).
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Read the table columns:
+</div>
+
+<table>
+<tr><th>Column</th><th>What It Means</th></tr>
+<tr><td><strong>Cumul. Actual ($)</strong></td><td>Running total of actual costs from July through that month</td></tr>
+<tr><td><strong>Cumul. Forecast ($)</strong></td><td>Running total of forecasted costs through that month</td></tr>
+<tr><td><strong>Delta ($)</strong></td><td>The difference: Forecast minus Actual. Positive means under budget.</td></tr>
+<tr><td><strong>Delta %</strong></td><td>The delta as a percentage of the forecast</td></tr>
+<tr><td><strong>Cumul. MMBTU (Actual)</strong></td><td>Running total of actual energy consumption</td></tr>
+<tr><td><strong>Cumul. MMBTU (Fcast)</strong></td><td>Running total of forecasted consumption</td></tr>
+<tr><td><strong>MMBTU Delta</strong></td><td>Difference in energy consumption</td></tr>
+<tr><td><strong>MMBTU Delta %</strong></td><td>Consumption difference as a percentage</td></tr>
+</table>
+
+<div class="step">
+<span class="step-num">Step 4:</span> Look at the <strong>Delta ($)</strong> column. Green values mean under budget for that month's running total. Red values mean over budget.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> The final row (FY TOTAL) shows the projected year-end delta. This is the same number shown on the "Forecast vs Actual" KPI card on the Dashboard tab.
+</div>
+
+<!-- ============================================================ -->
+<h2>8. Price vs Volume Tab</h2>
+<!-- ============================================================ -->
+
+<p>This tab answers a critical question: <strong>"Did costs go up because we used more energy, or because the price of energy went up?"</strong> These are two very different problems with very different solutions.</p>
+
+<ul>
+<li>If <strong>volume</strong> drove the increase, the answer is conservation: use less energy.</li>
+<li>If <strong>price</strong> drove the increase, the answer is procurement: negotiate better rates or lock in hedges.</li>
+</ul>
+
+<div class="step">
+<span class="step-num">Step 1:</span> Click the <strong>Price vs Volume</strong> tab.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Two charts side by side at the top (FY25 vs FY26 cost comparison, and FY25 vs FY26 MMBTU comparison). Below them is a variance analysis table.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Read the <strong>Cost Comparison</strong> chart (left). Light blue bars = FY2025 costs, crimson bars = FY2026 costs. This shows the dollar change month by month.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Read the <strong>MMBTU Comparison</strong> chart (right). This shows volume (how much energy was used) for both years, with a dashed gray line for the 30-year normal HDD (Heating Degree Days) for weather context.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4:</span> Read the variance table. The key columns are:
+</div>
+
+<table>
+<tr><th>Column</th><th>What It Means</th></tr>
+<tr><td><strong>FY25 Cost / FY26 Cost</strong></td><td>Total energy cost for each month, both years</td></tr>
+<tr><td><strong>$ Variance</strong></td><td>The dollar difference (FY26 minus FY25). Red means FY26 cost more.</td></tr>
+<tr><td><strong>FY25 MMBTU / FY26 MMBTU</strong></td><td>Energy consumption for each month, both years</td></tr>
+<tr><td><strong>MMBTU Var. / MMBTU %</strong></td><td>The volume difference and its percentage change</td></tr>
+<tr><td><strong>FY25 HDD / FY26 HDD</strong></td><td>Heating Degree Days for each month (weather severity)</td></tr>
+<tr><td><strong>HDD %</strong></td><td>Percentage change in HDD between years</td></tr>
+<tr><td><strong>30-Yr Normal</strong></td><td>The historical average HDD for that month</td></tr>
+</table>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> If the MMBTU variance is small but the cost variance is large, prices went up. If MMBTU increased significantly and the HDD column also increased, colder weather likely drove the higher usage.
+</div>
+
+<!-- ============================================================ -->
+<h2>9. HDD / Weather Tab</h2>
+<!-- ============================================================ -->
+
+<p><strong>HDD</strong> stands for <strong>Heating Degree Days</strong>. This is a standard weather measurement used across the energy industry. Here is how it works:</p>
+
+<ul>
+<li>HDD is based on 65 degrees Fahrenheit (the temperature below which buildings typically need heating).</li>
+<li>If the average temperature on a day is 35 degrees F, that day has 30 HDD (65 minus 35 = 30).</li>
+<li>Monthly HDD is the sum of daily HDD values for all days in that month.</li>
+<li><strong>Higher HDD = colder weather = more heating energy needed.</strong></li>
+</ul>
+
+<div class="step">
+<span class="step-num">Step 1:</span> Click the <strong>HDD / Weather</strong> tab.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A bar chart comparing HDD for FY2025 (light blue), FY2026 (crimson), and the 30-year normal (dashed gray line). Below is a data table and explanatory notes.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Read the chart. Winter months (Nov, Dec, Jan, Feb) will have the tallest bars. Summer months (Jun, Jul, Aug) will be very short. Compare the crimson bars (this year) to the light blue bars (last year): if this year's bars are taller, it was a colder year.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Read the table showing HDD values for FY2025, FY2026, and the 30-year normal. The total row at the bottom sums the entire fiscal year.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4:</span> Read the notes at the bottom of the table:
+</div>
+
+<ul>
+<li><strong>Source:</strong> Data comes from the NWS Spokane climate reports for the Pullman-Moscow Airport weather station (KPUW) via the NOAA ACIS API.</li>
+<li><strong>Forecast months</strong> use the 30-year normal (1991&ndash;2020 average) until the actual HDD data is published by NOAA.</li>
+</ul>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A summary line at the bottom of the notes like "FY2025 Total: 5,432 HDD | FY2026 Total: 5,678 HDD | 30-Yr Normal: 5,550 HDD." This lets you quickly compare whether this year was warmer or colder than average.
+</div>
+
+<h3>Why Weather Matters</h3>
+<p>If FY2026 HDD is significantly higher than FY2025, you would expect gas consumption (and costs) to be higher, and that is not a sign of waste &mdash; it is simply colder weather. Conversely, if HDD is lower but costs went up, something else is driving the increase (possibly price changes or operational issues).</p>
+
+<!-- ============================================================ -->
+<h2>10. Data Sources Tab</h2>
+<!-- ============================================================ -->
+
+<div class="step">
+<span class="step-num">Step 1:</span> Click the <strong>Data Sources</strong> tab.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Two cards. The first lists all the utility accounts. The second explains the methodology behind the forecasts.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Review the <strong>Avista Utilities</strong> account list. This shows all WSU Facilities Services accounts with Avista, including the account number (partially masked) and whether it covers gas, electric, or both.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Note the <strong>Inland Power</strong> section. Inland Power provides electric service to outlying WSU facilities that are not served by Avista.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4:</span> Note the <strong>Kintec (Gas Supplier)</strong> section. This is the commodity gas delivery provider, billed in Dekatherms.
+</div>
+
+<div class="step">
+<span class="step-num">Step 5:</span> Read the <strong>Methodology Notes</strong> card. Key points:
+</div>
+
+<ul>
+<li>Actuals are shown in bold black text; forecasts are shown in blue italic text.</li>
+<li>Forecasts are calculated using CY2024&ndash;CY2025 growth trends applied to same-month values, with a price hedge adjustment.</li>
+<li>Data is sourced from the "Executive Summary (Print)" sheet in the master Excel workbook, cross-checked against the Consolidated Data sheet.</li>
+<li>FY2026 = July 2025 through June 2026.</li>
+</ul>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> If you see a green "Verified vs Consolidated Data" badge in the main header, it means the exported data passed the cross-check (no discrepancies greater than 5% between the summary sheet and the consolidated data).
+</div>
+
+<!-- ============================================================ -->
+<h2>11. Using Dark Mode</h2>
+<!-- ============================================================ -->
+
+<div class="step">
+<span class="step-num">Step 1:</span> Look at the top-right corner of the crimson header bar. You will see the text "Dark Mode" next to a small toggle switch.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> Click the toggle switch. The entire dashboard will change to a dark background with light text.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> The background changes from light gray to dark navy. Text changes from dark gray to light gray. Charts and tables automatically adjust their colors for readability on the dark background. The toggle switch dot slides to the right and turns gold.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Click the toggle again to return to light mode. Your preference is saved automatically and will persist the next time you open the dashboard.
+</div>
+
+<!-- ============================================================ -->
+<h2>12. Printing for Meetings</h2>
+<!-- ============================================================ -->
+
+<p>The dashboard includes a built-in print layout that creates a clean, one-page summary designed specifically for printing or saving as a PDF.</p>
+
+<div class="step">
+<span class="step-num">Step 1:</span> Click the <strong>Print Report</strong> button in the top-right area of the crimson header bar (next to the Dark Mode toggle). It has a small printer icon.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Your browser's print dialog opens. The preview shows a one-page summary with: the WSU header, a budget status banner, 8 KPI summary boxes, and a monthly cost table. All the interactive elements (tabs, charts, login screen) are hidden.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2:</span> To save as PDF, select <strong>"Save as PDF"</strong> or <strong>"Microsoft Print to PDF"</strong> as the printer instead of a physical printer.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3:</span> Verify the settings:
+</div>
+
+<ul>
+<li><strong>Layout:</strong> Portrait (the print CSS is designed for 8.5 x 11 inch paper)</li>
+<li><strong>Margins:</strong> Default or 0.75 inch (the CSS sets 0.75 inch margins)</li>
+<li><strong>Background graphics:</strong> Make sure this option is <strong>checked</strong> so the colored KPI borders, budget banner, and table shading print correctly.</li>
+</ul>
+
+<div class="step">
+<span class="step-num">Step 4:</span> Click <strong>Print</strong> or <strong>Save</strong>.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A one-page PDF or printout with the WSU crimson header, all 8 KPI cards in a 4x2 grid, and a month-by-month summary table. Forecast rows appear in blue italic. The footer reads "WSU Facilities Services - Energy Cost Projection FY2026 - Confidential."
+</div>
+
+<div class="warning">
+<strong>Note:</strong> If the printed page looks wrong (missing colors, two pages, or no data), make sure "Background graphics" is enabled in your print settings. Also, if you are in Dark Mode, the print layout will automatically revert to light colors for printing &mdash; you do not need to switch to light mode first.
+</div>
+
+<!-- ============================================================ -->
+<h2>Glossary of Terms</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>Term</th><th>Full Name</th><th>Definition</th></tr>
+<tr><td><strong>FY</strong></td><td>Fiscal Year</td><td>WSU's budget year running July 1 through June 30. FY2026 means July 2025 through June 2026.</td></tr>
+<tr><td><strong>YTD</strong></td><td>Year-to-Date</td><td>The running total from the start of the fiscal year (July) through the most recent month with actual data.</td></tr>
+<tr><td><strong>MMBTU</strong></td><td>Million British Thermal Units</td><td>A standard unit of energy. Used to measure both electricity and gas on a common scale. One MMBTU is approximately the energy in 293 kWh of electricity or 1 Dekatherm of natural gas.</td></tr>
+<tr><td><strong>kWh</strong></td><td>Kilowatt-hour</td><td>The standard billing unit for electricity. One kWh is the energy used by a 1,000-watt appliance running for one hour. This is what appears on the electric bill.</td></tr>
+<tr><td><strong>Dekatherm</strong></td><td>Dekatherm (Dth)</td><td>A unit of gas energy equal to 1 MMBTU or 1,000,000 BTU. Used by Kintec for gas commodity billing.</td></tr>
+<tr><td><strong>HDD</strong></td><td>Heating Degree Days</td><td>A weather measurement. For any day, HDD = max(0, 65&deg;F - average temperature). Monthly HDD is the sum of all daily values. Higher HDD means colder weather and more heating needed.</td></tr>
+<tr><td><strong>KPI</strong></td><td>Key Performance Indicator</td><td>A high-level metric summarizing an important aspect of performance. The summary cards at the top of the dashboard are KPIs.</td></tr>
+<tr><td><strong>Forecast</strong></td><td>Forecast / Projection</td><td>A predicted future cost based on historical trends and a price hedge adjustment. Forecast values appear in blue italic text on the dashboard.</td></tr>
+<tr><td><strong>Actual</strong></td><td>Actual Cost</td><td>The real amount paid, based on utility bills received. Actual values appear in bold black text.</td></tr>
+<tr><td><strong>Hedge</strong></td><td>Price Hedge / Contingency</td><td>A percentage added to forecast values to account for potential price increases. This provides a buffer so the forecast is not too optimistic.</td></tr>
+<tr><td><strong>Delta</strong></td><td>Delta (Difference)</td><td>The difference between two values, typically Forecast minus Actual. A positive delta means under budget; negative means over budget.</td></tr>
+<tr><td><strong>Cumulative</strong></td><td>Cumulative / Running Total</td><td>The sum of all values from the beginning of the fiscal year through a given month. Each month adds to the previous running total.</td></tr>
+<tr><td><strong>Avista</strong></td><td>Avista Utilities</td><td>The local utility company that provides electricity and natural gas distribution service to WSU's Pullman campus.</td></tr>
+<tr><td><strong>Kintec</strong></td><td>Kintec Energy</td><td>The commodity gas supplier that delivers natural gas to WSU. Their charge covers the gas itself; Avista's charge covers delivery through the pipes.</td></tr>
+<tr><td><strong>Inland Power</strong></td><td>Inland Power &amp; Light</td><td>A rural electric cooperative that provides electricity to some outlying WSU facilities not served by Avista.</td></tr>
+<tr><td><strong>KPUW</strong></td><td>Pullman-Moscow Regional Airport</td><td>The weather station identifier used for HDD data. Located near campus, it provides the most representative local weather data.</td></tr>
+<tr><td><strong>NWS</strong></td><td>National Weather Service</td><td>The federal agency that publishes official weather data, including HDD values used in this dashboard.</td></tr>
+<tr><td><strong>NOAA</strong></td><td>National Oceanic and Atmospheric Administration</td><td>The parent agency of NWS. The dashboard sources HDD data from the NOAA ACIS (Applied Climate Information System) API.</td></tr>
+<tr><td><strong>30-Yr Normal</strong></td><td>30-Year Climate Normal</td><td>The average HDD value for each month based on 30 years of historical data (1991&ndash;2020). Used as a baseline for "typical" weather.</td></tr>
+<tr><td><strong>CY</strong></td><td>Calendar Year</td><td>January through December (as opposed to Fiscal Year, which runs July through June). Used in some methodology references.</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>Quick Reference Card</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>I want to...</th><th>Go to this tab</th></tr>
+<tr><td>Get a quick overview of budget status</td><td>Dashboard</td></tr>
+<tr><td>See the exact dollar amount for a specific month</td><td>Monthly Detail</td></tr>
+<tr><td>Understand why the gas bill was high</td><td>Gas Analysis</td></tr>
+<tr><td>See how much energy was consumed (not cost)</td><td>Energy Use</td></tr>
+<tr><td>Compare this year to last year</td><td>Year-over-Year</td></tr>
+<tr><td>See how spending is tracking over the full year</td><td>Cumulative Summary</td></tr>
+<tr><td>Determine if cost changes are from price or usage</td><td>Price vs Volume</td></tr>
+<tr><td>Check if weather explains a cost change</td><td>HDD / Weather</td></tr>
+<tr><td>Find account numbers or methodology info</td><td>Data Sources</td></tr>
+<tr><td>Print a one-page summary for a meeting</td><td>Print Report button (header bar)</td></tr>
+</table>
+
+<div class="footer">
+WSU Facilities Services | Energy Services | Last updated March 2026
+</div>
+
+</body>
+</html>

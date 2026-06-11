@@ -1,0 +1,173 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+</style></head><body>
+
+<h1>How to Update Dashboard Data &mdash; Quick Reference Card</h1>
+
+<p>A concise reference for updating all four WSU Facilities Services dashboards. For detailed walkthroughs, see the individual guides listed at the end of this document.</p>
+
+<!-- ============================================================ -->
+<h2>1. Dashboard Overview</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>Dashboard</th><th>URL</th><th>Data Source</th><th>Update Frequency</th></tr>
+<tr>
+  <td>Energy Cost Projection</td>
+  <td>jswsu.github.io/wsu-energy-dashboard/</td>
+  <td>Excel VBA macro &rarr; data.json</td>
+  <td>Monthly (after Kintec/Avista bills)</td>
+</tr>
+<tr>
+  <td>Campus Metering</td>
+  <td>jswsu.github.io/wsu-energy-dashboard/metering.html</td>
+  <td>SkySpark &rarr; 7 JSON files</td>
+  <td>Monthly</td>
+</tr>
+<tr>
+  <td>Water Conservation</td>
+  <td>jswsu.github.io/wsu-energy-dashboard/water-conservation.html</td>
+  <td>Same as Metering (shared data files)</td>
+  <td>Monthly (before meeting)</td>
+</tr>
+<tr>
+  <td>Steam Plant Operations</td>
+  <td>jswsu.github.io/wsu-energy-dashboard/steam-plant.html</td>
+  <td>Excel import via dashboard</td>
+  <td>Monthly (after Energy Report)</td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>2. All Dashboards</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>Item</th><th>Details</th></tr>
+<tr><td>Password</td><td><b>Energy@WSU</b> &mdash; same for all four dashboards</td></tr>
+<tr><td>Dark mode</td><td>Toggle in the header bar; preference saved in browser</td></tr>
+<tr><td>Deployment</td><td>GitHub Pages auto-deploys within 1&ndash;2 minutes of any push to the <code>main</code> branch</td></tr>
+<tr><td>Browser refresh</td><td>After pushing new data, hard refresh with <b>Ctrl+Shift+R</b> to bypass cache</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>3. Energy Cost Projection Update</h2>
+<!-- ============================================================ -->
+
+<div class="step"><span class="step-num">Step 1.</span> Open the Energy Report Excel workbook on the shared drive (R:\ENERGY GROUP\...Energy Report\).</div>
+<div class="step"><span class="step-num">Step 2.</span> Enter the latest monthly data, then run the <b>Export to JSON</b> VBA macro. Review the verification message for any warnings.</div>
+<div class="step"><span class="step-num">Step 3.</span> Copy the exported <code>data.json</code> file to the root of the Git repo.</div>
+<div class="step"><span class="step-num">Step 4.</span> Commit and push to GitHub (or upload <code>data.json</code> directly via the GitHub web interface).</div>
+
+<div class="tip"><span class="tip-label">Tip:</span> The VBA macro cross-checks exported values against the consolidated data sheet and flags discrepancies greater than 5%.</div>
+
+<!-- ============================================================ -->
+<h2>4. Campus Metering / Water Conservation Update</h2>
+<!-- ============================================================ -->
+
+<div class="step"><span class="step-num">Step 1.</span> In SkySpark Shell, run: <code>task_exportToIO(2025-01-01..2026-03-31)</code> &mdash; adjust the end date to the current month.</div>
+<div class="step"><span class="step-num">Step 2.</span> Open the SkySpark <b>Files</b> app &rarr; <code>io/</code> folder. Download all 7 JSON files to your local machine.</div>
+<div class="step"><span class="step-num">Step 3.</span> Run <code>push-data.sh</code> from Git Bash, or manually upload the files to the <code>data/</code> folder on GitHub.</div>
+<div class="step"><span class="step-num">Step 4.</span> Hard refresh the dashboard (<b>Ctrl+Shift+R</b>) to verify the new data appears.</div>
+
+<div class="tip"><span class="tip-label">Tip:</span> Both the Metering and Water Conservation dashboards share <code>domestic_water.json</code> and <code>irrigation.json</code>, so one update covers both.</div>
+
+<table>
+<tr><th>Export File</th><th>Used By</th></tr>
+<tr><td>electric.json</td><td>Metering</td></tr>
+<tr><td>condensate.json</td><td>Metering</td></tr>
+<tr><td>chw.json</td><td>Metering</td></tr>
+<tr><td>domestic_water.json</td><td>Metering + Water Conservation</td></tr>
+<tr><td>irrigation.json</td><td>Metering + Water Conservation</td></tr>
+<tr><td>sites.json</td><td>Metering</td></tr>
+<tr><td>connectors.json</td><td>Metering</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>5. Steam Plant Operations Update</h2>
+<!-- ============================================================ -->
+
+<div class="step"><span class="step-num">Step 1.</span> Open the Steam Plant Operations dashboard &rarr; navigate to the <b>Data Management</b> tab.</div>
+<div class="step"><span class="step-num">Step 2.</span> Drag and drop the monthly Energy Report Excel file onto the upload area.</div>
+<div class="step"><span class="step-num">Step 3.</span> Review the parsed data preview, then click <b>Merge Into Dataset</b>.</div>
+<div class="step"><span class="step-num">Step 4.</span> Click <b>Download JSON</b> to save the updated dataset, then upload it to the <code>data/</code> folder on GitHub.</div>
+
+<div class="tip"><span class="tip-label">Tip:</span> The dashboard validates and previews data before merging, so you can catch errors before committing.</div>
+
+<!-- ============================================================ -->
+<h2>6. UP Report Generation</h2>
+<!-- ============================================================ -->
+
+<div class="step"><span class="step-num">Step 1.</span> Open the Steam Plant Operations dashboard &rarr; navigate to the <b>UP Report</b> tab.</div>
+<div class="step"><span class="step-num">Step 2.</span> Select the target month from the dropdown and click <b>Load Data</b>.</div>
+<div class="step"><span class="step-num">Step 3.</span> Enter the manual fields from Kintec/Avista invoices (costs, delivery charges, etc.).</div>
+<div class="step"><span class="step-num">Step 4.</span> Click <b>Generate UP Report Excel</b> to produce the formatted spreadsheet.</div>
+<div class="step"><span class="step-num">Step 5.</span> Save the generated file to the shared drive: <code>R:\ENERGY GROUP\...\UP\UP2026\</code></div>
+
+<div class="warning"><b>Important:</b> Double-check all manually entered invoice values before generating. The report is used for official university utility billing.</div>
+
+<!-- ============================================================ -->
+<h2>7. File Locations</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>Item</th><th>Location</th></tr>
+<tr><td>Git repository</td><td>github.com/JSWSU/wsu-energy-dashboard</td></tr>
+<tr><td>Live dashboards</td><td>jswsu.github.io/wsu-energy-dashboard/</td></tr>
+<tr><td>Energy Report workbook</td><td>R:\ENERGY GROUP\Energy Services Admin\Energy Files\Utility\Energy Report\</td></tr>
+<tr><td>UP reports</td><td>R:\ENERGY GROUP\Energy Services Admin\Energy Files\Utility\UP\UP2026\</td></tr>
+<tr><td>SkySpark</td><td>https://skyspark.fais.wsu.edu/</td></tr>
+<tr><td>BTU monthly reports</td><td>R:\ENERGY GROUP\Energy Services Admin\Energy Files\Utility\BTU Monthly Reports\</td></tr>
+<tr><td>push-data.sh script</td><td>C:\Users\john.slagboom\Desktop\Git\push-data.sh</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>8. Who to Contact</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>Issue</th><th>Contact</th></tr>
+<tr><td>Dashboard bugs or feature requests</td><td>John Slagboom</td></tr>
+<tr><td>SkySpark access or issues</td><td>John Slagboom</td></tr>
+<tr><td>GitHub repo access</td><td>John Slagboom</td></tr>
+<tr><td>Energy Report Excel questions</td><td>[Supervisor]</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>9. Detailed Guides</h2>
+<!-- ============================================================ -->
+
+<p>For step-by-step instructions, see the individual guides in the <code>docs/guides/</code> folder:</p>
+
+<table>
+<tr><th>#</th><th>Guide</th><th>Filename</th></tr>
+<tr><td>1</td><td>Energy Cost Projection Dashboard</td><td>01-Energy-Cost-Projection-Dashboard.doc</td></tr>
+<tr><td>2</td><td>Campus Metering Dashboard</td><td>02-Campus-Metering-Dashboard.doc</td></tr>
+<tr><td>3</td><td>Updating Metering Data from SkySpark</td><td>03-Updating-Metering-Data-From-SkySpark.doc</td></tr>
+<tr><td>4</td><td>Water Conservation Meeting Guide</td><td>04-Water-Conservation-Meeting-Guide.doc</td></tr>
+<tr><td>5</td><td>Water Conservation Task Management</td><td>05-Water-Conservation-Task-Management.doc</td></tr>
+<tr><td>6</td><td>Steam Plant Operations Dashboard</td><td>06-Steam-Plant-Operations-Dashboard.doc</td></tr>
+<tr><td>7</td><td>Importing Steam Plant Data</td><td>07-Importing-Steam-Plant-Data.doc</td></tr>
+<tr><td>8</td><td>Generating Monthly UP Report</td><td>08-Generating-Monthly-UP-Report.doc</td></tr>
+<tr><td>9</td><td>Data Update Quick Reference (this document)</td><td>09-Data-Update-Quick-Reference.doc</td></tr>
+<tr><td>10</td><td>Sensus AMR Meter Reading Workflow</td><td>10-Sensus-AMR-Meter-Reading-Workflow.doc</td></tr>
+</table>
+
+<div class="footer">WSU Facilities Services | Energy Services | Last updated March 2026</div>
+
+</body></html>

@@ -1,0 +1,369 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+code { background: #f5f5f5; padding: 1px 4px; border: 1px solid #e5e7eb; border-radius: 3px; font-size: 10pt; }
+</style></head><body>
+
+<h1>Guide 10: Sensus AMR Meter Reading Workflow</h1>
+
+<!-- ================================================================ -->
+<!--  SECTION 1: WHAT IS THE SENSUS AMR SYSTEM?                       -->
+<!-- ================================================================ -->
+
+<h2>1. What Is the Sensus AMR System?</h2>
+
+<p>The <strong>Sensus AMR</strong> (Advanced Meter Reading) system is how WSU reads domestic water and irrigation meters that are not connected to SkySpark. A Sensus handheld tablet is walked past each meter on a pre loaded route; the tablet picks up a radio signal from the MXU attached to each meter and records the current register value. At the end of the walk, the readings are pulled off the tablet as a binary <code>.DAT</code> file, converted to <code>.CSV</code>, reviewed for anomalies, and pushed into SkySpark for usage calculation and dashboard display.</p>
+
+<p>The output file is an <strong>AMR CSV</strong> (filename format <code>AMRoutputYYYYMMDD.csv</code>), where the date is the day the file was exported from the tablet, not the day the reads were taken. Each row in the file is one meter read.</p>
+
+<table>
+<tr><th>Meter type</th><th>Flag in CSV</th><th>Notes</th></tr>
+<tr><td>SmartPoint (radio)</td><td>Meter Type = B</td><td>Reads automatically as the tablet passes within range</td></tr>
+<tr><td>Pit meter</td><td>Meter Type = P</td><td>Same tablet read process; meter sits in a ground pit</td></tr>
+<tr><td>Manual</td><td>Meter Type = M</td><td>Operator reads the dial by hand and types the value into the tablet</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<!--  SECTION 2: WHAT YOU NEED BEFORE YOU START                       -->
+<!-- ================================================================ -->
+
+<h2>2. What You Need Before You Start</h2>
+
+<table>
+<tr><th style="width:25%;">Item</th><th style="width:30%;">What You Need From It</th><th style="width:45%;">Where to Find It</th></tr>
+<tr>
+  <td><strong>Sensus handheld tablet</strong></td>
+  <td>The device that picks up MXU reads on the walk.</td>
+  <td>Kept in the Energy Services office. Confirm battery is charged and the current route is loaded before heading out.</td>
+</tr>
+<tr>
+  <td><strong>AutoRead for Windows</strong></td>
+  <td>Desktop application used to load routes onto the tablet and pull reads back.</td>
+  <td>Installed on the workstation that syncs with the tablet.</td>
+</tr>
+<tr>
+  <td><strong>Route definition</strong></td>
+  <td>The list of meters to be read for this cycle. Same route every month unless meters are added, retired, or re sequenced.</td>
+  <td>Managed inside AutoRead.</td>
+</tr>
+<tr>
+  <td><strong>Prior AMR CSV</strong></td>
+  <td>The previous month's <code>AMRoutputYYYYMMDD.csv</code>. Used as the prior read for the usage calculation and for comparing against this month's register values.</td>
+  <td>Shared drive: <code>R:\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Output\</code></td>
+</tr>
+<tr>
+  <td><strong>MRR column reference</strong></td>
+  <td>The 27 column header map used to interpret the raw CSV. Without this you cannot tell which column is the register value, which is the multiplier, which is the read date, etc.</td>
+  <td>Outlook message: <code>Sensus data title from MRR.msg</code>, filed alongside the CSVs.</td>
+</tr>
+</table>
+
+<!-- ================================================================ -->
+<!--  SECTION 3: WALKING THE ROUTE                                    -->
+<!-- ================================================================ -->
+
+<h2>3. Step-by-Step: Walking the Route</h2>
+
+<div class="step"><span class="step-num">Step 1.</span> Pick up the Sensus tablet from the Energy Services office. Confirm the route for the current cycle is loaded (tap the route name on the tablet home screen).</div>
+
+<div class="step"><span class="step-num">Step 2.</span> Drive or walk the route. For each SmartPoint and Pit meter, the tablet reads the MXU automatically as you pass within radio range. A row on the tablet screen turns green when the read is captured.</div>
+
+<div class="step"><span class="step-num">Step 3.</span> For each Manual meter (Meter Type = M), open the meter box or vault, read the dial, and type the register value into the tablet prompt. Double check the value before saving; manual reads cannot be re verified by the radio.</div>
+
+<div class="step"><span class="step-num">Step 4.</span> When every meter on the route has been captured, return to the office.</div>
+
+<div class="tip"><span class="tip-label">Tip:</span> The tablet stamps each read with the actual date and time you passed the meter. These Read Dates become the dynamic "Last Month" and "Current" columns in the exported CSV. The filename date (the day you export the file) is usually several days later than the read walk itself.</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 4: PULLING DATA FROM TABLET TO COMPUTER                 -->
+<!-- ================================================================ -->
+
+<h2>4. Step-by-Step: Pulling Data From Tablet to Computer</h2>
+
+<div class="step"><span class="step-num">Step 1.</span> Connect the tablet to the workstation over USB.</div>
+
+<div class="step"><span class="step-num">Step 2.</span> Open <strong>AutoRead for Windows</strong>.</div>
+
+<div class="step"><span class="step-num">Step 3.</span> Right click in the AutoRead window and select <strong>Clear</strong> to wipe any prior session state.</div>
+
+<div class="step"><span class="step-num">Step 4.</span> Right click and select <strong>Import</strong> to pull the current reads from the tablet.</div>
+
+<div class="step"><span class="step-num">Step 5.</span> Right click and select <strong>Load</strong> to write the imported reads into AutoRead's working file, which is exported as <code>latestread_amr.DAT</code>.</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 5: CONVERTING DAT TO CSV                                -->
+<!-- ================================================================ -->
+
+<h2>5. Step-by-Step: Converting .DAT to .CSV</h2>
+
+<div class="step"><span class="step-num">Step 1.</span> In File Explorer, locate the <code>.DAT</code> file that was just exported (typically <code>latestread_amr.DAT</code>).</div>
+
+<div class="step"><span class="step-num">Step 2.</span> Right click the file, choose <strong>Open with</strong>, and open it with <strong>Notepad</strong>.</div>
+
+<div class="step"><span class="step-num">Step 3.</span> With the file open, choose <strong>File &rarr; Save As...</strong></div>
+
+<div class="step"><span class="step-num">Step 4.</span> In the Save As dialog, change <strong>Save as type</strong> to <strong>All files</strong>.</div>
+
+<div class="step"><span class="step-num">Step 5.</span> Change the filename extension from <code>.DAT</code> to <code>.csv</code>, using the format <code>AMRoutputYYYYMMDD.csv</code> where <code>YYYYMMDD</code> is today's date. For example: <code>AMRoutput20260421.csv</code>. Save the file.</div>
+
+<div class="tip"><span class="tip-label">Tip:</span> The <code>.DAT</code> file is already plain ASCII comma separated text. Notepad's "Save As" trick just renames the extension. No encoding conversion is needed and no header row is added.</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 6: UNDERSTANDING THE CSV COLUMNS                        -->
+<!-- ================================================================ -->
+
+<h2>6. Understanding the CSV Columns</h2>
+
+<p>The AMR CSV has <strong>no header row</strong>. Each row has 27 comma separated fields. The column meanings are defined by the MRR reference message (<code>Sensus data title from MRR.msg</code>). The table below lists the fields you will use most when reviewing data.</p>
+
+<table>
+<tr><th style="width:10%;">Index (0 based)</th><th style="width:25%;">Column</th><th style="width:65%;">What It Is</th></tr>
+<tr><td style="text-align:center;">0</td><td>Account</td><td>Unique account number, for example <code>200001</code>. Used to join across monthly runs.</td></tr>
+<tr><td style="text-align:center;">5</td><td>Building #</td><td>WSU building number, for example <code>0358C</code>.</td></tr>
+<tr><td style="text-align:center;">6</td><td>Service Address</td><td>Human readable building name or location.</td></tr>
+<tr><td style="text-align:center;">7</td><td>Loc Description</td><td>Room, vault, or nearby landmark.</td></tr>
+<tr><td style="text-align:center;">8</td><td>Meter Number</td><td>Internal meter name, for example <code>0358CDW_001</code>.</td></tr>
+<tr><td style="text-align:center;">9</td><td>Service Type</td><td>Always <code>W</code> (water).</td></tr>
+<tr><td style="text-align:center;">10</td><td>Last Month (dynamic)</td><td>Placeholder column for the prior read. Typically blank in the raw CSV; the actual prior read comes from the previous month's file.</td></tr>
+<tr><td style="text-align:center;">11</td><td>Current (dynamic)</td><td>Placeholder column for the current read. The actual register value lives in column 12.</td></tr>
+<tr><td style="text-align:center;">12</td><td><strong>Raw Read</strong></td><td>Current register value from the meter. This is the number you difference against the prior month to compute usage.</td></tr>
+<tr><td style="text-align:center;">16</td><td>MXU ID</td><td>Radio transmitter ID (blank for Manual meters).</td></tr>
+<tr><td style="text-align:center;">17</td><td>Meter ID</td><td>Physical meter ID stamped on the meter body.</td></tr>
+<tr><td style="text-align:center;">18</td><td>Meter Type</td><td><code>B</code> = SmartPoint, <code>P</code> = Pit, <code>M</code> = Manual.</td></tr>
+<tr><td style="text-align:center;">20</td><td>Read Date</td><td>Actual date the meter was read, in <code>MMDDYYYY</code> format. Use this for the dynamic date window, not the filename.</td></tr>
+<tr><td style="text-align:center;">24</td><td>System</td><td><code>DW</code> = domestic water, <code>IR</code> = irrigation.</td></tr>
+<tr><td style="text-align:center;"><strong>25</strong></td><td><strong>Multiplier</strong></td><td>Register multiplier. Expected values are <strong>1, 10, 100, or 1000</strong>. Any other value is a configuration error.</td></tr>
+</table>
+
+<div class="warning">
+<strong>Important:</strong> The "Last Month" and "Current" header labels in the MRR reference are <strong>dynamic placeholders</strong>. For any given file they reflect the actual Read Date range, not a fixed calendar month. Always use column 20 (Read Date) to determine which month the reads actually cover.
+</div>
+
+<p>Usage for any single meter is computed as:</p>
+
+<p style="margin-left:24px; font-family:Consolas,monospace; background:#f5f5f5; padding:8px 12px; border-left:4px solid #5f6b6d;">
+Usage = (Current Raw Read &minus; Prior Raw Read) &times; Multiplier
+</p>
+
+<!-- ================================================================ -->
+<!--  SECTION 7: REVIEWING THE CSV FOR DATA/CONFIG ANOMALIES          -->
+<!-- ================================================================ -->
+
+<h2>7. Reviewing the CSV for Data and Configuration Anomalies</h2>
+
+<p>Before you push the CSV into SkySpark, review it line by line for issues that would corrupt the usage calculation. The focus here is <strong>data and configuration problems</strong>, not physical ones like leaks or continuous use. The categories below are the recurring patterns.</p>
+
+<h3>A. Multiplier Problems</h3>
+
+<table>
+<tr><th style="width:30%;">Symptom</th><th style="width:70%;">What It Means / What To Check</th></tr>
+<tr>
+  <td><strong>Multiplier is blank</strong></td>
+  <td>Column 25 is empty. Usage cannot be computed. The meter config in AutoRead is missing the multiplier. Fix in AutoRead before re exporting.</td>
+</tr>
+<tr>
+  <td><strong>Multiplier not 1, 10, 100, or 1000</strong></td>
+  <td>Any other value (2, 5, 50, etc.) is a configuration error. Correct in AutoRead.</td>
+</tr>
+<tr>
+  <td><strong>Multiplier changes across runs</strong></td>
+  <td>Same Account, but the Multiplier value in month A differs from month B. The register numbers cannot be differenced across runs once the multiplier changes. Reconcile which value is correct, then restate history.</td>
+</tr>
+<tr>
+  <td><strong>Multiplier magnitude mismatch</strong></td>
+  <td>Multiplier is 1000 but the raw register is already 7+ digits, or Multiplier is 1 on a 4 digit register that looks like it should be a Mult=1000 meter. A small register delta in either case yields an implausible usage. Compare to similar buildings in the same route.</td>
+</tr>
+</table>
+
+<h3>B. Usage Calculation Problems</h3>
+
+<table>
+<tr><th style="width:30%;">Symptom</th><th style="width:70%;">What It Means / What To Check</th></tr>
+<tr>
+  <td><strong>Raw read decreased</strong></td>
+  <td>Current register value is less than the prior month's. Physical meters do not run backwards. Common causes: multiplier should be higher and the register wrapped, wrong Meter ID crossed with a nearby meter, encoder reversed on swap, or a manual transcription error. Usage would come out negative.</td>
+</tr>
+<tr>
+  <td><strong>Register pinned near 9 digit max</strong></td>
+  <td>Raw value is within 10,000 units of 999,999,999. Either the register has rolled over and the MXU is still reporting the pre rollover value, or the register is physically stuck at near max. Either way the next computed usage will wrap wildly negative.</td>
+</tr>
+<tr>
+  <td><strong>Register stuck across runs (DW)</strong></td>
+  <td>Raw value is identical in 2+ consecutive runs on a domestic water meter. DW should always advance in an active building. Suspect a stalled register, a dead MXU, or a bad MXU to meter coupling.</td>
+</tr>
+<tr>
+  <td><strong>Register stuck across runs (IR, Nov&ndash;Apr)</strong></td>
+  <td>Irrigation meters are expected to sit flat through Pullman winters. Flag but do not alarm; confirm the meter is physically shut off before dismissing.</td>
+</tr>
+<tr>
+  <td><strong>Register reads zero every run</strong></td>
+  <td>Literal <code>0000</code> in the Raw Read column across multiple runs. Usage will trivially be zero regardless of physical flow. Usually a newly installed but uncommissioned meter or a bad register/MXU pair.</td>
+</tr>
+<tr>
+  <td><strong>Raw read format shift (decimal vs integer)</strong></td>
+  <td>One run's raw read has a decimal point (for example <code>118811.49</code>); later runs are integer only (for example <code>11891937</code>). This is a unit or format change, not a real delta. Differencing these produces huge fake usage. Reconcile the format before computing cross run usage.</td>
+</tr>
+<tr>
+  <td><strong>Account missing from a run</strong></td>
+  <td>An Account present in prior months is absent from the current file. Either the route was edited, the MXU is offline, the meter was removed, or the tablet missed the read. Data continuity issue; usage cannot be computed for the gap.</td>
+</tr>
+<tr>
+  <td><strong>Account appears for the first time</strong></td>
+  <td>A new Account in the current file has no prior baseline. Flag for the first billing cycle so the initial usage is not inflated from an assumed zero start.</td>
+</tr>
+<tr>
+  <td><strong>System field is not DW or IR</strong></td>
+  <td>Column 24 must be <code>DW</code> or <code>IR</code>. Any other value routes usage into the wrong bucket in SkySpark and the dashboards.</td>
+</tr>
+</table>
+
+<h3>C. A Concrete Example</h3>
+
+<p>From the April 2026 CSV scan:</p>
+
+<table>
+<tr><th>Account</th><th>Building</th><th>Observation</th><th>Classification</th></tr>
+<tr><td>200045</td><td>0111A ENTOM SHOP</td><td>Raw Read = <code>0000</code> in all 3 runs, Multiplier = 1000.</td><td>Register reads zero every run. Check MXU and register commissioning.</td></tr>
+<tr><td>200051</td><td>0111 ENTOM GREENHOUSE</td><td>Raw went <code>118811.49</code> &rarr; <code>11891937</code> &rarr; <code>11931225</code>.</td><td>Format shift. Reconcile units before differencing.</td></tr>
+<tr><td>200083</td><td>0675 Valley Crest IR</td><td>Raw = <code>999999768</code>, unchanged across 3 runs.</td><td>Near 9 digit rollover. Register replacement or restate needed.</td></tr>
+<tr><td>200104</td><td>0805 McEachern</td><td>Raw went <code>992,485,723</code> &rarr; <code>992,259,351</code> &rarr; <code>991,851,628</code>.</td><td>Register decreasing. Suspect multiplier, meter ID crossover, or encoder reversed.</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<!--  SECTION 8: FIXING OR ESCALATING ANOMALIES                       -->
+<!-- ================================================================ -->
+
+<h2>8. Fixing or Escalating Anomalies</h2>
+
+<table>
+<tr><th style="width:35%;">If the anomaly is...</th><th style="width:65%;">Then...</th></tr>
+<tr>
+  <td><strong>A config error in AutoRead</strong> (wrong multiplier, missing MXU link, wrong System code)</td>
+  <td>Correct the meter record in AutoRead, re load the route to the tablet, and re export on the next read cycle. No need to re walk the route for config fixes alone.</td>
+</tr>
+<tr>
+  <td><strong>A manual read transcription error</strong> (Meter Type = M, raw dropped by a small amount)</td>
+  <td>Walk to the meter, take a fresh read, and overwrite the bad entry in the CSV before importing to SkySpark. Flag the account so the operator retakes the read next cycle.</td>
+</tr>
+<tr>
+  <td><strong>A stuck or zero register</strong></td>
+  <td>Physically inspect the meter and MXU. If the issue is confirmed, open a work order for meter or MXU replacement and leave the reading as is until resolved. Do not back fill usage with estimates.</td>
+</tr>
+<tr>
+  <td><strong>A 9 digit rollover</strong></td>
+  <td>Escalate for register replacement. Until resolved, usage after the rollover must be calculated as <code>(999,999,999 &minus; prior) + current</code>. The downstream SkySpark importer will not do this automatically.</td>
+</tr>
+<tr>
+  <td><strong>A format shift (decimal vs integer)</strong></td>
+  <td>Determine which format is the "true" register reading and convert the other run to match before computing usage. Document the correction so future reviewers do not re flag it.</td>
+</tr>
+<tr>
+  <td><strong>A dropped or new account</strong></td>
+  <td>Confirm with the tablet whether the meter was skipped on the walk. If the meter is genuinely gone or newly commissioned, update the route definition and note the baseline.</td>
+</tr>
+</table>
+
+<!-- ================================================================ -->
+<!--  SECTION 9: LOADING DATA INTO SKYSPARK                           -->
+<!-- ================================================================ -->
+
+<h2>9. Loading Data Into SkySpark</h2>
+
+<p>Once the CSV has been reviewed and any correctable issues fixed, it is imported into the <code>wsumeters</code> project in SkySpark, where usage is computed, stored as history, and exposed to the Metering and Water Conservation dashboards.</p>
+
+<div class="step"><span class="step-num">Step 1.</span> Log in to SkySpark at <code>https://skyspark.fais.wsu.edu/</code> and open the <code>wsumeters</code> project.</div>
+
+<div class="step"><span class="step-num">Step 2.</span> Navigate to the CSV Import connector configured for Sensus AMR.</div>
+
+<div class="step"><span class="step-num">Step 3.</span> Upload the reviewed <code>AMRoutputYYYYMMDD.csv</code> file.</div>
+
+<div class="step"><span class="step-num">Step 4.</span> Confirm the importer recognizes all accounts and reports no ingest errors. Accounts flagged in Section 7 will still import; the sanitization layer below handles their downstream effects.</div>
+
+<div class="warning">
+<strong>Important:</strong> Known issue. The SkySpark CSV Import connector keys on the row position within the file, not on the Account number. If the row order changes, the importer can shift every subsequent meter by one row, producing billion gallon spikes for the first run after the shift. The fix lives <strong>downstream</strong> of SkySpark and is described in Section 10. Do not attempt to fix this inside SkySpark.
+</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 10: POST-IMPORT SANITIZATION                            -->
+<!-- ================================================================ -->
+
+<h2>10. Post Import Sanitization (Pipeline Overview)</h2>
+
+<p>After SkySpark has stored the imported reads, the monthly update script (<code>update-data.sh</code>) runs four cleanup passes before the JSON data files are pushed to GitHub Pages. This layered defense catches row shift spikes, data gap catch ups, and any residual format oddities from the raw CSV.</p>
+
+<table>
+<tr><th style="width:30%;">Layer</th><th style="width:70%;">What It Does</th></tr>
+<tr>
+  <td><code>merge-data.py</code></td>
+  <td>Reads the SkySpark JSON exports and merges with the historical dataset. Detects overlapping date windows and resolves to the most recent value.</td>
+</tr>
+<tr>
+  <td><code>_null_outliers.py</code></td>
+  <td>Pass 1. For each meter, computes a baseline median from clean historical months and nulls any new value greater than 20 times that baseline.</td>
+</tr>
+<tr>
+  <td><code>_null_outliers_v2.py</code></td>
+  <td>Pass 2. Catches data gap catch ups that survived pass 1. Nulls any value greater than 5 times the maximum pre gap reading when the reading sits on the other side of a multi week gap.</td>
+</tr>
+<tr>
+  <td>Client side <code>sanitizeOutliers()</code></td>
+  <td>Last line of defense. The metering and water conservation dashboards call this on every fetched JSON row; any value above <code>max(100000, 20 &times; pre gap max)</code> is replaced with null at display time.</td>
+</tr>
+</table>
+
+<p>None of these layers attempt to <em>fix</em> the underlying CSV. Their job is to prevent spurious values from surfacing in the dashboards while the meter is actually fixed upstream.</p>
+
+<!-- ================================================================ -->
+<!--  SECTION 11: FILING THE FINAL CSV                                -->
+<!-- ================================================================ -->
+
+<h2>11. Filing the Final CSV</h2>
+
+<div class="step"><span class="step-num">Step 1.</span> Copy the reviewed CSV to the shared drive:</div>
+<p style="margin-left:24px;"><code>R:\ENERGY GROUP\Energy Services Admin\Energy Files\Meters\SENSUS\Output\</code></p>
+
+<div class="step"><span class="step-num">Step 2.</span> Keep the original filename (<code>AMRoutputYYYYMMDD.csv</code>). Do not overwrite prior months; each file is part of the historical record used for future usage calculations.</div>
+
+<div class="step"><span class="step-num">Step 3.</span> If you produced an anomaly review document (for example <code>multiplier-usage-anomalies.md</code> or a written list of accounts to follow up on), file it in the same folder alongside the CSV so the next reviewer has context.</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 12: MONTHLY WORKFLOW SUMMARY                            -->
+<!-- ================================================================ -->
+
+<h2>12. Monthly Workflow Summary</h2>
+
+<p>Use this quick reference checklist each month:</p>
+
+<table>
+<tr><th style="width:8%; text-align:center;">#</th><th style="width:92%;">Action</th></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">1</td><td>Charge the Sensus tablet and confirm the current route is loaded.</td></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">2</td><td>Walk the route. Capture SmartPoint and Pit reads via radio; key in Manual reads by hand.</td></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">3</td><td>Back at the office, connect the tablet and use AutoRead (<strong>Clear &rarr; Import &rarr; Load</strong>) to export <code>latestread_amr.DAT</code>.</td></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">4</td><td>Open the <code>.DAT</code> file in Notepad and Save As <code>AMRoutputYYYYMMDD.csv</code> using today's date.</td></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">5</td><td>Review the CSV line by line against the MRR column reference. Check for the anomaly categories in Section 7.</td></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">6</td><td>Fix or escalate anomalies per Section 8. Retake any manual reads that were transcribed wrong.</td></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">7</td><td>Import the reviewed CSV into SkySpark via the CSV Import connector.</td></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">8</td><td>Run <code>update-data.sh</code> to export SkySpark JSON, apply the sanitization layers, and push to GitHub.</td></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">9</td><td>Hard refresh the Metering and Water Conservation dashboards (<strong>Ctrl+Shift+R</strong>) to confirm new data appears.</td></tr>
+<tr><td style="text-align:center; font-weight:bold; color:#981e32;">10</td><td>File the reviewed CSV (and any anomaly notes) in the SENSUS Output folder on the shared drive.</td></tr>
+</table>
+
+<div class="footer">
+  WSU Facilities Services &nbsp;|&nbsp; Energy Services &nbsp;|&nbsp; Last updated April 2026
+</div>
+
+</body></html>

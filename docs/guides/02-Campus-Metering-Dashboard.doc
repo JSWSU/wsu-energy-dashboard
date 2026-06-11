@@ -1,0 +1,666 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+</style></head><body>
+
+<h1>How to Use the Campus Metering Dashboard</h1>
+
+<p>This guide walks you through every feature of the WSU Campus Metering Dashboard, step by step. The dashboard shows electric, steam, chilled water, and water usage for every metered building on the WSU Pullman campus. No prior experience with dashboards or energy data is required.</p>
+
+<!-- ============================================================ -->
+<h2>1. Getting Started</h2>
+<!-- ============================================================ -->
+
+<h3>Opening the Dashboard</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Open any web browser (Chrome, Edge, or Firefox all work).
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Type or paste this address into the address bar and press Enter:<br>
+<b>jswsu.github.io/wsu-energy-dashboard/metering.html</b>
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A login screen with the WSU crimson header reading "WSU Campus Metering" and a password box below it.
+</div>
+
+<h3>Signing In</h3>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Click inside the password box and type the dashboard password. Your supervisor will provide this to you.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4.</span> Click the <b>Sign In</b> button (or press Enter on your keyboard).
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A brief loading spinner that says "Loading metering data..." followed by the full dashboard. Your browser will remember your login, so you will not need to enter the password again unless you clear your browser data.
+</div>
+
+<h3>What You See First</h3>
+
+<div class="step">
+<span class="step-num">Step 5.</span> Look at the top of the page. You will see:
+<ul>
+<li><b>Crimson header bar</b> &mdash; Shows "WSU Campus Metering Dashboard" along with the data period (e.g., "Jan 2025 &ndash; Feb 2026"), the number of campus sites, and links to other dashboards.</li>
+<li><b>Tab bar</b> &mdash; A row of buttons directly below the header: <b>Overview</b>, <b>Electric</b>, <b>Thermal</b>, <b>Water</b>, <b>Buildings</b>, <b>Connectors</b>, and <b>Data Info</b>. Click any tab to switch to that section.</li>
+<li><b>Overview tab content</b> &mdash; This is the default view that loads first. It gives you a summary of all campus utilities at a glance.</li>
+</ul>
+</div>
+
+<div class="tip">
+<span class="tip-label">Tip:</span> You can return to the Overview at any time by clicking the <b>Overview</b> tab in the tab bar.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>2. Overview Tab</h2>
+<!-- ============================================================ -->
+
+<p>The Overview tab is your starting point. It summarizes all campus energy and water data in one place.</p>
+
+<h3>KPI Cards (Key Performance Indicator Cards)</h3>
+
+<p>At the top of the Overview tab, you will see a row of colored summary cards. KPI stands for Key Performance Indicator &mdash; these are the most important numbers at a glance. Each card shows one important metric:</p>
+
+<table>
+<tr><th>Card</th><th>What It Shows</th><th>Color</th></tr>
+<tr><td>Total Sites</td><td>The number of campus buildings in the system</td><td>Crimson</td></tr>
+<tr><td>Total Energy</td><td>Combined electric + steam + chilled water energy in MMBtu (Million British Thermal Units)</td><td>Amber (electric color)</td></tr>
+<tr><td>Total Water</td><td>Combined domestic + irrigation water in kGal (thousand gallons)</td><td>Blue (water color)</td></tr>
+<tr><td>Connector Health</td><td>Percentage of data connections that are working properly</td><td>Green</td></tr>
+<tr><td>Electric</td><td>Total campus electric consumption in MMBtu</td><td>Amber</td></tr>
+<tr><td>Steam</td><td>Total campus steam consumption in MMBtu</td><td>Red</td></tr>
+<tr><td>Domestic Water</td><td>Total domestic water consumption in kGal</td><td>Blue</td></tr>
+<tr><td>Irrigation</td><td>Total irrigation water consumption in kGal</td><td>Green</td></tr>
+<tr><td>Data Quality</td><td>Result of automated data integrity checks (e.g., "All Passed" or number of warnings)</td><td>Green/Amber/Red depending on results</td></tr>
+</table>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Hover your mouse over any KPI card to see a tooltip that explains what the number means and how it was calculated.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Click on any KPI card to expand it. An expanded card shows a monthly breakdown table with values for each month in the data period, plus a total row at the bottom.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Click the same card again to collapse it back to the summary view.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> When you click the Total Energy card, for example, it expands to show a table with columns for Month, Electric, Steam, CHW (Chilled Water), and Total. Each row represents one month.
+</div>
+
+<h3>Top Buildings Charts</h3>
+
+<div class="step">
+<span class="step-num">Step 4.</span> Scroll down past the KPI cards. You will see two large horizontal bar charts side by side:
+<ul>
+<li><b>Top 20 Buildings by Total Energy (MMBtu)</b> &mdash; On the left. Each bar is color-coded: amber for electric, red for steam, and cyan for CHW (Chilled Water) energy. Bars are stacked so you can see both the total and the breakdown.</li>
+<li><b>Top 20 Buildings by Total Water (kGal)</b> &mdash; On the right. Each bar is color-coded: blue for domestic water and green for irrigation.</li>
+</ul>
+</div>
+
+<div class="step">
+<span class="step-num">Step 5.</span> Hover your mouse over any bar segment to see the exact value in a tooltip popup.
+</div>
+
+<h3>Monthly Totals Charts</h3>
+
+<div class="step">
+<span class="step-num">Step 6.</span> Scroll down further to see two stacked bar charts:
+<ul>
+<li><b>Monthly Campus Energy Totals</b> &mdash; Shows how much energy the entire campus used each month, broken down by electric, steam, and CHW energy.</li>
+<li><b>Monthly Campus Water Totals</b> &mdash; Shows campus-wide water usage each month, broken down by domestic and irrigation.</li>
+</ul>
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Energy consumption typically peaks in winter months (more steam for heating) and summer months (more chilled water for cooling). Irrigation is highest in summer and drops to near zero in winter.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>3. Electric Tab</h2>
+<!-- ============================================================ -->
+
+<p>The Electric tab focuses entirely on electric consumption across the campus.</p>
+
+<h3>What Is Electric Consumption?</h3>
+
+<p>Electric consumption is measured in <b>kWh (kilowatt-hours)</b>. One kWh is the amount of energy used by running a 1,000-watt appliance for one hour. In this dashboard, electric consumption is also displayed in <b>MMBtu (Million British Thermal Units)</b> so it can be compared directly with steam and chilled water. The conversion is: 1 kWh = 0.003412 MMBtu.</p>
+
+<h3>KPI Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Click the <b>Electric</b> tab in the tab bar.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Four KPI cards at the top:
+<ul>
+<li><b>Total Electric</b> &mdash; Total campus electric consumption in MMBtu, with the equivalent kWh value shown below it.</li>
+<li><b>Buildings</b> &mdash; Number of buildings that have electric meter data.</li>
+<li><b>Data Points</b> &mdash; Total number of data rows (one row per building per month).</li>
+<li><b>Avg per Building</b> &mdash; The average 14-month electric consumption per building.</li>
+</ul>
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Click on the <b>Total Electric</b> KPI card to expand it and see a month-by-month breakdown.
+</div>
+
+<h3>Monthly Electric Trend Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Scroll down to the <b>Monthly Electric Trend (MMBtu)</b> line chart. This shows how campus-wide electric consumption changed month to month.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4.</span> Look for small diamond-shaped markers on the chart line. These are <b>anomaly markers</b> &mdash; they appear when a month's usage is unusually high compared to neighboring months (more than double the average of the months before and after it).
+</div>
+
+<div class="step">
+<span class="step-num">Step 5.</span> Hover your mouse over a diamond marker. A callout box will appear showing the percentage spike (e.g., "+120% vs avg") and which building drove the spike.
+</div>
+
+<div class="tip">
+<span class="tip-label">Tip:</span> Anomalies are not necessarily problems. They could be caused by seasonal changes, special events, or construction. They simply flag months that are worth a closer look.
+</div>
+
+<h3>Top 15 Buildings Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 6.</span> Scroll to the <b>Top 15 Buildings &mdash; Electric (MMBtu, 14-mo Total)</b> horizontal bar chart. This shows which buildings use the most electricity.
+</div>
+
+<div class="step">
+<span class="step-num">Step 7.</span> Hover over any bar to see the exact value.
+</div>
+
+<h3>Searching the Electric Table</h3>
+
+<div class="step">
+<span class="step-num">Step 8.</span> Scroll to the <b>Building Electric Consumption (MMBtu)</b> table. Above the table is a search bar.
+</div>
+
+<div class="step">
+<span class="step-num">Step 9.</span> Click inside the search bar and type a building name or building number (e.g., "Smith" or "0087"). The table instantly filters to show only buildings that match your search.
+</div>
+
+<div class="step">
+<span class="step-num">Step 10.</span> Clear the search bar (select all text and delete it) to show all buildings again.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A table with columns for Bldg #, Building Name, 14-mo Total, and one column for each month. The table is sorted from highest total consumption to lowest. Monthly values are displayed in MMBtu.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>4. Thermal Tab</h2>
+<!-- ============================================================ -->
+
+<p>The Thermal tab shows steam and chilled water (CHW) energy. These are the two utility types that provide heating and cooling to campus buildings.</p>
+
+<h3>What Are Steam and Chilled Water?</h3>
+
+<p><b>Steam</b> is produced at the campus steam plant and distributed through underground pipes to heat buildings. It is measured in <b>pounds (lb)</b> of steam condensate returned from buildings. The conversion is: 1 lb of steam = approximately 0.001 MMBtu (1,000 BTU).</p>
+
+<p><b>CHW (Chilled Water)</b> is cold water circulated through buildings for air conditioning. CHW energy is measured in <b>ton-ref-hr (ton of refrigeration hours)</b>. One ton of refrigeration is the cooling power needed to melt one ton of ice in 24 hours. The conversion is: 1 ton-ref-hr = 0.012 MMBtu (12,000 BTU).</p>
+
+<p>Both steam and CHW are displayed in MMBtu so they can be compared on the same scale.</p>
+
+<h3>KPI Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Click the <b>Thermal</b> tab in the tab bar.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Four KPI cards:
+<ul>
+<li><b>Total Steam</b> &mdash; Campus-wide steam consumption in MMBtu, with the number of buildings that have steam meters.</li>
+<li><b>Total CHW Energy</b> &mdash; Campus-wide chilled water energy in MMBtu, with the building count.</li>
+<li><b>Combined Thermal</b> &mdash; Steam + CHW Energy added together for a single thermal total.</li>
+<li><b>Steam Records</b> &mdash; Number of data rows in the condensate file.</li>
+</ul>
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Click any KPI card to expand it and see monthly detail.
+</div>
+
+<h3>Monthly Thermal Trend Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Scroll to the <b>Monthly Thermal Trend (MMBtu)</b> line chart. This chart shows two lines:
+<ul>
+<li><b>Red line</b> &mdash; Steam consumption each month.</li>
+<li><b>Cyan line</b> &mdash; CHW energy consumption each month.</li>
+</ul>
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Steam peaks in cold months (December through February) and drops in summer. CHW energy does the opposite &mdash; it peaks in warm months (June through September) and drops in winter. This is normal seasonal behavior.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4.</span> As on the Electric tab, look for diamond-shaped anomaly markers and hover over them to see spike details.
+</div>
+
+<h3>Top 15 Buildings Charts</h3>
+
+<div class="step">
+<span class="step-num">Step 5.</span> Below the trend chart, you will see two side-by-side bar charts:
+<ul>
+<li><b>Top 15 Buildings &mdash; Steam (MMBtu)</b> on the left (red bars).</li>
+<li><b>Top 15 Buildings &mdash; CHW Energy (MMBtu)</b> on the right (cyan bars).</li>
+</ul>
+</div>
+
+<div class="step">
+<span class="step-num">Step 6.</span> Hover over any bar to see the exact value for that building.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>5. Water Tab</h2>
+<!-- ============================================================ -->
+
+<p>The Water tab shows domestic water and irrigation water consumption across the campus.</p>
+
+<h3>Domestic Water vs. Irrigation Water</h3>
+
+<p><b>Domestic water</b> is the water used inside buildings &mdash; drinking, restrooms, kitchens, laboratories, and other indoor needs.</p>
+
+<p><b>Irrigation water</b> is the water used outdoors to maintain lawns, landscaping, and athletic fields.</p>
+
+<p>Both are measured in <b>gallons (gal)</b> at the meter. Because campus water usage runs into the millions of gallons, the dashboard displays values in <b>kGal (thousand gallons)</b>. The conversion is: 1 kGal = 1,000 gallons.</p>
+
+<p>You may also hear the unit <b>CCF (hundred cubic feet)</b> used on utility bills. One CCF = 748 gallons, or about 0.748 kGal. The dashboard uses kGal throughout for simplicity.</p>
+
+<h3>KPI Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Click the <b>Water</b> tab in the tab bar.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Four KPI cards:
+<ul>
+<li><b>Domestic Water</b> &mdash; Total domestic water in kGal, with building count.</li>
+<li><b>Irrigation</b> &mdash; Total irrigation water in kGal, with building count.</li>
+<li><b>Total Water</b> &mdash; Domestic + Irrigation combined for a campus-wide total.</li>
+<li><b>Data Records</b> &mdash; Total rows from both the domestic water and irrigation data files.</li>
+</ul>
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Click any KPI card to expand it and see the monthly breakdown.
+</div>
+
+<h3>Monthly Water Trend Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Scroll to the <b>Monthly Water Trend (kGal)</b> line chart. Two lines are shown:
+<ul>
+<li><b>Blue line</b> &mdash; Domestic water each month.</li>
+<li><b>Green line</b> &mdash; Irrigation water each month.</li>
+</ul>
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Domestic water tends to stay relatively steady year-round, with possible dips during academic breaks. Irrigation shows a strong seasonal pattern &mdash; high in summer, near zero in winter when the ground is frozen or dormant.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4.</span> Look for diamond-shaped anomaly markers on the chart and hover to see details.
+</div>
+
+<h3>Top 15 Buildings Charts</h3>
+
+<div class="step">
+<span class="step-num">Step 5.</span> Below the trend chart, two side-by-side bar charts display:
+<ul>
+<li><b>Top 15 Buildings &mdash; Domestic Water (kGal)</b> on the left (blue bars).</li>
+<li><b>Top 15 Buildings &mdash; Irrigation (kGal)</b> on the right (green bars).</li>
+</ul>
+</div>
+
+<div class="step">
+<span class="step-num">Step 6.</span> Hover over any bar to see the exact value.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>6. Buildings Tab</h2>
+<!-- ============================================================ -->
+
+<p>The Buildings tab lets you look up any specific building and see all its utility data in one place.</p>
+
+<h3>Searching for a Building</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Click the <b>Buildings</b> tab in the tab bar.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A search bar at the top and a grid of building cards below it. Buildings are sorted from highest total usage to lowest.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Click inside the search bar and type a building name or building number. For example, type "CUB" to find the Compton Union Building, or type "0087" to search by building number. The cards instantly filter as you type.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Clear the search bar to return to the full list.
+</div>
+
+<h3>Reading a Building Card</h3>
+
+<p>Each building card shows:</p>
+<ul>
+<li><b>Building name</b> in bold at the top.</li>
+<li><b>Building number</b> and square footage (if available) in smaller gray text below the name.</li>
+<li><b>Colored badges</b> showing the 14-month totals for each utility the building has:
+<ul>
+<li>Amber badge = Electric (MMBtu)</li>
+<li>Red badge = Steam (MMBtu)</li>
+<li>Cyan badge = CHW Energy (MMBtu)</li>
+<li>Blue badge = Domestic Water (kGal)</li>
+<li>Green badge = Irrigation (kGal)</li>
+</ul>
+</li>
+<li>If a building has no metered data, it will show "No metered data" in gray text instead of badges.</li>
+</ul>
+
+<h3>Expanding a Building Card</h3>
+
+<div class="step">
+<span class="step-num">Step 4.</span> Click on any building card to expand it. A detailed table appears showing monthly values for every utility type.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A table with columns for Month, Elec (electric), Steam, CHW E (chilled water energy), Dom W (domestic water), and Irrig (irrigation). Each row is one month. A dash ("-") means that building has no data for that utility in that month.
+</div>
+
+<div class="step">
+<span class="step-num">Step 5.</span> Click the same building card again to collapse it back to the summary view.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>7. Connectors Tab</h2>
+<!-- ============================================================ -->
+
+<p>The Connectors tab shows the status of <b>SkySpark connectors</b>. A connector is a software link between SkySpark (the energy monitoring platform) and a building's physical meters. If a connector is working, data flows from the meter into the dashboard. If a connector has a problem, data for that building may be missing or stale.</p>
+
+<h3>KPI Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Click the <b>Connectors</b> tab in the tab bar.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Four KPI cards at the top:
+<ul>
+<li><b>Total Connectors</b> &mdash; The total number of connectors configured for the campus.</li>
+<li><b>OK</b> &mdash; Number of connectors that are actively collecting data without errors (green border).</li>
+<li><b>Fault</b> &mdash; Number of connectors with errors that need investigation (red border).</li>
+<li><b>Disabled</b> &mdash; Number of connectors that are intentionally turned off, plus any in an unknown state.</li>
+</ul>
+</div>
+
+<h3>What OK, Fault, and Disabled Mean</h3>
+
+<table>
+<tr><th>Status</th><th>Indicator</th><th>What It Means</th></tr>
+<tr><td>OK</td><td>Green dot</td><td>The connector is working normally. Data is flowing from the building meter into SkySpark.</td></tr>
+<tr><td>Fault</td><td>Red dot</td><td>The connector has an error. This could mean a network problem, a meter communication failure, or a configuration issue. The Error column in the table may show additional details.</td></tr>
+<tr><td>Disabled</td><td>Gray dot</td><td>The connector has been intentionally turned off. This could be because the building is under renovation, the meter was decommissioned, or the connector is not needed right now.</td></tr>
+</table>
+
+<h3>Using Filter Buttons</h3>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Below the KPI cards, you will see a row of filter buttons: <b>All</b>, <b>OK</b>, <b>Fault</b>, and <b>Disabled</b>.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Click <b>Fault</b> to see only the connectors with errors. This is useful for quickly finding which connections need attention.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4.</span> Click <b>OK</b> to see only working connectors, or <b>Disabled</b> to see only disabled ones.
+</div>
+
+<div class="step">
+<span class="step-num">Step 5.</span> Click <b>All</b> to return to the full list.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> The connector table has three columns: <b>Connector</b> (the connector name), <b>Status</b> (with a colored dot and status text), and <b>Error</b> (error details, if any). Connectors are sorted so Faults appear first, then Disabled, then OK.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>8. Data Info Tab</h2>
+<!-- ============================================================ -->
+
+<p>The Data Info tab tells you where the dashboard data comes from and shows the results of automatic data quality checks.</p>
+
+<h3>Data Sources Section</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Click the <b>Data Info</b> tab in the tab bar.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> A blue information box at the top showing:
+<ul>
+<li><b>Data Period</b> &mdash; The date range of the data (e.g., January 2025 through February 2026, which is 14 months).</li>
+<li><b>Source</b> &mdash; SkySpark "wsumeters" project at skyspark.fais.wsu.edu.</li>
+<li><b>Export Method</b> &mdash; Built-in SkySpark view functions with Export Format, run from the SkySpark Shell.</li>
+</ul>
+</div>
+
+<h3>Unit Conversions</h3>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Scroll to the <b>Unit Conversions</b> section. This lists the exact formulas used to convert raw meter data into the display units:
+<ul>
+<li>Electric: kWh &times; 0.003412 = MMBtu</li>
+<li>Steam: lb &times; 0.001 = MMBtu</li>
+<li>CHW Energy: tonrefh &times; 0.012 = MMBtu</li>
+<li>Domestic Water: gal &divide; 1,000 = kGal</li>
+<li>Irrigation: gal &divide; 1,000 = kGal</li>
+</ul>
+</div>
+
+<h3>File Inventory</h3>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Scroll to the <b>File Inventory</b> table. This shows every data file the dashboard loads, how many rows it contains, and a brief description. There are 7 files in total: electric.json, condensate.json, domestic_water.json, irrigation.json, chw.json, sites.json, and connectors.json.
+</div>
+
+<h3>Data Quality and Verification</h3>
+
+<div class="step">
+<span class="step-num">Step 4.</span> Scroll to the <b>Data Quality &amp; Verification</b> card. At the top, colored badges summarize the results (e.g., "8 Passed, 2 Warnings").
+</div>
+
+<div class="step">
+<span class="step-num">Step 5.</span> Review the <b>Integrity Checks</b> table. Each row is one check the dashboard runs automatically when data loads:
+</div>
+
+<table>
+<tr><th>Check</th><th>What It Verifies</th></tr>
+<tr><td>Row Counts</td><td>Every data file has at least one row of data.</td></tr>
+<tr><td>NA/Invalid Values</td><td>No missing or corrupted values in usage fields.</td></tr>
+<tr><td>Negative Values</td><td>No negative usage values (which could indicate meter rollover errors).</td></tr>
+<tr><td>Zero-Usage Months</td><td>How many rows have zero usage (informational, not an error).</td></tr>
+<tr><td>Date Range</td><td>All utility datasets cover the same date range.</td></tr>
+<tr><td>Building Coverage</td><td>How many buildings have data in each utility vs. total sites.</td></tr>
+<tr><td>Monthly Continuity</td><td>Whether any buildings are missing data for certain months.</td></tr>
+<tr><td>Cross-Utility Sanity</td><td>Top electric buildings should overlap with top steam buildings (large buildings use both).</td></tr>
+<tr><td>KPI Recalculation</td><td>The displayed KPI values match independent recalculation from raw data.</td></tr>
+<tr><td>Conversion Reference</td><td>The unit conversion formulas used (always passes; for reference).</td></tr>
+</table>
+
+<div class="step">
+<span class="step-num">Step 6.</span> Scroll to the <b>KPI Cross-Check</b> table to see each utility's raw sum, converted value, and dashboard KPI side by side. A green checkmark means the values match.
+</div>
+
+<div class="step">
+<span class="step-num">Step 7.</span> Scroll to the <b>Per-Utility Breakdown</b> table for detailed row counts, valid/invalid/negative/zero counts, building counts, and date ranges for each utility type.
+</div>
+
+<div class="tip">
+<span class="tip-label">Tip:</span> If you see warnings, they are usually informational (e.g., some buildings are missing data for certain months because they were not metered during that period). Red failures are rare and indicate something that needs attention from the energy team.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>9. Sorting and Filtering Tables</h2>
+<!-- ============================================================ -->
+
+<p>The Electric tab includes a detailed data table with sortable columns. Here is how to use sorting and search filtering.</p>
+
+<h3>Searching</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> On the Electric tab, scroll down to the <b>Building Electric Consumption</b> table.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Click inside the <b>search bar</b> above the table and type any part of a building name or building number. The table filters instantly as you type.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Delete the text in the search bar to restore the full table.
+</div>
+
+<h3>Reading the Table</h3>
+
+<div class="step">
+<span class="step-num">Step 4.</span> The table columns are:
+<ul>
+<li><b>Bldg #</b> &mdash; The building number (left-aligned).</li>
+<li><b>Building Name</b> &mdash; The building name (left-aligned).</li>
+<li><b>14-mo Total</b> &mdash; The building's total consumption over the 14-month period (bold, for easy scanning).</li>
+<li><b>One column per month</b> &mdash; Monthly consumption values in the display unit (e.g., MMBtu for electric).</li>
+</ul>
+</div>
+
+<div class="step">
+<span class="step-num">Step 5.</span> Buildings are sorted from highest 14-month total to lowest by default. This puts the largest consumers at the top of the table.
+</div>
+
+<div class="tip">
+<span class="tip-label">Tip:</span> If the table is too wide for your screen, you can scroll the table horizontally. Grab the bottom scrollbar of the table area and drag left or right to see all the monthly columns.
+</div>
+
+<h3>A Note on the Buildings Tab Search</h3>
+
+<p>The Buildings tab has its own search bar that works the same way &mdash; type a building name or number and the building cards filter instantly. The Connectors tab uses filter buttons instead of a search bar (see Section 7 above).</p>
+
+
+<!-- ============================================================ -->
+<h2>10. Dark Mode and Printing</h2>
+<!-- ============================================================ -->
+
+<h3>Dark Mode</h3>
+
+<p>Dark mode changes the dashboard from a light background to a dark background. Some users find this easier on their eyes, especially in dimly lit rooms.</p>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Look at the top-right corner of the crimson header bar. You will see the text "Dark Mode" and a small toggle switch next to it.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Click the toggle switch to turn dark mode on. The entire dashboard will change to a dark color scheme.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Click the toggle switch again to return to light mode.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> In dark mode, the background turns dark gray, text turns light gray, and charts adjust their colors for better contrast. All data and functionality remain identical.
+</div>
+
+<div class="tip">
+<span class="tip-label">Tip:</span> Your dark mode preference is saved in your browser. The next time you open the dashboard, it will remember whether you had dark mode on or off.
+</div>
+
+<h3>Printing</h3>
+
+<div class="step">
+<span class="step-num">Step 4.</span> To print the dashboard, press <b>Ctrl + P</b> on your keyboard (or go to your browser menu and select Print).
+</div>
+
+<div class="step">
+<span class="step-num">Step 5.</span> The print layout automatically hides the header bar, tab bar, search bars, filter buttons, and login screen. It shows all sections on the printed page in landscape orientation.
+</div>
+
+<div class="step">
+<span class="step-num">Step 6.</span> If you are in dark mode, the print layout automatically switches to light colors for better readability on paper.
+</div>
+
+<div class="tip">
+<span class="tip-label">Tip:</span> For best results, use the "Save as PDF" option in the print dialog if you want a digital copy to share by email.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>11. Glossary</h2>
+<!-- ============================================================ -->
+
+<p>This glossary defines every technical term and abbreviation used in the Campus Metering Dashboard.</p>
+
+<table>
+<tr><th>Term</th><th>Definition</th></tr>
+<tr><td><b>BTU</b></td><td>British Thermal Unit. The amount of heat needed to raise the temperature of one pound of water by one degree Fahrenheit. This is the basic unit of energy measurement for heating and cooling.</td></tr>
+<tr><td><b>CCF</b></td><td>Hundred Cubic Feet. A unit of water volume commonly used on utility bills. 1 CCF = 748 gallons = 0.748 kGal. The dashboard uses kGal instead of CCF for simplicity.</td></tr>
+<tr><td><b>CHW</b></td><td>Chilled Water. Cold water circulated through pipes in buildings to provide air conditioning. Sometimes written as "CHW Energy" when referring to the cooling energy it delivers.</td></tr>
+<tr><td><b>Connector</b></td><td>A software connection in SkySpark that links to a building's physical meters. When a connector is "OK," data flows normally from the meter into the dashboard. When it is "Fault," there is an error preventing data collection.</td></tr>
+<tr><td><b>Condensate</b></td><td>Water that forms when steam cools and condenses back to liquid. Steam condensate is returned from buildings to the steam plant and its volume (in pounds) is used to measure how much steam a building consumed.</td></tr>
+<tr><td><b>Data Quality</b></td><td>A set of 10 automatic checks that run when the dashboard loads to verify the data is complete, consistent, and accurate. Results are shown on the Overview tab and the Data Info tab.</td></tr>
+<tr><td><b>Domestic Water</b></td><td>Water used inside buildings for drinking, restrooms, kitchens, laboratories, and other indoor purposes. Distinguished from irrigation water, which is used outdoors.</td></tr>
+<tr><td><b>gal</b></td><td>Gallon. A unit of liquid volume. Water meters measure consumption in gallons.</td></tr>
+<tr><td><b>Irrigation</b></td><td>Water used outdoors for lawns, landscaping, athletic fields, and other outdoor vegetation. Measured separately from domestic water.</td></tr>
+<tr><td><b>JSON</b></td><td>JavaScript Object Notation. The file format used to store the dashboard data. Each data file (e.g., electric.json) contains rows of building-by-month usage values.</td></tr>
+<tr><td><b>kGal</b></td><td>Thousand Gallons (kilo-gallons). The dashboard's standard unit for water volume. 1 kGal = 1,000 gallons.</td></tr>
+<tr><td><b>KPI</b></td><td>Key Performance Indicator. A summary number that shows a critical measurement at a glance. KPI cards appear at the top of each tab.</td></tr>
+<tr><td><b>kWh</b></td><td>Kilowatt-hour. The standard unit for measuring electric energy. 1 kWh is the energy used by a 1,000-watt device running for one hour. Example: a 100-watt light bulb running for 10 hours uses 1 kWh.</td></tr>
+<tr><td><b>lb</b></td><td>Pound. In this dashboard, pounds refer to the weight of steam condensate returned from buildings. Used as the raw measurement unit for steam consumption.</td></tr>
+<tr><td><b>MMBtu</b></td><td>Million British Thermal Units. The dashboard's standard unit for energy, allowing electric, steam, and chilled water to be compared on the same scale. 1 MMBtu = 1,000,000 BTU.</td></tr>
+<tr><td><b>SkySpark</b></td><td>The energy monitoring and analytics platform used by WSU Facilities Services. It collects meter data from campus buildings and is the source of all data displayed in this dashboard. Accessible at skyspark.fais.wsu.edu.</td></tr>
+<tr><td><b>Steam</b></td><td>High-pressure water vapor produced at the campus steam plant and piped to buildings for heating. Measured in pounds (lb) of condensate returned.</td></tr>
+<tr><td><b>ton-ref-hr</b></td><td>Ton of Refrigeration Hour. A unit of cooling energy. One ton of refrigeration = 12,000 BTU per hour, which is the cooling power needed to melt one ton of ice in 24 hours.</td></tr>
+</table>
+
+<div class="footer">
+WSU Facilities Services &nbsp;|&nbsp; Energy Services &nbsp;|&nbsp; Last updated March 2026
+</div>
+
+</body></html>

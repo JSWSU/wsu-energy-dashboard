@@ -1,0 +1,619 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+</style></head><body>
+
+<h1>Guide 5: How to Manage Water Conservation Tasks</h1>
+
+<p>This guide walks you through creating, editing, deleting, and syncing water conservation tasks in the Water Conservation Dashboard. Tasks are the follow-up items that come out of monthly anomaly reviews &mdash; they track what was found, who is investigating, and how it was resolved.</p>
+
+<!-- ============================================================ -->
+<h2>1. Overview</h2>
+<!-- ============================================================ -->
+
+<p>A <strong>task</strong> is a tracked follow-up from a water anomaly investigation. When the dashboard flags unusual water usage at a building &mdash; such as a spike in domestic water or irrigation running during winter &mdash; you create a task to document the issue and track it through investigation to resolution.</p>
+
+<h3>Where Tasks Are Stored</h3>
+
+<p>Tasks are stored in two places:</p>
+
+<table>
+<tr>
+  <th>Location</th>
+  <th>Purpose</th>
+  <th>Notes</th>
+</tr>
+<tr>
+  <td><strong>Browser localStorage</strong></td>
+  <td>Your working copy &mdash; what you see and edit in the dashboard</td>
+  <td>Specific to your browser on your computer. Clearing browser data erases tasks.</td>
+</tr>
+<tr>
+  <td><strong>Smartsheet (CSV backup)</strong></td>
+  <td>The shared record &mdash; what the committee sees and updates</td>
+  <td>Kept in sync via CSV import/export. This is your safety net.</td>
+</tr>
+</table>
+
+<h3>Issue ID Format</h3>
+
+<p>Every task gets a unique Issue ID in the format: <strong>WC-YYYY-NNN</strong></p>
+
+<table>
+<tr>
+  <th>Part</th>
+  <th>Meaning</th>
+  <th>Example</th>
+</tr>
+<tr>
+  <td>WC</td>
+  <td>Water Conservation (prefix for all tasks)</td>
+  <td>WC-2026-001</td>
+</tr>
+<tr>
+  <td>YYYY</td>
+  <td>The year the task was created</td>
+  <td>WC-2026-015</td>
+</tr>
+<tr>
+  <td>NNN</td>
+  <td>Sequential number, zero-padded to 3 digits</td>
+  <td>WC-2025-042</td>
+</tr>
+</table>
+
+<p>Issue IDs are assigned automatically when you create a task. You never need to type one in yourself.</p>
+
+
+<!-- ============================================================ -->
+<h2>2. Creating a Task</h2>
+<!-- ============================================================ -->
+
+<p>There are three ways to create tasks. The most common is from an anomaly row.</p>
+
+<h3>Method A: From an Anomaly Row (Most Common)</h3>
+
+<p>Use this when reviewing anomalies during a monthly meeting and you want to create a task for a specific flagged issue.</p>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Go to the <strong>Anomaly Review</strong> tab.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> Find the anomaly row you want to investigate. You can use the service filter buttons (Domestic Water, Irrigation Water) or the Anomalies Only button to narrow down the list.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> Click on the anomaly row to expand it. You will see a chart and monthly detail table showing the usage pattern.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4.</span> In the <strong>Action</strong> column of the anomaly row, click the <strong>"Create Task"</strong> button. This button only appears if there is no existing open task for that anomaly.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 5.</span> A modal dialog opens with the task form. The following fields are <strong>auto-filled</strong> for you:
+  <ul>
+    <li><strong>Building Number</strong> &mdash; from the anomaly data (read-only)</li>
+    <li><strong>Building Name</strong> &mdash; from the anomaly data (read-only)</li>
+    <li><strong>Utility Type</strong> &mdash; Domestic Water or Irrigation Water (read-only)</li>
+    <li><strong>MeterID</strong> &mdash; the meter that flagged (read-only)</li>
+    <li><strong>Status</strong> &mdash; defaults to "Open - Not Started"</li>
+    <li><strong>WO#</strong> &mdash; defaults to "NA"</li>
+    <li><strong>Action / Description</strong> &mdash; auto-generated with the month, usage amount, percentage deviation, and baseline average</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 6.</span> Fill in the fields you need to set:
+  <ul>
+    <li><strong>Assigned To</strong> &mdash; type the name of who will investigate (e.g., "John S." or "Maintenance")</li>
+    <li><strong>Action Note</strong> &mdash; optional, add any initial notes or context</li>
+    <li><strong>Status</strong> &mdash; change from the dropdown if needed (usually leave as "Open - Not Started")</li>
+    <li><strong>WO#</strong> &mdash; enter a work order number if one has already been created</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 7.</span> Click <strong>"Save Task"</strong>. The task is saved immediately.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> If a prior task exists for the same building and service, the modal will show a <strong>"Prior Notes"</strong> box at the top with the description and action notes from the previous task. This helps you see what was done last time.
+</div>
+
+<h3>Method B: Bulk Create for All New Anomalies</h3>
+
+<p>Use this when you want to quickly create tasks for every anomaly that does not already have an open task.</p>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Go to the <strong>Anomaly Review</strong> tab.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> Click the <strong>"Create Tasks for All New Anomalies"</strong> button at the top of the tab.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> A confirmation message will tell you how many tasks were created. Each task gets the auto-generated description with usage details.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> Bulk-created tasks will have "Open - Not Started" status, no assignee, and WO# set to "NA". You will need to go to the Task Tracker tab afterward to assign people and update statuses.
+</div>
+
+<h3>Method C: From the Building Review Table</h3>
+
+<p>On the Anomaly Review tab, non-anomaly building rows also have a "Create Task" button. Use this if you want to create a task for a building that was not flagged as an anomaly but still needs investigation.</p>
+
+
+<!-- ============================================================ -->
+<h2>3. Editing a Task</h2>
+<!-- ============================================================ -->
+
+<p>There are two ways to edit tasks: <strong>inline editing</strong> (quick changes) and the <strong>edit modal</strong> (full edit form).</p>
+
+<h3>Inline Editing (Quick Changes)</h3>
+
+<p>Three fields can be edited directly in the task table without opening any dialog:</p>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Go to the <strong>Task Tracker</strong> tab.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> Find your task using the search bar or status filters.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> Click directly on one of these editable fields in the table row:
+  <ul>
+    <li><strong>Assigned To</strong> &mdash; click the text, type a new name, click away to save</li>
+    <li><strong>Action Note</strong> &mdash; click the text, type your update, click away to save</li>
+    <li><strong>WO#</strong> &mdash; click the text, type the work order number, click away to save</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4.</span> Click anywhere outside the field to save. Changes are saved automatically to localStorage when you click away.
+</div>
+
+<p>You can also change the <strong>Status</strong> directly in the table by using the dropdown menu in the Status column. Select the new status and it saves immediately.</p>
+
+<h3>Edit Modal (Full Edit Form)</h3>
+
+<p>Use the edit modal when you need to update multiple fields at once, or when you want to edit the Description field (which is not inline-editable).</p>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Go to the <strong>Task Tracker</strong> tab.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> Find the task you want to edit.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> Click the <strong>pencil icon</strong> button in the <strong>Actions</strong> column of the task row.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4.</span> The edit modal opens, showing the task title as "Edit Task WC-YYYY-NNN". All fields are displayed:
+  <ul>
+    <li><strong>Building Number</strong> and <strong>Building Name</strong> &mdash; read-only, cannot be changed</li>
+    <li><strong>Utility Type</strong> and <strong>MeterID</strong> &mdash; read-only, cannot be changed</li>
+    <li><strong>Status</strong> &mdash; select a new status from the dropdown</li>
+    <li><strong>WO#</strong> &mdash; enter or update the work order number</li>
+    <li><strong>Assigned To</strong> &mdash; update who is responsible</li>
+    <li><strong>Action / Description</strong> &mdash; edit the original issue description</li>
+    <li><strong>Action Note</strong> &mdash; add or update resolution notes, progress updates, or investigation findings</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 5.</span> Click <strong>"Save Task"</strong> to save changes, or <strong>"Cancel"</strong> to discard. You can also click outside the modal to cancel.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>4. Understanding the 5 Statuses</h2>
+<!-- ============================================================ -->
+
+<p>Tasks use five statuses that match the Smartsheet task tracker exactly. Use them consistently so the committee always knows where things stand.</p>
+
+<table>
+<tr>
+  <th>Status</th>
+  <th>What It Means</th>
+  <th>Example</th>
+</tr>
+<tr>
+  <td><strong>Open - Not Started</strong></td>
+  <td>The anomaly has been identified but nobody has begun investigating it yet. This is the default status for new tasks.</td>
+  <td>"We noticed high water at Thompson Hall but nobody has checked it yet."</td>
+</tr>
+<tr>
+  <td><strong>Open - In Progress</strong></td>
+  <td>Someone is actively investigating the issue. They may be on-site checking equipment, reviewing meter data, or coordinating with maintenance.</td>
+  <td>"John is checking the irrigation controller at Smith Gym."</td>
+</tr>
+<tr>
+  <td><strong>Open - Monitor</strong></td>
+  <td>The issue was looked at but we are not sure yet if it is a real problem. We are watching the next month of data before taking further action.</td>
+  <td>"CUE water was high last month, let's watch it this month before acting."</td>
+</tr>
+<tr>
+  <td><strong>Closed - Resolved</strong></td>
+  <td>The root cause was found and fixed. The issue is done. Include what was found and what was done in the Action Note before closing.</td>
+  <td>"Found and fixed a leaking valve at Wegner Hall."</td>
+</tr>
+<tr>
+  <td><strong>Closed - Not Resolved</strong></td>
+  <td>The issue was investigated but no problem was found, or the usage is normal for that building's operations. No further action needed.</td>
+  <td>"Investigated McCroskey, usage is normal for that building's operations."</td>
+</tr>
+</table>
+
+<h3>Status Workflow</h3>
+
+<p>A typical task moves through statuses like this:</p>
+
+<div class="step">
+  <strong>Open - Not Started</strong> &rarr; <strong>Open - In Progress</strong> &rarr; <strong>Closed - Resolved</strong>
+</div>
+
+<p>Or, if monitoring is needed first:</p>
+
+<div class="step">
+  <strong>Open - Not Started</strong> &rarr; <strong>Open - Monitor</strong> &rarr; <strong>Open - In Progress</strong> &rarr; <strong>Closed - Resolved</strong>
+</div>
+
+<p>Or, if the investigation finds no real problem:</p>
+
+<div class="step">
+  <strong>Open - Not Started</strong> &rarr; <strong>Open - In Progress</strong> &rarr; <strong>Closed - Not Resolved</strong>
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> The Anomaly Review tab shows a <strong>Task Status</strong> badge for each anomaly row, so you can see at a glance whether an issue is being tracked and what its current status is.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>5. Deleting a Task</h2>
+<!-- ============================================================ -->
+
+<h3>When to Delete vs. When to Close</h3>
+
+<table>
+<tr>
+  <th>Action</th>
+  <th>When to Use</th>
+</tr>
+<tr>
+  <td><strong>Delete</strong></td>
+  <td>The task was created by mistake, is a duplicate of another task, or was created for the wrong building/meter. Delete removes it permanently.</td>
+</tr>
+<tr>
+  <td><strong>Close</strong> (Resolved or Not Resolved)</td>
+  <td>The task was a real investigation item. Even if no action was needed, close it instead of deleting it. Closed tasks stay in the system as a historical record.</td>
+</tr>
+</table>
+
+<div class="warning">
+  <strong>Rule of thumb:</strong> If someone spent any time investigating the issue, <strong>close it</strong> (with notes about what was found). Only <strong>delete</strong> tasks that should never have existed.
+</div>
+
+<h3>How to Delete a Task</h3>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Go to the <strong>Task Tracker</strong> tab.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> Find the task you want to delete.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> Click the <strong>trash can icon</strong> button in the <strong>Actions</strong> column of the task row.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4.</span> A confirmation dialog will appear asking: <strong>"Delete task WC-YYYY-NNN?"</strong> Click <strong>OK</strong> to confirm, or <strong>Cancel</strong> to keep the task.
+</div>
+
+<div class="warning">
+  <strong>Warning:</strong> Deletion is permanent. There is no undo. If you delete a task by accident, you would need to re-import from Smartsheet CSV to recover it (assuming it was previously exported).
+</div>
+
+
+<!-- ============================================================ -->
+<h2>6. Searching and Filtering Tasks</h2>
+<!-- ============================================================ -->
+
+<h3>Search Bar</h3>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Go to the <strong>Task Tracker</strong> tab.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> Type in the search bar at the top. It searches across all of these fields at once:
+  <ul>
+    <li>Building number (e.g., "0078")</li>
+    <li>Building name (e.g., "Thompson")</li>
+    <li>Meter ID (e.g., "0078_DW_001")</li>
+    <li>Assigned To (e.g., "John")</li>
+    <li>Description text (e.g., "irrigation" or "spike")</li>
+    <li>Issue ID (e.g., "WC-2026")</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> Results filter instantly as you type. Clear the search bar to show all tasks again.
+</div>
+
+<h3>Status Filter Buttons</h3>
+
+<p>Above the search bar, you will see a row of filter buttons:</p>
+
+<table>
+<tr>
+  <th>Button</th>
+  <th>Shows</th>
+</tr>
+<tr>
+  <td><strong>All</strong></td>
+  <td>All tasks regardless of status</td>
+</tr>
+<tr>
+  <td><strong>Not Started</strong></td>
+  <td>Only tasks with status "Open - Not Started"</td>
+</tr>
+<tr>
+  <td><strong>In Progress</strong></td>
+  <td>Only tasks with status "Open - In Progress"</td>
+</tr>
+<tr>
+  <td><strong>Monitor</strong></td>
+  <td>Only tasks with status "Open - Monitor"</td>
+</tr>
+<tr>
+  <td><strong>Resolved</strong></td>
+  <td>Only tasks with status "Closed - Resolved"</td>
+</tr>
+<tr>
+  <td><strong>Not Resolved</strong></td>
+  <td>Only tasks with status "Closed - Not Resolved"</td>
+</tr>
+</table>
+
+<p>Click a button to filter. Click <strong>"All"</strong> to return to the full list. The active filter button is highlighted in WSU crimson.</p>
+
+<h3>Status Pills</h3>
+
+<p>Directly below the filter buttons, colored status pills show the count of tasks in each status. This gives you a quick overview of how many items are open, in progress, being monitored, or closed.</p>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> You can combine the status filter with the search bar. For example, click "In Progress" and then type "Smith" to find only in-progress tasks related to Smith Gym.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>7. Smartsheet CSV Sync</h2>
+<!-- ============================================================ -->
+
+<p>Tasks live in your browser (localStorage), but the official shared record is in Smartsheet. You keep them in sync by importing and exporting CSV files. This is a two-way process you should do <strong>before and after each monthly meeting</strong>.</p>
+
+<h3>Importing from Smartsheet</h3>
+
+<p>Import brings Smartsheet data into your browser. Do this <strong>before the meeting</strong> to make sure you have the latest updates from the committee.</p>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Open the Smartsheet water conservation task tracker. Click <strong>File &gt; Export &gt; Export to CSV</strong>. Save the CSV file to a location you can find (e.g., your Downloads folder).
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> In the Water Conservation Dashboard, go to the <strong>Task Tracker</strong> tab.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> Click the <strong>"Import from Smartsheet"</strong> button in the top-right area of the filter bar.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4.</span> A file picker opens. Navigate to and select the CSV file you exported from Smartsheet.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 5.</span> The dashboard processes the file and shows an <strong>import summary</strong> banner:
+  <ul>
+    <li><strong>New</strong> &mdash; tasks in the CSV that were not in your browser (added)</li>
+    <li><strong>Updated</strong> &mdash; tasks that existed in both places but Smartsheet had newer data (Smartsheet wins)</li>
+    <li><strong>Unchanged</strong> &mdash; tasks that were identical in both places (no changes needed)</li>
+  </ul>
+</div>
+
+<h3>How Import Matching Works</h3>
+
+<p>The import tries to match CSV rows to existing tasks in this order:</p>
+
+<table>
+<tr>
+  <th>Priority</th>
+  <th>Match Method</th>
+</tr>
+<tr>
+  <td>1st</td>
+  <td><strong>Issue ID</strong> &mdash; if the CSV row has an Issue ID (e.g., WC-2026-005), it looks for a task with that exact ID</td>
+</tr>
+<tr>
+  <td>2nd</td>
+  <td><strong>Building + Meter + Entry Date</strong> &mdash; fallback if there is no Issue ID match</td>
+</tr>
+<tr>
+  <td>No match</td>
+  <td>A <strong>new task</strong> is created from the CSV data</td>
+</tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Tip &mdash; Smartsheet wins on conflicts:</span> When a task exists in both your browser and the CSV, the import updates your local task with the Smartsheet values for Status, WO#, Action Note, and Assigned To. This is by design &mdash; Smartsheet is the shared record that the whole committee can edit.
+</div>
+
+<h3>Exporting to Smartsheet</h3>
+
+<p>Export sends your browser data out as a CSV file. Do this <strong>after the meeting</strong> to push your updates back to Smartsheet.</p>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> On the <strong>Task Tracker</strong> tab, click the <strong>"Export to Smartsheet"</strong> button in the top-right area of the filter bar.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> A CSV file automatically downloads to your Downloads folder. The filename includes today's date: <strong>water_conservation_tasks_YYYY-MM-DD.csv</strong>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> Open Smartsheet. Import or paste the CSV data to update the shared task tracker. The CSV contains these 11 columns:
+</div>
+
+<table>
+<tr>
+  <th>#</th>
+  <th>Column</th>
+  <th>Example</th>
+</tr>
+<tr><td>1</td><td>Issue ID</td><td>WC-2026-003</td></tr>
+<tr><td>2</td><td>Entry Date</td><td>2026-02-15</td></tr>
+<tr><td>3</td><td>Status</td><td>Open - In Progress</td></tr>
+<tr><td>4</td><td>WO#</td><td>W-84521</td></tr>
+<tr><td>5</td><td>Action Note</td><td>Checked irrigation controller, valve stuck open</td></tr>
+<tr><td>6</td><td>Utility Type</td><td>Domestic Water</td></tr>
+<tr><td>7</td><td>Building Number</td><td>0078</td></tr>
+<tr><td>8</td><td>MeterID</td><td>0078_DW_001</td></tr>
+<tr><td>9</td><td>Building Name</td><td>Thompson Hall</td></tr>
+<tr><td>10</td><td>Action / Description</td><td>Feb 2026: 245.3 kGal (+87% vs prior Feb avg...)</td></tr>
+<tr><td>11</td><td>Assigned To</td><td>John S.</td></tr>
+</table>
+
+<h3>When to Sync</h3>
+
+<table>
+<tr>
+  <th>Timing</th>
+  <th>Action</th>
+  <th>Why</th>
+</tr>
+<tr>
+  <td><strong>Before each meeting</strong></td>
+  <td>Import from Smartsheet</td>
+  <td>Get the latest updates from other committee members who may have updated tasks directly in Smartsheet</td>
+</tr>
+<tr>
+  <td><strong>After each meeting</strong></td>
+  <td>Export to Smartsheet</td>
+  <td>Push your meeting updates (new tasks, status changes, notes) back to the shared record</td>
+</tr>
+<tr>
+  <td><strong>After making bulk changes</strong></td>
+  <td>Export to Smartsheet</td>
+  <td>Backup your work in case browser data is lost</td>
+</tr>
+</table>
+
+
+<!-- ============================================================ -->
+<h2>8. Important Notes</h2>
+<!-- ============================================================ -->
+
+<div class="warning">
+  <strong>Tasks are stored in your browser.</strong> If you clear your browser data (cache, cookies, site data), all tasks in your browser will be permanently lost. Always export to Smartsheet CSV as a backup after making changes.
+</div>
+
+<div class="warning">
+  <strong>Browser-specific storage.</strong> Tasks are tied to the specific browser and computer you are using. If you open the dashboard in a different browser (e.g., switching from Chrome to Edge) or on a different computer, your tasks will not be there. Import the latest Smartsheet CSV first.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Best practice &mdash; Export early, export often:</span> After every meeting, or after making a batch of changes, click "Export to Smartsheet" to download a CSV backup. This takes two seconds and protects you from data loss.
+</div>
+
+<div class="tip">
+  <span class="tip-label">localStorage keys (for reference):</span> Tasks are stored under the key <strong>wsu_water_tasks</strong> and the task counter under <strong>wsu_water_task_counter</strong>. You should never need to interact with these directly, but this is useful to know if IT is troubleshooting.
+</div>
+
+<p>Additional notes to keep in mind:</p>
+
+<ul>
+  <li>The dashboard password is shared across the team. Anyone with the password can view the dashboard, but tasks are per-browser &mdash; each person has their own local copy.</li>
+  <li>The Anomaly Review tab and Task Tracker tab stay in sync. Creating a task from an anomaly row immediately updates the Action column to show the linked task instead of a "Create Task" button.</li>
+  <li>The Task Status badge on anomaly rows updates in real time as you change task statuses.</li>
+</ul>
+
+
+<!-- ============================================================ -->
+<h2>9. Troubleshooting</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr>
+  <th style="width: 30%;">Problem</th>
+  <th style="width: 30%;">Likely Cause</th>
+  <th style="width: 40%;">Solution</th>
+</tr>
+<tr>
+  <td><strong>"My tasks disappeared"</strong></td>
+  <td>Browser data was cleared (manually or by IT policy), or you switched to a different browser or computer.</td>
+  <td>Go to the Task Tracker tab and click <strong>"Import from Smartsheet"</strong>. Select your most recent CSV export. All previously exported tasks will be restored.</td>
+</tr>
+<tr>
+  <td><strong>"Import didn't match any tasks"</strong></td>
+  <td>The Issue ID format in the CSV does not match what is in your browser, or the CSV headers are not in the expected format.</td>
+  <td>Check that the CSV has the exact 11 column headers listed in Section 7 (case-sensitive). Verify Issue IDs are in WC-YYYY-NNN format. If the CSV was exported from Excel, make sure it was saved as "CSV (Comma delimited)" and not tab-separated.</td>
+</tr>
+<tr>
+  <td><strong>"Duplicate tasks appeared"</strong></td>
+  <td>A task was imported that could not be matched to an existing one (different Issue ID or missing building/meter/date match), so a new copy was created.</td>
+  <td>Delete the duplicate task using the trash can icon. To prevent this, always make sure Issue IDs are consistent between the dashboard and Smartsheet.</td>
+</tr>
+<tr>
+  <td><strong>"The Create Task button is missing on an anomaly row"</strong></td>
+  <td>An open task already exists for that building and service. The dashboard links the anomaly to the existing task instead.</td>
+  <td>This is normal behavior. The Action column will show a link to the existing task instead. Click it to jump to the Task Tracker tab with that task highlighted.</td>
+</tr>
+<tr>
+  <td><strong>"I changed a status but the anomaly tab still shows the old status"</strong></td>
+  <td>The Anomaly Review tab may not have re-rendered yet.</td>
+  <td>Click to a different tab and then back to Anomaly Review, or refresh the page. Status changes update both tabs automatically, but if something looks stale, a refresh will fix it.</td>
+</tr>
+<tr>
+  <td><strong>"CSV export file is empty"</strong></td>
+  <td>There are no tasks in your browser localStorage.</td>
+  <td>Import from Smartsheet first. If you have never created any tasks and have no Smartsheet CSV, there is nothing to export yet.</td>
+</tr>
+<tr>
+  <td><strong>"I cannot edit the Building Number or Building Name on a task"</strong></td>
+  <td>These fields are read-only by design. They are set when the task is created and cannot be changed afterward.</td>
+  <td>If the building info is wrong, delete the task and create a new one from the correct anomaly row. Or, if it was a Smartsheet import issue, correct it in Smartsheet and re-import.</td>
+</tr>
+</table>
+
+
+<div class="footer">
+WSU Facilities Services &nbsp;|&nbsp; Energy Services &nbsp;|&nbsp; Last updated March 2026
+</div>
+
+</body></html>

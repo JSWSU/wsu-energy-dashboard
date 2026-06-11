@@ -12,22 +12,73 @@ Cause: One or both JSON files (domestic_water.json, irrigation.json) is missing 
 Solution:
 1. Go to https://github.com/JSWSU/wsu-energy-dashboard and verify both files exist in data/
 2. Open each file and check for valid JSON with a "rows" array
-3. If missing: re-export from SkySpark and upload to GitHub
+3. If missing or invalid: re-export from SkySpark and re-publish via the data
+   update pipeline (bash update-data.sh from C:\Users\john.slagboom\Desktop\Git\,
+   see the OPERATIONS doc); never upload raw exports straight to data/
 4. Validate at https://jsonlint.com/
 
 
 NO ANOMALIES DETECTED
 -----------------------
 
-Cause A: No prior-year data exists for the same calendar month (YoY comparison needs at least 1 prior year).
-Cause B: No buildings have usage spikes exceeding 100% of their prior-year same-month average.
-Cause C: Only the most recent 3 months are checked for anomalies.
+Cause A: No prior-year data exists for the same calendar month (YoY comparison needs at least 1 prior-year value for that month).
+Cause B: No buildings have usage spikes exceeding 100% above their prior-year same-month average (only positive deviations are flagged).
+Cause C: Only the most recent 3 DATA months are checked for anomalies.
 
 Solution:
 1. Check that data spans at least 2 years so prior-year comparison is possible
 2. This may be expected if usage patterns are consistent year-over-year
-3. Anomaly detection only runs on the last 3 months -- older anomalies are not shown
-4. Verify data files contain the expected date range (currently Jan 2024 -- Feb 2026)
+3. Anomaly detection only runs on the most recent 3 months present in the data;
+   older anomalies are not shown
+4. Check the Data Info tab for the live data date range and confirm it includes
+   the months you expect
+
+
+A MONTH SHOWS ZERO OR A BLANK WHERE USAGE IS EXPECTED
+-------------------------------------------------------
+
+Note: a month with missing or nulled data aggregates as 0, so it appears as a
+low or zero bar in charts and tables, not a gap.
+
+Cause A: The client-side sanitizer nulled an implausible value. Every data load
+runs sanitizeOutliers() in the browser; values more than 20x the building's own
+January to July 2025 monthly maximum (minimum threshold 100,000 gallons) are
+nulled before display.
+
+Cause B: The value was nulled server-side by the pipeline sanitizers during a
+data update (known CSV import spikes; the row stays in the file with
+"usage": null).
+
+Cause C: The month's CSV reads have not landed in SkySpark yet. A partially
+reported month aggregates as a low bar.
+
+Solution:
+1. Cause A: open browser dev tools (F12) > Console tab and look for
+   [sanitizeOutliers] warnings naming the building, month, and nulled value.
+   If the reading is genuinely wrong, correct it in SkySpark, re-export, and
+   re-run the data update pipeline
+2. Cause B: check the building's rows in data/domestic_water.json or
+   data/irrigation.json on GitHub for "usage": null. Correct the source data
+   in SkySpark if needed, then re-export and re-run bash update-data.sh from
+   C:\Users\john.slagboom\Desktop\Git\
+3. Cause C: wait for the next manual-reads import (Li's mid-month export),
+   then re-run the data update pipeline (see the OPERATIONS doc or the
+   How to Use tab)
+
+
+DASHBOARD SHOWS OLD MONTHS IN ANOMALY REVIEW
+----------------------------------------------
+
+Cause: Anomaly detection uses the most recent 3 months PRESENT IN THE DATA, not
+the calendar. If data updates are skipped, the dashboard silently keeps
+reviewing the last 3 months it has.
+
+Solution:
+1. Check the Data Info tab for the live data date range
+2. Run the data update pipeline to load newer months (see the OPERATIONS doc
+   or the How to Use tab)
+3. Hard refresh (Ctrl+Shift+R) and confirm the anomaly table shows the new
+   months
 
 
 FILTER SHOWS "NO ANOMALIES MATCH THE SELECTED FILTER"
@@ -44,7 +95,7 @@ Solution:
 IMPORTED TASKS HAVE WRONG BUILDING NUMBERS
 --------------------------------------------
 
-Cause: The Smartsheet CSV has building numbers that don't match the MeterID prefix. This was a known data quality issue in the original Smartsheet (column shift in rows 28-38).
+Cause: The Smartsheet CSV has building numbers that don't match the MeterID prefix. This was a known data quality issue in the original Smartsheet (column shift in rows 28 to 38).
 
 Solution:
 1. The dashboard auto-corrects building numbers from MeterID on import
@@ -160,7 +211,10 @@ Cause: Password is case-sensitive: "Energy@WSU" (capital E, capital W, capital S
 Solution:
 1. Try the exact password: Energy@WSU
 2. Clear browser cache or try an incognito/private window
-3. The auth gate uses localStorage key "wsuMeteringAuth" -- shared across all dashboards
+3. The auth gate uses localStorage key "wsuMeteringAuth", shared by the
+   metering, water conservation, and steam plant dashboards only. The Energy
+   Cost Projection dashboard (index.html) uses its own key (wsuEnergyAuth)
+   and prompts for the password separately.
 
 
 DARK MODE TOGGLE NOT RESPONDING

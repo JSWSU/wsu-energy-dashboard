@@ -1,0 +1,393 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+</style></head><body>
+
+<h1>How to Use the Steam Plant Operations Dashboard</h1>
+
+<p>This guide walks you through every section of the WSU Steam Plant Operations Dashboard. It is written for someone opening the dashboard for the first time. Every abbreviation is defined the first time it appears, and each section explains what you are looking at and why it matters.</p>
+
+<p>The Steam Plant Operations Dashboard tracks the performance of WSU's two steam plants, five boilers, three generators, and plant water systems. It shows gas consumption, steam production, boiler efficiency, runtime hours, and water usage across all equipment.</p>
+
+<!-- ============================================================ -->
+<h2>1. Getting Started</h2>
+<!-- ============================================================ -->
+
+<div class="step">
+<span class="step-num">Step 1.</span> Open your web browser and go to:<br>
+<b>https://jswsu.github.io/wsu-energy-dashboard/steam-plant.html</b>
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> You will see a login screen titled "WSU Steam Plant Operations" with a password field. Type the password <b>Energy@WSU</b> and click <b>Sign In</b> (or press Enter).
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> After signing in, the password screen disappears and you see the dashboard. At the top is a crimson header bar reading "WSU Steam Plant Operations" with a subtitle showing the date range of the data (for example, "Jul 20 &ndash; Feb 26 &bull; 68 Months &bull; 5 Boilers, 2 Plants, 3 Generators"). You only need to sign in once &mdash; the browser remembers you.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Below the header, you will see a row of tabs: <b>Overview</b>, <b>Gas Consumption</b>, <b>Steam &amp; Efficiency</b>, <b>Runtime &amp; Availability</b>, <b>Plant Water</b>, <b>Data Management</b>, <b>UP Report</b>, and <b>Help</b>. Click any tab to switch to that section. The active tab is highlighted in crimson.
+</div>
+
+<div class="step">
+<span class="step-num">Step 4.</span> In the header bar on the right side, you will see links to the other WSU energy dashboards (Campus Metering, Water Conservation, Energy Cost Projection, and Folder Map), plus a <b>Dark Mode</b> toggle slider.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> The Overview tab loads by default. It shows a fiscal year selector, five colored summary cards, and two charts. If you see "Error Loading Data" instead, the data file may not be available &mdash; contact your supervisor.
+</div>
+
+<!-- ============================================================ -->
+<h2>2. Overview Tab</h2>
+<!-- ============================================================ -->
+
+<p>The Overview tab gives you a high-level summary of all steam plant operations for a chosen fiscal year. It is the first thing you see when you open the dashboard.</p>
+
+<h3>Fiscal Year Selector</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> At the top left of the Overview tab, find the <b>Fiscal Year</b> dropdown. It defaults to the most recent fiscal year. A fiscal year (FY) at WSU runs from July 1 through June 30. For example, FY26 runs from July 2025 through June 2026.
+</div>
+
+<div class="step">
+<span class="step-num">Step 2.</span> Click the dropdown and select any available fiscal year (for example, FY25 or FY24). All KPI (Key Performance Indicator) cards and charts on this tab will update to show data for that year.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Next to the dropdown, you will see a summary like "8 of 12 months &bull; Jul 25 &ndash; Feb 26." This tells you how many months of data are available for the selected fiscal year.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> If the fiscal year is not yet complete (fewer than 12 months), the dashboard is showing Fiscal Year To Date (FYTD) data. FYTD means "the total from the start of the fiscal year up to the latest month with data."
+</div>
+
+<h3>KPI Summary Cards</h3>
+
+<p>Below the fiscal year selector, five colored cards summarize the key metrics. Each card shows:</p>
+
+<table>
+<tr><th>Card</th><th>Color</th><th>What It Shows</th></tr>
+<tr><td>Campus Total Gas</td><td>Gold border</td><td>Total natural gas consumed by all boilers, measured in SCF (Standard Cubic Feet). SCF is a standardized unit for measuring gas volume.</td></tr>
+<tr><td>Campus Total Steam</td><td>Crimson border</td><td>Total steam produced by all boilers, measured in pounds (lbs).</td></tr>
+<tr><td>Total Boiler Runtime</td><td>Amber border</td><td>Combined run hours for all 5 boilers during the selected fiscal year.</td></tr>
+<tr><td>Generator Output</td><td>Indigo border</td><td>Total electricity produced by on-site generators, measured in kWh (kilowatt-hours).</td></tr>
+<tr><td>Total Plant Water</td><td>Blue border</td><td>Combined water usage across both steam plants from all sources.</td></tr>
+</table>
+
+<div class="step">
+<span class="step-num">Step 4.</span> Each card shows three pieces of information: the FYTD total value, a comparison to the same period in the prior fiscal year (with a percentage change arrow &mdash; green down arrow means a decrease, red up arrow means an increase), and a projected annual total. The projection takes the FYTD total and estimates the full 12-month number.
+</div>
+
+<div class="step">
+<span class="step-num">Step 5.</span> <b>Click any KPI card</b> to expand it. A comparison table appears below the card showing a month-by-month breakdown: the current fiscal year value, the prior fiscal year value, and the percentage change for each month. The bottom row shows the FYTD totals. Click the card again to collapse it.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> When a card is expanded, a small triangle icon at the top-right of the card rotates to point upward, and the detailed table slides open with an animation.
+</div>
+
+<h3>Charts</h3>
+
+<div class="step">
+<span class="step-num">Step 6.</span> Below the KPI cards are two charts side by side:
+</div>
+
+<p><b>Monthly Gas &amp; Steam Trends</b> (left chart): A line chart showing monthly gas consumption on the left axis and steam production on the right axis over the entire data range. The selected fiscal year is highlighted with thicker lines. Gas and steam normally rise and fall together because more gas is burned to produce more steam. If they diverge, it may indicate an efficiency change.</p>
+
+<p><b>Gas Consumption by Fiscal Year</b> (right chart): A bar chart showing the total gas consumed in each fiscal year. The selected year is highlighted. If a fiscal year is incomplete, the bar shows only the actual-to-date value. Use this chart to compare year-over-year trends and see whether gas consumption is rising or falling.</p>
+
+<!-- ============================================================ -->
+<h2>3. Gas Consumption Tab</h2>
+<!-- ============================================================ -->
+
+<p>Click the <b>Gas Consumption</b> tab to see detailed natural gas usage broken down by individual boiler and by steam plant.</p>
+
+<h3>KPI Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> At the top of this tab, three KPI cards summarize gas consumption across the entire data range:
+</div>
+
+<table>
+<tr><th>Card</th><th>What It Shows</th></tr>
+<tr><td>CASP Total Gas</td><td>Gas consumed at the Central Auditorium Steam Plant (CASP), which houses Boilers 1 and 2. Measured in SCF (Standard Cubic Feet).</td></tr>
+<tr><td>GWSP Total Gas</td><td>Gas consumed at the Grimes Way Steam Plant (GWSP), which houses Boilers 3, 4, and 5. Measured in SCF.</td></tr>
+<tr><td>Campus Total Gas</td><td>Combined gas from both plants (CASP + GWSP). Also shows how many months had fuel oil firing events.</td></tr>
+</table>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> CASP is the Central Auditorium Steam Plant (Boilers 1 and 2, gas only). GWSP is the Grimes Way Steam Plant (Boilers 3, 4, and 5, which are dual-fuel and can also burn oil).
+</div>
+
+<h3>Monthly Gas by Boiler Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 2.</span> The large stacked bar chart titled <b>Monthly Gas by Boiler (scf)</b> shows each month's total gas consumption broken into colored segments for each boiler: B1 (blue), B2 (red), B3 (amber), B4 (purple), B5 (cyan). Taller bars indicate months with higher heating demand, typically during winter.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Hover over any bar segment to see a tooltip showing the exact gas value for that boiler in that month.
+</div>
+
+<h3>CASP vs GWSP vs Campus Gas Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 4.</span> The left side-by-side chart titled <b>CASP vs GWSP vs Campus Gas</b> is a line chart comparing gas consumption between the two steam plants. The Campus line (gold) is the sum of the CASP (crimson) and GWSP (green) lines. This helps you see which plant is using more gas in any given month.
+</div>
+
+<h3>Oil Usage Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 5.</span> The right side-by-side chart titled <b>Oil Usage (lbs) &mdash; Boilers 3, 4, 5</b> shows fuel oil consumption. Only Boilers 3, 4, and 5 at GWSP are dual-fuel and capable of burning oil. Oil firing is uncommon &mdash; most months will show zero. Non-zero months indicate gas supply constraints or scheduled testing of the oil firing system.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> The oil chart will usually be mostly flat at zero. If you see a spike, it means one or more dual-fuel boilers switched to oil for that month.
+</div>
+
+<h3>Monthly Gas Detail Table</h3>
+
+<div class="step">
+<span class="step-num">Step 6.</span> Below the charts is a detailed table showing gas consumption for every month. Columns include each boiler (B1 through B5), plant totals (CASP and GWSP), campus total, and oil usage. Months with oil firing are highlighted in red. The bottom row shows the all-time total for each column.
+</div>
+
+<!-- ============================================================ -->
+<h2>4. Steam &amp; Efficiency Tab</h2>
+<!-- ============================================================ -->
+
+<p>Click the <b>Steam &amp; Efficiency</b> tab to see how much steam the boilers produce and how efficiently they convert gas into steam.</p>
+
+<h3>KPI Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Four KPI cards summarize steam production and efficiency:
+</div>
+
+<table>
+<tr><th>Card</th><th>What It Shows</th></tr>
+<tr><td>Campus Total Steam</td><td>Total steam produced by all boilers across the entire data range, in pounds (lbs).</td></tr>
+<tr><td>Avg Efficiency Ratio</td><td>The average ratio of steam output (lbs) to gas input (SCF) across all boilers. A higher number means the boilers are converting gas into steam more efficiently.</td></tr>
+<tr><td>Avg Economizer Delta-T</td><td>The average temperature difference (in degrees Fahrenheit) across the economizer heat exchangers. Higher is better.</td></tr>
+<tr><td>Peak Steam Month</td><td>The single month with the highest total steam production, with the exact value shown below.</td></tr>
+</table>
+
+<h3>What Is an Efficiency Ratio?</h3>
+
+<div class="tip">
+<span class="tip-label">Key concept:</span> The efficiency ratio is calculated as: steam produced (lbs) divided by gas consumed (SCF). For example, a ratio of 8.50 lbs/scf means the boiler produces 8.50 pounds of steam for every standard cubic foot of gas it burns. A higher ratio is better because it means less fuel is wasted. Each boiler has its own efficiency, and you can compare them on the chart below.
+</div>
+
+<h3>What Is an Economizer?</h3>
+
+<div class="tip">
+<span class="tip-label">Key concept:</span> An economizer is a heat exchanger that recovers heat from the hot exhaust gases leaving the boiler. It uses that recovered heat to pre-warm the incoming feedwater before it enters the boiler. This reduces the amount of fuel needed to turn the water into steam. Delta-T (written as "Delta-T" or the Greek letter Delta followed by T) means "temperature difference" &mdash; specifically, the outlet temperature minus the inlet temperature of the economizer. A higher Delta-T means more heat is being recovered from the exhaust.
+</div>
+
+<h3>Monthly Steam Production Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 2.</span> The large stacked bar chart titled <b>Monthly Steam Production by Boiler (lbs)</b> shows steam output for each month, stacked by boiler. Boilers 1 and 2 (CASP) produce steam from gas only. Boilers 3, 4, and 5 (GWSP) are dual-fuel and their bars show total steam (gas plus oil combined).
+</div>
+
+<h3>Efficiency Ratio Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 3.</span> The left side-by-side chart titled <b>Efficiency Ratio (steam lbs / gas scf)</b> is a line chart showing each boiler's efficiency over time. Each boiler has its own colored line. Gaps in a line mean that boiler was offline (no gas consumed) during that month. A consistently lower line may indicate a boiler that needs maintenance or tuning.
+</div>
+
+<h3>Economizer Delta-T Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 4.</span> The right side-by-side chart titled <b>Economizer Delta-T (degrees F) by Boiler</b> plots the temperature gain across each boiler's economizer. A declining trend could mean the economizer surfaces are fouled with soot and need cleaning. Gaps mean the boiler was offline or no temperature data was recorded.
+</div>
+
+<!-- ============================================================ -->
+<h2>5. Runtime &amp; Availability Tab</h2>
+<!-- ============================================================ -->
+
+<p>Click the <b>Runtime &amp; Availability</b> tab to see how many hours each boiler and generator has operated.</p>
+
+<h3>KPI Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Four KPI cards summarize runtime:
+</div>
+
+<table>
+<tr><th>Card</th><th>What It Shows</th></tr>
+<tr><td>Total Boiler Runtime</td><td>Combined run hours across all 5 boilers for the entire data range.</td></tr>
+<tr><td>Generator Runtime</td><td>Totalized cumulative runtime (in hours) across all 3 generators. This is the lifetime meter reading, not a monthly figure.</td></tr>
+<tr><td>Generator Output</td><td>Totalized cumulative electricity generated (in kWh) across all 3 generators. This is the lifetime meter reading.</td></tr>
+<tr><td>Oil Runtime Events</td><td>The number of months in which any boiler recorded oil-fired runtime.</td></tr>
+</table>
+
+<div class="tip">
+<span class="tip-label">Key concept:</span> "Cumulative runtime" means the running meter total since the meter was installed. It only goes up over time. The dashboard calculates the monthly runtime by subtracting the previous month's reading from the current month's reading (this is called a "delta").
+</div>
+
+<h3>Monthly Boiler Runtime Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 2.</span> The large stacked bar chart titled <b>Monthly Boiler Runtime (hrs)</b> shows actual run hours per boiler per month. Expect higher runtime during the winter heating season (roughly November through March). A significant drop in a boiler's runtime during winter could indicate a maintenance outage or equipment issue.
+</div>
+
+<h3>Boiler Availability Heatmap</h3>
+
+<div class="step">
+<span class="step-num">Step 3.</span> Below the runtime chart is a <b>Boiler Availability Heatmap</b>. This is a color-coded grid showing the last 24 months. Each cell represents one boiler in one month. The colors mean:
+</div>
+
+<table>
+<tr><th>Color</th><th>Runtime Hours</th><th>Meaning</th></tr>
+<tr><td style="background: #dcfce7; color: #166534; font-weight: bold;">Green</td><td>More than 500 hrs</td><td>Heavily used &mdash; the boiler ran for a large portion of the month.</td></tr>
+<tr><td style="background: #fef9c3; color: #854d0e; font-weight: bold;">Yellow</td><td>100 to 500 hrs</td><td>Moderate use &mdash; the boiler ran part of the month.</td></tr>
+<tr><td style="background: #fee2e2; color: #991b1b; font-weight: bold;">Red</td><td>Less than 100 hrs</td><td>Light use &mdash; the boiler barely ran or was started briefly.</td></tr>
+<tr><td style="background: #f9fafb; color: #6b7280;">Dash (&mdash;)</td><td>0 hrs</td><td>Offline or idle &mdash; the boiler did not run that month.</td></tr>
+</table>
+
+<div class="step">
+<span class="step-num">Step 4.</span> Scroll the heatmap left and right if needed to see all 24 months. This is a quick way to spot patterns, such as a boiler that was offline for several months in a row (maintenance shutdown) or seasonal patterns in boiler usage.
+</div>
+
+<h3>Generator Runtime &amp; Output Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 5.</span> The bottom chart titled <b>Generator Runtime &amp; Output</b> shows monthly electricity generated (in kWh) by each of the three on-site generators: Generator 1 (gas-fired), Generator 2 (gas-fired), and Generator 3 (diesel). Generators typically run during peak electrical demand periods or during utility power outages. Many months may show zero output if the generators were not needed.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> Generator output is usually low or zero in most months. Significant spikes indicate a period when on-site generation was needed, often due to an outage or demand management event.
+</div>
+
+<!-- ============================================================ -->
+<h2>6. Plant Water Tab</h2>
+<!-- ============================================================ -->
+
+<p>Click the <b>Plant Water</b> tab to see water usage across both steam plants from various sources.</p>
+
+<h3>Understanding the Water System</h3>
+
+<div class="tip">
+<span class="tip-label">Key concept:</span> Steam plants need a constant supply of water to produce steam. The water system works like this: <b>Raw water</b> (untreated water from a well or other source) enters the plant. Some water is treated to become <b>potable</b> (city-quality drinking water). Some raw water goes through a <b>Reverse Osmosis (RO)</b> membrane system, which removes dissolved minerals; the purified output is called <b>RO permeate</b>. This treated water becomes <b>makeup water</b>, which is fed into the boiler to replace steam that has been sent out to campus buildings. The quality of the makeup water matters because mineral-laden water causes scale buildup inside boilers.
+</div>
+
+<h3>KPI Cards</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> Five KPI cards summarize water usage:
+</div>
+
+<table>
+<tr><th>Card</th><th>What It Shows</th></tr>
+<tr><td>GWSP Raw Water</td><td>Grimes Way Steam Plant raw water intake (in gallons x1000).</td></tr>
+<tr><td>GWSP Potable</td><td>Grimes Way potable (city) water usage (in gallons x100).</td></tr>
+<tr><td>GWSP Permeate</td><td>Grimes Way reverse osmosis permeate output.</td></tr>
+<tr><td>CASP East Water</td><td>Central Auditorium Steam Plant east side water usage (in gallons x100).</td></tr>
+<tr><td>CASP West Water</td><td>Central Auditorium Steam Plant west side water usage (in gallons x100).</td></tr>
+</table>
+
+<h3>Monthly Plant Water by Source Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 2.</span> The large stacked bar chart titled <b>Monthly Plant Water by Source</b> shows total plant water each month, broken into colored segments: GWSP Raw (blue), GWSP Potable (green), GWSP Permeate (cyan), CASP East (crimson), and CASP West (purple). This gives you a complete picture of where all the plant water is coming from.
+</div>
+
+<h3>GWSP Water Trends Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 3.</span> The left side-by-side chart titled <b>GWSP Water Trends</b> is a line chart showing individual water source trends for the Grimes Way plant: raw water (untreated intake), potable (city supply), and permeate (reverse osmosis output). These lines help you understand which water sources are being relied on and whether usage patterns are changing.
+</div>
+
+<h3>Makeup Water Temperature Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 4.</span> The right side-by-side chart titled <b>Makeup Water Temperature (degrees F)</b> tracks the temperature of GWSP boiler makeup water over time. This temperature follows seasonal patterns: colder in winter, warmer in summer. Colder inlet water requires more energy to heat to steam temperature, which affects boiler efficiency. Watch for unusual drops that could indicate a change in the water source.
+</div>
+
+<h3>CASP East vs West Water Chart</h3>
+
+<div class="step">
+<span class="step-num">Step 5.</span> The bottom chart titled <b>CASP East vs West Water</b> is a bar chart comparing water consumption between the east and west sides of the Central Auditorium Steam Plant. In normal operation, both sides should show roughly similar usage. A significant or persistent imbalance between the two may indicate a leak, a stuck valve, or other plumbing issue that should be investigated.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> If one side consistently uses much more water than the other over several months, mention it to your supervisor. It could be a sign of a problem that needs maintenance attention.
+</div>
+
+<!-- ============================================================ -->
+<h2>7. Dark Mode and Printing</h2>
+<!-- ============================================================ -->
+
+<h3>Dark Mode</h3>
+
+<div class="step">
+<span class="step-num">Step 1.</span> In the top-right corner of the header bar, find the <b>Dark Mode</b> slider toggle. Click it to switch between light mode (white backgrounds) and dark mode (dark gray backgrounds). The setting is saved in your browser, so it will persist the next time you visit.
+</div>
+
+<div class="tip">
+<span class="tip-label">What you should see:</span> In dark mode, the background turns dark gray, text turns light gray, and all charts and tables adjust their colors for readability. The dark mode toggle dot slides to the right and turns gold.
+</div>
+
+<h3>Printing</h3>
+
+<div class="step">
+<span class="step-num">Step 2.</span> To print a summary of the dashboard, press <b>Ctrl+P</b> (or go to File &gt; Print in your browser). The dashboard automatically switches to a print-friendly layout: the header, navigation tabs, login screen, and dark mode toggle are hidden. A special print summary section is shown instead with key data.
+</div>
+
+<div class="step">
+<span class="step-num">Step 3.</span> The print layout uses landscape orientation with 0.5-inch margins. If you are in dark mode, the print version automatically reverts to light colors so it prints clearly on white paper. You can also "Print to PDF" to save a copy.
+</div>
+
+<!-- ============================================================ -->
+<h2>8. Glossary</h2>
+<!-- ============================================================ -->
+
+<p>This glossary defines every technical term and abbreviation used in the dashboard.</p>
+
+<table>
+<tr><th>Term</th><th>Definition</th></tr>
+<tr><td><b>CASP</b></td><td>Central Auditorium Steam Plant. Located at the center of campus. Houses Boilers 1 and 2, which burn natural gas only.</td></tr>
+<tr><td><b>GWSP</b></td><td>Grimes Way Steam Plant. Located on the west side of campus. Houses Boilers 3, 4, and 5, which are dual-fuel (gas and oil).</td></tr>
+<tr><td><b>SCF</b></td><td>Standard Cubic Feet. A unit for measuring the volume of natural gas at standardized temperature and pressure conditions. This makes measurements comparable regardless of actual conditions at the time of measurement.</td></tr>
+<tr><td><b>FY</b></td><td>Fiscal Year. WSU's fiscal year runs from July 1 through June 30 of the following calendar year. FY26 means July 1, 2025 through June 30, 2026.</td></tr>
+<tr><td><b>FYTD</b></td><td>Fiscal Year To Date. The cumulative total from the start of the fiscal year (July 1) through the latest month with available data. For example, if data is available through February, FYTD covers July through February (8 of 12 months).</td></tr>
+<tr><td><b>KPI</b></td><td>Key Performance Indicator. A summary metric displayed in a colored card at the top of each tab. KPIs provide at-a-glance information about the most important measures.</td></tr>
+<tr><td><b>Delta-T</b></td><td>Temperature difference, specifically outlet temperature minus inlet temperature. Written with the Greek letter Delta and a capital T. Used on this dashboard to measure economizer performance. A higher Delta-T means more heat is being recovered.</td></tr>
+<tr><td><b>Economizer</b></td><td>A heat exchanger installed in the boiler exhaust stack that recovers waste heat from hot flue gases. It uses that heat to pre-warm the incoming feedwater, reducing the amount of fuel needed to produce steam.</td></tr>
+<tr><td><b>Efficiency Ratio</b></td><td>Steam output (lbs) divided by gas input (SCF). A higher ratio means the boiler is converting fuel into steam more efficiently. Typical values vary by boiler age and design.</td></tr>
+<tr><td><b>Dual-fuel</b></td><td>A boiler that can burn either natural gas or fuel oil. Boilers 3, 4, and 5 at GWSP are dual-fuel. Oil firing is uncommon and typically happens during gas supply constraints or testing.</td></tr>
+<tr><td><b>Runtime</b></td><td>The number of hours a boiler or generator has been in operation. Measured by a cumulative hour meter on each piece of equipment. Monthly runtime is calculated as the difference between the current and previous month's meter reading.</td></tr>
+<tr><td><b>Raw Water</b></td><td>Untreated water from a well or other natural source that enters the steam plant before any purification.</td></tr>
+<tr><td><b>Potable Water</b></td><td>City-quality treated drinking water supplied to the steam plant from the municipal or campus water system.</td></tr>
+<tr><td><b>RO Permeate</b></td><td>Water that has been purified by a Reverse Osmosis (RO) membrane system. RO removes dissolved minerals and impurities, producing very clean water called "permeate." This high-quality water is used as boiler makeup water to prevent mineral scale buildup.</td></tr>
+<tr><td><b>Makeup Water</b></td><td>Treated water that is added to the boiler system to replace water lost as steam. Steam is sent to campus buildings for heating; the condensate (cooled steam) is partially returned, but some is lost. Makeup water replenishes what is lost.</td></tr>
+<tr><td><b>kWh</b></td><td>Kilowatt-hour. A unit of electrical energy. One kWh equals the energy consumed (or produced) by a 1,000-watt device running for one hour.</td></tr>
+<tr><td><b>Generator</b></td><td>An on-site machine that produces electricity. WSU has three generators: Generators 1 and 2 are gas-fired, and Generator 3 is diesel-fired. They run during peak demand or utility outages to provide backup power.</td></tr>
+<tr><td><b>Heatmap</b></td><td>A color-coded grid on the Runtime &amp; Availability tab that shows boiler operating levels at a glance. Green means heavy use, yellow means moderate, red means light, and a dash means the boiler was offline.</td></tr>
+<tr><td><b>Projection</b></td><td>An estimate of the full fiscal year total based on the FYTD average. Calculated as (FYTD total / months elapsed) x 12. This gives a rough forecast assuming the rest of the year follows the same trend.</td></tr>
+<tr><td><b>lbs (pounds)</b></td><td>The unit used to measure steam production and fuel oil consumption. Steam is measured by mass flow in pounds.</td></tr>
+<tr><td><b>MMBTU</b></td><td>One Million British Thermal Units. A standard unit of energy used to measure delivered natural gas quantities on utility bills.</td></tr>
+<tr><td><b>BTU/cuft</b></td><td>British Thermal Units per cubic foot. A measure of the energy content (heat value) of the natural gas being delivered. Higher BTU/cuft means the gas is richer in energy.</td></tr>
+<tr><td><b>UP Report</b></td><td>Utilities Production Report. A monthly report generated from the UP Report tab that combines auto-populated steam plant data with manually entered invoice data (gas costs, electric bills, water well readings).</td></tr>
+</table>
+
+<div class="footer">
+WSU Facilities Services &nbsp;|&nbsp; Energy Services &nbsp;|&nbsp; Last updated March 2026
+</div>
+
+</body></html>

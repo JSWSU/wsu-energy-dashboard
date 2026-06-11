@@ -1,0 +1,347 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+</style></head><body>
+
+<h1>How to Run a Water Conservation Meeting</h1>
+<p style="font-size: 10pt; color: #6b7280;">Guide 4 &mdash; WSU Facilities Services, Energy Services</p>
+
+
+<!-- ============================================================ -->
+<h2>1. Overview</h2>
+<!-- ============================================================ -->
+
+<p>The Water Conservation Task Force meets monthly to review water usage anomalies across campus buildings. The purpose of the meeting is to identify unexpected spikes in domestic or irrigation water usage, decide whether each spike requires investigation, assign follow-up tasks, and track progress on previously opened issues.</p>
+
+<p>The <strong>Water Conservation Meeting Dashboard</strong> (<code>water-conservation.html</code>) is the primary tool for the meeting. It replaces the old workflow of viewing SkySpark reports side-by-side with a Smartsheet task tracker. Everything now happens in a single browser screen.</p>
+
+<p><strong>Who attends:</strong> Facilities Services energy staff, building maintenance supervisors, plumbing shop leads, and occasionally representatives from Housing, Dining, or Athletics for buildings under their purview.</p>
+
+<p><strong>What the dashboard provides:</strong></p>
+<ul>
+  <li><strong>Anomaly Review tab</strong> &mdash; A sortable, filterable table of every metered building/service pair, with automatic spike detection and winter irrigation alerts. Click any row to expand a year-over-year chart and monthly data table.</li>
+  <li><strong>Task Tracker tab</strong> &mdash; Full task management with five statuses that match the Smartsheet tracker. Import/export CSV for Smartsheet sync.</li>
+  <li><strong>Historical Trends tab</strong> &mdash; Campus-wide domestic and irrigation water trend charts, plus a top-10 buildings chart.</li>
+  <li><strong>Building Index tab</strong> &mdash; Searchable directory of all buildings with domestic and irrigation badges. Click any building to expand its monthly usage detail.</li>
+  <li><strong>How to Use tab</strong>: In-app help covering the meeting workflow, data updates, and Smartsheet sync.</li>
+  <li><strong>Data Info tab</strong>: Data sources, the update pipeline steps, and automated data quality checks.</li>
+  <li><strong>KPI summary cards</strong> &mdash; At the top of the Anomaly Review tab: Domestic Spike Anomalies, Irrigation Spike Anomalies, Winter Irrigation Alerts, and Open Tasks.</li>
+</ul>
+
+<p><strong>Dashboard URL:</strong> <code>jswsu.github.io/wsu-energy-dashboard/water-conservation.html</code></p>
+<p><strong>Password:</strong> <code>Energy@WSU</code></p>
+
+
+<!-- ============================================================ -->
+<h2>2. Before the Meeting (15 min prep)</h2>
+<!-- ============================================================ -->
+
+<p>Complete these steps 15 to 30 minutes before the meeting starts. The goal is to make sure the data is current and you are familiar with the anomalies so you can lead the discussion smoothly.</p>
+
+<div class="step">
+  <span class="step-num">Step 1:</span> Open the dashboard in your browser and log in with <code>Energy@WSU</code>. You will land on the <strong>Anomaly Review</strong> tab by default.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2:</span> Check the KPI cards at the top. These give you a quick count of how many anomalies were detected:
+  <ul>
+    <li><strong>Domestic Spike Anomalies</strong> &mdash; Count of flagged months on domestic water meters: months within the most recent 3 data months where usage is more than 100% above the average of the same calendar month in prior years.</li>
+    <li><strong>Irrigation Spike Anomalies</strong> &mdash; The same detection applied to irrigation meters. No months are excluded: the prior-year same-month comparison absorbs the summer irrigation ramp naturally.</li>
+    <li><strong>Winter Irrigation Alerts</strong> &mdash; Irrigation usage of 1 kGal or more in any November to February month within the most recent 3 data months. Systems should be winterized in these months.</li>
+    <li><strong>Open Tasks</strong> &mdash; Count of tasks in Open status (Not Started, In Progress, or Monitor).</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3:</span> Click the <strong>"Anomalies Only"</strong> button (red outline) in the filter bar. This hides buildings with no anomalies and shows only the flagged rows. Scan the list to get a sense of how many buildings need discussion.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4:</span> For each anomaly, note the key information in the table columns:
+  <ul>
+    <li><strong>Bldg # / Building Name</strong> &mdash; Which building.</li>
+    <li><strong>Service</strong> &mdash; Domestic Water or Irrigation Water.</li>
+    <li><strong>Type</strong> &mdash; Spike or Winter Irrigation.</li>
+    <li><strong>Month</strong> &mdash; The month when the anomaly occurred.</li>
+    <li><strong>Usage (kGal)</strong> &mdash; How much water was used in that month.</li>
+    <li><strong>Baseline (kGal)</strong> &mdash; The expected usage (average of the same month in prior years). For winter irrigation, baseline is "0 (expected)" because no irrigation should occur.</li>
+    <li><strong>Deviation</strong> &mdash; How far above the baseline, shown as a percentage (e.g., +245%).</li>
+    <li><strong>Task Status</strong> &mdash; Whether a task already exists for this anomaly.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 5:</span> Click over to the <strong>Task Tracker</strong> tab. Review the list of open tasks from the previous meeting. Check if any tasks have been updated externally in Smartsheet.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 6:</span> If someone updated tasks in Smartsheet since the last meeting, import those changes now:
+  <ol>
+    <li>Export the current Smartsheet task list as a CSV file.</li>
+    <li>On the Task Tracker tab, click <strong>"Import from Smartsheet"</strong>.</li>
+    <li>Select the CSV file. The dashboard will show an import summary (e.g., "Imported 47 rows: 0 new, 12 updated, 35 unchanged.").</li>
+    <li>Review the summary to confirm changes look correct.</li>
+  </ol>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 7 (optional):</span> If attendees prefer a paper reference, press <strong>Ctrl+P</strong> to print. The print layout shows the anomaly table and open tasks in a clean landscape format with a signature line for next meeting date.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> You can also use the <strong>"Spikes Only"</strong> or <strong>"Winter Irrigation Only"</strong> filter buttons to isolate specific anomaly types. Use the <strong>"All Services"</strong>, <strong>"Domestic Water"</strong>, or <strong>"Irrigation Water"</strong> buttons to filter by water type.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>3. During the Meeting</h2>
+<!-- ============================================================ -->
+
+<p>Share your screen so everyone can see the dashboard. Start on the <strong>Anomaly Review</strong> tab with the <strong>"Anomalies Only"</strong> filter active.</p>
+
+<div class="step">
+  <span class="step-num">Step 1:</span> Walk through the anomaly table from top to bottom. You can click the <strong>"Deviation"</strong> column header to sort by highest deviation first &mdash; this puts the biggest spikes at the top so you address the most significant issues first.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2:</span> For each anomaly row, <strong>click the row to expand it</strong>. This reveals two things:
+  <ul>
+    <li><strong>Year-over-year line chart</strong> &mdash; Shows monthly usage for each calendar year as separate lines, with the anomaly month highlighted by a red dot. This helps the group quickly see if usage is truly unusual or part of a trend.</li>
+    <li><strong>Monthly data table</strong> &mdash; Shows actual kGal values for each month broken down by year. The bottom row shows the year-over-year percentage change for each month. Anomaly cells are highlighted in red.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3:</span> Lead a brief discussion for each anomaly:
+  <ul>
+    <li>Is this expected? (e.g., a new building came online, a known event)</li>
+    <li>Is there a known cause? (e.g., a leak that was already reported)</li>
+    <li>Does it need investigation? (e.g., maintenance should check the meter or the building)</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4:</span> If action is needed, click the <strong>"Create Task"</strong> button in the Action column. A modal dialog opens with the building number, building name, utility type, and meter ID pre-filled. Fill in:
+  <ul>
+    <li><strong>Status</strong> &mdash; Usually "Open - Not Started" for a new issue.</li>
+    <li><strong>Assigned To</strong> &mdash; The person or shop responsible for investigating.</li>
+    <li><strong>Action / Description</strong> &mdash; A description of the anomaly is auto-generated (e.g., "Feb 26: 152.3 kGal (+245% vs prior Feb avg of 44.1 kGal). Investigate cause."). You can edit this or add context from the discussion.</li>
+    <li><strong>Action Note</strong> &mdash; Any immediate notes from the meeting discussion.</li>
+    <li><strong>WO#</strong> &mdash; Work order number, if one has been submitted. Leave as "NA" if not applicable yet.</li>
+  </ul>
+  Click <strong>"Save Task"</strong> to create it.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> If there are many new anomalies, you can click <strong>"Create Tasks for All New Anomalies"</strong> at the top of the filter bar. This bulk-creates tasks for every anomaly that does not already have one. You can then go to the Task Tracker tab to fill in assignees and notes for each.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 5:</span> If a task already exists for an anomaly, the Action column shows the Issue ID (e.g., "WC-2026-003") as a button. Click it to jump directly to that task on the Task Tracker tab so you can update it during the meeting.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 6:</span> Switch to the <strong>Task Tracker</strong> tab to review and update existing tasks:
+  <ul>
+    <li><strong>Change status</strong> &mdash; Use the dropdown in the Status column. For example, move a task from "Not Started" to "In Progress" if someone has begun investigating, or to "Monitor" if the group wants to watch it for another month.</li>
+    <li><strong>Update notes</strong> &mdash; Click the Action Note cell to type directly into it. Record what was discussed, any findings, or next steps.</li>
+    <li><strong>Add a work order number</strong> &mdash; Click the WO# cell and enter the work order number if one has been submitted.</li>
+    <li><strong>Edit a task</strong> &mdash; Click the pencil icon in the Actions column to open the full edit modal for any task.</li>
+    <li><strong>Delete a task</strong> &mdash; Click the trash icon in the Actions column if a task was created in error.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 7:</span> Use the <strong>Historical Trends</strong> tab to show campus-wide water patterns if the group wants context. This tab includes:
+  <ul>
+    <li><strong>Campus Domestic Water Trend</strong> &mdash; Monthly domestic water usage across all buildings with anomaly markers.</li>
+    <li><strong>Campus Irrigation Trend</strong> &mdash; Monthly irrigation usage across all buildings with anomaly markers.</li>
+    <li><strong>Top 10 Buildings by Total Water</strong> &mdash; Horizontal bar chart showing which buildings use the most water overall.</li>
+  </ul>
+</div>
+
+<div class="warning">
+  <strong>Important:</strong> All task changes save automatically to your browser's local storage as you make them. However, local storage is tied to your specific browser on your specific computer. Always export to CSV after the meeting as a backup and to sync with Smartsheet.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>4. After the Meeting (10 min)</h2>
+<!-- ============================================================ -->
+
+<p>Complete these steps immediately after the meeting to keep Smartsheet in sync.</p>
+
+<div class="step">
+  <span class="step-num">Step 1:</span> Go to the <strong>Task Tracker</strong> tab.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2:</span> Click <strong>"Export to Smartsheet"</strong> (the crimson button on the right side of the filter bar). This downloads a CSV file containing all tasks with 11 columns that match the Smartsheet format:
+  <ul>
+    <li>Issue ID, Entry Date, Status, WO#, Action Note, Utility Type, Building Number, MeterID, Building Name, Action / Description, Assigned To</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3:</span> Open Smartsheet and import the downloaded CSV to replace the old task data. This keeps the Smartsheet tracker up to date for anyone who checks it between meetings.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4 (optional):</span> If you want printed meeting minutes, press <strong>Ctrl+P</strong>. The print layout includes:
+  <ul>
+    <li>The title "WSU Water Conservation Meeting Minutes" with the current date.</li>
+    <li>A table of all anomalies reviewed.</li>
+    <li>A table of all open tasks.</li>
+    <li>A signature line for next meeting date and notes.</li>
+  </ul>
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> Keep your exported CSV file saved locally as a backup. If browser data is ever cleared, you can re-import it using "Import from Smartsheet" to restore all tasks.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>5. Understanding Anomaly Types</h2>
+<!-- ============================================================ -->
+
+<p>The dashboard automatically detects two types of anomalies. Understanding how they work will help you lead the discussion and answer questions from the group.</p>
+
+<h3>Spike Anomalies</h3>
+<p>A spike is flagged when a building's monthly water usage is <strong>more than 100% higher</strong> than the average of the same calendar month in prior years. Only the most recent 3 data months are checked, and a month is evaluated only when at least one prior year has usage for that same calendar month. This year-over-year comparison accounts for normal seasonal patterns (e.g., higher irrigation in summer is expected, so only unusual increases above the historical pattern are flagged).</p>
+
+<table>
+  <tr><th>Severity</th><th>Visual Indicator</th><th>Threshold</th></tr>
+  <tr><td>High</td><td>Red left border on the row</td><td>More than 200% above the prior-year same-month average</td></tr>
+  <tr><td>Medium</td><td>Orange left border on the row</td><td>100% to 200% above the prior-year same-month average</td></tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Seasonal Patterns:</span> No months are excluded from spike detection. Because each month is compared to the average of the same calendar month in prior years, the comparison absorbs the summer irrigation ramp naturally: a summer irrigation month is flagged only when it is unusual for that month, not simply because it is summer.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Facilitator Note:</span> If a month shows zero or blank where usage is expected, the data sanitizer may have nulled an implausible meter value (a defense against known CSV import glitches). The Data Info tab and the browser console (press F12 and look for [sanitizeOutliers] warnings) confirm it. Treat it as missing data, not zero usage.
+</div>
+
+<h3>Winter Irrigation Alerts</h3>
+<p>Irrigation water usage of <strong>1 kGal or more</strong> during <strong>November, December, January, or February</strong> is flagged as a winter irrigation alert when the month falls within the most recent 3 data months. Irrigation systems should be winterized during these months, so usage may indicate a leak, a valve left open, or a system that was not properly shut down.</p>
+
+<table>
+  <tr><th>Type</th><th>Visual Indicator</th><th>What It Means</th></tr>
+  <tr><td>Winter Irrigation</td><td>Green left border on the row</td><td>Irrigation usage of 1 kGal or more detected in a winter month. The baseline is "0 (expected)" because no irrigation should be occurring.</td></tr>
+</table>
+
+<h3>Understanding the Anomaly Table Columns</h3>
+
+<table>
+  <tr><th>Column</th><th>What It Shows</th></tr>
+  <tr><td>Bldg #</td><td>The building number from SkySpark.</td></tr>
+  <tr><td>Building Name</td><td>The full building name.</td></tr>
+  <tr><td>Service</td><td>Domestic Water or Irrigation Water.</td></tr>
+  <tr><td>Anomalies</td><td>Total number of anomaly months detected for this building/service pair.</td></tr>
+  <tr><td>Type</td><td>Spike or Winter Irrigation.</td></tr>
+  <tr><td>Month</td><td>The month when the worst (highest deviation) anomaly occurred.</td></tr>
+  <tr><td>Usage (kGal)</td><td>Actual water usage in that month, in thousands of gallons.</td></tr>
+  <tr><td>Baseline (kGal)</td><td>Expected usage based on the average of the same month in prior years. For winter irrigation, this is "0 (expected)".</td></tr>
+  <tr><td>Deviation</td><td>How far above the baseline, shown as a percentage. For example, +245% means usage was about 3.45 times the baseline.</td></tr>
+  <tr><td>Task Status</td><td>Whether a task exists for this building/service. Shows the task status badge (Not Started, In Progress, Monitor, Resolved, Not Resolved) or a dash if no task exists.</td></tr>
+  <tr><td>Action</td><td>A "Create Task" button if no task exists, or the Issue ID as a link to the existing task.</td></tr>
+</table>
+
+<h3>The Expanded Row Detail</h3>
+<p>When you click any row in the anomaly table, it expands to show:</p>
+<ul>
+  <li><strong>Line chart</strong> &mdash; Each year plotted as a separate line over the 12 calendar months. The anomaly month is marked with a red dot. This makes it easy to compare the current year against prior years at a glance.</li>
+  <li><strong>Data table</strong> &mdash; Monthly kGal values organized by year (most recent year on top), with a total column on the right. The anomaly cell is highlighted in red. The bottom row shows the year-over-year percentage change for each month (e.g., +45%, -12%). Changes greater than 100% are bolded.</li>
+</ul>
+
+
+<!-- ============================================================ -->
+<h2>6. Understanding Task Statuses</h2>
+<!-- ============================================================ -->
+
+<p>The dashboard uses five task statuses that match the Smartsheet tracker exactly. Using them consistently ensures everyone is on the same page.</p>
+
+<table>
+  <tr><th>Status</th><th>Color</th><th>When to Use</th></tr>
+  <tr><td><strong>Open - Not Started</strong></td><td>Yellow/amber badge</td><td>A new anomaly has been identified but no one has looked into it yet. This is the default status when creating a new task.</td></tr>
+  <tr><td><strong>Open - In Progress</strong></td><td>Blue badge</td><td>Someone is actively investigating. For example, a meter check has been scheduled, a work order has been submitted, or maintenance is inspecting the building.</td></tr>
+  <tr><td><strong>Open - Monitor</strong></td><td>Green badge</td><td>The investigation is done for now, but the group wants to watch the building for another month or two to see if usage returns to normal. Common after a repair or when a single-month spike might be a data anomaly.</td></tr>
+  <tr><td><strong>Closed - Resolved</strong></td><td>Green badge with checkmark</td><td>The issue was found and fixed. For example: a leak was repaired, a stuck valve was closed, a meter multiplier was corrected, or a billing adjustment was made.</td></tr>
+  <tr><td><strong>Closed - Not Resolved</strong></td><td>Gray badge</td><td>The issue was investigated but no actionable fix was found. For example: the usage increase is explained by higher occupancy, a new program in the building, construction activity, or a confirmed seasonal pattern.</td></tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> On the Task Tracker tab, you can filter tasks by status using the filter buttons at the top. The status pill badges below the filter bar show a count for each status so you can see the overall distribution at a glance.
+</div>
+
+
+<!-- ============================================================ -->
+<h2>7. Tips for a Smooth Meeting</h2>
+<!-- ============================================================ -->
+
+<div class="step">
+  <span class="step-num">1.</span> <strong>Start with the biggest anomalies.</strong> Click the "Deviation" column header to sort by highest percentage first. This ensures the group spends time on the most significant issues before moving to smaller ones.
+</div>
+
+<div class="step">
+  <span class="step-num">2.</span> <strong>Do not create tasks for known seasonal patterns.</strong> If a building always uses more water in a particular month (e.g., athletics facilities during fall sports), make a note during discussion but skip creating a task. You can close the discussion with "known seasonal pattern, no action needed."
+</div>
+
+<div class="step">
+  <span class="step-num">3.</span> <strong>Update task notes during the meeting, not after.</strong> It is easy to forget details and context if you wait until later. Click directly into the Action Note cell on the Task Tracker tab and type what was discussed while it is fresh.
+</div>
+
+<div class="step">
+  <span class="step-num">4.</span> <strong>Use "Monitor" status liberally.</strong> One month of high usage is not always a problem. If the group is unsure, set the task to "Open - Monitor" and revisit it at the next meeting. If usage comes back down, you can close it as "Not Resolved" with a note that it was a one-time occurrence.
+</div>
+
+<div class="step">
+  <span class="step-num">5.</span> <strong>Use the column filters for targeted discussions.</strong> The anomaly table has filter menus (hamburger icon) on most columns. For example, filter the Building Name column to show only a specific building if someone wants to discuss their portfolio, or filter the Service column to discuss all irrigation issues at once.
+</div>
+
+<div class="step">
+  <span class="step-num">6.</span> <strong>Check the Historical Trends tab for campus-wide context.</strong> If the group notices many buildings with spikes in the same month, it may indicate a data issue or a campus-wide event rather than individual building problems. The trend charts help distinguish isolated issues from system-wide patterns.
+</div>
+
+<div class="step">
+  <span class="step-num">7.</span> <strong>Always export tasks to CSV after the meeting.</strong> This is your backup and your Smartsheet sync. If someone clears browser data or you switch computers, the tasks in the dashboard are lost unless you have a CSV backup.
+</div>
+
+<div class="step">
+  <span class="step-num">8.</span> <strong>Use the search bar on the Task Tracker tab.</strong> If someone asks "what's the status on Building 231?" you can quickly type "231" in the search bar to find all tasks related to that building.
+</div>
+
+<div class="step">
+  <span class="step-num">9.</span> <strong>Dark mode is available</strong> if you are presenting in a dim room. Use the slider toggle in the header bar. Your preference is saved for next time.
+</div>
+
+<div class="step">
+  <span class="step-num">10.</span> <strong>Keep meetings focused.</strong> Aim to spend 1-2 minutes per anomaly. If an issue requires a longer discussion, note it as a follow-up item and move on. The meeting is most effective when every anomaly gets at least a brief review.
+</div>
+
+<div class="warning">
+  <strong>Remember:</strong> Tasks are stored in your browser's local storage. They are tied to your browser on your computer. If you log in from a different computer, your tasks will not appear. Always import the latest CSV from Smartsheet at the start of each meeting to ensure you have the most current data, and always export after the meeting.
+</div>
+
+
+<div class="footer">
+  WSU Facilities Services &nbsp;|&nbsp; Energy Services &nbsp;|&nbsp; Last updated 06/11/2026
+</div>
+
+</body></html>

@@ -1,0 +1,306 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+.code { font-family: Consolas, monospace; font-size: 10pt; background: #f5f5f5; padding: 8px 12px; border: 1px solid #e5e7eb; margin: 8px 0; display: block; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+</style></head><body>
+
+<h1>Guide 7: How to Import Monthly Steam Plant Data</h1>
+
+<p>This guide walks you through importing a new month of steam plant data into the Steam Plant Dashboard. You will use the monthly ENERGY Excel file that gets finalized each month and import it through the dashboard's built-in Data Management tool.</p>
+
+<!-- ============================================================ -->
+<h2>1. Overview</h2>
+<!-- ============================================================ -->
+
+<p><strong>What this process does:</strong> Adds a new month of daily steam plant readings (boiler data, gas consumption, steam production, water usage, and generator data) into the dashboard so that charts, KPI cards, and reports reflect the latest information.</p>
+
+<p><strong>How often:</strong> Once per month, after the monthly Energy Report Excel file has been finalized and reviewed by your supervisor.</p>
+
+<p><strong>Time required:</strong> Approximately 5 minutes from start to finish.</p>
+
+<p><strong>What happens behind the scenes:</strong> The dashboard reads the Excel file entirely inside your web browser. Nothing is uploaded to a server during the import step. The file is parsed using a library called SheetJS, which extracts the daily data rows from the "Daily Data" sheet in the workbook. The data is then merged into the dashboard's existing dataset.</p>
+
+<!-- ============================================================ -->
+<h2>2. What You Need</h2>
+<!-- ============================================================ -->
+
+<table>
+  <tr>
+    <th>Item</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Monthly Energy Excel file</td>
+    <td>The finalized file for the month, e.g., <strong>ENERGY JUL 2025.xlsm</strong> or <strong>ENERGY AUG 2025.xlsx</strong>. Must be in <strong>.xlsx</strong> or <strong>.xlsm</strong> format. The file must contain a sheet named <strong>"Daily Data"</strong>.</td>
+  </tr>
+  <tr>
+    <td>Dashboard access</td>
+    <td>Open the Steam Plant Dashboard in a web browser (Chrome, Edge, or Firefox recommended). You will need the dashboard password: <strong>Energy@WSU</strong></td>
+  </tr>
+  <tr>
+    <td>GitHub access (for saving)</td>
+    <td>To make the update visible to everyone, you will need permission to upload files to the GitHub repository. Your supervisor can provide access if you do not already have it.</td>
+  </tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> Make sure you have the <em>finalized</em> version of the Energy file. If the file is still being reviewed or edited, wait until it is complete before importing.
+</div>
+
+<!-- ============================================================ -->
+<h2>3. Step-by-Step: Import a Monthly File</h2>
+<!-- ============================================================ -->
+
+<div class="step">
+  <span class="step-num">Step 1: Open the dashboard and navigate to Data Management</span><br>
+  Open the Steam Plant Dashboard in your web browser. If prompted, enter the password <strong>Energy@WSU</strong>. Once the dashboard loads, look at the row of tabs near the top of the page. Click the <strong>"Data Management"</strong> tab. It is the sixth tab from the left, between "Plant Water" and "UP Report."
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2: Find the "Import Monthly Excel Files" section</span><br>
+  At the top of the Data Management tab, you will see a card titled <strong>"Import Monthly Excel Files."</strong> Below the title is a blue information box that explains what the tool does. Below that is a dashed-border drop zone that says <strong>"Drop Excel files here or click to browse."</strong>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3: Add your Excel file</span><br>
+  You have two options:
+  <ul>
+    <li><strong>Drag and drop:</strong> Open File Explorer, find your Energy Excel file, and drag it directly onto the dashed drop zone. The border will turn crimson when you hover over it, confirming the dashboard is ready to accept the file.</li>
+    <li><strong>Click to browse:</strong> Click anywhere inside the dashed drop zone. A file picker dialog will open. Navigate to your Energy Excel file, select it, and click "Open."</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4: Wait for parsing</span><br>
+  The dashboard will read the Excel file directly in your browser. This takes just a few seconds. During this time, the dashboard is looking for the <strong>"Daily Data"</strong> sheet inside the workbook and extracting all the daily rows (one row per day, with columns for each boiler, gas readings, steam production, water meters, and generators).
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> No data leaves your computer during this step. The file is processed entirely in your browser -- nothing is uploaded to any server.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 5: Review the import preview</span><br>
+  After parsing completes, a gray <strong>"Import Preview"</strong> panel appears below the drop zone. It shows:
+  <ul>
+    <li>The file name that was parsed</li>
+    <li>The number of daily rows detected (e.g., "31 daily rows")</li>
+    <li>The months covered (e.g., "months: Jul 2025")</li>
+    <li>A total count of rows ready to merge</li>
+  </ul>
+  Review this information to make sure it looks correct. For a typical month, you should see 28-31 daily rows and a single month listed.
+</div>
+
+<div class="warning">
+  <strong>Check before proceeding:</strong> If the preview says "No 'Daily Data' sheet found -- skipped" or "No data rows found to import," stop and check that you selected the correct file. The Energy file must contain a sheet named exactly "Daily Data."
+</div>
+
+<div class="step">
+  <span class="step-num">Step 6: Click "Merge Into Dataset"</span><br>
+  Once you have confirmed the preview looks correct, click the <strong>"Merge Into Dataset"</strong> button (crimson button, left side of the preview panel). This merges the new daily rows into the dashboard's existing data.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 7: Check the confirmation message</span><br>
+  A green confirmation message appears below the import area. It will say something like:
+  <div class="code">Merge complete: 0 rows replaced, 31 rows added. 18 months, 548 daily rows.</div>
+  This tells you:
+  <ul>
+    <li><strong>Rows replaced:</strong> How many existing daily rows were overwritten (usually 0 for a new month)</li>
+    <li><strong>Rows added:</strong> How many new daily rows were inserted (should match the days in the month)</li>
+    <li><strong>Total months:</strong> The total number of months now in the dataset</li>
+    <li><strong>Total daily rows:</strong> The grand total of all daily records</li>
+  </ul>
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> If "rows replaced" shows a number greater than zero, that means the month you imported already existed in the dataset and the old data was replaced with the new data. This is normal if you are re-importing a corrected file.
+</div>
+
+<!-- ============================================================ -->
+<h2>4. Verifying the Import</h2>
+<!-- ============================================================ -->
+
+<p>After importing, take a moment to verify that the data looks correct:</p>
+
+<div class="step">
+  <span class="step-num">Check the Data Inventory table</span><br>
+  Scroll down on the Data Management tab to find the <strong>"Data Inventory"</strong> card. This table lists every month in the dataset along with the number of daily rows for each month. Your newly imported month should appear in the list with the correct row count (28-31 rows depending on the month).
+</div>
+
+<div class="step">
+  <span class="step-num">Check the Overview tab</span><br>
+  Click the <strong>"Overview"</strong> tab (first tab). The KPI cards at the top of the page should now reflect the updated data. If you imported the most recent month, the "Latest Month" values should show that month's totals.
+</div>
+
+<div class="step">
+  <span class="step-num">Check the Gas and Steam tabs</span><br>
+  Click the <strong>"Gas Consumption"</strong> tab and then the <strong>"Steam &amp; Efficiency"</strong> tab. The bar and line charts on each tab should include a new data point for the month you just imported. Scroll to the right end of the charts to confirm the latest month appears.
+</div>
+
+<!-- ============================================================ -->
+<h2>5. Exporting the Updated Data</h2>
+<!-- ============================================================ -->
+
+<p><strong>Why you need to export:</strong> The import you just performed only updates the data inside your current browser session. To make the update permanent and visible to everyone who uses the dashboard, you need to download the updated JSON file and upload it to GitHub.</p>
+
+<h3>Download JSON (required for saving to GitHub)</h3>
+
+<div class="step">
+  <span class="step-num">Step 1:</span> On the <strong>Data Management</strong> tab, find the <strong>"Export Data"</strong> card (below the import section).<br>
+  <span class="step-num">Step 2:</span> Click the <strong>"Download JSON (Daily+Monthly)"</strong> button.<br>
+  <span class="step-num">Step 3:</span> Your browser will download a file named <strong>steam_plant.json</strong>. Save it somewhere easy to find (e.g., your Downloads folder or Desktop).
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> This JSON file is the one you will upload to GitHub in Section 7. It contains both the daily records and the monthly rollup summaries.
+</div>
+
+<h3>Download Excel (optional -- for your records)</h3>
+
+<div class="step">
+  Click the <strong>"Download Excel (.xlsx)"</strong> button to download an Excel file named <strong>WSU_Energy_Data_Export.xlsx</strong>. This file contains all daily data in the exact same column format as the original WSU Energy Data Combined workbook, with one sheet named "Daily Data." This is useful for creating a combined backup or for spreadsheet analysis.
+</div>
+
+<h3>Download CSV (optional -- for spreadsheet analysis)</h3>
+
+<div class="step">
+  Click the <strong>"Download Daily CSV"</strong> button to download a file named <strong>steam_plant_daily.csv</strong>. This is a simple comma-separated file with all daily records. It uses the dashboard's internal short column names (e.g., b1_gas, gwsp_steam) rather than the long Excel headers.
+</div>
+
+<!-- ============================================================ -->
+<h2>6. Importing Multiple Months at Once</h2>
+<!-- ============================================================ -->
+
+<p>If you need to catch up on several months, the dashboard can handle multiple files at once:</p>
+
+<div class="step">
+  <span class="step-num">Option A: Drag multiple files at once</span><br>
+  Select several Energy Excel files in File Explorer (hold Ctrl and click each file, or use Shift+click for a range), then drag them all onto the drop zone at the same time.
+</div>
+
+<div class="step">
+  <span class="step-num">Option B: Use the file picker</span><br>
+  Click the drop zone, and in the file picker dialog, hold Ctrl and click each file you want to import, then click "Open."
+</div>
+
+<p>The preview panel will show a summary line for each file (file name, row count, and months detected), plus a combined total at the bottom. Click <strong>"Merge Into Dataset"</strong> once to merge all files at the same time.</p>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> If the same month appears in multiple files, the last file's data wins. If a month already exists in the dashboard, the import will replace it. This is useful for correcting data -- just re-import the corrected file and it will overwrite the old values.
+</div>
+
+<!-- ============================================================ -->
+<h2>7. Saving to GitHub (So Everyone Sees the Update)</h2>
+<!-- ============================================================ -->
+
+<p>After you have imported the data and downloaded the updated <strong>steam_plant.json</strong> file, you need to upload it to GitHub so the live dashboard picks up the changes.</p>
+
+<div class="step">
+  <span class="step-num">Step 1: Go to the GitHub repository</span><br>
+  Open your web browser and navigate to the GitHub repository for the dashboard. If you do not have the URL bookmarked, ask your supervisor.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2: Navigate to the data folder</span><br>
+  In the repository, click into the <strong>data/</strong> folder. You should see the existing <strong>steam_plant.json</strong> file listed there.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3: Upload the new file</span><br>
+  Click the <strong>"Add file"</strong> button near the top right, then select <strong>"Upload files."</strong> Drag your downloaded <strong>steam_plant.json</strong> file onto the upload area, or click "choose your files" to browse for it. This will replace the existing file.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4: Commit the change</span><br>
+  Scroll down to the "Commit changes" section. In the commit message box, type a brief description such as:
+  <div class="code">Update steam_plant.json - add Jul 2025 data</div>
+  Make sure <strong>"Commit directly to the main branch"</strong> is selected, then click <strong>"Commit changes."</strong>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 5: Verify the live dashboard</span><br>
+  Wait 1-2 minutes for GitHub Pages to rebuild. Then open the Steam Plant Dashboard in a new browser tab (or hard-refresh with <strong>Ctrl+Shift+R</strong>). The new month's data should appear across all tabs.
+</div>
+
+<div class="warning">
+  <strong>Important:</strong> If you skip this step, the data you imported will only exist in your current browser session. Once you close the browser tab or refresh the page, the data will revert to whatever is saved on GitHub.
+</div>
+
+<!-- ============================================================ -->
+<h2>8. Troubleshooting</h2>
+<!-- ============================================================ -->
+
+<table>
+  <tr>
+    <th>Problem</th>
+    <th>Likely Cause</th>
+    <th>Solution</th>
+  </tr>
+  <tr>
+    <td><strong>"No 'Daily Data' sheet found -- skipped"</strong></td>
+    <td>The Excel file does not contain a sheet named "Daily Data," or you selected the wrong file.</td>
+    <td>Open the file in Excel and check the sheet tabs at the bottom. The import tool requires a sheet named exactly <strong>"Daily Data"</strong>. If the sheet has a different name, contact your supervisor. Also verify that the file is the monthly Energy file and not a different spreadsheet.</td>
+  </tr>
+  <tr>
+    <td><strong>"No data rows found to import"</strong></td>
+    <td>The "Daily Data" sheet exists but does not have the expected row structure (numbered days in column A, dates in column B).</td>
+    <td>Open the file in Excel and check the "Daily Data" sheet. Column A should have day numbers (1, 2, 3...) and Column B should have dates. If the layout is different from the standard format, the file may need to be restructured. Contact your supervisor.</td>
+  </tr>
+  <tr>
+    <td><strong>"SheetJS library not loaded"</strong></td>
+    <td>The xlsx.min.js file that the dashboard uses to read Excel files did not load properly.</td>
+    <td>Try refreshing the page (Ctrl+Shift+R). If the error persists, check your internet connection or contact your supervisor -- the library file may be missing from the dashboard deployment.</td>
+  </tr>
+  <tr>
+    <td><strong>File won't parse at all</strong></td>
+    <td>The file is not in .xlsx or .xlsm format, or the file is corrupted.</td>
+    <td>The import only accepts <strong>.xlsx</strong> and <strong>.xlsm</strong> files. If you have an older <strong>.xls</strong> file, open it in Excel and save it as .xlsx first. If the file still won't work, try downloading a fresh copy from the shared drive.</td>
+  </tr>
+  <tr>
+    <td><strong>Data looks wrong after import</strong></td>
+    <td>The source file may have errors, or the wrong file was imported.</td>
+    <td>Re-import the correct file -- the dashboard will replace the bad data with the new data for any overlapping dates. If you need to fully revert, download the original <strong>steam_plant.json</strong> from GitHub and replace it (see Section 7, but upload the original file instead).</td>
+  </tr>
+  <tr>
+    <td><strong>Charts did not update after import</strong></td>
+    <td>Rare display glitch.</td>
+    <td>Click a different tab (e.g., "Gas Consumption"), then click back to the tab you were viewing. The charts should now reflect the new data. If not, refresh the page with Ctrl+Shift+R. Note: refreshing will lose un-exported data, so export first.</td>
+  </tr>
+  <tr>
+    <td><strong>New month not showing on the live dashboard</strong></td>
+    <td>The JSON file was not uploaded to GitHub, or GitHub Pages has not finished rebuilding.</td>
+    <td>Confirm you completed Section 7 (uploading steam_plant.json to GitHub). Wait 1-2 minutes, then hard-refresh the dashboard (Ctrl+Shift+R). Check the GitHub repository to verify the file was updated.</td>
+  </tr>
+  <tr>
+    <td><strong>Imported month has zero values for some columns</strong></td>
+    <td>The source Excel file may have blank cells where data was expected.</td>
+    <td>This is normal for columns that do not apply every month (e.g., oil usage when boilers are running on gas only). Check the source Excel file to confirm whether the blanks are expected. The dashboard treats blank cells as zero.</td>
+  </tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Still stuck?</span> Contact your supervisor or the Energy Services team lead. Common issues can usually be resolved by verifying you have the correct Energy Excel file and that it contains the standard "Daily Data" sheet format.
+</div>
+
+<!-- ============================================================ -->
+
+<div class="footer">
+  WSU Facilities Services &nbsp;|&nbsp; Energy Services &nbsp;|&nbsp; Last updated March 2026
+</div>
+
+</body></html>

@@ -1,0 +1,585 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+</style></head><body>
+
+<h1>Guide 8: How to Generate a Monthly UP Report</h1>
+
+<!-- ================================================================ -->
+<!--  SECTION 1: WHAT IS THE UP REPORT?                               -->
+<!-- ================================================================ -->
+
+<h2>1. What Is the UP Report?</h2>
+
+<p>The <strong>Utilities Production (UP) Report</strong> is a monthly summary of WSU steam plant operations. It captures everything that happened at the steam plant during a given month:</p>
+
+<ul>
+  <li><strong>Steam production</strong> &mdash; how many pounds of steam each boiler produced, and how many days each boiler ran</li>
+  <li><strong>Gas consumption</strong> &mdash; how much natural gas (in standard cubic feet) each boiler and generator burned</li>
+  <li><strong>Fuel costs</strong> &mdash; the cost of natural gas and fuel oil, broken down by boiler</li>
+  <li><strong>Weather data</strong> &mdash; heating and cooling degree days for the month</li>
+  <li><strong>Well water</strong> &mdash; how many gallons were pumped from each campus well</li>
+  <li><strong>Campus electric consumption</strong> &mdash; kWh, cost, and peak demand for each Avista circuit serving the steam plant</li>
+  <li><strong>Generator output</strong> &mdash; kWh produced by the three on-site generators</li>
+  <li><strong>Budget</strong> &mdash; steam plant labor costs and goods &amp; services costs</li>
+</ul>
+
+<p>The finished report is an Excel file (named like <code>UP0725.xlsx</code> for July 2025) that gets saved to the shared drive for permanent records. The dashboard automates most of the report &mdash; it pulls boiler data, steam production, gas usage, and generator output directly from the steam plant database. You fill in the rest from invoices and meter readings.</p>
+
+<!-- ================================================================ -->
+<!--  SECTION 2: WHAT YOU NEED BEFORE YOU START                       -->
+<!-- ================================================================ -->
+
+<h2>2. What You Need Before You Start</h2>
+
+<p>Gather the following items before you sit down to create the report. Each one provides specific data that you will enter by hand.</p>
+
+<table>
+  <tr>
+    <th style="width:25%;">Item</th>
+    <th style="width:30%;">What You Need From It</th>
+    <th style="width:45%;">Where to Find It</th>
+  </tr>
+  <tr>
+    <td><strong>Kintec Gas Invoice</strong></td>
+    <td>Total MMBTU delivered and total dollar amount. You will divide the total cost by total therms to get Cost/Therm.</td>
+    <td>Arrives by mail or email from Kintec Energy. Filed in the Energy Services folder. Ask your supervisor if you don't have access.</td>
+  </tr>
+  <tr>
+    <td><strong>Avista BTU Rating Report</strong></td>
+    <td>The "BTU/cuft" value (for example, 1056.52). This is the energy content of the natural gas delivered that month.</td>
+    <td>Monthly email from Avista. Search your inbox for "BTU" or "heating value." The number is usually in the body of the email or an attached PDF.</td>
+  </tr>
+  <tr>
+    <td><strong>Coleman Oil Invoice</strong></td>
+    <td>Oil cost per gallon (for example, $3.95). Only needed if fuel oil was burned that month.</td>
+    <td>Invoice from Coleman Oil. If no oil was burned, you can skip this &mdash; the dashboard will carry forward the last oil price you entered.</td>
+  </tr>
+  <tr>
+    <td><strong>Avista Electric Bill</strong></td>
+    <td>For each of the 5 circuits: kWh used, total cost ($), and peak demand (KVA).</td>
+    <td>Avista utility bill for the steam plant accounts. The bill lists each circuit separately. Match by circuit name or account number.</td>
+  </tr>
+  <tr>
+    <td><strong>Well Meter Readings</strong></td>
+    <td>Gallons pumped for wells #4, #6, #7, and #8.</td>
+    <td>Recorded by operators at each well site. Check the well log binder or spreadsheet.</td>
+  </tr>
+  <tr>
+    <td><strong>Operator Log</strong></td>
+    <td>Maximum and minimum steam production rates (lbs/hr) for the month.</td>
+    <td>Steam plant operator daily log. If not recorded for this month, you can leave these fields blank.</td>
+  </tr>
+  <tr>
+    <td><strong>Budget Statement (5280)</strong></td>
+    <td>Steam Plant Labor cost ($) and Goods &amp; Services cost ($).</td>
+    <td>The 5280 budget statement from Financial Services. Ask your supervisor for access if needed.</td>
+  </tr>
+  <tr>
+    <td><strong>Biotech kWh</strong></td>
+    <td>kWh reading from the Biotech building (Route A meter).</td>
+    <td>Route A meter reading log.</td>
+  </tr>
+  <tr>
+    <td><strong>Chlorine Usage</strong></td>
+    <td>Pounds of chlorine used for water treatment.</td>
+    <td>Master Water File maintained by plant operators.</td>
+  </tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> You don't need every item to get started. You can load the auto-fill data, enter what you have, save your work, and come back later to finish. The dashboard remembers your entries for each month.
+</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 3: LOADING THE AUTO-FILL DATA                           -->
+<!-- ================================================================ -->
+
+<h2>3. Step-by-Step: Loading the Auto-Fill Data</h2>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Open the Steam Plant Operations Dashboard in your web browser. If prompted for a password, enter <code>Energy@WSU</code>.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> Click the <strong>UP Report</strong> tab in the navigation bar at the top of the page.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> Find the <strong>Report Month</strong> dropdown. It lists all available months with the most recent at the top. Select the month you want to generate the report for.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4.</span> Click the <strong>Load Data</strong> button. The dashboard will pull that month's data from the steam plant database.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 5.</span> Three new sections will appear below:
+  <ul style="margin-top:8px;">
+    <li><strong>Auto-Populated Data</strong> (green header) &mdash; a table showing boiler days, steam production (lbs), gas usage (SCF), oil burned (gallons), and generator data. This data was pulled automatically from the database. You do not need to enter or change these values.</li>
+    <li><strong>Manual Entry Fields</strong> (blue header) &mdash; input fields organized into fieldsets for gas costs, weather, electric, water, and budget. These are the fields you fill in from invoices and readings.</li>
+    <li><strong>Report Preview</strong> &mdash; a live preview of the complete UP report with color coding.</li>
+  </ul>
+</div>
+
+<h3>Understanding the Color Coding</h3>
+
+<p>Throughout the Manual Entry Fields and the Report Preview, colors tell you where each value comes from:</p>
+
+<table>
+  <tr>
+    <th style="width:15%;">Color</th>
+    <th style="width:30%;">Meaning</th>
+    <th style="width:55%;">What You Do</th>
+  </tr>
+  <tr>
+    <td style="background:#dcfce7; border:1px solid #86efac; text-align:center;"><strong>Green</strong></td>
+    <td>Auto-filled from the steam plant database</td>
+    <td>Do not touch these. They are pulled directly from the database and should be correct if the latest monthly data has been imported.</td>
+  </tr>
+  <tr>
+    <td style="background:#dbeafe; border:1px solid #93c5fd; text-align:center;"><strong>Blue</strong></td>
+    <td>Manual entry &mdash; you type these in</td>
+    <td>Enter these values from your invoices, meter readings, and reports. These are the fields described in Section 4 below.</td>
+  </tr>
+  <tr>
+    <td style="background:#f3f4f6; border:1px solid #d1d5db; text-align:center;"><strong>Gray</strong></td>
+    <td>Calculated automatically from your inputs</td>
+    <td>These are computed by formulas (for example, Gas Cost = Therms x Cost/Therm). You do not enter these &mdash; they update as you fill in the blue fields.</td>
+  </tr>
+</table>
+
+<!-- ================================================================ -->
+<!--  SECTION 4: ENTERING MANUAL FIELDS                               -->
+<!-- ================================================================ -->
+
+<h2>4. Step-by-Step: Entering Manual Fields</h2>
+
+<p>After loading the data, scroll down to the <strong>Manual Entry Fields</strong> card. The fields are organized into five fieldsets. Work through each one using the corresponding invoice or data source.</p>
+
+<h3>Gas &amp; Fuel Costs</h3>
+
+<table>
+  <tr>
+    <th style="width:25%;">Field</th>
+    <th style="width:25%;">Source</th>
+    <th style="width:50%;">How to Fill It In</th>
+  </tr>
+  <tr>
+    <td><strong>Gas Delivered (MMBTU)</strong></td>
+    <td>Kintec gas invoice</td>
+    <td>Find the total MMBTU delivered on the Kintec bill and enter that number. For example: <code>12500</code>. The dashboard will multiply this by 10 to convert to therms.</td>
+  </tr>
+  <tr>
+    <td><strong>Gas BTU/cuft</strong></td>
+    <td>Avista BTU rating email</td>
+    <td>Enter the BTU per cubic foot value from the monthly Avista report. For example: <code>1056.52</code>. This value is used to convert gas volumes (SCF) into therms.</td>
+  </tr>
+  <tr>
+    <td><strong>Gas Cost/Therm ($)</strong></td>
+    <td>Kintec gas invoice (calculated)</td>
+    <td>Divide the total dollar amount on the Kintec invoice by the total therms. For example, if the invoice is $65,000 and total therms are 122,700, then Cost/Therm = 65000 / 122700 = <code>0.5298</code>.</td>
+  </tr>
+  <tr>
+    <td><strong>Oil Cost/Gallon ($)</strong></td>
+    <td>Coleman Oil invoice</td>
+    <td>Enter the price per gallon from the Coleman Oil invoice. For example: <code>3.95</code>. <br><br><strong>Special behavior:</strong> Once you enter an oil cost, it automatically carries forward to future months. You only need to update it when the price changes on a new invoice.</td>
+  </tr>
+</table>
+
+<h3>Weather &amp; Steam Stats</h3>
+
+<table>
+  <tr>
+    <th style="width:25%;">Field</th>
+    <th style="width:25%;">Source</th>
+    <th style="width:50%;">How to Fill It In</th>
+  </tr>
+  <tr>
+    <td><strong>Heating Degree Days</strong></td>
+    <td>Auto-filled if available; otherwise weather data</td>
+    <td>If the Energy Cost Projection dashboard has data for this month, HDD will be filled in automatically when you click Load Data. If it is blank, enter the HDD from your weather data source.</td>
+  </tr>
+  <tr>
+    <td><strong>Cooling Degree Days</strong></td>
+    <td>Weather data</td>
+    <td>Enter CDD from your weather data. In winter months, this is typically <code>0</code>.</td>
+  </tr>
+  <tr>
+    <td><strong>Max Lbs/Hr Steam</strong></td>
+    <td>Operator log</td>
+    <td>The highest steam production rate recorded during the month, in pounds per hour. If not recorded, you can leave this blank.</td>
+  </tr>
+  <tr>
+    <td><strong>Min Lbs/Hr Steam</strong></td>
+    <td>Operator log</td>
+    <td>The lowest steam production rate recorded during the month, in pounds per hour. If not recorded, you can leave this blank.</td>
+  </tr>
+</table>
+
+<h3>Avista Electric (Per Circuit)</h3>
+
+<p>The electric section has a table with five rows, one for each Avista circuit serving the steam plant. For each circuit, you enter three values from the Avista electric bill.</p>
+
+<table>
+  <tr>
+    <th style="width:20%;">Circuit</th>
+    <th style="width:20%;">Meter ID</th>
+    <th style="width:60%;">What to Enter</th>
+  </tr>
+  <tr>
+    <td><strong>MP-A</strong></td>
+    <td>TUR-111</td>
+    <td rowspan="5">For each circuit, enter:<br>
+      <ul>
+        <li><strong>kWh</strong> &mdash; kilowatt-hours consumed (from the bill)</li>
+        <li><strong>Cost ($)</strong> &mdash; total cost for that circuit (from the bill)</li>
+        <li><strong>Peak KVA</strong> &mdash; peak demand in kilovolt-amperes (from the bill)</li>
+      </ul>
+      Match each row to the corresponding circuit on the Avista bill using the circuit name or meter ID.</td>
+  </tr>
+  <tr>
+    <td><strong>MP-C</strong></td>
+    <td>SPU124+TVW131</td>
+  </tr>
+  <tr>
+    <td><strong>MP-D</strong></td>
+    <td>SPU-122</td>
+  </tr>
+  <tr>
+    <td><strong>MP-E</strong></td>
+    <td>TUR-115</td>
+  </tr>
+  <tr>
+    <td><strong>MP-G</strong></td>
+    <td>SPU-125</td>
+  </tr>
+</table>
+
+<p>Below the circuit table there is one additional field:</p>
+
+<table>
+  <tr>
+    <th style="width:25%;">Field</th>
+    <th style="width:25%;">Source</th>
+    <th style="width:50%;">How to Fill It In</th>
+  </tr>
+  <tr>
+    <td><strong>Biotech kWh</strong></td>
+    <td>Route A meter reading</td>
+    <td>Enter the kWh reading from the Biotech building's Route A meter for the month.</td>
+  </tr>
+</table>
+
+<h3>Fresh Water (Well Readings)</h3>
+
+<table>
+  <tr>
+    <th style="width:25%;">Field</th>
+    <th style="width:25%;">Source</th>
+    <th style="width:50%;">How to Fill It In</th>
+  </tr>
+  <tr>
+    <td><strong>Well #4 (gal)</strong></td>
+    <td>Well meter log</td>
+    <td>Gallons pumped from Well #4 during the month.</td>
+  </tr>
+  <tr>
+    <td><strong>Well #6 (gal)</strong></td>
+    <td>Well meter log</td>
+    <td>Gallons pumped from Well #6 during the month.</td>
+  </tr>
+  <tr>
+    <td><strong>Well #7 (gal)</strong></td>
+    <td>Well meter log</td>
+    <td>Gallons pumped from Well #7 during the month.</td>
+  </tr>
+  <tr>
+    <td><strong>Well #8 (gal)</strong></td>
+    <td>Well meter log</td>
+    <td>Gallons pumped from Well #8 during the month.</td>
+  </tr>
+  <tr>
+    <td><strong>Lbs Chlorine</strong></td>
+    <td>Master Water File</td>
+    <td>Total pounds of chlorine used for water treatment during the month.</td>
+  </tr>
+</table>
+
+<h3>Budget &amp; Labor</h3>
+
+<table>
+  <tr>
+    <th style="width:25%;">Field</th>
+    <th style="width:25%;">Source</th>
+    <th style="width:50%;">How to Fill It In</th>
+  </tr>
+  <tr>
+    <td><strong>Steam Plant Labor ($)</strong></td>
+    <td>5280 Budget Statement</td>
+    <td>Enter the total labor cost for the steam plant from the 5280 budget statement.</td>
+  </tr>
+  <tr>
+    <td><strong>Goods &amp; Services ($)</strong></td>
+    <td>5280 Budget Statement</td>
+    <td>Enter the goods and services cost from the 5280 budget statement.</td>
+  </tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> As you enter values, the Report Preview at the bottom of the page updates in real time. You can scroll down to check your work as you go.
+</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 5: SAVING YOUR WORK                                     -->
+<!-- ================================================================ -->
+
+<h2>5. Saving Your Work</h2>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> After entering your manual fields, click the <strong>Save Manual Entries</strong> button (blue button below the fieldsets).
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> You will see a confirmation message with a timestamp (for example, "Saved at 2:35 PM") appear next to the button. This confirms your entries have been saved.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> If you come back later to finish, select the same month from the dropdown and click <strong>Load Data</strong>. Your previously saved manual entries will be restored automatically.
+</div>
+
+<div class="warning">
+  <strong>Important:</strong> Your entries are saved in <strong>your browser's local storage</strong> on this computer only. They are not synced to a server or shared between computers. If you switch to a different computer, your saved entries will not be there. Always generate and save the final Excel file before clearing your browser data.
+</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 6: REVIEWING THE PREVIEW                                -->
+<!-- ================================================================ -->
+
+<h2>6. Reviewing the Preview</h2>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Scroll down to the <strong>Report Preview</strong> card. This shows the complete UP report in the same layout as the Excel file, with color coding to show which values are auto-filled (green), entered by you (blue), or calculated (gray).
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> Review each section of the preview. The sections are:
+  <ul style="margin-top:8px;">
+    <li><strong>Steam Production</strong> &mdash; boiler days, steam lbs (gas and oil), oil burned, gas delivered/used, generator gas, internal gas</li>
+    <li><strong>Efficiency</strong> &mdash; lbs per gallon oil, lbs per therm gas</li>
+    <li><strong>Fuel Costs</strong> &mdash; oil cost, gas cost, and total fuel cost per boiler</li>
+    <li><strong>Cost per 1,000 lbs Steam</strong> &mdash; unit costs for oil and gas per boiler</li>
+    <li><strong>Weather &amp; Stats</strong> &mdash; HDD, CDD, steam rates, BTU/cuft, costs, labor, G&amp;S, total production cost</li>
+    <li><strong>Fresh Water</strong> &mdash; well gallons, total pumped, chlorine</li>
+    <li><strong>Electric</strong> &mdash; per-circuit kWh, cost, peak KVA, generator kWh, totals</li>
+  </ul>
+</div>
+
+<h3>Quick Sanity Checks</h3>
+
+<p>Before generating the Excel file, do a quick scan for obvious problems:</p>
+
+<table>
+  <tr>
+    <th style="width:35%;">Check</th>
+    <th style="width:65%;">What to Look For</th>
+  </tr>
+  <tr>
+    <td><strong>Total steam</strong></td>
+    <td>Should be in the millions of pounds (for example, 40,000,000 to 120,000,000 depending on season). If it is zero or extremely small, the database may not have the latest month imported yet.</td>
+  </tr>
+  <tr>
+    <td><strong>Gas therms</strong></td>
+    <td>Should be a positive number. If it shows zero, check that you entered the Gas BTU/cuft value.</td>
+  </tr>
+  <tr>
+    <td><strong>Fuel costs add up</strong></td>
+    <td>Total Fuel Cost should equal Oil Cost + Gas Cost. If oil was not burned, Oil Cost should be $0.</td>
+  </tr>
+  <tr>
+    <td><strong>Total Production Cost</strong></td>
+    <td>Should equal Labor + Goods &amp; Services + Fuel Cost. This is calculated automatically &mdash; just make sure it looks reasonable.</td>
+  </tr>
+  <tr>
+    <td><strong>Electric kWh and Cost</strong></td>
+    <td>Each circuit should have non-zero kWh and a corresponding cost. If any circuit shows zero, double-check your entries.</td>
+  </tr>
+  <tr>
+    <td><strong>Well water totals</strong></td>
+    <td>Total gallons pumped should be the sum of the four wells. If a well was offline, its value may be zero &mdash; that is normal.</td>
+  </tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> If a calculated (gray) value looks wrong, the issue is almost always a typo in one of your manual (blue) entries. For example, if gas cost seems way too high, check that you entered Cost/Therm correctly (it should be a small decimal like 0.53, not 53).
+</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 7: GENERATING THE EXCEL FILE                            -->
+<!-- ================================================================ -->
+
+<h2>7. Generating the Excel File</h2>
+
+<div class="step">
+  <span class="step-num">Step 1.</span> Once you are satisfied with the preview, click the green <strong>Generate UP Report Excel</strong> button.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2.</span> Your browser will download an Excel file. The filename follows the format <code>UP{MMYY}.xlsx</code>. For example:
+  <ul style="margin-top:8px;">
+    <li>July 2025 &rarr; <code>UP0725.xlsx</code></li>
+    <li>January 2026 &rarr; <code>UP0126.xlsx</code></li>
+    <li>December 2025 &rarr; <code>UP1225.xlsx</code></li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3.</span> Open the downloaded file in Excel to spot-check it:
+  <ul style="margin-top:8px;">
+    <li>Click on a gray (calculated) cell and look at the <strong>formula bar</strong> at the top of Excel. It should show a formula (like <code>=B17+B18</code>), not a hardcoded number. This confirms the Excel file has live formulas.</li>
+    <li>Check that the totals in the TOTALS column match what you saw in the preview.</li>
+    <li>Verify the title row says the correct month (for example, "WSU Steam Plant &mdash; UP Report: Jul 25").</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4.</span> Save the file to the shared drive:
+  <br><br>
+  <code style="background:#f5f5f5; padding:4px 8px; border:1px solid #e5e7eb; display:block; margin-top:4px;">
+    R:\ENERGY GROUP\Energy Services Admin\Energy Files\Utility\UP\UP2026\
+  </code>
+  <br>
+  Replace <code>UP2026</code> with the current fiscal year folder if different. If the folder for the current year does not exist yet, create it.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> The Excel file intentionally uses formulas for all calculated fields. If you need to correct a value after generating, you can either: (a) fix it in the dashboard and re-generate, or (b) edit the value directly in Excel and the formula-driven cells will recalculate automatically.
+</div>
+
+<!-- ================================================================ -->
+<!--  SECTION 8: TIPS AND COMMON QUESTIONS                            -->
+<!-- ================================================================ -->
+
+<h2>8. Tips and Common Questions</h2>
+
+<table>
+  <tr>
+    <th style="width:35%;">Question / Situation</th>
+    <th style="width:65%;">Answer</th>
+  </tr>
+  <tr>
+    <td><strong>"I made a mistake in one of my entries."</strong></td>
+    <td>Change the field to the correct value, click <strong>Save Manual Entries</strong> again, and then click <strong>Generate UP Report Excel</strong> to download a fresh file. The old file in your Downloads folder can be deleted.</td>
+  </tr>
+  <tr>
+    <td><strong>"I need to redo last month's report."</strong></td>
+    <td>Select that month from the dropdown and click <strong>Load Data</strong>. Your previously saved manual entries will be restored. Make any corrections, save, and re-generate.</td>
+  </tr>
+  <tr>
+    <td><strong>"The auto-filled numbers look wrong or show zero."</strong></td>
+    <td>The auto-filled data comes from the steam plant database (<code>data/steam_plant.json</code>). If the latest month's data has not been imported yet, those values will be missing or zero. Go to the <strong>Data Management</strong> tab to check if the latest month was imported. If not, import the monthly ENERGY Excel file first, then come back to the UP Report tab.</td>
+  </tr>
+  <tr>
+    <td><strong>"The oil cost field already has a value and I didn't enter one."</strong></td>
+    <td>This is by design. Once you enter an oil cost per gallon, it carries forward automatically to future months. This saves you from re-entering the same price every month. When you get a new Coleman Oil invoice with a different price, just overwrite the value.</td>
+  </tr>
+  <tr>
+    <td><strong>"The HDD field already has a value."</strong></td>
+    <td>If the Energy Cost Projection dashboard (<code>data.json</code>) has heating degree day data for this month, it is filled in automatically. If it is blank, enter HDD from your weather data source.</td>
+  </tr>
+  <tr>
+    <td><strong>"Does the Excel file have formulas?"</strong></td>
+    <td>Yes, intentionally. Calculated fields like Gas Cost, Total Fuel Cost, Cost per 1,000 lbs, and Gas Use (Therms) are all formulas. If you change a value in Excel, the calculated fields update automatically. This makes it easy to do "what if" scenarios or correct a number after generating.</td>
+  </tr>
+  <tr>
+    <td><strong>"What are the Avista account numbers?"</strong></td>
+    <td>They are pre-filled in row 52 of the Excel file. You do not need to enter them. For reference: MP-A = 15400-44701-0, MP-C = 15400-45902-0, MP-D = 15400-44201-1, MP-E = 15400-43001-2, MP-G = 15400-44801-0.</td>
+  </tr>
+  <tr>
+    <td><strong>"Where do I file the finished report?"</strong></td>
+    <td>Save the Excel file to the shared drive under the current fiscal year UP folder: <code>R:\ENERGY GROUP\Energy Services Admin\Energy Files\Utility\UP\UP2026\</code></td>
+  </tr>
+  <tr>
+    <td><strong>"My entries disappeared."</strong></td>
+    <td>Entries are stored in your browser's local storage. They will be lost if you clear your browser data or switch to a different computer. Always generate and save the Excel file promptly after entering your data.</td>
+  </tr>
+  <tr>
+    <td><strong>"What are the five boilers?"</strong></td>
+    <td>Boilers 1 and 2 are at CASP (gas-only). Boilers 3, 4, and 5 are at GWSP (dual-fuel: gas + oil). The dashboard handles them separately because B3-B5 have additional oil data fields that B1-B2 do not.</td>
+  </tr>
+  <tr>
+    <td><strong>"What are the three generators?"</strong></td>
+    <td>Generators 1 and 2 are gas-fired. Generator 3 is diesel. The dashboard tracks kWh output for all three, gas consumption for Gen 1 and Gen 2, and fuel gallons for Gen 3.</td>
+  </tr>
+</table>
+
+<!-- ================================================================ -->
+<!--  SECTION 9: MONTHLY WORKFLOW SUMMARY                             -->
+<!-- ================================================================ -->
+
+<h2>9. Monthly Workflow Summary</h2>
+
+<p>Use this quick-reference checklist each month:</p>
+
+<table>
+  <tr>
+    <th style="width:8%; text-align:center;">#</th>
+    <th style="width:92%;">Action</th>
+  </tr>
+  <tr>
+    <td style="text-align:center; font-weight:bold; color:#981e32;">1</td>
+    <td>Gather all invoices and readings (Kintec gas bill, Avista BTU report, Coleman Oil invoice, Avista electric bill, well meter readings, operator log, 5280 budget statement, Biotech kWh, chlorine usage).</td>
+  </tr>
+  <tr>
+    <td style="text-align:center; font-weight:bold; color:#981e32;">2</td>
+    <td>Open the Steam Plant dashboard and click the <strong>UP Report</strong> tab.</td>
+  </tr>
+  <tr>
+    <td style="text-align:center; font-weight:bold; color:#981e32;">3</td>
+    <td>Select the report month from the dropdown and click <strong>Load Data</strong>.</td>
+  </tr>
+  <tr>
+    <td style="text-align:center; font-weight:bold; color:#981e32;">4</td>
+    <td>Enter all manual fields: gas costs, weather, electric circuits, well readings, budget.</td>
+  </tr>
+  <tr>
+    <td style="text-align:center; font-weight:bold; color:#981e32;">5</td>
+    <td>Click <strong>Save Manual Entries</strong> and verify the timestamp confirmation.</td>
+  </tr>
+  <tr>
+    <td style="text-align:center; font-weight:bold; color:#981e32;">6</td>
+    <td>Review the Report Preview &mdash; check color coding, totals, and sanity checks.</td>
+  </tr>
+  <tr>
+    <td style="text-align:center; font-weight:bold; color:#981e32;">7</td>
+    <td>Click <strong>Generate UP Report Excel</strong> to download the file.</td>
+  </tr>
+  <tr>
+    <td style="text-align:center; font-weight:bold; color:#981e32;">8</td>
+    <td>Open the Excel file, spot-check formulas and totals.</td>
+  </tr>
+  <tr>
+    <td style="text-align:center; font-weight:bold; color:#981e32;">9</td>
+    <td>Save the file to the shared drive: <code>R:\ENERGY GROUP\...\UP\UP2026\</code></td>
+  </tr>
+</table>
+
+<div class="footer">
+  WSU Facilities Services &nbsp;|&nbsp; Energy Services &nbsp;|&nbsp; Last updated March 2026
+</div>
+
+</body></html>

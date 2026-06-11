@@ -11,7 +11,7 @@ What this covers: The monthly cycle of preparing for, running, and following up 
 
 Frequency: Monthly, at the Water Conservation Task Force meeting.
 
-Time required: ~5 minutes prep, meeting duration, ~5 minutes follow-up.
+Time required: ~15 minutes for the monthly data update (typically mid-month), ~5 minutes meeting prep, meeting duration, ~5 minutes follow-up.
 
 
 WHERE EVERYTHING LIVES
@@ -27,19 +27,45 @@ Smartsheet:
 GitHub repository:
   https://github.com/JSWSU/wsu-energy-dashboard
 
-Data files (updated separately via SkySpark export):
+Data files (published to GitHub by the update pipeline):
   data/domestic_water.json   Domestic water usage (gallons)
   data/irrigation.json       Irrigation water usage (gallons)
+
+Update pipeline (local Git clone):
+  C:\Users\john.slagboom\Desktop\Git\data\new\          Staging folder for fresh SkySpark exports
+  C:\Users\john.slagboom\Desktop\Git\update-data.sh     One-command merge + sanitize + push
 
 
 BEFORE THE MEETING
 -------------------
 
-Step 1: Update water data (if new SkySpark data is available)
+Step 1: Update water data (run the full pipeline when new SkySpark data is available)
 
-  1. Export domestic_water.json and irrigation.json from SkySpark
-  2. Upload to the data/ folder on GitHub
-  3. Verify the dashboard loads with fresh data
+  1. Pre-flight in SkySpark: confirm the latest manual reads imported.
+     Spot-check 2 or 3 CSV-sourced meters for the new month-end readings.
+     Li's EnergyMeter.accdb export lands mid-month, so month N data is
+     typically available around the 15th of month N+1.
+  2. In the SkySpark Shell run task_exportToIO(<range>) as a single line,
+     e.g. task_exportToIO(2026-03-01..2026-05-31). Overlapping months that
+     are already loaded is safe; the merge fills gaps and never downgrades
+     good values.
+  3. Download the 7 JSON files from SkySpark Files io/.
+  4. Copy them into C:\Users\john.slagboom\Desktop\Git\data\new\.
+  5. From C:\Users\john.slagboom\Desktop\Git\ run: bash update-data.sh
+     (it merges via merge-data.py, applies two outlier sanitization passes
+     plus a known-bad-row fix pass, pushes to GitHub via push-data.sh, and
+     clears the staging folder; staging is kept if the push fails so the
+     run can be repeated).
+  6. After about a minute, hard-refresh the dashboard (Ctrl+Shift+R) and
+     check the Data Info tab: date range updated, integrity checks green.
+
+  WARNING: NEVER upload raw exports straight to the data/ folder on GitHub.
+  That bypasses the merge and all sanitization.
+
+  UPDATE CADENCE: Data is monthly. Aim to update within a few days of Li's
+  mid-month export so the meeting reviews fresh months. The anomaly window
+  is the most recent 3 DATA months, so skipped updates mean the dashboard
+  silently reviews old months.
 
 Step 2: Import latest tasks from Smartsheet
 
@@ -47,7 +73,7 @@ Step 2: Import latest tasks from Smartsheet
   2. Open the dashboard: https://jswsu.github.io/wsu-energy-dashboard/water-conservation.html
   3. Go to the Task Tracker tab
   4. Click "Import from Smartsheet" and select the CSV file
-  5. Review the import summary (e.g., "Imported 47 rows: 12 updated, 35 unchanged, 0 new")
+  5. Review the import summary (e.g., "Imported 47 rows: 0 new, 12 updated, 35 unchanged.")
   6. Verify tasks loaded correctly in the task table
 
 
@@ -58,7 +84,7 @@ Step 1: Review anomalies (Anomaly Review tab)
 
   1. Start on the Anomaly Review tab (loads by default)
   2. Review the KPI cards for an overview:
-     - Domestic spike count, Irrigation spike count, Winter irrigation alerts, Open tasks
+     - Domestic Spike Anomalies, Irrigation Spike Anomalies, Winter Irrigation Alerts, Open Tasks
   3. Walk through the anomaly table row by row:
      - Click a row to expand the line chart and data table for that building
      - Check the "Task Status" column to see if a task already exists for that building
@@ -78,16 +104,16 @@ Step 2: Review existing tasks (Task Tracker tab)
 
   1. Switch to the Task Tracker tab
   2. Filter by status to focus on open items:
-     - "In Progress" -- check for updates
-     - "Not Started" -- assign or discuss
-     - "Monitor" -- review for resolution
+     - "In Progress": check for updates
+     - "Not Started": assign or discuss
+     - "Monitor": review for resolution
   3. Update tasks inline:
      - Change status via the dropdown
      - Click the Assigned To or Action Note fields to edit directly
      - Click the pencil icon for full edit modal
   4. Close resolved tasks by changing status to "Closed - Resolved" or "Closed - Not Resolved"
 
-Step 3: Review trends (Historical Trends tab -- optional)
+Step 3: Review trends (Historical Trends tab, optional)
 
   1. Switch to the Historical Trends tab for big-picture context
   2. Review campus-level domestic and irrigation trends
@@ -95,9 +121,10 @@ Step 3: Review trends (Historical Trends tab -- optional)
   4. Review the top 10 buildings by water consumption
 
 Note: For first-time users or new committee members, the "How to Use" tab
-(rightmost tab) contains an in-app guide with the meeting workflow, tab
-descriptions, anomaly type explanations, task status reference, and
-troubleshooting tips.
+contains an in-app guide with the meeting workflow, data update steps,
+Smartsheet sync, tab descriptions, anomaly type explanations, task status
+reference, and troubleshooting tips. The Data Info tab (rightmost) shows the
+live data date range, pipeline details, and automated integrity checks.
 
 
 AFTER THE MEETING
@@ -145,14 +172,20 @@ UNDERSTANDING ANOMALY TYPES
 -----------------------------
 
 Spike Anomalies:
-  - A building's monthly usage is >100% higher than the average of the same month in prior years (YoY)
-  - Only the most recent 3 months are checked for anomalies
-  - Severity: Red border = >200% deviation (high), Orange border = 100-200% (medium)
-  - YoY comparison naturally handles university seasonal patterns (student move-in/out, irrigation season)
+  - A building's monthly usage is more than 100% above the average of the same
+    calendar month in prior years (YoY); only positive deviations are flagged
+  - Only the most recent 3 DATA months are checked, and a month is evaluated
+    only when at least one prior year has usage for that same calendar month
+  - Severity: Red border = more than 200% above (High), Orange border = 100% to 200% above (Medium)
+  - YoY comparison naturally handles university seasonal patterns (student
+    move-in/out, summer irrigation ramp-up), so no months are excluded from
+    spike detection
   - Common causes: leaks, meter issues, multiplier errors, temporary high usage (construction, cooling)
 
 Winter Irrigation Alerts:
   - Irrigation water usage >= 1 kGal during Nov, Dec, Jan, or Feb
+  - Only flagged within the most recent 3 DATA months, so these alerts appear
+    only when that window includes a Nov to Feb month
   - Sub-1 kGal values are ignored (rounding artifacts from meter reads)
   - Green border in the anomaly table
   - Systems should be winterized; any usage may indicate a leak or valve left open
@@ -164,6 +197,8 @@ TROUBLESHOOTING
 Dashboard shows "Error loading data":
   - Verify domestic_water.json and irrigation.json exist in the data/ folder on GitHub
   - Check that each file is valid JSON with a "rows" array
+  - If missing or invalid: re-publish via the data update pipeline (see BEFORE
+    THE MEETING, Step 1); never hand-upload raw exports
 
 Import shows "0 rows imported":
   - Verify the CSV has the expected 11 columns with headers matching:
@@ -172,7 +207,7 @@ Import shows "0 rows imported":
   - Check that the CSV is comma-separated (not tab or semicolon)
 
 Tasks disappeared:
-  - Tasks are stored in browser localStorage -- they're lost if browser data is cleared
+  - Tasks are stored in browser localStorage; they're lost if browser data is cleared
   - Always export to CSV after meetings as a backup
   - Import the CSV to restore tasks
 
@@ -181,6 +216,9 @@ Export CSV has wrong data:
   - Verify tasks look correct on the Task Tracker tab before exporting
 
 Anomaly count seems wrong:
-  - Irrigation spikes during May-Sep are intentionally excluded
-  - Check the info box below the KPI cards for the detection rules
+  - Check the info box below the KPI cards for the detection rules (both
+    detectors check only the most recent 3 DATA months; there is no
+    irrigation-season exclusion)
+  - If the flagged months look old, run the data update pipeline; the 3-month
+    window follows the data, not the calendar
   - Use column filters to verify which anomalies are shown vs hidden

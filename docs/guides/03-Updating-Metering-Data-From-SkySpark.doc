@@ -1,0 +1,410 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+body { font-family: Calibri, sans-serif; font-size: 11pt; color: #2d2d2d; margin: 1in; }
+h1 { font-size: 20pt; color: #981e32; border-bottom: 3px solid #981e32; padding-bottom: 8px; }
+h2 { font-size: 14pt; color: #981e32; margin-top: 24px; }
+h3 { font-size: 12pt; color: #5f6b6d; }
+.step { margin: 12px 0; padding: 8px 12px; background: #f5f5f5; border-left: 4px solid #981e32; }
+.step-num { font-weight: bold; color: #981e32; }
+.tip { margin: 12px 0; padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #3b82f6; }
+.tip-label { font-weight: bold; color: #0c4a6e; }
+.warning { margin: 12px 0; padding: 8px 12px; background: #fef2f2; border-left: 4px solid #dc2626; }
+.code { font-family: Consolas, monospace; font-size: 10pt; background: #f5f5f5; padding: 8px 12px; border: 1px solid #e5e7eb; margin: 8px 0; display: block; white-space: pre-wrap; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th { background: #981e32; color: white; padding: 8px 12px; text-align: left; }
+td { border: 1px solid #e5e7eb; padding: 8px 12px; }
+tr:nth-child(even) td { background: #f9fafb; }
+.footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #6b7280; }
+</style></head><body>
+
+<h1>Guide 3: How to Update Metering Data from SkySpark</h1>
+
+<!-- ===== SECTION 1: OVERVIEW ===== -->
+
+<h2>1. Overview</h2>
+
+<p>This guide walks you through the process of exporting fresh utility metering data from SkySpark and publishing it to the Campus Metering Dashboard. The dashboard displays energy and water consumption for every metered building on the WSU Pullman campus.</p>
+
+<p>The update cycle has three stages:</p>
+<ol>
+  <li><strong>Export</strong> &mdash; Run an export function inside SkySpark that creates 7 JSON data files.</li>
+  <li><strong>Transfer</strong> &mdash; Download those files from SkySpark and copy them into a staging folder on your PC.</li>
+  <li><strong>Process and publish</strong>: Run one script, <strong>update-data.sh</strong>, which merges the new data into the existing files, sanitizes known meter glitches, pushes to GitHub (which automatically updates the live dashboard), and clears the staging folder.</li>
+</ol>
+
+<table>
+  <tr><th>Detail</th><th>Value</th></tr>
+  <tr><td>How often</td><td>Monthly, or whenever new data is available in SkySpark</td></tr>
+  <tr><td>Time required</td><td>About 15 minutes (5 min export, 5 min download, 5 min to run the update script)</td></tr>
+  <tr><td>Skill level</td><td>No programming experience required &mdash; just follow each step</td></tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> If you have done this before and just need a quick refresher, skip to the step-by-step sections (Sections 3, 4, and 5).
+</div>
+
+<!-- ===== SECTION 2: WHAT YOU NEED ===== -->
+
+<h2>2. What You Need Before You Start</h2>
+
+<p>Make sure you have all of the following before beginning:</p>
+
+<table>
+  <tr><th>Requirement</th><th>How to Get It</th></tr>
+  <tr>
+    <td><strong>SkySpark login credentials</strong></td>
+    <td>Ask your supervisor or the Energy Services team for a username and password to the Pullman campus SkySpark instance at <span class="code" style="display:inline; padding:2px 6px;">https://skyspark.fais.wsu.edu/</span></td>
+  </tr>
+  <tr>
+    <td><strong>GitHub access</strong></td>
+    <td>You need a GitHub account with push access to the repository:<br><span class="code" style="display:inline; padding:2px 6px;">https://github.com/JSWSU/wsu-energy-dashboard</span><br>Ask the Energy Services team to add you as a collaborator.</td>
+  </tr>
+  <tr>
+    <td><strong>Git Bash</strong></td>
+    <td>The update script (Section 5) runs in Git Bash. Download it from <span class="code" style="display:inline; padding:2px 6px;">https://git-scm.com/downloads</span> and install with default settings.</td>
+  </tr>
+  <tr>
+    <td><strong>Python 3</strong></td>
+    <td>The update script calls Python helper scripts (the merge and sanitize steps) through the Windows <span class="code" style="display:inline; padding:2px 6px;">py</span> launcher. Install Python from <span class="code" style="display:inline; padding:2px 6px;">https://www.python.org/downloads/</span> with default settings (the py launcher is included).</td>
+  </tr>
+  <tr>
+    <td><strong>Dashboard repository folder</strong></td>
+    <td>The update script and its helpers live in <span class="code" style="display:inline; padding:2px 6px;">C:\Users\john.slagboom\Desktop\Git\</span> on the Energy Services PC. On a new PC, ask the Energy Services team to help clone the repository and copy push-data.sh (it contains the GitHub access token and is not stored in GitHub).</td>
+  </tr>
+  <tr>
+    <td><strong>Web browser</strong></td>
+    <td>Chrome, Edge, or Firefox. Any modern browser will work.</td>
+  </tr>
+</table>
+
+<!-- ===== SECTION 3: EXPORT DATA FROM SKYSPARK ===== -->
+
+<h2>3. Step-by-Step: Export Data from SkySpark</h2>
+
+<p>SkySpark is the metering platform that collects utility data from every building on campus. In this step, you will run an export function that packages that data into 7 JSON files.</p>
+
+<h3>3.1 &mdash; Log into SkySpark</h3>
+
+<div class="step">
+  <span class="step-num">Step 1:</span> Open your web browser and go to:<br>
+  <span class="code" style="display:inline; padding:2px 6px;">https://skyspark.fais.wsu.edu/</span>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2:</span> Enter your SkySpark username and password when prompted. After logging in, you should see the SkySpark home screen.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3:</span> Make sure you are in the <strong>wsumeters</strong> project. The project name appears in the top navigation bar. If you see a different project name, click on it and select <strong>wsumeters</strong> from the dropdown list.
+</div>
+
+<h3>3.2 &mdash; Open the Shell App</h3>
+
+<div class="step">
+  <span class="step-num">Step 4:</span> In the left sidebar (or the app launcher), find and click <strong>Shell</strong>. This opens a command-line interface where you can run export commands.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> If you do not see "Shell" in the sidebar, look for the app launcher icon (grid of dots or squares) and search for "Shell" in the app list.
+</div>
+
+<h3>3.3 &mdash; Run the Export Function</h3>
+
+<p>There is a pre-built function called <strong>task_exportToIO</strong> that exports all 7 data files in one command. You just need to tell it what date range to export. Because the update script (Section 5) merges new data into the existing files, you only need to export the most recent month or two, not the full history.</p>
+
+<div class="step">
+  <span class="step-num">Step 5:</span> In the Shell input box, type the following command and press Enter:
+</div>
+
+<div class="code">task_exportToIO(2026-03-01..2026-05-31)</div>
+
+<div class="warning">
+  <strong>Important: set the date range to the months you want to load.</strong> The range above (2026-03-01..2026-05-31) is an example. Use the first day of the earliest month you need through the last day of the most recent complete month. For example:
+  <ul style="margin: 4px 0 4px 20px;">
+    <li>If you are loading just May 2026, use: <span class="code" style="display:inline; padding:2px 6px;">task_exportToIO(2026-05-01..2026-05-31)</span></li>
+    <li>If you are catching up on March through May 2026, use: <span class="code" style="display:inline; padding:2px 6px;">task_exportToIO(2026-03-01..2026-05-31)</span></li>
+    <li>Overlap with months already on the dashboard is safe: the merge step updates those rows in place instead of duplicating them.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 6:</span> Wait for the function to finish. It typically takes 30&ndash;60 seconds. When it completes, you will see a results table showing the filename and row count for each of the 7 files.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> Glance at the row counts to confirm the export is not empty. They cover only the exported window, so they will not match the dashboard's Data Info totals, which count the full merged history.
+</div>
+
+<h3>3.4 &mdash; What Each File Contains</h3>
+
+<p>The export function creates these 7 files in SkySpark's <strong>io/</strong> directory:</p>
+
+<table>
+  <tr><th>File</th><th>Contains</th><th>Units</th></tr>
+  <tr><td><strong>electric.json</strong></td><td>Building electric consumption</td><td>kWh (kilowatt-hours)</td></tr>
+  <tr><td><strong>condensate.json</strong></td><td>Steam condensate (a measure of steam usage)</td><td>lb (pounds)</td></tr>
+  <tr><td><strong>domestic_water.json</strong></td><td>Domestic water usage (sinks, toilets, etc.)</td><td>gal (gallons)</td></tr>
+  <tr><td><strong>irrigation.json</strong></td><td>Irrigation water usage (sprinklers, landscaping)</td><td>gal (gallons)</td></tr>
+  <tr><td><strong>chw.json</strong></td><td>Chilled water energy (air conditioning)</td><td>ton-hours</td></tr>
+  <tr><td><strong>sites.json</strong></td><td>Building metadata (names, addresses, square footage)</td><td>N/A</td></tr>
+  <tr><td><strong>connectors.json</strong></td><td>Connector health status (is data flowing correctly?)</td><td>N/A</td></tr>
+</table>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> The dashboard converts these raw units into common units for display (e.g., kWh to MMBtu for energy, gallons to kGal for water). You do not need to do any conversions yourself.
+</div>
+
+<!-- ===== SECTION 4: DOWNLOAD FILES FROM SKYSPARK ===== -->
+
+<h2>4. Step-by-Step: Download Files from SkySpark</h2>
+
+<p>Now that the files have been exported to SkySpark's internal storage, you need to download them to your PC.</p>
+
+<div class="step">
+  <span class="step-num">Step 1:</span> In SkySpark, navigate to the <strong>Files</strong> app. You can find it in the left sidebar or app launcher, the same way you found Shell.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2:</span> In the Files app, you will see a folder list. Click on the <strong>io/</strong> folder to open it.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3:</span> You should see all 7 JSON files listed:
+  <ul style="margin: 4px 0 4px 20px;">
+    <li>electric.json</li>
+    <li>condensate.json</li>
+    <li>domestic_water.json</li>
+    <li>irrigation.json</li>
+    <li>chw.json</li>
+    <li>sites.json</li>
+    <li>connectors.json</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4:</span> Download each file to your PC. Click on a file name to select it, then use the download button (usually a downward arrow icon). Save all 7 files to a location you can find easily, such as your <strong>Downloads</strong> folder or your <strong>Desktop</strong>.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> Some browsers will ask where to save each file. Others will automatically save to your Downloads folder. Either way, make sure you know where the files ended up before moving to the next section.
+</div>
+
+<div class="warning">
+  <strong>Check the file sizes.</strong> File size scales with the exported date range: a 1 to 2 month export produces much smaller utility files (electric, condensate, domestic_water, irrigation, chw) than a full-history export. If any file is under 1 KB it may be empty or corrupted: go back and re-run the export with the correct date range.
+</div>
+
+<!-- ===== SECTION 5: RUN THE UPDATE SCRIPT ===== -->
+
+<h2>5. Step-by-Step: Run the Update Script</h2>
+
+<p>The live dashboard reads its data directly from GitHub, but the new files must <strong>not</strong> be uploaded as-is. A single script, <strong>update-data.sh</strong>, takes the files from a staging folder and does everything in the right order: it merges the new months into the existing data files, runs three data-cleaning passes that null or correct known meter glitches, pushes the results to GitHub, and clears the staging folder. The dashboard then updates automatically within 1 to 2 minutes.</p>
+
+<div class="warning">
+  <strong>Never replace the data/ files on GitHub directly.</strong> Do not upload files through the GitHub website and do not copy raw exports straight into the data/ folder. The pipeline's merge and sanitization steps must run: skipping them either wipes out the merged history (a short export would replace the full dataset) or publishes raw data containing known CSV import glitches, such as the Sensus AMR row-shift spikes that appear as billion-gallon readings.
+</div>
+
+<div class="step">
+  <span class="step-num">Step 1:</span> Copy the 7 JSON files you downloaded from SkySpark into the <strong>staging folder</strong>:<br>
+  <span class="code" style="display:inline; padding:2px 6px;">C:\Users\john.slagboom\Desktop\Git\data\new\</span><br>
+  Do not copy them into <span class="code" style="display:inline; padding:2px 6px;">data\</span> itself. The script reads from <span class="code" style="display:inline; padding:2px 6px;">data\new\</span> and updates <span class="code" style="display:inline; padding:2px 6px;">data\</span> for you (after backing up the originals to <span class="code" style="display:inline; padding:2px 6px;">data\backup\</span>).
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2:</span> Open <strong>Git Bash</strong>. You can find it in your Start menu by searching for "Git Bash."
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3:</span> In Git Bash, navigate to the Git folder and run the script:
+</div>
+
+<div class="code">cd ~/Desktop/Git
+bash update-data.sh</div>
+
+<div class="step">
+  <span class="step-num">Step 4:</span> Watch the output. The script announces each stage as it runs:
+  <ol style="margin: 4px 0 4px 20px;">
+    <li><strong>Merge</strong> (merge-data.py): merges the new rows into the existing data files, keyed by building, meter, and start date. Months that overlap are updated in place, so re-loading a month is safe. sites.json and connectors.json are replaced outright.</li>
+    <li><strong>Sanitize pass 1</strong> (_null_outliers.py): nulls row-shift spikes above 20x the baseline median.</li>
+    <li><strong>Sanitize pass 2</strong> (_null_outliers_v2.py): nulls data-gap catch-up spikes above 5x the pre-gap maximum.</li>
+    <li><strong>Fix known rows</strong> (_fix_known_rows.py): corrects known bad rows (CSV spikes, the 0092 double-count, negative values).</li>
+    <li><strong>Push</strong> (push-data.sh): uploads all 7 files to GitHub. You should see OK for each file.</li>
+    <li><strong>Cleanup</strong>: removes the JSON files from data\new\ so a stale export is never merged twice.</li>
+  </ol>
+  A successful run ends like this:
+</div>
+
+<div class="code">Step 5: Pushing to GitHub...
+
+Pushing metering data to GitHub...
+===================================
+  OK: electric.json
+  OK: condensate.json
+  OK: domestic_water.json
+  OK: irrigation.json
+  OK: chw.json
+  OK: sites.json
+  OK: connectors.json
+===================================
+Done: 7 pushed, 0 failed
+
+Step 6: Cleaning up staging folder...
+  Removed JSON files from data/new/
+
+Done! Dashboard will update in ~60 seconds.</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> If any file shows FAIL or the script stops partway, see Section 7 (Troubleshooting) for help. The staging folder is cleared only after a successful push, so once the problem is fixed you can simply run the script again.
+</div>
+
+<!-- ===== SECTION 6: VERIFYING THE UPDATE ===== -->
+
+<h2>6. Verifying the Update</h2>
+
+<p>After update-data.sh finishes, GitHub Pages will automatically rebuild the dashboard. This usually takes about a minute.</p>
+
+<div class="step">
+  <span class="step-num">Step 1:</span> Open the dashboard in your browser:<br>
+  <span class="code" style="display:inline; padding:2px 6px;">https://jswsu.github.io/wsu-energy-dashboard/metering.html</span>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 2:</span> If prompted, enter the password: <strong>Energy@WSU</strong>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 3:</span> <strong>Hard refresh</strong> the page to make sure you are not seeing cached (old) data. Press:<br>
+  <strong>Ctrl + Shift + R</strong> (on Windows) or <strong>Cmd + Shift + R</strong> (on Mac)
+</div>
+
+<div class="step">
+  <span class="step-num">Step 4:</span> Click the <strong>"Data Info"</strong> tab. Check the following:
+  <ul style="margin: 4px 0 4px 20px;">
+    <li><strong>Data Period:</strong> Should include the latest month you exported.</li>
+    <li><strong>Row counts:</strong> Should be larger than before the update. They will not match the SkySpark export row counts: the export covers only the new months, while the dashboard counts the full merged history.</li>
+    <li><strong>Data Quality card:</strong> Should show "Pass" (green). If it shows warnings, review the details &mdash; some warnings are normal (e.g., a building with no meter for a particular utility).</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 5:</span> Click the <strong>"Overview"</strong> tab. Glance at the KPI cards at the top:
+  <ul style="margin: 4px 0 4px 20px;">
+    <li><strong>Total Energy</strong> and <strong>Total Water</strong> should increase slightly compared to the previous month (since you added one more month of data).</li>
+    <li><strong>Connector Health</strong> percentage should be reasonable (typically 80%+).</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-num">Step 6:</span> Optionally, click the <strong>"Buildings"</strong> tab and spot-check one or two buildings to make sure their data looks reasonable.
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> The Water Conservation dashboard reads the same domestic_water.json and irrigation.json files, so this update refreshes it too. Hard-refresh it the same way:<br>
+  <span class="code" style="display:inline; padding:2px 6px;">https://jswsu.github.io/wsu-energy-dashboard/water-conservation.html</span>
+</div>
+
+<div class="tip">
+  <span class="tip-label">Tip:</span> If the dashboard still shows old data after a hard refresh, wait another minute and try again. GitHub Pages deployments occasionally take up to 5 minutes.
+</div>
+
+<!-- ===== SECTION 7: TROUBLESHOOTING ===== -->
+
+<h2>7. Troubleshooting</h2>
+
+<h3>"SkySpark Shell won't open"</h3>
+<div class="step">
+  <strong>Possible cause:</strong> Browser compatibility issue or SkySpark session timeout.<br>
+  <strong>Fix:</strong>
+  <ul style="margin: 4px 0 4px 20px;">
+    <li>Try a different browser (Chrome, Edge, or Firefox).</li>
+    <li>Clear your browser cache and log in again.</li>
+    <li>If you still cannot access Shell, ask the Energy Services team &mdash; the Shell app may need to be enabled for your user account.</li>
+  </ul>
+</div>
+
+<h3>"Files are empty or very small"</h3>
+<div class="step">
+  <strong>Possible cause:</strong> The date range in the export command may be wrong, or SkySpark may not have data for the requested period.<br>
+  <strong>Fix:</strong>
+  <ul style="margin: 4px 0 4px 20px;">
+    <li>Double-check the date range in your command. The format must be <span class="code" style="display:inline; padding:2px 6px;">YYYY-MM-DD..YYYY-MM-DD</span> (two dots between the dates).</li>
+    <li>Make sure the range covers the months you want to load and ends on the last day of the most recent complete month (e.g., 2026-03-01..2026-05-31).</li>
+    <li>Try running a single view function manually to see if it returns data, for example:<br>
+    <span class="code" style="display:inline; padding:2px 6px;">view_elecMeters(2026-03-01..2026-05-31, "Energy (kWh)", "Site", "Export Format")</span></li>
+  </ul>
+</div>
+
+<h3>"Dashboard still shows old data after uploading"</h3>
+<div class="step">
+  <strong>Possible cause:</strong> GitHub Pages has not finished deploying yet, or your browser is showing a cached version.<br>
+  <strong>Fix:</strong>
+  <ul style="margin: 4px 0 4px 20px;">
+    <li>Wait 2&ndash;5 minutes after uploading. GitHub Pages needs time to rebuild.</li>
+    <li>Hard refresh the page: <strong>Ctrl + Shift + R</strong>.</li>
+    <li>Try opening the dashboard in a private/incognito browser window.</li>
+    <li>Check GitHub to confirm the files were actually updated: go to the data/ folder in the repository and verify the "last updated" timestamp on each file.</li>
+  </ul>
+</div>
+
+<h3>"update-data.sh fails or a file shows FAIL"</h3>
+<div class="step">
+  <strong>Possible cause:</strong> An empty staging folder, a missing Python install, or an expired GitHub Personal Access Token (PAT).<br>
+  <strong>Fix:</strong>
+  <ul style="margin: 4px 0 4px 20px;">
+    <li><strong>"No JSON files found" error:</strong> The staging folder is empty. Copy the 7 JSON files into <span class="code" style="display:inline; padding:2px 6px;">C:\Users\john.slagboom\Desktop\Git\data\new\</span> and run the script again.</li>
+    <li><strong>"py: command not found" error:</strong> Python (or its py launcher) is not installed. Install Python from python.org with default settings, then re-run the script.</li>
+    <li><strong>PAT expired:</strong> The token in push-data.sh has an expiration date. If it has expired, generate a new one on GitHub with "Contents: Read and write" permission for the repository and update the script. Ask the Energy Services team for help if you are unsure how to do this.</li>
+    <li><strong>SHA error (FAIL message):</strong> This usually means the PAT does not have the right permissions or has expired. Generate a new PAT as described above.</li>
+    <li><strong>Other "command not found" errors:</strong> Make sure you are running the script in Git Bash (not Command Prompt or PowerShell).</li>
+    <li><strong>Script stopped partway:</strong> The script stops at the first error and clears the staging folder only after a successful push. Fix the reported problem and run <span class="code" style="display:inline; padding:2px 6px;">bash update-data.sh</span> again; re-merging the same files is safe.</li>
+  </ul>
+</div>
+
+<h3>"Dashboard shows Error loading data"</h3>
+<div class="step">
+  <strong>Possible cause:</strong> One or more JSON files are missing, corrupted, or not valid JSON.<br>
+  <strong>Fix:</strong>
+  <ul style="margin: 4px 0 4px 20px;">
+    <li>Go to the GitHub repository and check that all 7 files exist in the data/ folder.</li>
+    <li>Click on each file in GitHub to view its contents. Each utility file should start with <span class="code" style="display:inline; padding:2px 6px;">{"meta":...</span> or <span class="code" style="display:inline; padding:2px 6px;">{"rows":[...</span> and contain many rows of data.</li>
+    <li>If a file looks corrupted (garbled text, truncated), re-export from SkySpark, copy the files to data\new\, and run update-data.sh again.</li>
+    <li>You can validate JSON files at <span class="code" style="display:inline; padding:2px 6px;">https://jsonlint.com/</span> &mdash; paste the file contents and click "Validate JSON."</li>
+  </ul>
+</div>
+
+<h3>"I ran the export but only some files appeared in io/"</h3>
+<div class="step">
+  <strong>Possible cause:</strong> The export function may have hit an error partway through.<br>
+  <strong>Fix:</strong>
+  <ul style="margin: 4px 0 4px 20px;">
+    <li>Check the Shell output for error messages. Common errors include invalid date format or a SkySpark view function that has been renamed.</li>
+    <li>You can run each view function individually to isolate which one is failing. The individual commands are listed in the dashboard's Data Info tab, and are also shown here:</li>
+  </ul>
+  <div class="code">view_elecMeters(2026-03-01..2026-05-31, "Energy (kWh)", "Site", "Export Format")
+view_condensate(2026-03-01..2026-05-31, "Site", "Export Format")
+view_water(2026-03-01..2026-05-31, "Site", "Domestic", "Export Format")
+view_water(2026-03-01..2026-05-31, "Site", "Irrigation", "Export Format")
+view_chwExport(2026-03-01..2026-05-31, "CHW (tonhr)", "Site", "Export Format")</div>
+</div>
+
+<!-- ===== QUICK REFERENCE ===== -->
+
+<h2>Quick Reference Card</h2>
+
+<table>
+  <tr><th>Item</th><th>Value</th></tr>
+  <tr><td>SkySpark URL</td><td>https://skyspark.fais.wsu.edu/</td></tr>
+  <tr><td>SkySpark Project</td><td>wsumeters</td></tr>
+  <tr><td>Export Command</td><td>task_exportToIO(YYYY-MM-01..YYYY-MM-DD) for the new month(s); overlap with loaded months is safe</td></tr>
+  <tr><td>Export Location</td><td>SkySpark Files app &rarr; io/ folder</td></tr>
+  <tr><td>Staging Folder</td><td>C:\Users\john.slagboom\Desktop\Git\data\new\</td></tr>
+  <tr><td>Update Script</td><td>bash update-data.sh from C:\Users\john.slagboom\Desktop\Git\ in Git Bash (merge, sanitize, push, clear staging)</td></tr>
+  <tr><td>GitHub Repository</td><td>https://github.com/JSWSU/wsu-energy-dashboard</td></tr>
+  <tr><td>Dashboard URL</td><td>https://jswsu.github.io/wsu-energy-dashboard/metering.html</td></tr>
+  <tr><td>Dashboard Password</td><td>Energy@WSU</td></tr>
+  <tr><td>Hard Refresh Shortcut</td><td>Ctrl + Shift + R</td></tr>
+</table>
+
+<div class="footer">WSU Facilities Services | Energy Services | Last updated 06/11/2026</div>
+
+</body></html>
