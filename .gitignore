@@ -8,3 +8,4 @@ data/steam_plant_hourly.json
 data/new/
 data/backup/
 folder-scan.json
+sops/
