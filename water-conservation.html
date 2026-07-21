@@ -1330,8 +1330,10 @@ function aggregateByBuilding(rows, convertFn) {
     const key = r.bldgNo || 'Unknown';
     if (!map[key]) map[key] = { bldgNo: key, bldgName: r.bldgName || '', meters: r.meters || '', total: 0, months: {} };
     const mk = parseMonthKey(r.startDate);
-    const raw = typeof r.usage === 'number' && isFinite(r.usage) ? r.usage : 0;
-    const val = convertFn(raw);
+    // Null usage = no data, not zero: leave the month absent so charts show a
+    // gap and tables show an em dash instead of a fake 0.0
+    if (!mk || typeof r.usage !== 'number' || !isFinite(r.usage)) return;
+    const val = convertFn(r.usage);
     map[key].total += val;
     map[key].months[mk] = (map[key].months[mk] || 0) + val;
   });
