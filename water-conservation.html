@@ -649,64 +649,6 @@
         </table>
       </div>
 
-      <!-- ==================== TOP 10 TOP DOLLAR ISSUES PANEL (shown via filter button) ==================== -->
-      <div id="fieldActionPanel" style="display:none">
-      <h2 style="margin-top:1rem;">Top 10 Top Dollar Issues <span style="font-weight:400;font-size:0.82rem;color:var(--text-light);">physically verified, prepared 07/21/2026</span></h2>
-      <div class="info-box">
-        Each item below was screened for persistence (2 or more consecutive elevated months vs the same months in 2025) and then verified as physical:
-        either the meter register physically advanced in the 07/10/2026 meter reads file, or the value comes from a live BACnet or Calsense point.
-        Dollar figures use the FY27 proposed production cost of $0.00685 per gallon (sewer excluded, so true savings are higher where sewer applies).
-        Combined run rate if nothing is fixed: <strong>~$286,000 per year</strong>.
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th><th>Bldg</th><th style="text-align:left">Building</th><th style="text-align:left">Service</th>
-              <th style="text-align:left">Evidence</th><th>Excess use</th><th>$ / yr</th>
-              <th style="text-align:left">Verified by</th><th style="text-align:left">Field action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>1</td><td>0811</td><td style="text-align:left">Laboratory Animal Resources Center</td><td style="text-align:left">Domestic</td><td style="text-align:left">Jan to Apr 2026: 0.7 to 3.4M gal/mo vs 7 to 11k baseline</td><td>~2.0M gal/mo</td><td>$168,300</td><td style="text-align:left"><span class="task-status-badge ts-monitor">register-real</span></td><td style="text-align:left">Meter face read; verify x100 multiplier; inspect for major leak or process change; confirm the meter was reading at all in 2025</td></tr>
-            <tr><td>2</td><td>0095</td><td style="text-align:left">Smith Center for Undergraduate Education</td><td style="text-align:left">Domestic</td><td style="text-align:left">Jan to Apr 2026: 4 to 19x same-month 2025, 4 straight months</td><td>~614k gal/mo</td><td>$50,500</td><td style="text-align:left"><span class="task-status-badge ts-monitor">registers moving (2)</span></td><td style="text-align:left">Face reads on both meters (P110 and RoofTop); check mechanical systems fed by each</td></tr>
-            <tr><td>3</td><td>0079A</td><td style="text-align:left">Gannon Hall</td><td style="text-align:left">Domestic</td><td style="text-align:left">Jan to Apr 2026: steady 194 to 292k gal/mo vs 9 to 19k baseline</td><td>~232k gal/mo</td><td>$19,100</td><td style="text-align:left"><span class="task-status-badge ts-monitor">register-real, x1</span></td><td style="text-align:left">Continuous-leak signature; check flushometers, mechanical room, irrigation cross-connection</td></tr>
-            <tr><td>4</td><td>0120M</td><td style="text-align:left">Carver Farm, Vet Med Paddocks</td><td style="text-align:left">Irrigation</td><td style="text-align:left">May + Jun 2026: 83k + 160k gal where 2025 was zero</td><td>~121k gal/mo</td><td>$10,000</td><td style="text-align:left"><span class="task-status-badge ts-progress">Calsense live</span></td><td style="text-align:left">Inspect controller program and valves; stuck valve or unauthorized program</td></tr>
-            <tr><td>5</td><td>0807</td><td style="text-align:left">Bustad Hall</td><td style="text-align:left">Domestic</td><td style="text-align:left">Mar + Apr 2026: 280 to 296k gal/mo vs 169 to 193k same months 2025</td><td>~107k gal/mo</td><td>$8,800</td><td style="text-align:left"><span class="task-status-badge ts-progress">BACnet live</span></td><td style="text-align:left">Check washdown systems, cage washers, autoclaves</td></tr>
-            <tr><td>6</td><td>0078</td><td style="text-align:left">Sloan Hall</td><td style="text-align:left">Domestic</td><td style="text-align:left">Feb to Apr 2026 ramp: 40k, 87k, 142k gal/mo, accelerating</td><td>~89k gal/mo</td><td>$7,300</td><td style="text-align:left"><span class="task-status-badge ts-monitor">register accelerating</span></td><td style="text-align:left">Worsening leak; find it before it doubles again; verify x100 multiplier at the face</td></tr>
-            <tr><td>7</td><td>0044</td><td style="text-align:left">McCoy Hall</td><td style="text-align:left">Domestic</td><td style="text-align:left">Jan + Feb 2026: 127 to 128k gal/mo vs 45 to 48k same months 2025</td><td>~81k gal/mo</td><td>$6,700</td><td style="text-align:left"><span class="task-status-badge ts-progress">BACnet live</span></td><td style="text-align:left">Nearly 3x baseline on a live meter; walk fixtures and mechanical rooms</td></tr>
-            <tr><td>8</td><td>0832A</td><td style="text-align:left">Chilled Water Storage Pumphouse</td><td style="text-align:left">Domestic</td><td style="text-align:left">Jan + Feb 2026: 127k + 57k gal vs 25k + 12k same months 2025</td><td>~73k gal/mo</td><td>$6,000</td><td style="text-align:left"><span class="task-status-badge ts-progress">BACnet live</span></td><td style="text-align:left">Makeup water well above winter norm; check fill valves and loop losses</td></tr>
-            <tr><td>9</td><td>0822</td><td style="text-align:left">Allen Center for Global Animal Health</td><td style="text-align:left">Domestic</td><td style="text-align:left">Jan + Feb 2026: 131k + 57k gal vs 25 to 27k same months 2025</td><td>~68k gal/mo</td><td>$5,600</td><td style="text-align:left"><span class="task-status-badge ts-progress">BACnet live</span></td><td style="text-align:left">Intermittent failure pattern; check RO reject, humidification, process equipment</td></tr>
-            <tr><td>10</td><td>0180A</td><td style="text-align:left">Steffen Center Offices and Shops</td><td style="text-align:left">Domestic</td><td style="text-align:left">Feb + Mar 2026: 45 to 56k gal/mo where 2025 was zero</td><td>~51k gal/mo</td><td>$4,200</td><td style="text-align:left"><span class="task-status-badge ts-monitor">register-real (Ref 200134)</span></td><td style="text-align:left">New 2025 meter, no history; walk the building and yard hydrants</td></tr>
-            <tr class="total-row"><td></td><td colspan="5" style="text-align:left">Combined annualized run rate if nothing is fixed</td><td>~$286,000 / yr</td><td colspan="2"></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <h2 style="margin-top:1.25rem;">Excluded: looks like a leak, is actually a data artifact</h2>
-      <div class="info-box">
-        These buildings show large usage on the dashboard but their physical meter registers are flat, or the value traces to a known data-entry error.
-        Do not dispatch field crews for these; they are queued for historian cleanup.
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Bldg</th><th style="text-align:left">Dashboard shows</th><th style="text-align:left">Why it is not a field issue</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>0111A</td><td style="text-align:left">376k Jan + 108k Feb 2026</td><td style="text-align:left">Sensus register (Ref 200045) flat zero all of 2026; phantom leftovers pending historian cleanup</td></tr>
-            <tr><td>0180 (site)</td><td style="text-align:left">483k Feb + 1.25M Mar 2026</td><td style="text-align:left">Residue of the Ref 200020 February hand-entry typo; pending historian cleanup</td></tr>
-            <tr><td>0141H</td><td style="text-align:left">7.6M gal/mo Mar + Apr 2026</td><td style="text-align:left">Source-register jump with Mar and Apr deltas identical; interpolation signature; verify against raw AMR before any field call</td></tr>
-            <tr><td>0167</td><td style="text-align:left">11.3M gal Jul 2026</td><td style="text-align:left">Register stuck 6 months then one huge jump; almost certainly a bad July source entry</td></tr>
-            <tr><td>0124A</td><td style="text-align:left">1.15M gal Apr 2026</td><td style="text-align:left">Real delta accumulated over 3 stuck months, then a x100 multiplier applied; multiplier verification item</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="info-box" style="margin-top:1rem;">
-        <strong>Coverage caveat:</strong> May, June, and July 2026 domestic data is still sparse for many CSV-pipeline meters,
-        so a leak that started in May on a CSV meter may not appear in this screen yet. January 2026 currently duplicates
-        February on reingested meters (known import artifact); January evidence above was cross-checked against physical registers where used.
-      </div>
-      </div><!-- /fieldActionPanel -->
     </div>
   </div>
 
@@ -843,7 +785,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Top 10 Top Dollar Issues</strong>
-          Filter button on the Anomaly Review tab. Shows a curated top-10 list of high-cost issues verified as physical (meter register advanced, or live BACnet/Calsense reading), each with its dollar run rate and specific field action, plus an exclusion table of look-alike data artifacts so crews are not dispatched for phantoms.
+          Filter button on the Anomaly Review tab. Filters the sites table to the 10 building/service pairs with the highest verified dollar impact (each confirmed physical via meter register movement or a live BACnet/Calsense reading, ~$286k/yr combined at FY27 proposed $0.00685/gal, list prepared 07/21/2026). Expand rows and create tasks as usual.
         </div>
         <div class="help-tab-card">
           <strong>Task Tracker</strong>
@@ -1934,6 +1876,22 @@ function getTaskStatusLabel(anomaly, tasks) {
   return t ? t.status : 'No Task';
 }
 
+// Top 10 Top Dollar Issues (07/21/2026): building/service pairs verified as physical
+// (meter register advanced in the 07/10/2026 reads file, or live BACnet/Calsense point),
+// ranked by annualized cost at FY27 proposed $0.00685/gal. Combined run rate ~$286k/yr.
+const TOP10_TOP_DOLLAR = new Set([
+  '0811|Domestic Water',            // 1. Lab Animal Resources, ~$168k/yr
+  '0095|Domestic Water',            // 2. Smith CUE, ~$50k/yr
+  '0079A|Domestic Water',           // 3. Gannon Hall, ~$19k/yr
+  '0120M|Irrigation Water',         // 4. Carver Farm paddocks, ~$10k/yr
+  '0807|Domestic Water',            // 5. Bustad Hall, ~$8.8k/yr
+  '0078|Domestic Water',            // 6. Sloan Hall, ~$7.3k/yr
+  '0044|Domestic Water',            // 7. McCoy Hall, ~$6.7k/yr
+  '0832A CHW Plant|Domestic Water', // 8. CHW Storage Pumphouse, ~$6k/yr
+  '0822|Domestic Water',            // 9. Allen Center, ~$5.6k/yr
+  '0180A|Domestic Water'            // 10. Steffen Offices/Shops, ~$4.2k/yr
+]);
+
 function getFilteredRows(filter, tasks) {
   filter = filter || currentAnomalyFilter || 'all';
   tasks = tasks || loadTasks();
@@ -1959,6 +1917,8 @@ function getFilteredRows(filter, tasks) {
     list = list.filter(r => (r.worstAnomaly || r._raw || {}).type === 'spike');
   } else if (filter === 'winter_irrigation') {
     list = list.filter(r => (r.worstAnomaly || r._raw || {}).type === 'winter_irrigation');
+  } else if (filter === 'top10') {
+    list = list.filter(r => TOP10_TOP_DOLLAR.has(r.bldgNo + '|' + r.service));
   }
 
   // 2. Apply per-column filters
@@ -2047,7 +2007,7 @@ function renderAnomalyTab(filter) {
   // Update heading
   const headingEl = document.getElementById('anomalyHeading');
   const isAnomalyView = anomalyOnlyMode || filter === 'spike' || filter === 'winter_irrigation';
-  if (headingEl) headingEl.textContent = isAnomalyView ? 'Detected Anomalies' : 'All Sites';
+  if (headingEl) headingEl.textContent = filter === 'top10' ? 'Top 10 Top Dollar Issues' : isAnomalyView ? 'Detected Anomalies' : 'All Sites';
 
   // Build dynamic thead with sort + filter controls
   const thead = document.querySelector('#tblAnomalies thead');
@@ -3054,19 +3014,9 @@ function renderDataInfo(domestic, irrigation, totals) {
     document.querySelectorAll('#anomalyFilterBar .filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const svc = btn.dataset.svc;
-        const panel = document.getElementById('fieldActionPanel');
-        const sitesWrap = document.querySelector('#sec-anomalies .table-wrap');
         if (svc === 'anomaly_only') {
           anomalyOnlyMode = !anomalyOnlyMode;
           btn.classList.toggle('active', anomalyOnlyMode);
-          if (currentAnomalyFilter === 'top10') {
-            // Leave Top 10 view: back to All Services with the toggle applied
-            panel.style.display = 'none';
-            sitesWrap.style.display = '';
-            currentAnomalyFilter = 'all';
-            document.querySelectorAll('#anomalyFilterBar .filter-btn:not(.anomaly-toggle)').forEach(b =>
-              b.classList.toggle('active', b.dataset.svc === 'all'));
-          }
           renderAnomalyTab(currentAnomalyFilter);
           return;
         }
@@ -3074,13 +3024,6 @@ function renderDataInfo(domestic, irrigation, totals) {
         document.querySelectorAll('#anomalyFilterBar .filter-btn:not(.anomaly-toggle)').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentAnomalyFilter = svc;
-        if (svc === 'top10') {
-          panel.style.display = 'block';
-          sitesWrap.style.display = 'none';
-          return;
-        }
-        panel.style.display = 'none';
-        sitesWrap.style.display = '';
         renderAnomalyTab(currentAnomalyFilter);
       });
     });
