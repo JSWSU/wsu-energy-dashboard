@@ -2390,8 +2390,15 @@ function toggleSiteChart(row) {
   // read as prior-year lines
   const METER_COLORS = ['#0d9488', '#65a30d', '#e11d48', '#0284c7', '#b45309', '#c026d3', '#475569', '#ca8a04'];
 
-  const yearsOldestFirst = [...G_years];
-  const datasets = yearsOldestFirst.map(year => {
+  // Multi-meter buildings: the meters ARE the current year (one solid line
+  // each); prior years stay as dashed building totals. Single-meter buildings
+  // keep the classic total line for the current year.
+  const latestYr = G_years[G_years.length - 1];
+  const meterNames = md ? Object.keys(md).sort() : [];
+  const useMeterLines = meterNames.length > 1;
+
+  const yearsShown = [...G_years].filter(year => !(useMeterLines && year === latestYr));
+  const datasets = yearsShown.map(year => {
     const data = getYearMonthData(bldg.months, year);
     const cfg = getYearLineConfig(color, year, G_years);
     const isAnomalyYear = hasHighlight && year === anomalyYear;
@@ -2410,24 +2417,33 @@ function toggleSiteChart(row) {
       tension: 0.3,
       spanGaps: false
     };
-  });
+  }).filter(ds => ds.data.some(v => v != null));
 
-  // Per-meter lines (latest year) from uploaded meter-level data, when the
-  // building has more than one meter; single-meter buildings match the total
-  const latestYr = G_years[G_years.length - 1];
-  if (md && Object.keys(md).length > 1) {
-    Object.keys(md).sort().forEach((m, i) => {
+  if (useMeterLines) {
+    // The meter with the highest value in the anomaly month carries the red dot
+    let domMeter = null;
+    if (hasHighlight && anomalyYear === latestYr) {
+      let best = -Infinity;
+      meterNames.forEach(m => {
+        const v = md[m][latestYr + '-' + String(anomalyCalIdx + 1).padStart(2, '0')] || 0;
+        if (v > best) { best = v; domMeter = m; }
+      });
+    }
+    meterNames.forEach((m, i) => {
       const mc = METER_COLORS[i % METER_COLORS.length];
+      const isDom = m === domMeter;
       datasets.push({
         label: m,
+        _meter: true,
+        _anom: isDom,
         data: getYearMonthData(md[m], latestYr),
         borderColor: mc,
         backgroundColor: mc + '22',
         fill: false,
-        borderWidth: 1.25,
-        borderDash: [4, 3],
-        pointRadius: 0,
-        pointHoverRadius: 4,
+        borderWidth: 2,
+        pointRadius: CALENDAR_MONTHS.map((_, mi) => isDom && mi === anomalyCalIdx ? 7 : 3),
+        pointBackgroundColor: CALENDAR_MONTHS.map((_, mi) => isDom && mi === anomalyCalIdx ? '#dc2626' : mc),
+        pointBorderColor: CALENDAR_MONTHS.map((_, mi) => isDom && mi === anomalyCalIdx ? '#dc2626' : mc),
         tension: 0.3,
         spanGaps: false
       });
@@ -2448,10 +2464,12 @@ function toggleSiteChart(row) {
           callbacks: {
             label: ctx => {
               if (ctx.parsed.y == null) return null;
-              if (ctx.datasetIndex >= yearsOldestFirst.length) {
-                return ctx.dataset.label + ' (' + latestYr + '): ' + fmt(ctx.parsed.y, 1) + ' kGal';
+              const ds = ctx.dataset;
+              if (ds._meter) {
+                const isAnomaly = ds._anom && ctx.dataIndex === anomalyCalIdx;
+                return ds.label + ' (' + latestYr + '): ' + fmt(ctx.parsed.y, 1) + ' kGal' + (isAnomaly ? ' \u25C6 ANOMALY' : '');
               }
-              const yr = yearsOldestFirst[ctx.datasetIndex];
+              const yr = parseInt(ds.label, 10);
               const isAnomaly = hasHighlight && yr === anomalyYear && ctx.dataIndex === anomalyCalIdx;
               return yr + ': ' + fmt(ctx.parsed.y, 1) + ' kGal' + (isAnomaly ? ' \u25C6 ANOMALY' : '');
             }
