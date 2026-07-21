@@ -1896,8 +1896,8 @@ function getFilteredRows(filter, tasks) {
   filter = filter || currentAnomalyFilter || 'all';
   tasks = tasks || loadTasks();
 
-  // Determine source: anomaly-only mode or all sites
-  const isAnomalyOnly = anomalyOnlyMode || filter === 'spike' || filter === 'winter_irrigation';
+  // Determine source: anomaly-only mode or all sites (Top 10 always draws from all sites)
+  const isAnomalyOnly = filter !== 'top10' && (anomalyOnlyMode || filter === 'spike' || filter === 'winter_irrigation');
   let list;
   if (isAnomalyOnly) {
     list = G_anomalies.map(a => ({
@@ -2006,7 +2006,7 @@ function renderAnomalyTab(filter) {
 
   // Update heading
   const headingEl = document.getElementById('anomalyHeading');
-  const isAnomalyView = anomalyOnlyMode || filter === 'spike' || filter === 'winter_irrigation';
+  const isAnomalyView = filter !== 'top10' && (anomalyOnlyMode || filter === 'spike' || filter === 'winter_irrigation');
   if (headingEl) headingEl.textContent = filter === 'top10' ? 'Top 10 Top Dollar Issues' : isAnomalyView ? 'Detected Anomalies' : 'All Sites';
 
   // Build dynamic thead with sort + filter controls
@@ -3023,6 +3023,12 @@ function renderDataInfo(domestic, irrigation, totals) {
         // Deactivate service/type buttons (not the anomaly toggle)
         document.querySelectorAll('#anomalyFilterBar .filter-btn:not(.anomaly-toggle)').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        // Top 10 is a fixed building list; an active Anomalies Only toggle would
+        // intersect it down to nothing, so clear the toggle when entering Top 10
+        if (svc === 'top10' && anomalyOnlyMode) {
+          anomalyOnlyMode = false;
+          document.getElementById('btnAnomalyOnly').classList.remove('active');
+        }
         currentAnomalyFilter = svc;
         renderAnomalyTab(currentAnomalyFilter);
       });
