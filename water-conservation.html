@@ -608,7 +608,6 @@
   <!-- Nav Tabs -->
   <div class="nav-tabs" id="navTabs">
     <button class="nav-tab active" data-tab="anomalies">Anomaly Review</button>
-    <button class="nav-tab" data-tab="fieldactions">Field Action List</button>
     <button class="nav-tab" data-tab="tasks">Task Tracker</button>
     <button class="nav-tab" data-tab="trends">Historical Trends</button>
     <button class="nav-tab" data-tab="buildings">Building Index</button>
@@ -635,6 +634,7 @@
         <button class="filter-btn anomaly-toggle" id="btnAnomalyOnly" data-svc="anomaly_only">Anomalies Only</button>
         <button class="filter-btn" data-svc="spike">Spikes Only</button>
         <button class="filter-btn" data-svc="winter_irrigation">Winter Irrigation Only</button>
+        <button class="filter-btn" data-svc="top10">Top 10 Top Dollar Issues</button>
         <div style="flex:1"></div>
         <button class="btn-sm primary" id="btnCreateAll">Create Tasks for All New Anomalies</button>
       </div>
@@ -648,13 +648,10 @@
           <tbody id="anomalyBody"></tbody>
         </table>
       </div>
-    </div>
-  </div>
 
-  <!-- ==================== FIELD ACTION LIST TAB ==================== -->
-  <div class="section" id="sec-fieldactions">
-    <div class="card">
-      <h2>Field Action List: Top 10 High-Cost Physical Issues <span style="font-weight:400;font-size:0.82rem;color:var(--text-light);">prepared 07/21/2026</span></h2>
+      <!-- ==================== TOP 10 TOP DOLLAR ISSUES PANEL (shown via filter button) ==================== -->
+      <div id="fieldActionPanel" style="display:none">
+      <h2 style="margin-top:1rem;">Top 10 Top Dollar Issues <span style="font-weight:400;font-size:0.82rem;color:var(--text-light);">physically verified, prepared 07/21/2026</span></h2>
       <div class="info-box">
         Each item below was screened for persistence (2 or more consecutive elevated months vs the same months in 2025) and then verified as physical:
         either the meter register physically advanced in the 07/10/2026 meter reads file, or the value comes from a live BACnet or Calsense point.
@@ -685,9 +682,7 @@
           </tbody>
         </table>
       </div>
-    </div>
-    <div class="card">
-      <h2>Excluded: looks like a leak, is actually a data artifact</h2>
+      <h2 style="margin-top:1.25rem;">Excluded: looks like a leak, is actually a data artifact</h2>
       <div class="info-box">
         These buildings show large usage on the dashboard but their physical meter registers are flat, or the value traces to a known data-entry error.
         Do not dispatch field crews for these; they are queued for historian cleanup.
@@ -711,6 +706,7 @@
         so a leak that started in May on a CSV meter may not appear in this screen yet. January 2026 currently duplicates
         February on reingested meters (known import artifact); January evidence above was cross-checked against physical registers where used.
       </div>
+      </div><!-- /fieldActionPanel -->
     </div>
   </div>
 
@@ -846,8 +842,8 @@
           The main meeting screen. Shows all metered building/service pairs with KPI summary cards. Click any row to expand year-over-year charts and data tables. Use <strong>Anomalies Only</strong> to filter to flagged buildings. Create tasks directly from any row.
         </div>
         <div class="help-tab-card">
-          <strong>Field Action List</strong>
-          Curated top-10 list of high-cost issues verified as physical (meter register advanced, or live BACnet/Calsense reading). Each row carries the dollar run rate and the specific field action. Includes an exclusion table of look-alike data artifacts so crews are not dispatched for phantoms.
+          <strong>Top 10 Top Dollar Issues</strong>
+          Filter button on the Anomaly Review tab. Shows a curated top-10 list of high-cost issues verified as physical (meter register advanced, or live BACnet/Calsense reading), each with its dollar run rate and specific field action, plus an exclusion table of look-alike data artifacts so crews are not dispatched for phantoms.
         </div>
         <div class="help-tab-card">
           <strong>Task Tracker</strong>
@@ -3058,9 +3054,19 @@ function renderDataInfo(domestic, irrigation, totals) {
     document.querySelectorAll('#anomalyFilterBar .filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const svc = btn.dataset.svc;
+        const panel = document.getElementById('fieldActionPanel');
+        const sitesWrap = document.querySelector('#sec-anomalies .table-wrap');
         if (svc === 'anomaly_only') {
           anomalyOnlyMode = !anomalyOnlyMode;
           btn.classList.toggle('active', anomalyOnlyMode);
+          if (currentAnomalyFilter === 'top10') {
+            // Leave Top 10 view: back to All Services with the toggle applied
+            panel.style.display = 'none';
+            sitesWrap.style.display = '';
+            currentAnomalyFilter = 'all';
+            document.querySelectorAll('#anomalyFilterBar .filter-btn:not(.anomaly-toggle)').forEach(b =>
+              b.classList.toggle('active', b.dataset.svc === 'all'));
+          }
           renderAnomalyTab(currentAnomalyFilter);
           return;
         }
@@ -3068,6 +3074,13 @@ function renderDataInfo(domestic, irrigation, totals) {
         document.querySelectorAll('#anomalyFilterBar .filter-btn:not(.anomaly-toggle)').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentAnomalyFilter = svc;
+        if (svc === 'top10') {
+          panel.style.display = 'block';
+          sitesWrap.style.display = 'none';
+          return;
+        }
+        panel.style.display = 'none';
+        sitesWrap.style.display = '';
         renderAnomalyTab(currentAnomalyFilter);
       });
     });
