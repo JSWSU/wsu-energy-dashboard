@@ -1809,13 +1809,42 @@ function parseMeterCSV(text) {
   return out;
 }
 
+// Wherever byMeter rows (from the repo feed or the converter) carry real data
+// for a building-month, drop the building-total rows for that month so the
+// granular data wins and nothing double counts.
+function overlayByMeter(rows) {
+  const covered = new Set();
+  rows.forEach(r => {
+    if (r.byMeter && typeof r.usage === 'number' && isFinite(r.usage)) {
+      covered.add((r.bldgNo || '') + '|' + (r.startDate || ''));
+    }
+  });
+  if (!covered.size) return rows;
+  return rows.filter(r => r.byMeter || !covered.has((r.bldgNo || '') + '|' + (r.startDate || '')));
+}
+
+// Collect per-meter series from byMeter rows into G_meterDetail without
+// overwriting entries already provided by a browser upload (uploads win).
+function collectByMeterDetail(rows, service) {
+  rows.forEach(r => {
+    if (!r.byMeter || typeof r.usage !== 'number' || !isFinite(r.usage)) return;
+    const mk = parseMonthKey(r.startDate);
+    if (!mk) return;
+    const dk = r.bldgNo + '|' + service;
+    const d = (G_meterDetail[dk] = G_meterDetail[dk] || {});
+    const m = (d[r.meters] = d[r.meters] || {});
+    if (!(mk in m)) m[mk] = r.usage / 1000;
+  });
+}
+
 // Merge uploaded per-meter rows over the repo building totals.
 // Returns { domestic, irrigation, well } row arrays ready for aggregation.
-function applyMeterUploads(domestic, irrigation) {
+function applyMeterUploads(domestic, irrigation, wellRepo) {
   G_meterDetail = {};
   G_uploadInfo = null;
+  wellRepo = wellRepo || [];
   const up = loadUploads();
-  if (!up || !up.rows || !up.rows.length) return { domestic: domestic, irrigation: irrigation, well: [] };
+  if (!up || !up.rows || !up.rows.length) return { domestic: domestic, irrigation: irrigation, well: wellRepo };
 
   const byService = {};
   up.rows.forEach(r => { (byService[r.service] = byService[r.service] || []).push(r); });
@@ -1861,7 +1890,7 @@ function applyMeterUploads(domestic, irrigation) {
   return {
     domestic: sanitizeOutliers(overlay(domestic, 'Domestic Water'), 'upload:domestic'),
     irrigation: sanitizeOutliers(overlay(irrigation, 'Irrigation Water'), 'upload:irrigation'),
-    well: overlay([], 'Well Water')  // production wells: legitimately large values, no sanitizer
+    well: overlay(wellRepo, 'Well Water')  // production wells: legitimately large values, no sanitizer
   };
 }
 
@@ -3165,14 +3194,18 @@ function renderDataInfo(domestic, irrigation, totals) {
 // ============================================================
 (async function init() {
   try {
-    const [domRepo, irrRepo] = await Promise.all([
+    const [domRepo, irrRepo, wellRepo] = await Promise.all([
       loadJSON('data/domestic_water.json'),
-      loadJSON('data/irrigation.json')
+      loadJSON('data/irrigation.json'),
+      loadJSON('data/well_water.json').catch(() => [])
     ]);
-    const merged = applyMeterUploads(domRepo, irrRepo);
-    const domestic = merged.domestic;
-    const irrigation = merged.irrigation;
-    const well = merged.well;
+    const merged = applyMeterUploads(domRepo, irrRepo, wellRepo);
+    const domestic = overlayByMeter(merged.domestic);
+    const irrigation = overlayByMeter(merged.irrigation);
+    const well = overlayByMeter(merged.well);
+    collectByMeterDetail(domestic, 'Domestic Water');
+    collectByMeterDetail(irrigation, 'Irrigation Water');
+    collectByMeterDetail(well, 'Well Water');
 
     G_months = getSortedMonths(domestic, irrigation.concat(well));
     G_monthLabels = G_months.map(monthLabel);
