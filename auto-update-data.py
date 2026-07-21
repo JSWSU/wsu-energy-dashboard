@@ -47,6 +47,9 @@ GH_REPO = "jswsu/wsu-energy-dashboard"
 EXPORT_FILES = ["electric.json", "condensate.json", "domestic_water.json",
                 "irrigation.json", "chw.json", "sites.json", "connectors.json"]
 FILE_URL_PATTERNS = [
+    # SkySpark 3.1.11 serves project files at the full file uri (verified 07/21/2026);
+    # the three shorter forms below all 404 on this server but are kept as fallbacks
+    "{base}/api/{proj}/file/proj/{proj}/io/{name}",
     "{base}/api/{proj}/file/io/{name}",
     "{base}/proj/{proj}/file/io/{name}",
     "{base}/api/{proj}/io/{name}",

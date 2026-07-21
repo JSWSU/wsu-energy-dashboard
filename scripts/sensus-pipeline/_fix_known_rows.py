@@ -1,7 +1,5 @@
-"""Fix known bad rows in the water files: CSV spikes, 0092 double-count, negatives.
-
-Corrections from the 06/2026 audit, kept in the pipeline so a re-merge of old
-exports cannot reintroduce them. Idempotent: a second run changes nothing.
+"""Apply two structural fixes that aren't judgment calls: hardcoded historical spikes
+and the 0092 virtual-meter double-count. Idempotent.
 
 Rules:
 - Null 3 known Sensus/CSV accumulation spikes in domestic_water.json, matched by
@@ -12,7 +10,10 @@ Rules:
   both "Calsense" and "Domestic") from domestic_water.json, but only for months
   where the physical 0092_DW_001 row also exists (any usage state). The dashboard
   sums by bldgNo, so the virtual row double-counted 0092.
-- Null any negative usage value (physically impossible) in both water files.
+
+Heuristic spike detection (former passes 1 and 2) is handled in scan-only mode
+by _review_outliers.py. Negative-usage rows are also surfaced there. No row in
+this script is silently modified beyond the two structural fixes above.
 """
 import json
 import shutil
@@ -23,15 +24,36 @@ from pathlib import Path
 DATA = Path(r"C:\Users\john.slagboom\Desktop\Git\data")
 FILES = ["domestic_water.json", "irrigation.json"]
 
-# Known spike rows keyed per file as (bldgNo, meters, startDate)
+# Known spike rows keyed per file as (bldgNo, meters, startDate) -> guard.
+# Guard = only null when usage is a number above this (idempotent; already-null rows skip).
+# Default guard is SPIKE_GUARD; sub-million phantoms carry a tailored guard set safely
+# above the building's real monthly usage so a legitimate future value survives.
 KNOWN_SPIKES = {
     "domestic_water.json": {
-        ("0121", "0121_DW_001 (CSV)", "05-01-2025"),  # TUKEY HORTICULTURE ORCHARD, ~40.8M gal
-        ("0816", "0816_DW_001 (CSV), 0816_DW_002 (CSV)", "03-01-2025"),  # FOOD SCIENCE/HUMAN NUTRITION, ~10.2M gal
-        ("0078", "0078_DW_001 (CSV)", "08-01-2025"),  # SLOAN HALL, ~4.7M gal
+        ("0121", "0121_DW_001 (CSV)", "05-01-2025"): None,  # TUKEY HORTICULTURE ORCHARD, ~40.8M gal
+        ("0816", "0816_DW_001 (CSV), 0816_DW_002 (CSV)", "03-01-2025"): None,  # FOOD SCIENCE/HUMAN NUTRITION, ~10.2M gal
+        ("0078", "0078_DW_001 (CSV)", "08-01-2025"): None,  # SLOAN HALL, ~4.7M gal
+        ("0109E", "0109EDW_001 (CSV)", "02-01-2026"): None,  # USDA POTTING SHED 109E, 11.89B phantom (row-shift, hisClear'd 2026-07-16)
+        ("0109G", "0109GDW_001 (CSV)", "02-01-2026"): None,  # USDA GREENHOUSE EAST, 1.69B phantom (row-shift, hisClear'd 2026-07-21)
+        ("0299C", "0299CDW_001 (CSV)", "02-01-2026"): None,  # AIRPORT NEW TERMINAL, 39.68M phantom (meter dead since Aug 2025, hisClear'd 2026-07-16)
+        ("0114", "0114_DW_001B (CSV), 0114_DW_001 (CSV), 0114_DW_002 (CSV), 0114_DW_003 (CSV)", "02-01-2026"): None,  # PLANT SCIENCES GREENHOUSE, 348M phantom (1,639x prior-yr median)
+        ("0372G", "0372GDW_002 (CSV), 0372GDW_001 (CSV)", "02-01-2026"): None,  # BAILEY-BRAYTON FIELD, 28.6M phantom (492x prior-yr median)
+        ("0165D", "0165DDW_001 (CSV)", "02-01-2026"): None,  # VET FEED LOT SHELTER, 14.9M phantom (50,822x prior-yr median)
+        # Added 07/21/2026: Feb/Mar 2026 row-shift residue confirmed phantom against the
+        # 07/10/2026 register file (meter registers flat/zero while these values exist).
+        ("0033E", "0033EDW_001 (CSV)", "02-01-2026"): None,  # MURROW HALL, 1.23M phantom (register delta 0)
+        ("0183", "0183_DW_001 (CSV)", "02-01-2026"): None,  # BOTANY FIELD LAB, 1.32M phantom (historian Feb = 0)
+        ("0180", "0180_DW_001 (CSV), 0180_DW_002 (CSV)", "03-01-2026"): None,  # STEFFEN CENTER, 1.25M (Ref 200020 Feb-typo residue)
+        ("0180", "0180_DW_001 (CSV), 0180_DW_002 (CSV)", "02-01-2026"): 200_000,  # STEFFEN CENTER, 483k (same typo residue)
+        ("0111", "0111_DW_001 (CSV)", "02-01-2026"): 500_000,  # ENTOMOLOGY GREENHOUSES, 934k phantom (historian Feb = 0)
+        ("0111A", "0111ADW_001 (CSV)", "01-01-2026"): 50_000,  # ENTOM SHOP, 376k phantom (Ref 200045 register zero all 2026)
+        ("0111A", "0111ADW_001 (CSV)", "02-01-2026"): 50_000,  # ENTOM SHOP, 108k phantom (same)
+        ("0118", "0118_DW_001 (CSV)", "02-01-2026"): 200_000,  # INSTRUCTIONAL GREENHOUSE, 458k phantom (register delta 0)
+        ("0357", "0357_DW_001 (CSV)", "02-01-2026"): 100_000,  # RECYCLING FACILITY, 223k phantom (historian Feb = 3,000)
+        ("0124A,B", "0124ADW_001 (CSV)", "04-01-2026"): None,  # HORTICULTURE GREENHOUSE, 1.15M = real 11,464-unit delta x suspect x100 mult; null until meter-face verified
     },
 }
-SPIKE_GUARD = 1_000_000  # only null when current value is a number above this
+SPIKE_GUARD = 1_000_000  # default guard when an entry's guard is None
 
 
 def is_num(x):
@@ -85,12 +107,13 @@ def main():
         removed = 0
 
         # 1. Null known spike rows (guarded, idempotent)
-        spikes = KNOWN_SPIKES.get(fname, set())
+        spikes = KNOWN_SPIKES.get(fname, {})
         for r in rows:
             key = (r.get("bldgNo"), r.get("meters"), r.get("startDate"))
             if key in spikes:
+                guard = spikes[key] if spikes[key] is not None else SPIKE_GUARD
                 u = r.get("usage")
-                if is_num(u) and u > SPIKE_GUARD:
+                if is_num(u) and u > guard:
                     r["usage"] = None
                     nulled += 1
                     print(f"  NULL spike     {fname} {key[0]} {key[2]}  was={u:,.0f}")
@@ -112,13 +135,7 @@ def main():
                 kept.append(r)
             grid["rows"] = rows = kept
 
-        # 3. Null any negative usage (physically impossible)
-        for r in rows:
-            u = r.get("usage")
-            if is_num(u) and u < 0:
-                r["usage"] = None
-                nulled += 1
-                print(f"  NULL negative  {fname} {r.get('bldgNo')} {r.get('startDate')}  was={u:,.2f}")
+        # (Negatives are surfaced in the sanity review report, not nulled here.)
 
         if nulled == 0 and removed == 0:
             print(f"{fname}: no changes")

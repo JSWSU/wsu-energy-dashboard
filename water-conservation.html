@@ -785,7 +785,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Top 10 Top Dollar Issues</strong>
-          Filter button on the Anomaly Review tab. Filters the sites table to the 10 building/service pairs with the highest verified dollar impact (each confirmed physical via meter register movement or a live BACnet/Calsense reading, ~$286k/yr combined at FY27 proposed $0.00685/gal, list prepared 07/21/2026). Expand rows and create tasks as usual.
+          Filter button on the Anomaly Review tab. Computed live from the loaded data: for each building/service, the latest one or two months with real 2026 data are compared to the same months in 2025, and the 10 sites with the highest annualized excess cost (FY27 proposed rate, $0.00685 per gallon) are shown. Recomputes automatically whenever the data updates. Expand rows and create tasks as usual.
         </div>
         <div class="help-tab-card">
           <strong>Task Tracker</strong>
@@ -1876,21 +1876,42 @@ function getTaskStatusLabel(anomaly, tasks) {
   return t ? t.status : 'No Task';
 }
 
-// Top 10 Top Dollar Issues (07/21/2026): building/service pairs verified as physical
-// (meter register advanced in the 07/10/2026 reads file, or live BACnet/Calsense point),
-// ranked by annualized cost at FY27 proposed $0.00685/gal. Combined run rate ~$286k/yr.
-const TOP10_TOP_DOLLAR = new Set([
-  '0811|Domestic Water',            // 1. Lab Animal Resources, ~$168k/yr
-  '0095|Domestic Water',            // 2. Smith CUE, ~$50k/yr
-  '0079A|Domestic Water',           // 3. Gannon Hall, ~$19k/yr
-  '0120M|Irrigation Water',         // 4. Carver Farm paddocks, ~$10k/yr
-  '0807|Domestic Water',            // 5. Bustad Hall, ~$8.8k/yr
-  '0078|Domestic Water',            // 6. Sloan Hall, ~$7.3k/yr
-  '0044|Domestic Water',            // 7. McCoy Hall, ~$6.7k/yr
-  '0832A CHW Plant|Domestic Water', // 8. CHW Storage Pumphouse, ~$6k/yr
-  '0822|Domestic Water',            // 9. Allen Center, ~$5.6k/yr
-  '0180A|Domestic Water'            // 10. Steffen Offices/Shops, ~$4.2k/yr
-]);
+// Top 10 Top Dollar Issues: computed at load from the data itself, never hardcoded.
+// For each building/service, take its latest one or two months that have real
+// (nonzero) 2026 data, compare each against the same calendar month in 2025
+// (fallback: 2025 median), and rank by annualized excess cost at the FY27
+// proposed rate. Stale meters naturally rank on their newest real data.
+let G_top10Keys = new Set();
+
+function computeTop10TopDollar() {
+  const RATE_PER_KGAL = 6.85; // FY27 proposed $0.00685/gal
+  const scored = [];
+  [[G_domByBldg, 'Domestic Water'], [G_irrigByBldg, 'Irrigation Water']].forEach(pair => {
+    const map = pair[0], service = pair[1];
+    Object.values(map).forEach(b => {
+      const keys26 = Object.keys(b.months).filter(mk => mk.startsWith('2026-') && b.months[mk] > 0).sort();
+      if (!keys26.length) return;
+      const recent = keys26.slice(-2);
+      const vals25 = Object.keys(b.months).filter(mk => mk.startsWith('2025-'))
+        .map(mk => b.months[mk]).filter(v => v > 0).sort((a, c) => a - c);
+      const med25 = vals25.length ? vals25[Math.floor(vals25.length / 2)] : 0;
+      let excess = 0;
+      recent.forEach(mk => {
+        const cal = mk.split('-')[1];
+        const priors = Object.keys(b.months)
+          .filter(m => m.startsWith('2025-') && m.split('-')[1] === cal)
+          .map(m => b.months[m]).filter(v => v > 0);
+        const base = priors.length ? priors.reduce((s, v) => s + v, 0) / priors.length : med25;
+        const e = b.months[mk] - base;
+        if (e > 0) excess += e;
+      });
+      if (excess <= 0) return;
+      scored.push({ key: b.bldgNo + '|' + service, dollars: (excess / recent.length) * 12 * RATE_PER_KGAL });
+    });
+  });
+  scored.sort((a, c) => c.dollars - a.dollars);
+  return new Set(scored.slice(0, 10).map(s => s.key));
+}
 
 function getFilteredRows(filter, tasks) {
   filter = filter || currentAnomalyFilter || 'all';
@@ -1918,7 +1939,7 @@ function getFilteredRows(filter, tasks) {
   } else if (filter === 'winter_irrigation') {
     list = list.filter(r => (r.worstAnomaly || r._raw || {}).type === 'winter_irrigation');
   } else if (filter === 'top10') {
-    list = list.filter(r => TOP10_TOP_DOLLAR.has(r.bldgNo + '|' + r.service));
+    list = list.filter(r => G_top10Keys.has(r.bldgNo + '|' + r.service));
   }
 
   // 2. Apply per-column filters
@@ -2992,6 +3013,7 @@ function renderDataInfo(domestic, irrigation, totals) {
     const winterIrrig = detectWinterIrrigation(G_irrigByBldg, recentMonths);
     G_anomalies = [...domSpikes, ...irrigSpikes, ...winterIrrig];
     G_allSiteRows = buildAllSiteRows();
+    G_top10Keys = computeTop10TopDollar();
 
     // Render default tab
     renderAnomalyTab();
