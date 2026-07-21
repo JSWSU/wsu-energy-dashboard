@@ -2386,7 +2386,9 @@ function toggleSiteChart(row) {
   const anomalyCalIdx = hasHighlight ? parseInt(w.month.split('-')[1], 10) - 1 : -1;
 
   const md = G_meterDetail[r.bldgNo + '|' + r.service] || null;
-  const METER_COLORS = ['#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#6366f1', '#14b8a6', '#f43f5e', '#84cc16'];
+  // Distinct from YEAR_COLORS (amber/violet/pink/indigo) so meter lines never
+  // read as prior-year lines
+  const METER_COLORS = ['#0d9488', '#65a30d', '#e11d48', '#0284c7', '#b45309', '#c026d3', '#475569', '#ca8a04'];
 
   const yearsOldestFirst = [...G_years];
   const datasets = yearsOldestFirst.map(year => {
@@ -2422,8 +2424,10 @@ function toggleSiteChart(row) {
         borderColor: mc,
         backgroundColor: mc + '22',
         fill: false,
-        borderWidth: 1.5,
-        pointRadius: 2,
+        borderWidth: 1.25,
+        borderDash: [4, 3],
+        pointRadius: 0,
+        pointHoverRadius: 4,
         tension: 0.3,
         spanGaps: false
       });
