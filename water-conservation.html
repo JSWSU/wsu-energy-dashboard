@@ -630,6 +630,7 @@
         <button class="filter-btn active" data-svc="all">All Services</button>
         <button class="filter-btn" data-svc="Domestic Water">Domestic Water</button>
         <button class="filter-btn" data-svc="Irrigation Water">Irrigation Water</button>
+        <button class="filter-btn" data-svc="Well Water">Well Water</button>
         <span class="filter-separator"></span>
         <button class="filter-btn anomaly-toggle" id="btnAnomalyOnly" data-svc="anomaly_only">Anomalies Only</button>
         <button class="filter-btn" data-svc="spike">Spikes Only</button>
@@ -801,7 +802,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Data Info</strong>
-          Data source details, the data update pipeline steps, unit conversions, file inventory, and automated data quality checks with integrity verification.
+          Data source details, the data update pipeline steps, unit conversions, file inventory, and automated data quality checks with integrity verification. Also hosts the <strong>Meter-Level Data Upload</strong>: upload the ByMeter Altura report CSVs to override the standard feed with fresher per-meter data, add the Well Water service, and unlock by-meter breakdown tables in expanded rows.
         </div>
       </div>
     </div>
@@ -906,6 +907,22 @@
 
   <!-- ==================== DATA INFO TAB ==================== -->
   <div class="section" id="sec-info">
+    <div class="card">
+      <h2>Meter-Level Data Upload</h2>
+      <div class="info-box">
+        Upload the <strong>ByMeter Altura report CSVs</strong> (Domestic Water, Irrigation Water, Well Water; columns:
+        id, Building Number, Building Name, Data Source, Meter, Service, Unit, Start Date, End Date, Usage; values in gallons).
+        Uploaded months <strong>override the standard feed</strong> for those buildings, Well Water appears as its own service filter,
+        and expanded building rows gain a by-meter breakdown table. Data persists in this browser until cleared; re-upload a newer
+        export for a service to replace it.
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.75rem; flex-wrap:wrap;">
+        <button class="btn-sm primary" id="btnUploadMeters">Upload Meter CSVs</button>
+        <button class="btn-sm" id="btnClearUploads">Clear Uploaded Data</button>
+        <input type="file" id="meterFiles" accept=".csv" multiple style="display:none">
+        <span id="uploadStatus" style="font-size:0.8rem;color:var(--text-light);"></span>
+      </div>
+    </div>
     <div class="card">
       <h2>Data Sources</h2>
       <div class="info-box">
@@ -1092,7 +1109,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 //  GLOBALS
 // ============================================================
 const chartInstances = [];
-const COLORS = { domestic: '#3b82f6', irrigation: '#22c55e' };
+const COLORS = { domestic: '#3b82f6', irrigation: '#22c55e', well: '#0e7490' };
 const STORAGE_KEY = 'wsu_water_tasks';
 const ID_COUNTER_KEY = 'wsu_water_task_counter';
 const WINTER_MONTHS = [11, 12, 1, 2];
@@ -1103,6 +1120,9 @@ const CALENDAR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','
 let G_anomalies = [];
 let G_domByBldg = {};
 let G_irrigByBldg = {};
+let G_wellByBldg = {};
+let G_meterDetail = {};   // 'bldgNo|service' -> { meterName: { 'YYYY-MM': kGal } } from uploads
+let G_uploadInfo = null;  // { uploadedAt, files, counts } when meter uploads are active
 let G_months = [];
 let G_monthLabels = [];
 let G_years = [];
@@ -1568,6 +1588,14 @@ function buildAllSiteRows() {
       hasAnomaly: anomalies.length > 0, worstAnomaly: worst
     });
   });
+  Object.values(G_wellByBldg).forEach(b => {
+    rows.push({
+      bldgNo: b.bldgNo, bldgName: b.bldgName, service: 'Well Water',
+      meters: b.meters, total: b.total,
+      anomalies: [], anomalyCount: 0,
+      hasAnomaly: false, worstAnomaly: null
+    });
+  });
   return rows;
 }
 
@@ -1747,6 +1775,94 @@ function parseCSVLine(line) {
   }
   cells.push(current);
   return cells;
+}
+
+// ============================================================
+//  METER-LEVEL DATA UPLOAD (localStorage)
+//  Accepts the ByMeter Altura report CSV exports. Uploaded months
+//  override the standard building-total feed; Well Water becomes
+//  its own service; per-meter series feed the expand-row tables.
+// ============================================================
+const UPLOAD_KEY = 'wsu_meter_uploads_v1';
+
+function loadUploads() {
+  try { return JSON.parse(localStorage.getItem(UPLOAD_KEY) || 'null'); }
+  catch (e) { return null; }
+}
+
+function parseMeterCSV(text) {
+  const raw = parseCSV(text);
+  const out = [];
+  raw.forEach(r => {
+    if (!r['Building Number'] || !r['Start Date'] || !r['Service']) return;
+    if (r['Unit'] && r['Unit'] !== 'gal') return; // gallons only; anything else is a bad export
+    const u = r['Usage'];
+    const num = (u === '' || u == null) ? null : parseFloat(u);
+    out.push({
+      bldgNo: r['Building Number'], bldgName: r['Building Name'] || '',
+      meter: r['Meter'] || '', dataSource: r['Data Source'] || 'Upload',
+      service: r['Service'].trim(),
+      startDate: r['Start Date'], endDate: r['End Date'] || r['Start Date'],
+      usage: (num != null && isFinite(num)) ? num : null
+    });
+  });
+  return out;
+}
+
+// Merge uploaded per-meter rows over the repo building totals.
+// Returns { domestic, irrigation, well } row arrays ready for aggregation.
+function applyMeterUploads(domestic, irrigation) {
+  G_meterDetail = {};
+  G_uploadInfo = null;
+  const up = loadUploads();
+  if (!up || !up.rows || !up.rows.length) return { domestic: domestic, irrigation: irrigation, well: [] };
+
+  const byService = {};
+  up.rows.forEach(r => { (byService[r.service] = byService[r.service] || []).push(r); });
+
+  // Per-meter detail for expand views (kGal)
+  up.rows.forEach(r => {
+    if (typeof r.usage !== 'number' || !isFinite(r.usage)) return;
+    const mk = parseMonthKey(r.startDate);
+    if (!mk) return;
+    const dk = r.bldgNo + '|' + r.service;
+    const d = (G_meterDetail[dk] = G_meterDetail[dk] || {});
+    const m = (d[r.meter] = d[r.meter] || {});
+    m[mk] = (m[mk] || 0) + r.usage / 1000;
+  });
+
+  function overlay(repoRows, service) {
+    const rows = byService[service] || [];
+    if (!rows.length) return repoRows;
+    const sums = {};
+    const meta = {};
+    rows.forEach(r => {
+      if (typeof r.usage !== 'number' || !isFinite(r.usage)) return;
+      const k = r.bldgNo + '|' + r.startDate;
+      sums[k] = (sums[k] || 0) + r.usage;
+      const mm = (meta[k] = meta[k] || { bldgName: r.bldgName, endDate: r.endDate, meters: [] });
+      if (mm.meters.indexOf(r.meter) < 0) mm.meters.push(r.meter);
+    });
+    const covered = new Set(Object.keys(sums));
+    const kept = repoRows.filter(r => !covered.has((r.bldgNo || '') + '|' + (r.startDate || '')));
+    Object.keys(sums).forEach(k => {
+      const b = k.split('|')[0];
+      kept.push({ bldgNo: b, bldgName: meta[k].bldgName, dataSource: 'Meter Upload',
+        meters: meta[k].meters.join(', '), service: service, unit: 'gal',
+        startDate: k.slice(b.length + 1), endDate: meta[k].endDate, usage: sums[k] });
+    });
+    return kept;
+  }
+
+  G_uploadInfo = {
+    uploadedAt: up.uploadedAt, files: up.files || [],
+    counts: Object.keys(byService).reduce((o, s) => { o[s] = byService[s].length; return o; }, {})
+  };
+  return {
+    domestic: sanitizeOutliers(overlay(domestic, 'Domestic Water'), 'upload:domestic'),
+    irrigation: sanitizeOutliers(overlay(irrigation, 'Irrigation Water'), 'upload:irrigation'),
+    well: overlay([], 'Well Water')  // production wells: legitimately large values, no sanitizer
+  };
 }
 
 function importSmartsheetCSV(text) {
@@ -1934,7 +2050,7 @@ function getFilteredRows(filter, tasks) {
   }
 
   // 1. Apply button-bar filter (service/type)
-  if (filter === 'Domestic Water' || filter === 'Irrigation Water') {
+  if (filter === 'Domestic Water' || filter === 'Irrigation Water' || filter === 'Well Water') {
     list = list.filter(r => r.service === filter);
   } else if (filter === 'spike') {
     list = list.filter(r => (r.worstAnomaly || r._raw || {}).type === 'spike');
@@ -2228,11 +2344,13 @@ function toggleSiteChart(row) {
   const r = sorted[idx];
   if (!r) return;
 
-  const byBldg = r.service === 'Irrigation Water' ? G_irrigByBldg : G_domByBldg;
+  const byBldg = r.service === 'Irrigation Water' ? G_irrigByBldg
+    : r.service === 'Well Water' ? G_wellByBldg : G_domByBldg;
   const bldg = byBldg[r.bldgNo];
   if (!bldg) return;
 
-  const color = r.service === 'Irrigation Water' ? COLORS.irrigation : COLORS.domestic;
+  const color = r.service === 'Irrigation Water' ? COLORS.irrigation
+    : r.service === 'Well Water' ? COLORS.well : COLORS.domestic;
   const w = r.worstAnomaly;
   const hasHighlight = w && w.month;
   const anomalyYear = hasHighlight ? parseInt(w.month.split('-')[0], 10) : null;
@@ -2333,6 +2451,26 @@ function toggleSiteChart(row) {
     tableDiv.innerHTML =
       '<table class="anomaly-detail-table"><thead><tr>' + headerCells +
       '</tr></thead><tbody>' + yearRows + yoyRow + '</tbody></table>';
+
+    // By-meter breakdown from uploaded meter-level data, latest year
+    const md = G_meterDetail[r.bldgNo + '|' + r.service];
+    if (md && Object.keys(md).length) {
+      const latestYear = G_years[G_years.length - 1];
+      const meters = Object.keys(md).sort();
+      const mtHeader = '<th style="text-align:left">Meter</th>' +
+        CALENDAR_MONTHS.map(lbl => '<th>' + lbl + '</th>').join('') + '<th>Total</th>';
+      const mtRows = meters.map(m => {
+        const data = getYearMonthData(md[m], latestYear);
+        const tot = data.reduce((s, v) => s + (v || 0), 0);
+        return '<tr><td style="text-align:left;white-space:nowrap">' + m + '</td>' +
+          data.map(v => v === null ? '<td class="zero-cell">&mdash;</td>' : '<td>' + fmt(v, 1) + '</td>').join('') +
+          '<td style="font-weight:600">' + fmt(tot, 1) + '</td></tr>';
+      }).join('');
+      tableDiv.innerHTML +=
+        '<div style="margin:0.75rem 0 0.25rem;font-weight:600;font-size:0.78rem;color:var(--text-light)">By Meter, ' +
+        latestYear + ' (kGal, uploaded meter-level data)</div>' +
+        '<table class="anomaly-detail-table"><thead><tr>' + mtHeader + '</tr></thead><tbody>' + mtRows + '</tbody></table>';
+    }
   }
 }
 
@@ -2995,16 +3133,21 @@ function renderDataInfo(domestic, irrigation, totals) {
 // ============================================================
 (async function init() {
   try {
-    const [domestic, irrigation] = await Promise.all([
+    const [domRepo, irrRepo] = await Promise.all([
       loadJSON('data/domestic_water.json'),
       loadJSON('data/irrigation.json')
     ]);
+    const merged = applyMeterUploads(domRepo, irrRepo);
+    const domestic = merged.domestic;
+    const irrigation = merged.irrigation;
+    const well = merged.well;
 
-    G_months = getSortedMonths(domestic, irrigation);
+    G_months = getSortedMonths(domestic, irrigation.concat(well));
     G_monthLabels = G_months.map(monthLabel);
     G_years = [...new Set(G_months.map(mk => parseInt(mk.split('-')[0], 10)))].sort((a, b) => a - b);
     G_domByBldg = aggregateByBuilding(domestic, galToKgal);
     G_irrigByBldg = aggregateByBuilding(irrigation, galToKgal);
+    G_wellByBldg = aggregateByBuilding(well, galToKgal);
 
     // Detect all anomalies
     // Only flag anomalies for the most recent 3 months
@@ -3033,6 +3176,46 @@ function renderDataInfo(domestic, irrigation, totals) {
     const totalDom = Object.values(G_domByBldg).reduce((s, b) => s + b.total, 0);
     const totalIrrig = Object.values(G_irrigByBldg).reduce((s, b) => s + b.total, 0);
     renderDataInfo(domestic, irrigation, { dom: totalDom, irrig: totalIrrig });
+
+    // Meter-level upload controls
+    const upStatus = document.getElementById('uploadStatus');
+    if (G_uploadInfo) {
+      upStatus.textContent = 'Active: ' +
+        Object.entries(G_uploadInfo.counts).map(([s, n]) => s + ' (' + n + ' rows)').join(', ') +
+        ' | uploaded ' + new Date(G_uploadInfo.uploadedAt).toLocaleString();
+    } else {
+      upStatus.textContent = 'No meter-level data uploaded.';
+    }
+    document.getElementById('btnUploadMeters').addEventListener('click', () =>
+      document.getElementById('meterFiles').click());
+    document.getElementById('meterFiles').addEventListener('change', async function() {
+      const files = [...this.files];
+      if (!files.length) return;
+      const existing = loadUploads() || { rows: [], files: [] };
+      let all = existing.rows;
+      const names = existing.files;
+      for (const f of files) {
+        const rows = parseMeterCSV(await f.text());
+        if (!rows.length) { alert(f.name + ' had no recognizable ByMeter rows; skipped.'); continue; }
+        const svcs = new Set(rows.map(rr => rr.service));
+        all = all.filter(rr => !svcs.has(rr.service)); // newest upload replaces that service
+        all = all.concat(rows);
+        if (names.indexOf(f.name) < 0) names.push(f.name);
+      }
+      if (!all.length) return;
+      try {
+        localStorage.setItem(UPLOAD_KEY, JSON.stringify({
+          uploadedAt: new Date().toISOString(), files: names, rows: all }));
+      } catch (e) {
+        alert('Upload too large to store in this browser: ' + e.message);
+        return;
+      }
+      location.reload();
+    });
+    document.getElementById('btnClearUploads').addEventListener('click', () => {
+      localStorage.removeItem(UPLOAD_KEY);
+      location.reload();
+    });
 
     // Wire up anomaly filter buttons
     document.querySelectorAll('#anomalyFilterBar .filter-btn').forEach(btn => {
