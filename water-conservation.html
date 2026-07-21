@@ -3150,9 +3150,14 @@ function renderDataInfo(domestic, irrigation, totals) {
     G_wellByBldg = aggregateByBuilding(well, galToKgal);
 
     // Detect all anomalies
-    // Only flag anomalies for the most recent 3 months
+    // Only flag anomalies for the most recent 3 months WITH DATA (empty
+    // placeholder months, e.g. a not-yet-populated current month, must not
+    // burn a window slot)
     // YoY: compare each recent month to the same calendar month in prior years
-    const recentMonths = G_months.slice(-3);
+    const hasDataIn = mk =>
+      Object.values(G_domByBldg).some(b => (b.months[mk] || 0) > 0) ||
+      Object.values(G_irrigByBldg).some(b => (b.months[mk] || 0) > 0);
+    const recentMonths = G_months.filter(hasDataIn).slice(-3);
     const domSpikes = detectBuildingAnomaliesYoY(G_domByBldg, recentMonths, G_months, 'Domestic Water');
     const irrigSpikes = detectBuildingAnomaliesYoY(G_irrigByBldg, recentMonths, G_months, 'Irrigation Water');
     const winterIrrig = detectWinterIrrigation(G_irrigByBldg, recentMonths);
