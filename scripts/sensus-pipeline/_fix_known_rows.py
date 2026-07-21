@@ -51,6 +51,7 @@ KNOWN_SPIKES = {
         ("0118", "0118_DW_001 (CSV)", "02-01-2026"): 200_000,  # INSTRUCTIONAL GREENHOUSE, 458k phantom (register delta 0)
         ("0357", "0357_DW_001 (CSV)", "02-01-2026"): 100_000,  # RECYCLING FACILITY, 223k phantom (historian Feb = 3,000)
         ("0124A,B", "0124ADW_001 (CSV)", "04-01-2026"): None,  # HORTICULTURE GREENHOUSE, 1.15M = real 11,464-unit delta x suspect x100 mult; null until meter-face verified
+        ("0071", "0071_DW_001 (CSV)", "02-01-2026"): None,  # ALBROOK HYDRAULICS LAB, 1.66M phantom (register moved 1 unit in Feb; dodges sanitizer, 2025 baseline < 1,000 gal floor)
     },
 }
 SPIKE_GUARD = 1_000_000  # default guard when an entry's guard is None
