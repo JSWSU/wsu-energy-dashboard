@@ -60,12 +60,15 @@ def main(argv):
             for r in csv.DictReader(f):
                 if not r.get("Building Number") or not r.get("Start Date") or not r.get("Service"):
                     continue
-                if r.get("Unit") and r["Unit"] != "gal":
+                unit = (r.get("Unit") or "gal").strip()
+                factor = {"gal": 1.0, "ft³": 7.48051948, "kgal": 1000.0}.get(unit)
+                if factor is None:
+                    print(f"SKIP unknown unit {unit!r} for {r.get('Meter')}")
                     continue
                 svc = r["Service"].strip()
                 u = r.get("Usage")
                 try:
-                    usage = float(u) if u not in ("", None) else None
+                    usage = float(u) * factor if u not in ("", None) else None
                 except ValueError:
                     usage = None
                 new_by_service.setdefault(svc, []).append({

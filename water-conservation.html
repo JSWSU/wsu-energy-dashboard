@@ -1868,9 +1868,11 @@ function parseMeterCSV(text) {
   const out = [];
   raw.forEach(r => {
     if (!r['Building Number'] || !r['Start Date'] || !r['Service']) return;
-    if (r['Unit'] && r['Unit'] !== 'gal') return; // gallons only; anything else is a bad export
+    // Convert to gallons; ft3 and kgal registers match SkySpark's own conversion
+    const factor = { 'gal': 1, 'ft³': 7.48051948, 'kgal': 1000 }[(r['Unit'] || 'gal').trim()];
+    if (factor == null) return;
     const u = r['Usage'];
-    const num = (u === '' || u == null) ? null : parseFloat(u);
+    const num = (u === '' || u == null) ? null : parseFloat(u) * factor;
     out.push({
       bldgNo: r['Building Number'], bldgName: r['Building Name'] || '',
       meter: r['Meter'] || '', dataSource: r['Data Source'] || 'Upload',
