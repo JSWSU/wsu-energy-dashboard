@@ -2386,9 +2386,15 @@ function toggleSiteChart(row) {
   const anomalyCalIdx = hasHighlight ? parseInt(w.month.split('-')[1], 10) - 1 : -1;
 
   const md = G_meterDetail[r.bldgNo + '|' + r.service] || null;
-  // Distinct from YEAR_COLORS (amber/violet/pink/indigo) so meter lines never
-  // read as prior-year lines
-  const METER_COLORS = ['#0d9488', '#65a30d', '#e11d48', '#0284c7', '#b45309', '#c026d3', '#475569', '#ca8a04'];
+  // Meter colors stay inside their service's color family (DW = blues/cyans,
+  // IR = greens, wells = teals) and avoid YEAR_COLORS (amber/violet/pink) so
+  // meter lines never read as prior-year lines or the wrong service
+  const METER_PALETTES = {
+    'Domestic Water':   ['#2563eb', '#0ea5e9', '#0891b2', '#1d4ed8', '#38bdf8', '#075985', '#64748b', '#334155'],
+    'Irrigation Water': ['#16a34a', '#84cc16', '#15803d', '#a3e635', '#047857', '#4d7c0f', '#166534', '#3f6212'],
+    'Well Water':       ['#0e7490', '#06b6d4', '#155e75', '#22d3ee', '#164e63', '#67e8f9', '#0c4a6e', '#a5f3fc']
+  };
+  const METER_COLORS = METER_PALETTES[r.service] || METER_PALETTES['Domestic Water'];
 
   // Multi-meter buildings: the meters ARE the current year (one solid line
   // each); prior years stay as dashed building totals. Single-meter buildings
