@@ -3120,19 +3120,33 @@ function switchToTask(issueId) {
 }
 
 function createAllNewTasks() {
+  // Respect the active filter: create tasks only for the rows currently shown
+  // in the table (Top 10 active = those 10 rows; Anomalies Only = those; etc.)
   const tasks = loadTasks();
+  const visible = getFilteredRows(currentAnomalyFilter, tasks);
   let count = 0;
-  G_anomalies.forEach(a => {
-    if (!findTaskForAnomaly(a, tasks)) {
-      createTask(a);
+  visible.forEach(r => {
+    if (r.worstAnomaly) {
+      if (!findTaskForAnomaly(r.worstAnomaly, tasks)) {
+        createTask(r.worstAnomaly);
+        count++;
+      }
+      return;
+    }
+    // Rows without a detection only become tasks in the curated Top 10 view;
+    // in the broad views, anomaly-free rows are just inventory, not issues
+    if (currentAnomalyFilter !== 'top10') return;
+    const pseudo = { bldgNo: r.bldgNo, bldgName: r.bldgName, service: r.service, meter: r.meters || '' };
+    if (!findAnyTaskForAnomaly(pseudo, tasks)) {
+      createTask(pseudo, { description: 'Top 10 Top Dollar issue: recent usage well above prior-year baseline. Investigate cause.' });
       count++;
     }
   });
   if (count > 0) {
-    alert('Created ' + count + ' new task' + (count > 1 ? 's' : '') + '.');
+    alert('Created ' + count + ' new task' + (count > 1 ? 's' : '') + ' for the ' + visible.length + ' row(s) currently shown.');
     renderAnomalyTab();
   } else {
-    alert('All anomalies already have tasks.');
+    alert('All currently shown rows already have tasks.');
   }
 }
 
