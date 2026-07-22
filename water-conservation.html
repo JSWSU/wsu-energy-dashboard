@@ -1169,15 +1169,18 @@ function meterClassKey(name) {
 }
 
 function meterBadges(meterName, months) {
-  const info = G_meterClass[meterClassKey(meterName)];
   const clsMap = { BACnet: 'mc-bacnet', Calsense: 'mc-calsense', AMR: 'mc-amr', Manual: 'mc-manual', Conflict: 'mc-conflict' };
   let html = '';
-  if (info && clsMap[info.cls]) {
-    const tip = [info.route ? 'Route: ' + info.route : '', info.refs ? 'Ref: ' + info.refs : '', info.note || '']
-      .filter(Boolean).join(' | ');
-    html += '<span class="mc-badge ' + clsMap[info.cls] + '" title="' + tip.replace(/"/g, '&quot;') + '">' +
-      (info.cls === 'Conflict' ? 'CONFLICT' : info.cls) + '</span>';
-  }
+  // Combined rows list several meters; badge each one
+  String(meterName || '').split(',').map(p => p.trim()).filter(Boolean).forEach(part => {
+    const info = G_meterClass[meterClassKey(part)];
+    if (info && clsMap[info.cls]) {
+      const tip = [part, info.route ? 'Route: ' + info.route : '', info.refs ? 'Ref: ' + info.refs : '', info.note || '']
+        .filter(Boolean).join(' | ');
+      html += '<span class="mc-badge ' + clsMap[info.cls] + '" title="' + tip.replace(/"/g, '&quot;') + '">' +
+        (info.cls === 'Conflict' ? 'CONFLICT' : info.cls) + '</span>';
+    }
+  });
   // Reporting health from the meter's own months (any real value incl. zero)
   if (months) {
     const real = Object.keys(months).filter(mk => months[mk] != null).sort();
@@ -1903,6 +1906,26 @@ function collectByMeterDetail(rows, service) {
     const dk = r.bldgNo + '|' + service;
     const d = (G_meterDetail[dk] = G_meterDetail[dk] || {});
     const m = (d[r.meters] = d[r.meters] || {});
+    if (!(mk in m)) m[mk] = r.usage / 1000;
+  });
+}
+
+// Universal fallback: buildings with no per-meter rows still name their
+// meter(s) in the standard feed's meters field. A single-meter building's
+// total IS that meter's series (exact); multi-meter buildings without
+// per-meter data get one combined row because the total cannot be split
+// without guessing.
+function collectTotalsAsMeters(rows, service, skipKeys) {
+  rows.forEach(r => {
+    if (r.byMeter || typeof r.usage !== 'number' || !isFinite(r.usage)) return;
+    const dk = r.bldgNo + '|' + service;
+    if (skipKeys.has(dk)) return;
+    const meterName = (r.meters || '').trim();
+    if (!meterName) return;
+    const mk = parseMonthKey(r.startDate);
+    if (!mk) return;
+    const d = (G_meterDetail[dk] = G_meterDetail[dk] || {});
+    const m = (d[meterName] = d[meterName] || {});
     if (!(mk in m)) m[mk] = r.usage / 1000;
   });
 }
@@ -3313,6 +3336,12 @@ function renderDataInfo(domestic, irrigation, totals) {
     collectByMeterDetail(domestic, 'Domestic Water');
     collectByMeterDetail(irrigation, 'Irrigation Water');
     collectByMeterDetail(well, 'Well Water');
+    // Buildings already covered by real per-meter data (upload or byMeter rows)
+    // keep it; everyone else derives meter identity from the standard feed
+    const detailed = new Set(Object.keys(G_meterDetail));
+    collectTotalsAsMeters(domestic, 'Domestic Water', detailed);
+    collectTotalsAsMeters(irrigation, 'Irrigation Water', detailed);
+    collectTotalsAsMeters(well, 'Well Water', detailed);
 
     G_months = getSortedMonths(domestic, irrigation.concat(well));
     G_monthLabels = G_months.map(monthLabel);
