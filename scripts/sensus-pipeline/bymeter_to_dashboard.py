@@ -60,7 +60,10 @@ def main(argv):
             for r in csv.DictReader(f):
                 if not r.get("Building Number") or not r.get("Start Date") or not r.get("Service"):
                     continue
-                unit = (r.get("Unit") or "gal").strip()
+                # Field-verified unit overrides: SkySpark's unit tag is wrong for
+                # these meters. 0167 confirmed GALLONS by John 07/22/2026.
+                UNIT_OVERRIDES = {"0167_DW_001 (CSV)": "gal"}
+                unit = UNIT_OVERRIDES.get((r.get("Meter") or "").strip()) or (r.get("Unit") or "gal").strip()
                 factor = {"gal": 1.0, "ft³": 7.48051948, "kgal": 1000.0}.get(unit)
                 if factor is None:
                     print(f"SKIP unknown unit {unit!r} for {r.get('Meter')}")
