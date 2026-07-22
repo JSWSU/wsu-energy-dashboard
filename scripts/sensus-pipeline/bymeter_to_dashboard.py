@@ -60,9 +60,19 @@ def main(argv):
             for r in csv.DictReader(f):
                 if not r.get("Building Number") or not r.get("Start Date") or not r.get("Service"):
                     continue
-                # Field-verified unit overrides: SkySpark's unit tag is wrong for
-                # these meters. 0167 confirmed GALLONS by John 07/22/2026.
-                UNIT_OVERRIDES = {"0167_DW_001 (CSV)": "gal"}
+                # Field-verified unit overrides (John, 07/22/2026): these registers
+                # read GALLONS; SkySpark's ft3 tag is wrong for them. 0182 is
+                # confirmed CUBIC FEET (tag right) and deliberately NOT listed.
+                UNIT_OVERRIDES = {
+                    "0016_DW_001 (CSV)": "gal", "0098_DW_001 (CSV)": "gal",
+                    "0109BDW_001 (CSV)": "gal", "0115_DW_001 (CSV)": "gal",
+                    "0136_DW_001 (CSV)": "gal", "0141GDW_001 (CSV)": "gal",
+                    "0141HDW_001 (CSV)": "gal", "0160ADW_001 (CSV)": "gal",
+                    "0167_DW_001 (CSV)": "gal", "0169_DW_001 (CSV)": "gal",
+                    "0180_DW_001 (CSV)": "gal", "0183_DW_001 (CSV)": "gal",
+                    "0198ADW_001 (CSV)": "gal", "0358CDW_001 (CSV Zero)": "gal",
+                    "0817ADW_001 (CSV)": "gal", "0837_DW_001 (CSV Zero)": "gal",
+                }
                 unit = UNIT_OVERRIDES.get((r.get("Meter") or "").strip()) or (r.get("Unit") or "gal").strip()
                 factor = {"gal": 1.0, "ft³": 7.48051948, "kgal": 1000.0}.get(unit)
                 if factor is None:
