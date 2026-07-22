@@ -1,0 +1,7478 @@
+{
+ "0001_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12345",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0001_DW_001": {
+  "bldg": "0001",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "13039",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0001_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12346",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0001_IR_001": {
+  "bldg": "0001",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0002_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12347",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0002_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13060",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0002_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12348",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0002_IR_001": {
+  "bldg": "0002",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0003ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12352",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12353",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12354",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003BCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12355",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003BDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12356",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003BEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12358",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003BEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12357",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003CCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12359",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003CEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12360",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003CEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12361",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500001",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "14054",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12349",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12350",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12351",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0003_ST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "14053",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0004_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13034",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0004_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12362",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0004_IR_001": {
+  "bldg": "0004",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0005_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12363",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0005_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13058",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0005_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12364",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0005_IR_001": {
+  "bldg": "0005",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0006_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12365",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0006_DW_001": {
+  "bldg": "0006",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12368",
+  "cls": "Manual"
+ },
+ "0006_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12366",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0006_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12367",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0006_IR_001": {
+  "bldg": "0006",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0009_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12369",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0009_DW_001": {
+  "bldg": "0009",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200026",
+  "cls": "AMR"
+ },
+ "0009_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12370",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0010_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "T",
+  "refs": "13073",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0010_IR_001": {
+  "bldg": "0010",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0011ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12375",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0011ADW_001": {
+  "bldg": "0011A",
+  "svc": "Domestic Water",
+  "route": "A",
+  "refs": "12379",
+  "cls": "BACnet",
+  "note": "also recorded on manual route A"
+ },
+ "0011ADW_002": {
+  "bldg": "0011A",
+  "svc": "Domestic Water",
+  "route": "A",
+  "refs": "12380",
+  "cls": "BACnet",
+  "note": "also recorded on manual route A"
+ },
+ "0011AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12377",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0011AEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12376",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0011AST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12378",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0011_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12372",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0011_DW_001": {
+  "bldg": "0011",
+  "svc": "Domestic Water",
+  "route": "A",
+  "refs": "12374",
+  "cls": "BACnet",
+  "note": "also recorded on manual route A"
+ },
+ "0011_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12373",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0012_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12381",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0012_DW_001": {
+  "bldg": "0012",
+  "svc": "Domestic Water",
+  "route": "A",
+  "refs": "12382",
+  "cls": "BACnet",
+  "note": "also recorded on manual route A"
+ },
+ "0012_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12383",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0012_IR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "14108",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0013_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "14113",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0013_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12384",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0013_IR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12385",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0013_IR_003": {
+  "bldg": "0013",
+  "svc": "Irrigation Water",
+  "route": "A",
+  "refs": "14114",
+  "cls": "Manual"
+ },
+ "0014_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12386",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0014_DW_001": {
+  "bldg": "0014",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12388",
+  "cls": "Manual"
+ },
+ "0014_DW_002": {
+  "bldg": "0014",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12389",
+  "cls": "Manual"
+ },
+ "0014_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12387",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0014_IR_001": {
+  "bldg": "0014",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0015_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12390",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0015_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12391",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0015_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12392",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0015_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12393",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0016_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12394",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0016_DW_001": {
+  "bldg": "0016",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200005",
+  "cls": "AMR"
+ },
+ "0016_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12395",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "13068",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET, H",
+  "refs": "13067, 500002",
+  "cls": "Conflict",
+  "note": "multiple route kinds in workbook: BACNET, H"
+ },
+ "0018ADW_001": {
+  "bldg": "0018A",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "13066",
+  "cls": "Manual"
+ },
+ "0018AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "13069",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "13070",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018AEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "13071",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12399",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12402",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018_DW_001": {
+  "bldg": "0018",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12400",
+  "cls": "Manual"
+ },
+ "0018_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12396",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12397",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12398",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0018_IR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12401",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0019_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12403",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0019_DW_001": {
+  "bldg": "0019",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12405",
+  "cls": "Manual"
+ },
+ "0019_DW_002": {
+  "bldg": "0019",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12406",
+  "cls": "Manual"
+ },
+ "0019_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12404",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0020_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12407",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0020_DW_001": {
+  "bldg": "0020",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "13033",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0020_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12408",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0020_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12409",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0024_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12410",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0024_DW_001": {
+  "bldg": "0024",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "13038",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0024_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12411",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0024_IR_001": {
+  "bldg": "0024",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0025_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12412",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0025_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14120",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0025_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12413",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0027CDW_001": {
+  "bldg": "0027C (Wellhouse 4)",
+  "svc": "Well Water",
+  "route": "",
+  "refs": "",
+  "cls": "BACnet"
+ },
+ "0030_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12416",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0030_CD_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12418",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0030_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12414",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0030_CE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12415",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0030_DW_001": {
+  "bldg": "0030",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14095",
+  "cls": "Manual"
+ },
+ "0030_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12417",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0030_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12419",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0031_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "S",
+  "refs": "12420",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0031_DW_001": {
+  "bldg": "0031",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200006",
+  "cls": "AMR"
+ },
+ "0032_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12421",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0032_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14180",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0032_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12424",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0032_DW_001": {
+  "bldg": "0032",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "12427",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0032_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12426",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0032_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12422",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0032_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12423",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0032_RO_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12425",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0033ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12428",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0033ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12432",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0033AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12429",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0033AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12430",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0033AEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12431",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0033EDW_001": {
+  "bldg": "0033E",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200036",
+  "cls": "AMR"
+ },
+ "0033WCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12433",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0033WDW_001": {
+  "bldg": "0033W",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "13036",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0033WEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12434",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0034_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12435",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0034_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "14105",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0034_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "14106",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0034_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12436",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0035_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12437",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0035_DW_001": {
+  "bldg": "0035",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14101",
+  "cls": "BACnet",
+  "note": "also recorded on manual route H"
+ },
+ "0035_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12438",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12439",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14056",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_DW_001": {
+  "bldg": "0036",
+  "svc": "Domestic Water",
+  "route": "B-D",
+  "refs": "14057",
+  "cls": "BACnet",
+  "note": "also recorded on manual route B-D"
+ },
+ "0036_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12440",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14059",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14064",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14065",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_EL_005": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14063",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_EL_006": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14061",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_EL_007": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14062",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_EL_008": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14060",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_HE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14055",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0036_ST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14058",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0037_DW_001": {
+  "bldg": "0037",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200037",
+  "cls": "AMR"
+ },
+ "0037_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12441",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0039_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12442",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0039_DW_001": {
+  "bldg": "0039",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14119",
+  "cls": "Manual"
+ },
+ "0039_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12443",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0040_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14121",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0040_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12444",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0042_DW_001": {
+  "bldg": "0042",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12445",
+  "cls": "Manual"
+ },
+ "0042_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12446",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0042_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12447",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0042_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12448",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0042_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12449",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0044_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12450",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0044_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12453",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0044_DW_001": {
+  "bldg": "0044",
+  "svc": "Domestic Water",
+  "route": "B",
+  "refs": "13043",
+  "cls": "BACnet",
+  "note": "also recorded on manual route B"
+ },
+ "0044_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12451",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0044_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12452",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0045_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12454",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0045_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500003",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0045_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12457",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0045_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "13080",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0045_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "13081",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0045_DW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14109",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0045_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12455",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0045_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12456",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0045_RO_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12458",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0046_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12459",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0046_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13065",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0046_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12460",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13021",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500004",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "13022",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "14133",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13015",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13005",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13006",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13007",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13008",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_005": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13009",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_006": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13010",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_007": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13011",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_008": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13012",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_009": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13013",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0050_EL_010": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13014",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0054_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12461",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0054_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12464",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0054_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12463",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0054_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12462",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0055ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12468",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0055ADW_001": {
+  "bldg": "0055A",
+  "svc": "Domestic Water",
+  "route": "B-D",
+  "refs": "14111",
+  "cls": "BACnet",
+  "note": "also recorded on manual route B-D"
+ },
+ "0055AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12469",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0055AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12470",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0055_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500005",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0055_DW_001": {
+  "bldg": "0055",
+  "svc": "Domestic Water",
+  "route": "B-D",
+  "refs": "12467",
+  "cls": "BACnet",
+  "note": "also recorded on manual route B-D"
+ },
+ "0055_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12465",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0055_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12466",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0055_ST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12471",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0055_ST_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12472",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0056_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12473",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0056_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500006",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0056_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12475",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0056_DW_001": {
+  "bldg": "0056",
+  "svc": "Domestic Water",
+  "route": "E, L",
+  "refs": "12476, 13064",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E, L"
+ },
+ "0056_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12474",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0057_DW_001": {
+  "bldg": "0057",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200027",
+  "cls": "AMR"
+ },
+ "0057_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12477",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0057_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12478",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0058_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12479",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0058_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500007",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0058_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12482",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0058_DW_001": {
+  "bldg": "0058",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "12483",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0058_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12480",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0058_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12481",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0060_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12485",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0060_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12487",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0060_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12484",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0060_WW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12486",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0062ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12493",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0062ACD_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12494",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0062ADW_001": {
+  "bldg": "0062A",
+  "svc": "Domestic Water",
+  "route": "A",
+  "refs": "12496",
+  "cls": "BACnet",
+  "note": "also recorded on manual route A"
+ },
+ "0062AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12490",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0062AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12491",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0062AEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12492",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0062AST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12495",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0062_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12488",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0062_DW_001": {
+  "bldg": "0062",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200028",
+  "cls": "AMR"
+ },
+ "0062_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12489",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "12497",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "N",
+  "refs": "12498B",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_CE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "N",
+  "refs": "12498C",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_DW_001": {
+  "bldg": "0063",
+  "svc": "Domestic Water",
+  "route": "N",
+  "refs": "12498",
+  "cls": "BACnet",
+  "note": "also recorded on manual route N"
+ },
+ "0063_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "N",
+  "refs": "12502",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_DW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "N",
+  "refs": "12503",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14149",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14150",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14151",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14152",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_005": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14153",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_006": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14154",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_007": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14155",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_008": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14156",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_009": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14157",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_010": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14158",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_011": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14159",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_012": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14160",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_013": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14161",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_014": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14162",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_016": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14163",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_017": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14164",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_018": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14165",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_019": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14166",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_020": {
+  "bldg": "",
+  "svc": "",
+  "route": "G",
+  "refs": "14167",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_021": {
+  "bldg": "",
+  "svc": "",
+  "route": "N",
+  "refs": "12499",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_022": {
+  "bldg": "",
+  "svc": "",
+  "route": "N",
+  "refs": "12500",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0063_EL_023": {
+  "bldg": "",
+  "svc": "",
+  "route": "N",
+  "refs": "12501",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13092",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13095",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_DW_001": {
+  "bldg": "0064",
+  "svc": "Domestic Water",
+  "route": "K",
+  "refs": "13098",
+  "cls": "BACnet",
+  "note": "also recorded on manual route K"
+ },
+ "0064_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13102",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13103",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13104",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13105",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_HE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13094",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_HE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13096",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_NG_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13097",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0064_ST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "13099",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0065ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12511",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0065ACD_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12514",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0065ACE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12513",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0065ADW_001": {
+  "bldg": "0065A",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14104",
+  "cls": "Manual"
+ },
+ "0065AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12512",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0065BCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12515",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0065BDW_001": {
+  "bldg": "0065B",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14096",
+  "cls": "Manual"
+ },
+ "0065BEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12516",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0065CCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12517",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0065CEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12518",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0066ADW_001": {
+  "bldg": "0066A",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200038",
+  "cls": "AMR"
+ },
+ "0066CDW_001": {
+  "bldg": "0066C",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200039",
+  "cls": "AMR"
+ },
+ "0067_DW_001": {
+  "bldg": "0067",
+  "svc": "Domestic Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0069ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12520",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0069AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12521",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0069BCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12522",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0069BDW_001": {
+  "bldg": "0069B",
+  "svc": "Domestic Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0069BEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12523",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0069_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12519",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0069_IR_001": {
+  "bldg": "0069",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0070_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C-D",
+  "refs": "12524",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0070_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C-D",
+  "refs": "13055",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0070_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C-D",
+  "refs": "13056",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0070_DW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "C-D",
+  "refs": "13057",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0070_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C-D",
+  "refs": "12525",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0071_DW_001": {
+  "bldg": "0071",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200031",
+  "cls": "AMR"
+ },
+ "0071_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12526",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0071_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12527",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0072_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12528",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0072_DW_001": {
+  "bldg": "0072",
+  "svc": "Domestic Water",
+  "route": "H, SENSUS",
+  "refs": "12530, 200159",
+  "cls": "Conflict",
+  "note": "workbook routes ambiguous for a CSV meter: H, SENSUS"
+ },
+ "0072_DW_002": {
+  "bldg": "0072",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12531",
+  "cls": "Manual"
+ },
+ "0072_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12529",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0074_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12535",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0074_DI_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12536",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0074_DW_001": {
+  "bldg": "0074",
+  "svc": "Domestic Water",
+  "route": "F, M",
+  "refs": "12534, 13040",
+  "cls": "BACnet",
+  "note": "also recorded on manual route F, M"
+ },
+ "0074_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12532",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0074_WS_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12533",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0076_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12537",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0076_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12539",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0076_DW_001": {
+  "bldg": "0076",
+  "svc": "Domestic Water",
+  "route": "A",
+  "refs": "14041",
+  "cls": "BACnet",
+  "note": "also recorded on manual route A"
+ },
+ "0076_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "13091",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0076_DW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12542",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0076_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12538",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0076_RO_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12540",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12547",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500009",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12550",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12548",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12549",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078AEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13059",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12543",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500008",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12546",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12545",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0078_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12544",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0079ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12552",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0079ADW_001": {
+  "bldg": "0079A",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12554",
+  "cls": "Manual"
+ },
+ "0079AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12553",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0079AIR_001": {
+  "bldg": "0079A",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0079BCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12555",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0079BDW_001": {
+  "bldg": "0079B",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12557",
+  "cls": "Manual"
+ },
+ "0079BEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12556",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0079BIR_001": {
+  "bldg": "0079B",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0079_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12551",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0080_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12558",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0080_DW_001": {
+  "bldg": "0080",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12560",
+  "cls": "Manual"
+ },
+ "0080_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12559",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0081ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12561",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0081ADW_001": {
+  "bldg": "0081A",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14103",
+  "cls": "Manual"
+ },
+ "0081AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12562",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0081BCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12563",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0081BDW_001": {
+  "bldg": "0081B",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14102",
+  "cls": "Manual"
+ },
+ "0081BEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12564",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0081CCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12565",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0081CDW_001": {
+  "bldg": "0081C",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12567",
+  "cls": "Manual"
+ },
+ "0081CEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12566",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0081CIR_001": {
+  "bldg": "0081C",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0082ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12571",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14182",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082ACE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14183",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082ACE_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14184",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082ADI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12574",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082ADW_001": {
+  "bldg": "0082A",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "12576",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0082ADW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12575",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12572",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12573",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082AIR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12577",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12568",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12570",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13035",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0082_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12569",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0083_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12578",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0083_DW_001": {
+  "bldg": "0083",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12580",
+  "cls": "Manual"
+ },
+ "0083_DW_002": {
+  "bldg": "0083",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12581",
+  "cls": "Manual"
+ },
+ "0083_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12579",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0084_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12582",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0084_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14123",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0084_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14134",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0084_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14107",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0084_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12583",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0084_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12584",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0084_HE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14124",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0084_ST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "14125",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0085ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12585",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0085AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12586",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0085BDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "13026",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0085BDW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "13027",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0085BDW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "13025",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0085BIR_001": {
+  "bldg": "0085B",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0086ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12589",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0086ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12592",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0086ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12593",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0086AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12590",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0086AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12591",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0086_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12587",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0086_DW_001": {
+  "bldg": "0086",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200032",
+  "cls": "AMR"
+ },
+ "0086_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12588",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0086_IR_001": {
+  "bldg": "0086",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0087_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12594",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0087_DW_001": {
+  "bldg": "0087",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14097",
+  "cls": "Manual"
+ },
+ "0087_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12595",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0087_IR_001": {
+  "bldg": "0087",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0088_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12596",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0088_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13023",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0088_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13024",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0088_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12597",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0089_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12598",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0089_DW_001": {
+  "bldg": "0089",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12601",
+  "cls": "Manual"
+ },
+ "0089_DW_002": {
+  "bldg": "0089",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12602",
+  "cls": "Manual"
+ },
+ "0089_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12599",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0089_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12600",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0090_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12604",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0090_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200008",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0090_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12603",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0091_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12605",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0091_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12607",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0091_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12606",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0091_IR_001": {
+  "bldg": "0091",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0092ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12610",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0092ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500011",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0092ADW_001": {
+  "bldg": "0092A",
+  "svc": "Domestic Water",
+  "route": "C",
+  "refs": "13030",
+  "cls": "BACnet",
+  "note": "also recorded on manual route C"
+ },
+ "0092AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12611",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0092AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12612",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0092_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12608",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0092_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500010",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0092_DW_001": {
+  "bldg": "0092",
+  "svc": "Domestic Water",
+  "route": "C",
+  "refs": "13042",
+  "cls": "BACnet",
+  "note": "also recorded on manual route C"
+ },
+ "0092_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12609",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0092_IR_001": {
+  "bldg": "0092",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0093CCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12613",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0093CCE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12615",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0093CDW_001": {
+  "bldg": "0093C",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12616",
+  "cls": "Manual"
+ },
+ "0093CEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12614",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0093ECD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12617",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0093EDW_001": {
+  "bldg": "0093E",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12619",
+  "cls": "BACnet",
+  "note": "also recorded on manual route H"
+ },
+ "0093EDW_002": {
+  "bldg": "0093E",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14185",
+  "cls": "BACnet",
+  "note": "also recorded on manual route H"
+ },
+ "0093EEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12618",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0093NCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12620",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0093NDW_001": {
+  "bldg": "0093N",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12622",
+  "cls": "BACnet",
+  "note": "also recorded on manual route H"
+ },
+ "0093NDW_002": {
+  "bldg": "0093N",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14186",
+  "cls": "BACnet",
+  "note": "also recorded on manual route H"
+ },
+ "0093NEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12621",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0093SCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12623",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0093SDW_001": {
+  "bldg": "0093S",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "12625",
+  "cls": "BACnet",
+  "note": "also recorded on manual route H"
+ },
+ "0093SDW_002": {
+  "bldg": "0093S",
+  "svc": "Domestic Water",
+  "route": "H",
+  "refs": "14187",
+  "cls": "BACnet",
+  "note": "also recorded on manual route H"
+ },
+ "0093SEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12624",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0094_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12628",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0094_DW_001": {
+  "bldg": "0094",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200033",
+  "cls": "AMR"
+ },
+ "0094_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12629",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0094_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12630",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0095_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12631",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0095_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "24099",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0095_CE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500012",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0095_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12634",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0095_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12635",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0095_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12632",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0095_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12633",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0095_IR_002": {
+  "bldg": "0095",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0095_MU_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500013",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0096_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12636",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0096_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12639",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0096_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12637",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0096_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12638",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0097PEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12643",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0097_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12640",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0097_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500014",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0097_DW_001": {
+  "bldg": "0097",
+  "svc": "Domestic Water",
+  "route": "B-D",
+  "refs": "13032",
+  "cls": "BACnet",
+  "note": "also recorded on manual route B-D"
+ },
+ "0097_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12641",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0097_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B-D",
+  "refs": "12642",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0098_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12644",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0098_DW_001": {
+  "bldg": "0098",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200009",
+  "cls": "AMR"
+ },
+ "0098_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12646",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0098_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12645",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0099_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12647",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0099_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET, M",
+  "refs": "14129, 500015",
+  "cls": "Conflict",
+  "note": "multiple route kinds in workbook: BACNET, M"
+ },
+ "0099_CE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14130",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0099_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12652",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0099_DW_001": {
+  "bldg": "0099",
+  "svc": "Domestic Water",
+  "route": "C, M",
+  "refs": "12654, 13047",
+  "cls": "BACnet",
+  "note": "also recorded on manual route C, M"
+ },
+ "0099_DW_003": {
+  "bldg": "0099 CHW Plant",
+  "svc": "Domestic Water",
+  "route": "M",
+  "refs": "12655",
+  "cls": "BACnet",
+  "note": "also recorded on manual route M"
+ },
+ "0099_DW_004": {
+  "bldg": "0099 CHW Plant",
+  "svc": "Domestic Water",
+  "route": "M",
+  "refs": "12656",
+  "cls": "BACnet",
+  "note": "also recorded on manual route M"
+ },
+ "0099_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12648",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0099_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12649",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0099_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12650",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0099_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12651",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0099_RO_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12653",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0100_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12657",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0100_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12660",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0100_DW_001": {
+  "bldg": "0100",
+  "svc": "Domestic Water",
+  "route": "C",
+  "refs": "13028",
+  "cls": "BACnet",
+  "note": "also recorded on manual route C"
+ },
+ "0100_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12658",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0100_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12659",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0103ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14168",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0109ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12663",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0109BCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12665",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0109BDW_001": {
+  "bldg": "0109B",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200010",
+  "cls": "AMR"
+ },
+ "0109BEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12664",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0109EDW_001": {
+  "bldg": "0109E",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200048",
+  "cls": "AMR"
+ },
+ "0109FDW_001": {
+  "bldg": "0109F",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200049",
+  "cls": "AMR"
+ },
+ "0109F_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200049",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0109GDW_001": {
+  "bldg": "0109G",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200050",
+  "cls": "AMR"
+ },
+ "0109_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12661",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0109_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12662",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0111ADW_001": {
+  "bldg": "0111A",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200045",
+  "cls": "AMR"
+ },
+ "0111A_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200045",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0111DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200051",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0111_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12666",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0111_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200051",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0114BDW_001": {
+  "bldg": "0114B",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200046",
+  "cls": "AMR"
+ },
+ "0114_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12673",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0114_CD_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12674",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0114_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12670",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0114_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200058",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0114_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12669",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0114_DW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12671",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0114_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12667",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0114_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12672",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0114_IR_001": {
+  "bldg": "0114",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0115_DW_001": {
+  "bldg": "0115",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200011",
+  "cls": "AMR"
+ },
+ "0115_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12675",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0118DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200052",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0118_DW_001": {
+  "bldg": "0118",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200052",
+  "cls": "AMR"
+ },
+ "0118_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12676",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0119_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12677",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0119_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13050",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0119_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12678",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0120CDW_001": {
+  "bldg": "0120C",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200012",
+  "cls": "AMR"
+ },
+ "0120FDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13061",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0120LDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13063",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0121_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F, SENSUS",
+  "refs": "12679, 200158",
+  "cls": "Conflict",
+  "note": "multiple route kinds in workbook: F, SENSUS"
+ },
+ "0122ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13000",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0122ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13001",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0122AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13003",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0122AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13002",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0122ANG_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13004",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0122_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "14110",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0122_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12682",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0122_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C, M",
+  "refs": "12683, 13054",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0122_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12680",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0122_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12681",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0124ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "14144",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0124AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12684",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0135_DW_001": {
+  "bldg": "0135",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200047",
+  "cls": "AMR"
+ },
+ "0136_DW_001": {
+  "bldg": "0136",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200013",
+  "cls": "AMR"
+ },
+ "0138_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12685",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0138_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12687",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0138_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12686",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0138_IR_001": {
+  "bldg": "0138",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0141GDW_001": {
+  "bldg": "0141G",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200014",
+  "cls": "AMR"
+ },
+ "0141GEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12688",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0141HDW_001": {
+  "bldg": "0141H",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200015",
+  "cls": "AMR"
+ },
+ "0147_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12906",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0147_IR_001": {
+  "bldg": "0147",
+  "svc": "Irrigation Water",
+  "route": "F",
+  "refs": "12907",
+  "cls": "Manual"
+ },
+ "0149_IR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "",
+  "refs": "12689",
+  "cls": "Conflict",
+  "note": "multiple route kinds in workbook: "
+ },
+ "0150_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12690",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0150_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12691",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0160ADW_001": {
+  "bldg": "0160A",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200016",
+  "cls": "AMR"
+ },
+ "0165DDW_001": {
+  "bldg": "0165D",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200017",
+  "cls": "AMR"
+ },
+ "0167_DW_001": {
+  "bldg": "0167",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200018",
+  "cls": "AMR"
+ },
+ "0169_DW_001": {
+  "bldg": "0169",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200019",
+  "cls": "AMR"
+ },
+ "0171_IR_001": {
+  "bldg": "0171",
+  "svc": "Irrigation Water",
+  "route": "A",
+  "refs": "12692",
+  "cls": "Manual"
+ },
+ "0173_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12908",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0180ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B, SENSUS",
+  "refs": "13046, 200134",
+  "cls": "Conflict",
+  "note": "multiple route kinds in workbook: B, SENSUS"
+ },
+ "0180A_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200134",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0180CDW_001": {
+  "bldg": "0180C",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200021",
+  "cls": "AMR"
+ },
+ "0180CEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12694",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0180C_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200021",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0180_DW_001": {
+  "bldg": "0180",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200020",
+  "cls": "AMR"
+ },
+ "0180_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12693",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0182_DW_001": {
+  "bldg": "0182",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200022",
+  "cls": "AMR"
+ },
+ "0183_DW_001": {
+  "bldg": "0183",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200023",
+  "cls": "AMR"
+ },
+ "0188ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14174",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0188CDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14175",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0188EDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14176",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0188E_NG_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14177",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0188FDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14178",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0188_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14173",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0195CDW_01": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "14131",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0195GDW_01": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "14132",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0195_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200131, 200132, 200133",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0198ADW_001": {
+  "bldg": "0198A",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200024",
+  "cls": "AMR"
+ },
+ "0198A_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200024",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0199BDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12695",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0302_DW_001": {
+  "bldg": "0302 (Wellhouse 7)",
+  "svc": "Well Water",
+  "route": "",
+  "refs": "",
+  "cls": "BACnet"
+ },
+ "0304_DW_001": {
+  "bldg": "0304 (Wellhouse 8)",
+  "svc": "Well Water",
+  "route": "F",
+  "refs": "12696",
+  "cls": "BACnet",
+  "note": "also recorded on manual route F"
+ },
+ "0304_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12697",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0307_DW_001": {
+  "bldg": "0307 (Wellhouse 6)",
+  "svc": "Well Water",
+  "route": "",
+  "refs": "",
+  "cls": "BACnet"
+ },
+ "0310_DW_001": {
+  "bldg": "0310 (Well System transfer station)",
+  "svc": "Well Water",
+  "route": "F",
+  "refs": "12698",
+  "cls": "BACnet",
+  "note": "also recorded on manual route F"
+ },
+ "0353_DW_001": {
+  "bldg": "0353",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200041",
+  "cls": "AMR"
+ },
+ "0353_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12700",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0357_DW_001": {
+  "bldg": "0357",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200043",
+  "cls": "AMR"
+ },
+ "0358ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12701",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0358ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12702",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0358BDW_001": {
+  "bldg": "0358B",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200040",
+  "cls": "AMR"
+ },
+ "0358CCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12703",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0358CDW_001": {
+  "bldg": "0358C",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200001",
+  "cls": "AMR"
+ },
+ "0358EDW_001": {
+  "bldg": "0358E",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200002",
+  "cls": "AMR"
+ },
+ "0358GCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12704",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0358GWS_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12705",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0358JDW_001": {
+  "bldg": "0358J",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200042",
+  "cls": "AMR"
+ },
+ "0358JEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12706",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0358JEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12707",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0362_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12709",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0362_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12708",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "J",
+  "refs": "12715",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365HDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "J",
+  "refs": "12712",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365HEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "J",
+  "refs": "12716",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365JDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "J",
+  "refs": "12711",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365KEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "J",
+  "refs": "12718",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365KIR_001": {
+  "bldg": "0365K",
+  "svc": "Irrigation Water",
+  "route": "J",
+  "refs": "12710",
+  "cls": "Manual"
+ },
+ "0365LEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "J",
+  "refs": "12717",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365PDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "J",
+  "refs": "12713",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365QDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "J",
+  "refs": "12714",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365RDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "12719",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0365_IR_001": {
+  "bldg": "0365",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "BACnet"
+ },
+ "0372GDW_001": {
+  "bldg": "0372G",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200053, 200054",
+  "cls": "AMR"
+ },
+ "0372GDW_002": {
+  "bldg": "0372G",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200054",
+  "cls": "AMR"
+ },
+ "0372GEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "14143",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0372GIR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "14179",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0372G_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200053",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0372G_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200054",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0372_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "T",
+  "refs": "13076",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0372_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "T",
+  "refs": "13075",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0400ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "24098",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0400_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "14146",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0401CDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200004",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0401_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12720",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0402ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12721",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0402IEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12722",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0404AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12723",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0412_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "14128",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200096",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650A_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200095, 200096",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650BDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200097",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650B_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200097",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650CDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200098",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650C_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200098",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650DDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200099",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650D_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200099",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650FDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200101",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650F_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200101",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650HDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200100",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650H_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200100",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0650_DW_001": {
+  "bldg": "0650",
+  "svc": "Irrigation Water",
+  "route": "SENSUS",
+  "refs": "200102",
+  "cls": "AMR"
+ },
+ "0650_IR_001": {
+  "bldg": "0650A",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0650_IR_002": {
+  "bldg": "0650A",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0650_IR_003": {
+  "bldg": "0650B",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0650_IR_004": {
+  "bldg": "0650C",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0650_IR_005": {
+  "bldg": "0650D",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0650_IR_006": {
+  "bldg": "0650H",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0650_IR_007": {
+  "bldg": "0650F",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0660_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200078, 200079, 200080",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0665_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200135, 200136, 200137, 200138, 200139, 200140, 200141, 200142, 200143, 200144, 200145, 200146, 200147, 200148, 200149, 200150, 200151, 200152, 200153, 200154, 200155, 200156, 200157",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0675AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12724",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0675BEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12725",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0675CEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12726",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0675_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200081, 200082, 200083",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0676_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200161, 200162, 200163, 200164, 200165",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0677_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200106, 200107, 200108, 200109, 200110",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0678_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200115, 200116, 200117, 200118, 200119, 200120, 200121, 200122, 200123, 200124, 200125, 200126, 200127, 200128, 200129, 200130",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0679_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200084, 200085, 200086, 200087, 200088, 200089, 200090, 200091, 200092, 200093, 200094",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680ADW_001": {
+  "bldg": "0680A",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200061",
+  "cls": "AMR"
+ },
+ "0680A_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200061",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680BDW_001": {
+  "bldg": "0680B",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200062",
+  "cls": "AMR"
+ },
+ "0680B_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200062",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680CDW_001": {
+  "bldg": "0680C",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200063",
+  "cls": "AMR"
+ },
+ "0680C_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200063",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680DDW_001": {
+  "bldg": "0680D",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200064",
+  "cls": "AMR"
+ },
+ "0680D_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200064",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680EDW_001": {
+  "bldg": "0680E",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200065",
+  "cls": "AMR"
+ },
+ "0680E_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200065",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680FDW_001": {
+  "bldg": "0680F",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200066",
+  "cls": "AMR"
+ },
+ "0680F_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200066",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680GDW_001": {
+  "bldg": "0680G",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200067",
+  "cls": "AMR"
+ },
+ "0680G_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200067",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680HDW_001": {
+  "bldg": "0680H",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200068",
+  "cls": "AMR"
+ },
+ "0680H_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200068",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680JDW_001": {
+  "bldg": "0680J",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200069",
+  "cls": "AMR"
+ },
+ "0680J_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200069",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680KDW_001": {
+  "bldg": "0680K",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200070",
+  "cls": "AMR"
+ },
+ "0680K_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200070",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680LDW_001": {
+  "bldg": "0680L",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200071",
+  "cls": "AMR"
+ },
+ "0680L_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200071",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680MDW_001": {
+  "bldg": "0680M",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200072",
+  "cls": "AMR"
+ },
+ "0680M_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200072",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680NDW_001": {
+  "bldg": "0680N",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200073",
+  "cls": "AMR"
+ },
+ "0680N_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200073",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680PDW_001": {
+  "bldg": "0680P",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200074",
+  "cls": "AMR"
+ },
+ "0680P_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200074",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680QDW_001": {
+  "bldg": "0680Q",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200075",
+  "cls": "AMR"
+ },
+ "0680Q_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200075",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200076, 200077",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0680_IR_001": {
+  "bldg": "0680",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0680_IR_002": {
+  "bldg": "0680",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Conflict",
+  "note": "CSV-imported in SkySpark but no match in meter reads workbook"
+ },
+ "0716_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12899",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0716_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12900",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12738",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "14181",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801ADW_001": {
+  "bldg": "0801A",
+  "svc": "Domestic Water",
+  "route": "E-D",
+  "refs": "12743",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E-D"
+ },
+ "0801AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12739",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12740",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801AEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12741",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801AIR_001": {
+  "bldg": "0801A",
+  "svc": "Irrigation Water",
+  "route": "E-D",
+  "refs": "12742",
+  "cls": "Calsense",
+  "note": "also recorded on manual route E-D"
+ },
+ "0801_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12727",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12732",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801_DW_001": {
+  "bldg": "0801",
+  "svc": "Domestic Water",
+  "route": "E-D",
+  "refs": "12737",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E-D"
+ },
+ "0801_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12733",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801_DW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12734",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801_DW_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12735",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801_DW_005": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12736",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12728",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12729",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12730",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0801_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "E-D",
+  "refs": "12731",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0803_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12744",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0803_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500016",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0803_DW_001": {
+  "bldg": "0803",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "12746",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0803_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12745",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0804_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12747",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0804_IR_001": {
+  "bldg": "0804",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0805EEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12748",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0805NCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12749",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0805NEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "12750",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0805NIR_001": {
+  "bldg": "0805",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0805_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200104",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0806_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12752",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0806_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500017",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0806_DW_001": {
+  "bldg": "0806",
+  "svc": "Domestic Water",
+  "route": "A",
+  "refs": "12757",
+  "cls": "BACnet",
+  "note": "also recorded on manual route A"
+ },
+ "0806_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12753",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0806_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12754",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0806_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12755",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0806_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12756",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0806_IR_003": {
+  "bldg": "0806",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0807ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12765",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14138",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807ADI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12770",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12769",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12766",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12767",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807AEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12768",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807AIR_001": {
+  "bldg": "0807A",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0807ARO_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12771",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12758",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500018",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12761",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12764",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12763",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12759",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12760",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0807_RO_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12762",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0808_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12772",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0808_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "13029",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0808_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12773",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0808_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12774",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0809_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12775",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0809_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "13037",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0809_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "12776",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0809_IR_001": {
+  "bldg": "0809",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0810_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C-D",
+  "refs": "12777",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0810_DW_001": {
+  "bldg": "0810",
+  "svc": "Domestic Water",
+  "route": "C-D",
+  "refs": "13031",
+  "cls": "BACnet",
+  "note": "also recorded on manual route C-D"
+ },
+ "0810_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C-D",
+  "refs": "12778",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0811_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12779",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0811_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12782",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0811_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12780",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0811_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12781",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0811_IR_001": {
+  "bldg": "0811",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0812ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500020",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12811",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812AEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12812",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812AEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12813",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812AEL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12809",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12797",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DCE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12802",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12798",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DDW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12799",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DDW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12800",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DDW_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12801",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12791",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12792",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12793",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DEL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12794",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DEL_005": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12795",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812DEL_006": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12796",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812FEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "T",
+  "refs": "13077",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812FEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "T",
+  "refs": "13078",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SCD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12784",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SDW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12805",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SDW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12815",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SDW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12816",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12803",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SEL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12804",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SEL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12806",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SEL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12807",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SEL_005": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12808",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SEL_007": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12810",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812SIR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12814",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12783",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A, BACNET",
+  "refs": "12788, 500019",
+  "cls": "Conflict",
+  "note": "multiple route kinds in workbook: A, BACNET"
+ },
+ "0812_CE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500021",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812_DW_001": {
+  "bldg": "0812",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200034",
+  "cls": "AMR"
+ },
+ "0812_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12785",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0812_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12786",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14048",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_CE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14049",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_CE_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14050",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_CF_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500022",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_CF_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500023",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_CF_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500024",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_CF_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500025",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_DW_001": {
+  "bldg": "0813 West CHW Plant",
+  "svc": "Domestic Water",
+  "route": "M",
+  "refs": "13090",
+  "cls": "BACnet",
+  "note": "also recorded on manual route M"
+ },
+ "0813_DW_002": {
+  "bldg": "0813 West CHW Plant",
+  "svc": "Domestic Water",
+  "route": "M",
+  "refs": "12819, 13089",
+  "cls": "BACnet",
+  "note": "also recorded on manual route M"
+ },
+ "0813_DW_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12820",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E, M",
+  "refs": "12817, 14042",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14043",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14044",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0813_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14115",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0814_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12821",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0814_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12822, 13048",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0815_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12823",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0815_DW_001": {
+  "bldg": "0815",
+  "svc": "Domestic Water",
+  "route": "C",
+  "refs": "13049",
+  "cls": "BACnet",
+  "note": "also recorded on manual route C"
+ },
+ "0815_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12824",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0815_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12825",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12826",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500026",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_CE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500027",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_CE_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500028",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12834",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_DI_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12835",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12832",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12833",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12827",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12828",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12830",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0816_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12831",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0817ADW_001": {
+  "bldg": "0817A",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200025",
+  "cls": "AMR"
+ },
+ "0817DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200055",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0817_DW_001": {
+  "bldg": "0817",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200055",
+  "cls": "AMR"
+ },
+ "0817_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12836",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0818_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12837",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0818_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500029",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0818_DW_001": {
+  "bldg": "0818",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200044",
+  "cls": "AMR"
+ },
+ "0818_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12841",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0818_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12838",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0818_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12839",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0819_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "12844",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0819_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "12842",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0819_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "12843",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0822ACD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14171",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0822ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14137",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0822ACE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14170",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0822ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14172",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0822_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12847",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0822_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "14112",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0822_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12845",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0822_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12846",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0822_ST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12848",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0826_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12849",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0826_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500030",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0826_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12854",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0826_DW_001": {
+  "bldg": "0826",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200035",
+  "cls": "AMR"
+ },
+ "0826_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12850",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0826_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12851",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0826_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12852",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0826_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12853",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0826_RO_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12855",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0827_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "CALSENSE",
+  "refs": "12856",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0827_IR_001": {
+  "bldg": "0827",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0832ACE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12859, 14135",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0832ACE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14136",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0832ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12858",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0832AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12857",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0833_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "CALSENSE",
+  "refs": "12860",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0835AEL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "12862",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0835_DW_001": {
+  "bldg": "0835",
+  "svc": "Domestic Water",
+  "route": "",
+  "refs": "",
+  "cls": "BACnet"
+ },
+ "0836_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12866",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500031",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12875",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12867",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12863",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12864",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12865",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12869",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_EL_005": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12870",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_EL_006": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12873",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_EL_007": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12874",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_HR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12871",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_HR_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12872",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_IR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F",
+  "refs": "12868",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0836_RO_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12876",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0837_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12877",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0837_DW_001": {
+  "bldg": "0837",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200003",
+  "cls": "AMR"
+ },
+ "0837_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12878",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0840_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12879",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0840_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "B",
+  "refs": "12880",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0850_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14122",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0850_CF_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500032",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0850_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12883",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0850_DW_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12884",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0850_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "14118",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0850_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12881",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0850_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12882",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0850_RO_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "M",
+  "refs": "12885",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0855_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12887",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0855_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A",
+  "refs": "12886",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A-D",
+  "refs": "12892",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "BACNET",
+  "refs": "500033",
+  "cls": "BACnet",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12895",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A-D",
+  "refs": "12894",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A-D",
+  "refs": "12888",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "A-D",
+  "refs": "12889",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "A-D",
+  "refs": "12890",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "A-D",
+  "refs": "12891",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_RO_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "12896",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0858_ST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "A-D",
+  "refs": "12893",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0860_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "14145",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0860_DI_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "L",
+  "refs": "14141",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0860_DW_001": {
+  "bldg": "0860",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200056, 200057",
+  "cls": "AMR"
+ },
+ "0860_DW_002": {
+  "bldg": "0860",
+  "svc": "Domestic Water",
+  "route": "SENSUS",
+  "refs": "200056, 200057",
+  "cls": "AMR"
+ },
+ "0860_IR_001": {
+  "bldg": "0860",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0861_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "K",
+  "refs": "12897",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0865ADW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F, SENSUS",
+  "refs": "14093, 200113",
+  "cls": "Conflict",
+  "note": "multiple route kinds in workbook: F, SENSUS"
+ },
+ "0865AIR_001": {
+  "bldg": "0865A",
+  "svc": "Irrigation Water",
+  "route": "F",
+  "refs": "14094",
+  "cls": "Manual"
+ },
+ "0865A_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "SENSUS",
+  "refs": "200113",
+  "cls": "AMR",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0865_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "F, SENSUS",
+  "refs": "12904, 200111, 200112",
+  "cls": "Conflict",
+  "note": "multiple route kinds in workbook: F, SENSUS"
+ },
+ "0865_IR_001": {
+  "bldg": "0865",
+  "svc": "Irrigation Water",
+  "route": "F",
+  "refs": "12905",
+  "cls": "Manual"
+ },
+ "0870_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14072",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14074",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14084",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14085",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14086",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_005": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14087",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_006": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14088",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_007": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14089",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_008": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14090",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_009": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14091",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_010": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14092",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_011": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14080",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_012": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14081",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_CE_013": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14075",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_DW_001": {
+  "bldg": "0870",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "14076",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0870_DW_002": {
+  "bldg": "0870 (Starbucks)",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "14078",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0870_DW_003": {
+  "bldg": "0870 (Starbucks)",
+  "svc": "Domestic Water",
+  "route": "E",
+  "refs": "14079",
+  "cls": "BACnet",
+  "note": "also recorded on manual route E"
+ },
+ "0870_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14069",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14068",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_EL_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14070",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_EL_004": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14071",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_EL_005": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14066",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_EL_006": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14067",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_HE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14073",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_HE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14082",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_HE_003": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14083",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0870_IR_001": {
+  "bldg": "0870",
+  "svc": "Irrigation Water",
+  "route": "",
+  "refs": "",
+  "cls": "Calsense"
+ },
+ "0870_ST_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "E",
+  "refs": "14077",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0872_CE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "24093",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0872_DW_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "24097",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0872_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "14099",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0872_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "14100",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0872_HE_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "24095",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0872_HE_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "24094",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0872_IR_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "14098",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0872_NG_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "H",
+  "refs": "24096",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0875_CD_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "14140",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0875_EL_001": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "14126",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0875_EL_002": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "14127",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ },
+ "0875_W": {
+  "bldg": "",
+  "svc": "",
+  "route": "C",
+  "refs": "14139",
+  "cls": "Manual",
+  "note": "no SkySpark point (v5 only)"
+ }
+}
