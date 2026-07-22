@@ -3405,10 +3405,10 @@ function renderDataInfo(domestic, irrigation, totals) {
     // anomaly tasks ignoring the active filter. Remove today's untouched
     // auto-created anomaly tasks once, then never run again. Safe to delete
     // this block after 08/2026.
-    if (!localStorage.getItem('wsu_task_purge_20260722')) {
+    if (!localStorage.getItem('wsu_task_purge_20260722b')) {
       const all = loadTasks();
       const keep = all.filter(t => !(
-        t.entryDate === '2026-07-22' &&
+        (t.entryDate === '07/22/26' || t.entryDate === '2026-07-22') &&
         t.status === 'Open - Not Started' &&
         (t.wo === 'NA' || !t.wo) && !t.assignedTo && !t.actionNote &&
         (t.description || '').indexOf('Top 10 Top Dollar issue') !== 0
@@ -3417,7 +3417,7 @@ function renderDataInfo(domestic, irrigation, totals) {
         saveTasks(keep);
         console.warn('[task purge 07/22/2026] removed ' + (all.length - keep.length) + ' bulk-created task(s)');
       }
-      localStorage.setItem('wsu_task_purge_20260722', 'done');
+      localStorage.setItem('wsu_task_purge_20260722b', 'done');
     }
 
     // Render task tracker
