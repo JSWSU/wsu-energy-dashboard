@@ -2581,6 +2581,7 @@ function toggleSiteChart(row) {
         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
         y: {
           beginAtZero: true,
+          title: { display: true, text: 'kGal', font: { size: 10 } },
           ticks: { font: { size: 10 }, callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }
         }
       }
@@ -2627,6 +2628,7 @@ function toggleSiteChart(row) {
     }
 
     tableDiv.innerHTML =
+      '<div style="margin:0 0 0.25rem;font-weight:600;font-size:0.78rem;color:var(--text-light)">Monthly Usage by Year (kGal)</div>' +
       '<table class="anomaly-detail-table"><thead><tr>' + headerCells +
       '</tr></thead><tbody>' + yearRows + yoyRow + '</tbody></table>';
 
