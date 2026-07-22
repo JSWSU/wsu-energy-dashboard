@@ -803,7 +803,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Top 10 Top Dollar Issues</strong>
-          Filter button on the Anomaly Review tab. Computed live from the loaded data: for each building/service, the latest one or two months with real 2026 data are compared to the same months in 2025, and the 10 sites with the highest annualized excess cost (FY27 proposed rate, $0.00685 per gallon) are shown. Recomputes automatically whenever the data updates. Expand rows and create tasks as usual.
+          Filter button on the Anomaly Review tab. Computed live from the loaded data and restricted to CURRENT issues: only buildings with real data in the two most recent campus data months are ranked. Their recent months are compared to the same months in 2025, and the 10 sites with the highest annualized excess cost (FY27 proposed rate, $0.00685 per gallon) are shown. Stale meters never appear here no matter how large their old numbers; those belong in field verification. Recomputes automatically whenever the data updates.
         </div>
         <div class="help-tab-card">
           <strong>Task Tracker</strong>
@@ -2127,13 +2127,21 @@ let G_top10Keys = new Set();
 
 function computeTop10TopDollar() {
   const RATE_PER_KGAL = 6.85; // FY27 proposed $0.00685/gal
+  const monthIdx = mk => parseInt(mk.slice(0, 4), 10) * 12 + parseInt(mk.slice(5, 7), 10);
+  // Currency gate: only buildings with data in the two most recent campus
+  // data months are ranked. A big number from a stale meter is not a current
+  // issue; it belongs in field verification, not the Top 10.
+  let maxIdx = 0;
+  [G_domByBldg, G_irrigByBldg].forEach(map => Object.values(map).forEach(b =>
+    Object.keys(b.months).forEach(mk => { if (b.months[mk] > 0) maxIdx = Math.max(maxIdx, monthIdx(mk)); })));
+  const cutoff = maxIdx - 1;
   const scored = [];
   [[G_domByBldg, 'Domestic Water'], [G_irrigByBldg, 'Irrigation Water']].forEach(pair => {
     const map = pair[0], service = pair[1];
     Object.values(map).forEach(b => {
       const keys26 = Object.keys(b.months).filter(mk => mk.startsWith('2026-') && b.months[mk] > 0).sort();
-      if (!keys26.length) return;
-      const recent = keys26.slice(-2);
+      if (!keys26.length || monthIdx(keys26[keys26.length - 1]) < cutoff) return;
+      const recent = keys26.slice(-2).filter(mk => monthIdx(mk) >= cutoff);
       const vals25 = Object.keys(b.months).filter(mk => mk.startsWith('2025-'))
         .map(mk => b.months[mk]).filter(v => v > 0).sort((a, c) => a - c);
       const med25 = vals25.length ? vals25[Math.floor(vals25.length / 2)] : 0;
