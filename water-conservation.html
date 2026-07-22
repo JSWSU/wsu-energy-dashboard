@@ -3401,6 +3401,25 @@ function renderDataInfo(domestic, irrigation, totals) {
     // Render building index
     renderBuildingTab();
 
+    // One-shot cleanup 07/22/2026: the old Create Tasks button bulk-created 23
+    // anomaly tasks ignoring the active filter. Remove today's untouched
+    // auto-created anomaly tasks once, then never run again. Safe to delete
+    // this block after 08/2026.
+    if (!localStorage.getItem('wsu_task_purge_20260722')) {
+      const all = loadTasks();
+      const keep = all.filter(t => !(
+        t.entryDate === '2026-07-22' &&
+        t.status === 'Open - Not Started' &&
+        (t.wo === 'NA' || !t.wo) && !t.assignedTo && !t.actionNote &&
+        (t.description || '').indexOf('Top 10 Top Dollar issue') !== 0
+      ));
+      if (keep.length !== all.length) {
+        saveTasks(keep);
+        console.warn('[task purge 07/22/2026] removed ' + (all.length - keep.length) + ' bulk-created task(s)');
+      }
+      localStorage.setItem('wsu_task_purge_20260722', 'done');
+    }
+
     // Render task tracker
     renderTaskTab();
 
