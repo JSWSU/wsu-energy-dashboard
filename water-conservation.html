@@ -309,6 +309,39 @@
   .anomaly-chart-cell { height: 200px; position: relative; }
   /* Mini data table inside expanded anomaly row */
   .anomaly-detail-wrap { overflow-x: auto; margin-top: 0.5rem; }
+  /* Top 10 Top Dollar summary strip (Anomaly Review tab, filter=top10) */
+  .top10-summary {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-left: 4px solid var(--red); border-radius: 6px;
+    padding: 0.85rem 1rem; margin-bottom: 0.85rem; font-size: 0.82rem; color: var(--text);
+  }
+  .top10-summary .t10-headline { font-size: 1.2rem; font-weight: 700; color: var(--red); }
+  .top10-summary .t10-formula {
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    font-size: 0.78rem; color: var(--text-light); margin-top: 0.35rem;
+  }
+  .top10-summary .t10-ref {
+    margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);
+    font-size: 0.76rem; color: var(--text-light);
+  }
+  .top10-summary .t10-ref strong { color: var(--text); }
+  /* Per-row cost breakdown block inside expanded Top 10 row */
+  .t10-cost-block {
+    margin-top: 0.75rem; padding: 0.65rem 0.85rem; border-radius: 6px;
+    background: var(--info-bg); border: 1px solid var(--info-border); color: var(--info-text);
+    font-size: 0.78rem;
+  }
+  .t10-cost-block .t10-cb-title { font-weight: 700; font-size: 0.82rem; margin-bottom: 0.35rem; }
+  .t10-cost-block .t10-cb-row {
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    font-size: 0.75rem; margin: 0.15rem 0;
+  }
+  .t10-cost-block .t10-cb-headline { font-weight: 700; font-size: 0.95rem; margin-top: 0.35rem; }
+  .t10-cost-block .t10-cb-context { margin-top: 0.4rem; font-size: 0.76rem; }
+  .t10-cost-block .t10-cb-ref {
+    margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px dashed var(--info-border);
+    font-size: 0.72rem; color: var(--text-light);
+  }
   .anomaly-detail-table {
     width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 0.75rem;
   }
@@ -656,6 +689,7 @@
         <div style="flex:1"></div>
         <button class="btn-sm primary" id="btnCreateAll">Create Tasks for All New Anomalies</button>
       </div>
+      <div id="top10Summary" class="top10-summary" style="display:none;"></div>
       <div class="table-wrap">
         <table id="tblAnomalies">
           <thead>
@@ -803,7 +837,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Top 10 Top Dollar Issues</strong>
-          Filter button on the Anomaly Review tab. Computed live from the loaded data and restricted to CURRENT issues: only buildings with real data in the two most recent campus data months are ranked. Their recent months are compared to the same months in 2025, and the 10 sites with the highest annualized excess cost (FY27 proposed rate, $0.00685 per gallon) are shown. Stale meters never appear here no matter how large their old numbers; those belong in field verification. Recomputes automatically whenever the data updates.
+          Filter button on the Anomaly Review tab. Computed live from the loaded data and restricted to CURRENT issues: only buildings with real data in the two most recent campus data months are ranked. Recent months are compared to the same months in 2025 (fallback: 2025 median). Ranking is by annualized run rate so the largest ongoing issues surface first, but the DISPLAYED headline is <strong>event cost to date</strong>, the actual excess kGal &times; rate (FY27 proposed, $6.85 per kGal) for the trigger months only. Every row expands to show the full arithmetic, net year-to-date vs 2025 as context (negatives allowed), and the annualized figure explicitly labeled as reference only. Stale meters never appear here no matter how large their old numbers; those belong in field verification. Recomputes automatically whenever the data updates.
         </div>
         <div class="help-tab-card">
           <strong>Task Tracker</strong>
@@ -2121,21 +2155,25 @@ function getTaskStatusLabel(anomaly, tasks) {
 // Top 10 Top Dollar Issues: computed at load from the data itself, never hardcoded.
 // For each building/service, take its latest one or two months that have real
 // (nonzero) 2026 data, compare each against the same calendar month in 2025
-// (fallback: 2025 median), and rank by annualized excess cost at the FY27
-// proposed rate. Stale meters naturally rank on their newest real data.
-let G_top10Keys = new Set();
+// (fallback: 2025 median). Ranking uses annualized run rate to surface the
+// biggest ongoing issues; the DISPLAYED headline is event cost to date
+// (excess kGal x rate for the trigger months only). Annualized appears only
+// as a labeled reference. Net YTD vs 2025 is shown as context (negatives
+// allowed). Stale meters are excluded by the recency gate (must have data
+// in the two most recent campus data months to be ranked).
+const TOP10_RATE_PER_KGAL = 6.85;   // FY27 proposed $0.00685/gal
+const TOP10_RATE_LABEL    = '$6.85/kGal (FY27 proposed, $0.00685/gal)';
+let G_top10Keys   = new Set();
+let G_top10Detail = {};   // key = bldgNo|service -> {eventCost, excessKGal, months[], netYtdKGal, netYtdCost, annualizedRef, rate}
 
 function computeTop10TopDollar() {
-  const RATE_PER_KGAL = 6.85; // FY27 proposed $0.00685/gal
   const monthIdx = mk => parseInt(mk.slice(0, 4), 10) * 12 + parseInt(mk.slice(5, 7), 10);
-  // Currency gate: only buildings with data in the two most recent campus
-  // data months are ranked. A big number from a stale meter is not a current
-  // issue; it belongs in field verification, not the Top 10.
   let maxIdx = 0;
   [G_domByBldg, G_irrigByBldg].forEach(map => Object.values(map).forEach(b =>
     Object.keys(b.months).forEach(mk => { if (b.months[mk] > 0) maxIdx = Math.max(maxIdx, monthIdx(mk)); })));
   const cutoff = maxIdx - 1;
   const scored = [];
+  G_top10Detail = {};
   [[G_domByBldg, 'Domestic Water'], [G_irrigByBldg, 'Irrigation Water']].forEach(pair => {
     const map = pair[0], service = pair[1];
     Object.values(map).forEach(b => {
@@ -2145,6 +2183,7 @@ function computeTop10TopDollar() {
       const vals25 = Object.keys(b.months).filter(mk => mk.startsWith('2025-'))
         .map(mk => b.months[mk]).filter(v => v > 0).sort((a, c) => a - c);
       const med25 = vals25.length ? vals25[Math.floor(vals25.length / 2)] : 0;
+      const monthDetail = [];
       let excess = 0;
       recent.forEach(mk => {
         const cal = mk.split('-')[1];
@@ -2153,14 +2192,51 @@ function computeTop10TopDollar() {
           .map(m => b.months[m]).filter(v => v > 0);
         const base = priors.length ? priors.reduce((s, v) => s + v, 0) / priors.length : med25;
         const e = b.months[mk] - base;
-        if (e > 0) excess += e;
+        if (e > 0) {
+          excess += e;
+          monthDetail.push({
+            mk: mk,
+            usage: b.months[mk],
+            baseline: base,
+            baselineSrc: priors.length ? ('2025-' + cal) : '2025 median',
+            excess: e,
+            cost: e * TOP10_RATE_PER_KGAL
+          });
+        }
       });
       if (excess <= 0) return;
-      scored.push({ key: b.bldgNo + '|' + service, dollars: (excess / recent.length) * 12 * RATE_PER_KGAL });
+      // Year-to-date context: sum 2026 real months vs same calendar months in 2025.
+      // Net can be NEGATIVE (building is below prior year year-to-date, even during a spike).
+      const ytdKeys = Object.keys(b.months).filter(mk => mk.startsWith('2026-') && b.months[mk] > 0);
+      const ytd26 = ytdKeys.reduce((s, mk) => s + b.months[mk], 0);
+      const ytd25 = ytdKeys.reduce((s, mk) => {
+        const v = b.months['2025-' + mk.split('-')[1]];
+        return s + (v > 0 ? v : 0);
+      }, 0);
+      const netYtdKGal = ytd26 - ytd25;
+      scored.push({
+        key: b.bldgNo + '|' + service,
+        bldgNo: b.bldgNo,
+        service: service,
+        eventCost: excess * TOP10_RATE_PER_KGAL,
+        excessKGal: excess,
+        months: monthDetail,
+        netYtdKGal: netYtdKGal,
+        netYtdCost: netYtdKGal * TOP10_RATE_PER_KGAL,
+        annualizedRef: (excess / recent.length) * 12 * TOP10_RATE_PER_KGAL,
+        rate: TOP10_RATE_PER_KGAL
+      });
     });
   });
-  scored.sort((a, c) => c.dollars - a.dollars);
-  return new Set(scored.slice(0, 10).map(s => s.key));
+  scored.sort((a, c) => c.annualizedRef - a.annualizedRef);
+  const top = scored.slice(0, 10);
+  top.forEach(s => { G_top10Detail[s.key] = s; });
+  return new Set(top.map(s => s.key));
+}
+
+function fmtMoney(v) {
+  const sign = v < 0 ? '-' : '';
+  return sign + '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
 }
 
 function getFilteredRows(filter, tasks) {
@@ -2214,7 +2290,7 @@ function getFilteredRows(filter, tasks) {
     const col = SITE_COLS.find(c => c.key === anomalySortCol);
     if (col) {
       const dir = anomalySortDir === 'desc' ? -1 : 1;
-      const isNum = ['usage', 'baseline', 'deviation', 'anomalyCount'].includes(anomalySortCol);
+      const isNum = ['usage', 'baseline', 'deviation', 'anomalyCount', 'costImpact'].includes(anomalySortCol);
       const rawFn = anomalySortCol === 'month'
         ? (r => { const w = r.worstAnomaly || r._raw; return w ? w.month || '' : ''; })
         : (anomalySortCol === 'taskStatus'
@@ -2279,6 +2355,39 @@ function renderAnomalyTab(filter) {
   const headingEl = document.getElementById('anomalyHeading');
   const isAnomalyView = filter !== 'top10' && (anomalyOnlyMode || filter === 'spike' || filter === 'winter_irrigation');
   if (headingEl) headingEl.textContent = filter === 'top10' ? 'Top 10 Top Dollar Issues' : isAnomalyView ? 'Detected Anomalies' : 'All Sites';
+
+  // Top 10 summary strip: aggregate event cost to date + labeled reference figures
+  const summaryEl = document.getElementById('top10Summary');
+  if (summaryEl) {
+    if (filter === 'top10') {
+      const detail = Object.values(G_top10Detail);
+      const totalEventCost = detail.reduce((s, d) => s + d.eventCost, 0);
+      const totalExcess    = detail.reduce((s, d) => s + d.excessKGal, 0);
+      const totalAnnual    = detail.reduce((s, d) => s + d.annualizedRef, 0);
+      const totalNetYtd    = detail.reduce((s, d) => s + d.netYtdCost, 0);
+      const monthLabels = new Set();
+      detail.forEach(d => d.months.forEach(m => monthLabels.add(monthLabel(m.mk))));
+      const monthSpan = [...monthLabels].sort().join(', ') || 'no trigger months';
+      summaryEl.innerHTML =
+        '<div><span class="t10-headline">' + fmtMoney(totalEventCost) + '</span> ' +
+          '<span style="font-weight:600">event cost to date</span> across the 10 buildings shown ' +
+          '(' + fmt(totalExcess, 0) + ' kGal above prior-year baseline, trigger months: ' + monthSpan + ').</div>' +
+        '<div class="t10-formula">' +
+          'Event cost = &Sigma; (excess kGal per trigger month) &times; rate. Rate = ' + TOP10_RATE_LABEL + '. ' +
+          'Baseline per row = same calendar month in 2025 (fallback: 2025 median).' +
+        '</div>' +
+        '<div class="t10-ref">' +
+          '<strong>Context:</strong> combined net year-to-date vs 2025 same-months = ' + fmtMoney(totalNetYtd) +
+            ' (' + fmt(detail.reduce((s, d) => s + d.netYtdKGal, 0), 0) + ' kGal). Negative means below 2025 YTD even with the current spike.' +
+          '<br><strong>Reference only (not a headline):</strong> annualized run rate for the same excess &times; 12 = ' +
+            fmtMoney(totalAnnual) + '/yr. Do not report this as the year figure &mdash; it fabricates a year that has not happened.' +
+        '</div>';
+      summaryEl.style.display = '';
+    } else {
+      summaryEl.style.display = 'none';
+      summaryEl.innerHTML = '';
+    }
+  }
 
   // Build dynamic thead with sort + filter controls
   const thead = document.querySelector('#tblAnomalies thead');
@@ -2407,6 +2516,14 @@ function renderAnomalyTab(filter) {
     const baseStr = w ? (w.baseline > 0 ? fmt(w.baseline, 1) : '0 (expected)') : '\u2014';
     const devStr = w && w.deviation != null ? '+' + w.deviation + '%' : '\u2014';
 
+    // Cost Impact cell: populated only for Top 10 rows (rows with a G_top10Detail entry).
+    // Headline is EVENT COST TO DATE \u2014 actual excess x rate, not annualized.
+    // Full arithmetic and the annualized reference figure live in the expanded row.
+    const t10 = G_top10Detail[r.bldgNo + '|' + r.service];
+    const costStr = t10
+      ? '<span style="font-weight:600;color:var(--red)" title="Event cost to date. Click row for full arithmetic.">' + fmtMoney(t10.eventCost) + '</span>'
+      : '\u2014';
+
     // Action column
     let actionHtml;
     if (task) {
@@ -2442,6 +2559,7 @@ function renderAnomalyTab(filter) {
       <td>${usageStr}</td>
       <td>${baseStr}</td>
       <td>${devStr}</td>
+      <td>${costStr}</td>
       <td style="text-align:center">${taskStatusHtml}</td>
       <td style="text-align:center">${actionHtml}</td>
     </tr>
@@ -2639,6 +2757,44 @@ function toggleSiteChart(row) {
       '<div style="margin:0 0 0.25rem;font-weight:600;font-size:0.78rem;color:var(--text-light)">Monthly Usage by Year (kGal)</div>' +
       '<table class="anomaly-detail-table"><thead><tr>' + headerCells +
       '</tr></thead><tbody>' + yearRows + yoyRow + '</tbody></table>';
+
+    // Cost Impact breakdown: only for rows on the Top 10 list.
+    // Prints the full arithmetic (excess kGal per trigger month x rate),
+    // net YTD vs 2025 (context, can be negative), and the annualized run
+    // rate LABELED as reference only (never as a headline).
+    const t10row = G_top10Detail[r.bldgNo + '|' + r.service];
+    if (t10row) {
+      const rows = t10row.months.map(m => {
+        return '<div class="t10-cb-row">' +
+          monthLabel(m.mk) + ':&nbsp;usage ' + fmt(m.usage, 1) + ' kGal &minus; baseline ' +
+          fmt(m.baseline, 1) + ' kGal (' + m.baselineSrc + ') = ' +
+          '<strong>' + fmt(m.excess, 1) + ' kGal excess</strong> &times; $' +
+          t10row.rate.toFixed(2) + '/kGal = <strong>' + fmtMoney(m.cost) + '</strong>' +
+          '</div>';
+      }).join('');
+      const netSign = t10row.netYtdKGal >= 0 ? '+' : '';
+      tableDiv.innerHTML +=
+        '<div class="t10-cost-block">' +
+          '<div class="t10-cb-title">Cost Impact &mdash; event cost to date</div>' +
+          rows +
+          '<div class="t10-cb-headline">Total event cost to date: ' + fmtMoney(t10row.eventCost) +
+            ' (' + fmt(t10row.excessKGal, 1) + ' kGal excess)</div>' +
+          '<div class="t10-cb-context">' +
+            '<strong>Net YTD vs 2025:</strong> ' + netSign + fmt(t10row.netYtdKGal, 1) + ' kGal = ' +
+            fmtMoney(t10row.netYtdCost) +
+            (t10row.netYtdKGal < 0
+              ? ' &mdash; this building is BELOW its 2025 year-to-date total even with the current spike.'
+              : ' &mdash; year-to-date this building is above 2025 by this much.') +
+          '</div>' +
+          '<div class="t10-cb-ref">' +
+            '<strong>Reference only (do not report as a year figure):</strong> ' +
+            'annualized run rate = (' + fmt(t10row.excessKGal, 1) + ' kGal / ' + t10row.months.length +
+            ' trigger month' + (t10row.months.length === 1 ? '' : 's') + ') &times; 12 &times; $' +
+            t10row.rate.toFixed(2) + '/kGal = ' + fmtMoney(t10row.annualizedRef) + '/yr. ' +
+            'Only meaningful if the current excess repeats every month for a year, which is rarely true for seasonal or one-off events.' +
+          '</div>' +
+        '</div>';
+    }
 
     // By-meter breakdown from uploaded meter-level data, all years present
     if (md && Object.keys(md).length) {
@@ -3006,6 +3162,8 @@ const SITE_COLS = [
     valFn: r => { const w = r.worstAnomaly || r; return w.baseline != null ? w.baseline : null; } },
   { key: 'deviation',    label: 'Deviation',        align: 'right',  sortable: true,  filterable: false,
     valFn: r => { const w = r.worstAnomaly || r; return w.deviation != null ? w.deviation : null; } },
+  { key: 'costImpact',   label: 'Cost Impact ($)',  align: 'right',  sortable: true,  filterable: false,
+    valFn: r => { const d = G_top10Detail[r.bldgNo + '|' + r.service]; return d ? d.eventCost : null; } },
   { key: 'taskStatus',   label: 'Task Status',      align: 'center', sortable: true,  filterable: true,  valFn: null },
   { key: 'action',       label: 'Action',           align: 'center', sortable: false, filterable: false, valFn: null }
 ];
@@ -3015,7 +3173,7 @@ function toggleAnomalySort(colKey) {
     anomalySortDir = anomalySortDir === 'asc' ? 'desc' : 'asc';
   } else {
     anomalySortCol = colKey;
-    anomalySortDir = colKey === 'deviation' || colKey === 'usage' || colKey === 'baseline' ? 'desc' : 'asc';
+    anomalySortDir = colKey === 'deviation' || colKey === 'usage' || colKey === 'baseline' || colKey === 'costImpact' ? 'desc' : 'asc';
   }
   renderAnomalyTab();
 }
