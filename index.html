@@ -654,11 +654,11 @@
 // ==================== FISCAL YEAR CONFIG ====================
 // >>> CHANGE THIS ONE OBJECT FOR FY ROLLOVER -- everything else reads from it <<<
 const FY = {
-  label: 'FY2026',                    // e.g. 'FY2027'
-  range: 'July 2025 \u2013 June 2026', // e.g. 'July 2026 \u2013 June 2027'
-  startYear: 2025,                     // calendar year of July (first month)
-  endYear: 2026,                       // calendar year of June (last month)
-  priorLabel: 'FY2025'                 // prior year label for YoY comparisons
+  label: 'FY2027',                    // e.g. 'FY2028'
+  range: 'July 2026 \u2013 June 2027', // e.g. 'July 2027 \u2013 June 2028'
+  startYear: 2026,                     // calendar year of July (first month)
+  endYear: 2027,                       // calendar year of June (last month)
+  priorLabel: 'FY2026'                 // prior year label for YoY comparisons
 };
 const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
 const MONTH_FULL = [
@@ -754,8 +754,8 @@ const C = {
   document.querySelector('#printSummary .ps-footer').textContent =
     'WSU Facilities Services \u2022 Energy Cost Projection ' + FY.label + ' \u2022 Confidential';
   // Update section headings and table headers with FY labels
-  const fyShort = FY.label.replace('FY20','FY');  // 'FY26'
-  const prShort = FY.priorLabel.replace('FY20','FY');  // 'FY25'
+  const fyShort = FY.label.replace('FY20','FY');  // 'FY27'
+  const prShort = FY.priorLabel.replace('FY20','FY');  // 'FY26'
   const qsa = (sel) => document.querySelectorAll(sel);
   // KPI labels
   qsa('.kpi-card[data-kpi="actualYTD"] .kpi-label').forEach(el => el.textContent = FY.label+' Actual + Forecast');
@@ -782,13 +782,13 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 
 // ==================== LOAD DATA & BUILD ====================
 function initDashboard(D) {
-  const fy26 = D.fy26, fy25gas = D.fy25gas, energyUse = D.energyUse,
+  const fy27 = D.fy27, fy26gas = D.fy26gas, energyUse = D.energyUse,
         yoy = D.yoy, cumul = D.cumul, hdd = D.hdd, kintec = D.kintec,
         variance = D.variance;
 
   // --- KPI Cards ---
-  const totalAct = sum(fy26.totalActual), totalFcast = sum(fy26.totalFcast);
-  const totalElec = sum(fy26.elecActual), totalGas = sum(fy26.gasActual);
+  const totalAct = sum(fy27.totalActual), totalFcast = sum(fy27.totalFcast);
+  const totalElec = sum(fy27.elecActual), totalGas = sum(fy27.gasActual);
   const totalMMBTU = sum(energyUse.totalActual);
   const totalElecMMBTU = sum(energyUse.elecActual), totalGasMMBTU = sum(energyUse.gasActual);
   // Use the authoritative delta from the cumulative summary (last month = full-year projection)
@@ -800,8 +800,8 @@ function initDashboard(D) {
   // Compute rates from cost/MMBTU (since cumul no longer has elecRate/gasRate)
   const elecRateAct = totalElecMMBTU > 0 ? totalElec / totalElecMMBTU : 0;
   const gasRateAct = totalGasMMBTU > 0 ? totalGas / totalGasMMBTU : 0;
-  const elecRateFcast = sum(energyUse.elecActual) > 0 ? sum(fy26.elecFcast) / sum(energyUse.elecActual) : 0;
-  const gasRateFcast = sum(energyUse.gasActual) > 0 ? sum(fy26.gasFcast) / sum(energyUse.gasActual) : 0;
+  const elecRateFcast = sum(energyUse.elecActual) > 0 ? sum(fy27.elecFcast) / sum(energyUse.elecActual) : 0;
+  const gasRateFcast = sum(energyUse.gasActual) > 0 ? sum(fy27.gasFcast) / sum(energyUse.gasActual) : 0;
 
   document.getElementById('kpiActualYTD').textContent = fmtDollarM(totalAct);
   document.getElementById('kpiForecast').textContent = fmtDollarM(totalFcast);
@@ -830,7 +830,7 @@ function initDashboard(D) {
   // A month is "actual" if the totalActual differs from totalFcast (actuals replaced forecast)
   const isActual = [];
   for (let i = 0; i < 12; i++) {
-    isActual.push(fy26.totalActual[i] !== fy26.totalFcast[i]);
+    isActual.push(fy27.totalActual[i] !== fy27.totalFcast[i]);
   }
   const actualMonthCount = isActual.filter(Boolean).length;
 
@@ -863,13 +863,13 @@ function initDashboard(D) {
   const kpiExpandConfig = {
     actualYTD: {
       headers: ['Month', 'Total Cost'],
-      rows: (i) => [MONTHS[i], fmtDollar(fy26.totalActual[i])],
+      rows: (i) => [MONTHS[i], fmtDollar(fy27.totalActual[i])],
       totalLabel: 'FY Total',
       totals: () => [fmtDollar(totalAct)]
     },
     forecast: {
       headers: ['Month', 'Total Forecast'],
-      rows: (i) => [MONTHS[i], fmtDollar(fy26.totalFcast[i])],
+      rows: (i) => [MONTHS[i], fmtDollar(fy27.totalFcast[i])],
       totalLabel: 'FY Total',
       totals: () => [fmtDollar(totalFcast)]
     },
@@ -887,20 +887,20 @@ function initDashboard(D) {
     },
     elecCost: {
       headers: ['Month', 'Electric Cost', 'Elec MMBTU'],
-      rows: (i) => [MONTHS[i], fmtDollar(fy26.elecActual[i]), fmtNum(energyUse.elecActual[i])],
+      rows: (i) => [MONTHS[i], fmtDollar(fy27.elecActual[i]), fmtNum(energyUse.elecActual[i])],
       totalLabel: 'YTD Total',
       totals: () => [fmtDollar(totalElec), fmtNum(totalElecMMBTU)]
     },
     gasCost: {
       headers: ['Month', 'Gas Cost', 'Gas MMBTU', 'Kintec', 'Avista'],
-      rows: (i) => [MONTHS[i], fmtDollar(fy26.gasActual[i]), fmtNum(energyUse.gasActual[i]), fmtDollar(fy26.kintecFcast[i]), fmtDollar(fy26.avistaFcast[i])],
+      rows: (i) => [MONTHS[i], fmtDollar(fy27.gasActual[i]), fmtNum(energyUse.gasActual[i]), fmtDollar(fy27.kintecFcast[i]), fmtDollar(fy27.avistaFcast[i])],
       totalLabel: 'YTD Total',
-      totals: () => [fmtDollar(totalGas), fmtNum(totalGasMMBTU), fmtDollar(sum(fy26.kintecFcast)), fmtDollar(sum(fy26.avistaFcast))]
+      totals: () => [fmtDollar(totalGas), fmtNum(totalGasMMBTU), fmtDollar(sum(fy27.kintecFcast)), fmtDollar(sum(fy27.avistaFcast))]
     },
     elecRate: {
       headers: ['Month', 'Elec $', 'kWh', '$/kWh'],
       rows: (i) => {
-        return [MONTHS[i], fmtDollar(fy26.elecActual[i]), fmtNum(energyUse.kwhActual[i]), fmtRateKwh(energyUse.kwhRate[i])];
+        return [MONTHS[i], fmtDollar(fy27.elecActual[i]), fmtNum(energyUse.kwhActual[i]), fmtRateKwh(energyUse.kwhRate[i])];
       },
       totalLabel: 'Avg / Total',
       totals: () => {
@@ -911,7 +911,7 @@ function initDashboard(D) {
     gasRate: {
       headers: ['Month', 'Gas $', 'MMBTU', '$/MMBTU'],
       rows: (i) => {
-        const m = energyUse.gasActual[i], c = fy26.gasActual[i];
+        const m = energyUse.gasActual[i], c = fy27.gasActual[i];
         return [MONTHS[i], fmtDollar(c), fmtNum(m), fmtRate(m > 0 ? c/m : 0)];
       },
       totalLabel: 'Avg / Total',
@@ -950,8 +950,8 @@ function initDashboard(D) {
   // --- Dashboard Charts ---
   chartInstances.push(new Chart(document.getElementById('chartMonthly'), {
     type:'bar', data:{ labels:MONTHS, datasets:[
-      {label:'Actual',data:fy26.totalActual,backgroundColor:C.primary,borderRadius:3},
-      {label:'Forecast',data:fy26.totalFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1.5,borderRadius:3}
+      {label:'Actual',data:fy27.totalActual,backgroundColor:C.primary,borderRadius:3},
+      {label:'Forecast',data:fy27.totalFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1.5,borderRadius:3}
     ]}, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollar(ctx.raw)}}},
       scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}
@@ -959,10 +959,10 @@ function initDashboard(D) {
 
   chartInstances.push(new Chart(document.getElementById('chartBreakdown'), {
     type:'bar', data:{ labels:MONTHS, datasets:[
-      {label:'Electric (Actual)',data:fy26.elecActual,backgroundColor:C.primary,stack:'actual',borderRadius:2},
-      {label:'Gas (Actual)',data:fy26.gasActual,backgroundColor:C.accent,stack:'actual',borderRadius:2},
-      {label:'Electric (Forecast)',data:fy26.elecFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,stack:'forecast',borderRadius:2},
-      {label:'Gas (Forecast)',data:fy26.gasFcast,backgroundColor:'rgba(198,146,20,0.2)',borderColor:C.accent,borderWidth:1,stack:'forecast',borderRadius:2}
+      {label:'Electric (Actual)',data:fy27.elecActual,backgroundColor:C.primary,stack:'actual',borderRadius:2},
+      {label:'Gas (Actual)',data:fy27.gasActual,backgroundColor:C.accent,stack:'actual',borderRadius:2},
+      {label:'Electric (Forecast)',data:fy27.elecFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,stack:'forecast',borderRadius:2},
+      {label:'Gas (Forecast)',data:fy27.gasFcast,backgroundColor:'rgba(198,146,20,0.2)',borderColor:C.accent,borderWidth:1,stack:'forecast',borderRadius:2}
     ]}, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollar(ctx.raw)}}},
       scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}
@@ -977,7 +977,7 @@ function initDashboard(D) {
       scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}
   }));
 
-  const pieElec = sum(fy26.elecActual), pieKintec = sum(fy26.kintecFcast), pieAvista = sum(fy26.avistaFcast);
+  const pieElec = sum(fy27.elecActual), pieKintec = sum(fy27.kintecFcast), pieAvista = sum(fy27.avistaFcast);
   const pieTotal = pieElec + pieKintec + pieAvista;
   chartInstances.push(new Chart(document.getElementById('chartPie'), {
     type:'doughnut', data:{
@@ -991,10 +991,10 @@ function initDashboard(D) {
   const tb1 = document.querySelector('#tableMonthly tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
     if(!isActual[i]) tr.className='forecast-row';
-    tr.innerHTML=`<td>${MONTH_FULL[i]}</td><td>${fmtDollar(fy26.totalActual[i])}</td><td>${fmtDollar(fy26.elecActual[i])}</td><td>${fmtDollar(fy26.gasActual[i])}</td><td class="forecast">${fmtDollar(fy26.totalFcast[i])}</td><td class="forecast">${fmtDollar(fy26.elecFcast[i])}</td><td class="forecast">${fmtDollar(fy26.gasFcast[i])}</td><td class="forecast">${fmtDollar(fy26.kintecFcast[i])}</td><td class="forecast">${fmtDollar(fy26.avistaFcast[i])}</td><td>${fy26.hedge}%</td>`;
+    tr.innerHTML=`<td>${MONTH_FULL[i]}</td><td>${fmtDollar(fy27.totalActual[i])}</td><td>${fmtDollar(fy27.elecActual[i])}</td><td>${fmtDollar(fy27.gasActual[i])}</td><td class="forecast">${fmtDollar(fy27.totalFcast[i])}</td><td class="forecast">${fmtDollar(fy27.elecFcast[i])}</td><td class="forecast">${fmtDollar(fy27.gasFcast[i])}</td><td class="forecast">${fmtDollar(fy27.kintecFcast[i])}</td><td class="forecast">${fmtDollar(fy27.avistaFcast[i])}</td><td>${fy27.hedge}%</td>`;
     tb1.appendChild(tr);}
   const tr1=document.createElement('tr');tr1.className='total-row';
-  tr1.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(totalAct)}</td><td>${fmtDollar(totalElec)}</td><td>${fmtDollar(totalGas)}</td><td class="forecast">${fmtDollar(totalFcast)}</td><td class="forecast">${fmtDollar(sum(fy26.elecFcast))}</td><td class="forecast">${fmtDollar(sum(fy26.gasFcast))}</td><td class="forecast">${fmtDollar(sum(fy26.kintecFcast))}</td><td class="forecast">${fmtDollar(sum(fy26.avistaFcast))}</td><td>${fy26.hedge}%</td>`;
+  tr1.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(totalAct)}</td><td>${fmtDollar(totalElec)}</td><td>${fmtDollar(totalGas)}</td><td class="forecast">${fmtDollar(totalFcast)}</td><td class="forecast">${fmtDollar(sum(fy27.elecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.gasFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.kintecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.avistaFcast))}</td><td>${fy27.hedge}%</td>`;
   tb1.appendChild(tr1);
 
   // --- Gas FY25 Table ---
@@ -1002,16 +1002,16 @@ function initDashboard(D) {
   const mfy25=['July '+pStartYr,'August '+pStartYr,'September '+pStartYr,'October '+pStartYr,'November '+pStartYr,'December '+pStartYr,'January '+pEndYr,'February '+pEndYr,'March '+pEndYr,'April '+pEndYr,'May '+pEndYr,'June '+pEndYr];
   const tb2=document.querySelector('#tableGas25 tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${mfy25[i]}</td><td>${fmtDollar(fy25gas.cost[i])}</td><td>${fmtNum(fy25gas.mmbtu[i])}</td><td>${fmtRate(fy25gas.perUnit[i])}</td><td>${fmtDollar(fy25gas.kintec[i])}</td><td>${fmtDollar(fy25gas.avista[i])}</td>`;
+    tr.innerHTML=`<td>${mfy25[i]}</td><td>${fmtDollar(fy26gas.cost[i])}</td><td>${fmtNum(fy26gas.mmbtu[i])}</td><td>${fmtRate(fy26gas.perUnit[i])}</td><td>${fmtDollar(fy26gas.kintec[i])}</td><td>${fmtDollar(fy26gas.avista[i])}</td>`;
     tb2.appendChild(tr);}
   const tr2=document.createElement('tr');tr2.className='total-row';
-  tr2.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(sum(fy25gas.cost))}</td><td>${fmtNum(sum(fy25gas.mmbtu))}</td><td>${fmtRate(sum(fy25gas.cost)/sum(fy25gas.mmbtu))}</td><td>${fmtDollar(sum(fy25gas.kintec))}</td><td>${fmtDollar(sum(fy25gas.avista))}</td>`;
+  tr2.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(sum(fy26gas.cost))}</td><td>${fmtNum(sum(fy26gas.mmbtu))}</td><td>${fmtRate(sum(fy26gas.cost)/sum(fy26gas.mmbtu))}</td><td>${fmtDollar(sum(fy26gas.kintec))}</td><td>${fmtDollar(sum(fy26gas.avista))}</td>`;
   tb2.appendChild(tr2);
 
   // --- Gas FY25 Chart ---
   chartInstances.push(new Chart(document.getElementById('chartGas25'),{type:'bar',data:{labels:MONTHS,datasets:[
-    {label:'Gas Cost ($)',data:fy25gas.cost,backgroundColor:C.accent,borderRadius:3,yAxisID:'y'},
-    {label:'Gas MMBTU',data:fy25gas.mmbtu,type:'line',borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,tension:0.3,yAxisID:'y1'}
+    {label:'Gas Cost ($)',data:fy26gas.cost,backgroundColor:C.accent,borderRadius:3,yAxisID:'y'},
+    {label:'Gas MMBTU',data:fy26gas.mmbtu,type:'line',borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,tension:0.3,yAxisID:'y1'}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{
     y:{position:'left',ticks:{callback:v=>'$'+(v/1e3).toFixed(0)+'K'}},
     y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fmtNum(v)}}}}}));
@@ -1032,7 +1032,7 @@ function initDashboard(D) {
     tr.innerHTML=`<td>${MONTH_FULL[i]}</td><td>${fmtNum(energyUse.totalActual[i])}</td><td>${fmtNum(energyUse.elecActual[i])}</td><td>${fmtNum(energyUse.gasActual[i])}</td><td class="forecast">${fmtNum(energyUse.totalFcast[i])}</td><td>${fmtNum(energyUse.kwhActual[i])}</td><td>${fmtRateKwh(energyUse.kwhRate[i])}</td>`;
     tb3.appendChild(tr);}
   const tr3=document.createElement('tr');tr3.className='total-row';
-  const avgKwh=sum(energyUse.kwhActual)>0?sum(fy26.elecActual)/sum(energyUse.kwhActual):0;
+  const avgKwh=sum(energyUse.kwhActual)>0?sum(fy27.elecActual)/sum(energyUse.kwhActual):0;
   tr3.innerHTML=`<td>YTD TOTAL</td><td>${fmtNum(sum(energyUse.totalActual))}</td><td>${fmtNum(sum(energyUse.elecActual))}</td><td>${fmtNum(sum(energyUse.gasActual))}</td><td class="forecast">${fmtNum(sum(energyUse.totalFcast))}</td><td>${fmtNum(sum(energyUse.kwhActual))}</td><td>${fmtRateKwh(avgKwh)}</td>`;
   tb3.appendChild(tr3);
 
@@ -1046,23 +1046,23 @@ function initDashboard(D) {
   // --- YoY Table (2 years: FY25 vs FY26) ---
   const tb4=document.querySelector('#tableYoY tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtNum(yoy.fy25total[i])}</td><td>${fmtNum(yoy.fy25elec[i])}</td><td>${fmtNum(yoy.fy25gas[i])}</td><td>${fmtNum(yoy.fy26total[i])}</td><td>${fmtNum(yoy.fy26elec[i])}</td><td>${fmtNum(yoy.fy26gas[i])}</td>`;
+    tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtNum(yoy.fy26total[i])}</td><td>${fmtNum(yoy.fy26elec[i])}</td><td>${fmtNum(yoy.fy26gas[i])}</td><td>${fmtNum(yoy.fy27total[i])}</td><td>${fmtNum(yoy.fy27elec[i])}</td><td>${fmtNum(yoy.fy27gas[i])}</td>`;
     tb4.appendChild(tr);}
   const tr4=document.createElement('tr');tr4.className='total-row';
-  tr4.innerHTML=`<td>FY TOTAL</td><td>${fmtNum(sum(yoy.fy25total))}</td><td>${fmtNum(sum(yoy.fy25elec))}</td><td>${fmtNum(sum(yoy.fy25gas))}</td><td>${fmtNum(sum(yoy.fy26total))}</td><td>${fmtNum(sum(yoy.fy26elec))}</td><td>${fmtNum(sum(yoy.fy26gas))}</td>`;
+  tr4.innerHTML=`<td>FY TOTAL</td><td>${fmtNum(sum(yoy.fy26total))}</td><td>${fmtNum(sum(yoy.fy26elec))}</td><td>${fmtNum(sum(yoy.fy26gas))}</td><td>${fmtNum(sum(yoy.fy27total))}</td><td>${fmtNum(sum(yoy.fy27elec))}</td><td>${fmtNum(sum(yoy.fy27gas))}</td>`;
   tb4.appendChild(tr4);
 
   // YoY notes
-  const yoyPctTotal=((sum(yoy.fy26total)-sum(yoy.fy25total))/sum(yoy.fy25total)*100).toFixed(1);
-  const yoyPctElec=sum(yoy.fy25elec)>0?((sum(yoy.fy26elec)-sum(yoy.fy25elec))/sum(yoy.fy25elec)*100).toFixed(1):'N/A';
-  const yoyPctGas=((sum(yoy.fy26gas)-sum(yoy.fy25gas))/sum(yoy.fy25gas)*100).toFixed(1);
+  const yoyPctTotal=((sum(yoy.fy27total)-sum(yoy.fy26total))/sum(yoy.fy26total)*100).toFixed(1);
+  const yoyPctElec=sum(yoy.fy26elec)>0?((sum(yoy.fy27elec)-sum(yoy.fy26elec))/sum(yoy.fy26elec)*100).toFixed(1):'N/A';
+  const yoyPctGas=((sum(yoy.fy27gas)-sum(yoy.fy26gas))/sum(yoy.fy26gas)*100).toFixed(1);
   const fyS = FY.label.replace('FY20','FY'), prS = FY.priorLabel.replace('FY20','FY');
   document.getElementById('yoyNotes').innerHTML=`<li>${fyS} vs ${prS}: ${yoyPctTotal}% total, ${yoyPctElec}% electric, ${yoyPctGas}% gas</li>`;
 
   // --- YoY Chart (2 years) ---
   chartInstances.push(new Chart(document.getElementById('chartYoY'),{type:'line',data:{labels:MONTHS,datasets:[
-    {label:FY.priorLabel,data:yoy.fy25total,borderColor:C.blue,backgroundColor:C.blueLight,pointRadius:3,tension:0.3},
-    {label:FY.label,data:yoy.fy26total,borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,borderWidth:2.5,tension:0.3}
+    {label:FY.priorLabel,data:yoy.fy26total,borderColor:C.blue,backgroundColor:C.blueLight,pointRadius:3,tension:0.3},
+    {label:FY.label,data:yoy.fy27total,borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,borderWidth:2.5,tension:0.3}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}},
     plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)+' MMBTU'}}}}}));
 
@@ -1092,21 +1092,21 @@ function initDashboard(D) {
     for(let i=0;i<12;i++){const tr=document.createElement('tr');
       if(!isActual[i]) tr.className='forecast-row';
       const costCls=variance.costDelta[i]>0?'negative':'positive';
-      tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtDollar(variance.fy25cost[i])}</td><td>${fmtDollar(variance.fy26cost[i])}</td><td class="${costCls}">${fmtDollar(variance.costDelta[i])}</td><td>${fmtNum(variance.fy25mmbtu[i])}</td><td>${fmtNum(variance.fy26mmbtu[i])}</td><td>${fmtNum(variance.mmbtuDelta[i])}</td><td>${fmtPct(variance.mmbtuDeltaPct[i])}</td><td>${fmtNum(variance.fy25hdd[i])}</td><td>${fmtNum(variance.fy26hdd[i])}</td><td>${variance.hddDeltaPct[i]}%</td><td>${fmtNum(variance.normalHdd[i])}</td>`;
+      tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtDollar(variance.fy26cost[i])}</td><td>${fmtDollar(variance.fy27cost[i])}</td><td class="${costCls}">${fmtDollar(variance.costDelta[i])}</td><td>${fmtNum(variance.fy26mmbtu[i])}</td><td>${fmtNum(variance.fy27mmbtu[i])}</td><td>${fmtNum(variance.mmbtuDelta[i])}</td><td>${fmtPct(variance.mmbtuDeltaPct[i])}</td><td>${fmtNum(variance.fy26hdd[i])}</td><td>${fmtNum(variance.fy27hdd[i])}</td><td>${variance.hddDeltaPct[i]}%</td><td>${fmtNum(variance.normalHdd[i])}</td>`;
       tb7.appendChild(tr);}
     const tr7=document.createElement('tr');tr7.className='total-row';
-    tr7.innerHTML=`<td>FY Total</td><td>${fmtDollar(sum(variance.fy25cost))}</td><td>${fmtDollar(sum(variance.fy26cost))}</td><td class="${sum(variance.costDelta)>0?'negative':'positive'}">${fmtDollar(sum(variance.costDelta))}</td><td>${fmtNum(sum(variance.fy25mmbtu))}</td><td>${fmtNum(sum(variance.fy26mmbtu))}</td><td>${fmtNum(sum(variance.mmbtuDelta))}</td><td>${fmtPct(sum(variance.mmbtuDelta)/sum(variance.fy25mmbtu)*100)}</td><td>${fmtNum(sum(variance.fy25hdd))}</td><td>${fmtNum(sum(variance.fy26hdd))}</td><td>--</td><td>${fmtNum(sum(variance.normalHdd))}</td>`;
+    tr7.innerHTML=`<td>FY Total</td><td>${fmtDollar(sum(variance.fy26cost))}</td><td>${fmtDollar(sum(variance.fy27cost))}</td><td class="${sum(variance.costDelta)>0?'negative':'positive'}">${fmtDollar(sum(variance.costDelta))}</td><td>${fmtNum(sum(variance.fy26mmbtu))}</td><td>${fmtNum(sum(variance.fy27mmbtu))}</td><td>${fmtNum(sum(variance.mmbtuDelta))}</td><td>${fmtPct(sum(variance.mmbtuDelta)/sum(variance.fy26mmbtu)*100)}</td><td>${fmtNum(sum(variance.fy26hdd))}</td><td>${fmtNum(sum(variance.fy27hdd))}</td><td>--</td><td>${fmtNum(sum(variance.normalHdd))}</td>`;
     tb7.appendChild(tr7);
 
     // Variance charts
     chartInstances.push(new Chart(document.getElementById('chartVarianceCost'),{type:'bar',data:{labels:MONTHS,datasets:[
-      {label:FY.priorLabel,data:variance.fy25cost,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
-      {label:FY.label,data:variance.fy26cost,backgroundColor:C.primary,borderRadius:3}
+      {label:FY.priorLabel,data:variance.fy26cost,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
+      {label:FY.label,data:variance.fy27cost,backgroundColor:C.primary,borderRadius:3}
     ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(1)+'M'}}}}}));
 
     chartInstances.push(new Chart(document.getElementById('chartVarianceMmbtu'),{type:'bar',data:{labels:MONTHS,datasets:[
-      {label:FY.priorLabel+' MMBTU',data:variance.fy25mmbtu,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
-      {label:FY.label+' MMBTU',data:variance.fy26mmbtu,backgroundColor:C.primary,borderRadius:3},
+      {label:FY.priorLabel+' MMBTU',data:variance.fy26mmbtu,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
+      {label:FY.label+' MMBTU',data:variance.fy27mmbtu,backgroundColor:C.primary,borderRadius:3},
       {label:'30-Yr Normal HDD',data:variance.normalHdd,type:'line',borderColor:C.gray,borderDash:[5,5],pointRadius:3,tension:0.3,fill:false}
     ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}}}}));
   }
@@ -1114,17 +1114,17 @@ function initDashboard(D) {
   // --- HDD Table ---
   const tb6=document.querySelector('#tableHDD tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtNum(hdd.fy25[i])}</td><td>${fmtNum(hdd.fy26[i])}</td><td>${fmtNum(hdd.normal[i])}</td>`;
+    tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtNum(hdd.fy26[i])}</td><td>${fmtNum(hdd.fy27[i])}</td><td>${fmtNum(hdd.normal[i])}</td>`;
     tb6.appendChild(tr);}
   const tr6=document.createElement('tr');tr6.className='total-row';
-  tr6.innerHTML=`<td>FY Total</td><td>${fmtNum(sum(hdd.fy25))}</td><td>${fmtNum(sum(hdd.fy26))}</td><td>${fmtNum(sum(hdd.normal))}</td>`;
+  tr6.innerHTML=`<td>FY Total</td><td>${fmtNum(sum(hdd.fy26))}</td><td>${fmtNum(sum(hdd.fy27))}</td><td>${fmtNum(sum(hdd.normal))}</td>`;
   tb6.appendChild(tr6);
-  document.getElementById('hddTotals').textContent=FY.priorLabel+' Total: '+fmtNum(sum(hdd.fy25))+' HDD | '+FY.label+' Total: '+fmtNum(sum(hdd.fy26))+' HDD | 30-Yr Normal: '+fmtNum(sum(hdd.normal))+' HDD';
+  document.getElementById('hddTotals').textContent=FY.priorLabel+' Total: '+fmtNum(sum(hdd.fy26))+' HDD | '+FY.label+' Total: '+fmtNum(sum(hdd.fy27))+' HDD | 30-Yr Normal: '+fmtNum(sum(hdd.normal))+' HDD';
 
   // --- HDD Chart ---
   chartInstances.push(new Chart(document.getElementById('chartHDD'),{type:'bar',data:{labels:MONTHS,datasets:[
-    {label:FY.priorLabel+' HDD',data:hdd.fy25,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
-    {label:FY.label+' HDD',data:hdd.fy26,backgroundColor:C.primary,borderRadius:3},
+    {label:FY.priorLabel+' HDD',data:hdd.fy26,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,borderRadius:3},
+    {label:FY.label+' HDD',data:hdd.fy27,backgroundColor:C.primary,borderRadius:3},
     {label:'30-Yr Normal',data:hdd.normal,type:'line',borderColor:C.gray,borderDash:[5,5],pointRadius:3,tension:0.3,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>fmtNum(v)}}}}}));
 
@@ -1183,13 +1183,13 @@ function initDashboard(D) {
     for (let i = 0; i < 12; i++) {
       const tr = document.createElement('tr');
       if (!isActual[i]) tr.className = 'forecast-row';
-      const d = fy26.totalActual[i] - fy26.totalFcast[i];
+      const d = fy27.totalActual[i] - fy27.totalFcast[i];
       const dCls = d > 0 ? 'negative' : d < 0 ? 'positive' : '';
-      tr.innerHTML = '<td>' + MONTHS[i] + '</td><td>' + fmtDollar(fy26.totalActual[i]) + '</td>' +
-        '<td>' + fmtDollar(fy26.totalFcast[i]) + '</td>' +
+      tr.innerHTML = '<td>' + MONTHS[i] + '</td><td>' + fmtDollar(fy27.totalActual[i]) + '</td>' +
+        '<td>' + fmtDollar(fy27.totalFcast[i]) + '</td>' +
         '<td class="' + dCls + '">' + fmtDollar(d) + '</td>' +
-        '<td>' + fmtDollar(fy26.elecActual[i]) + '</td>' +
-        '<td>' + fmtDollar(fy26.gasActual[i]) + '</td>' +
+        '<td>' + fmtDollar(fy27.elecActual[i]) + '</td>' +
+        '<td>' + fmtDollar(fy27.gasActual[i]) + '</td>' +
         '<td>' + fmtNum(energyUse.totalActual[i]) + '</td>';
       psBody.appendChild(tr);
     }
