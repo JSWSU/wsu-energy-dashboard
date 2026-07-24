@@ -481,7 +481,7 @@
         <div class="chart-container"><canvas id="chartMMBTU"></canvas></div>
       </div>
       <div class="card">
-        <h2>FY2026 Cost Distribution</h2>
+        <h2 id="pieHeader">Cost Distribution</h2>
         <div class="chart-container"><canvas id="chartPie"></canvas></div>
       </div>
     </div>
@@ -664,6 +664,8 @@ const FY = {
   priorLabel: 'FY2026'                 // prior year label for YoY comparisons
 };
 const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
+const MONTHS_CUR = MONTHS.map((m,i) => m + " '" + String(i < 6 ? FY.startYear : FY.endYear).slice(-2));
+const MONTHS_PRIOR = MONTHS.map((m,i) => m + " '" + String((i < 6 ? FY.startYear : FY.endYear) - 1).slice(-2));
 const MONTH_FULL = [
   'July '+FY.startYear, 'August '+FY.startYear, 'September '+FY.startYear,
   'October '+FY.startYear, 'November '+FY.startYear, 'December '+FY.startYear,
@@ -766,6 +768,7 @@ const C = {
   // Section titles (using data-fy attribute or direct selectors)
   const setH2 = (sectionId, text) => { const h = document.querySelector('#'+sectionId+' h2'); if(h) h.textContent = text; };
   setH2('monthly', FY.label+' Actuals vs Forecasts');
+  const pieH = document.getElementById('pieHeader'); if (pieH) pieH.textContent = FY.label + ' Cost Distribution';
   // Methodology note
   const methLi = document.querySelector('#sources .notes li:last-child');
   if(methLi && methLi.textContent.includes('FY2026')) {
@@ -952,7 +955,7 @@ function initDashboard(D) {
 
   // --- Dashboard Charts ---
   chartInstances.push(new Chart(document.getElementById('chartMonthly'), {
-    type:'bar', data:{ labels:MONTHS, datasets:[
+    type:'bar', data:{ labels:MONTHS_CUR, datasets:[
       {label:'Actual',data:fy27.totalActual,backgroundColor:C.primary,borderRadius:3},
       {label:'Forecast',data:fy27.totalFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1.5,borderRadius:3}
     ]}, options:{responsive:true,maintainAspectRatio:false,
@@ -961,7 +964,7 @@ function initDashboard(D) {
   }));
 
   chartInstances.push(new Chart(document.getElementById('chartBreakdown'), {
-    type:'bar', data:{ labels:MONTHS, datasets:[
+    type:'bar', data:{ labels:MONTHS_CUR, datasets:[
       {label:'Electric (Actual)',data:fy27.elecActual,backgroundColor:C.primary,stack:'actual',borderRadius:2},
       {label:'Gas (Actual)',data:fy27.gasActual,backgroundColor:C.accent,stack:'actual',borderRadius:2},
       {label:'Electric (Forecast)',data:fy27.elecFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,stack:'forecast',borderRadius:2},
@@ -972,7 +975,7 @@ function initDashboard(D) {
   }));
 
   chartInstances.push(new Chart(document.getElementById('chartMMBTU'), {
-    type:'bar', data:{ labels:MONTHS, datasets:[
+    type:'bar', data:{ labels:MONTHS_CUR, datasets:[
       {label:'Electric MMBTU',data:energyUse.elecActual,backgroundColor:C.primary,stack:'s1',borderRadius:2},
       {label:'Gas MMBTU',data:energyUse.gasActual,backgroundColor:C.accent,stack:'s1',borderRadius:2}
     ]}, options:{responsive:true,maintainAspectRatio:false,
@@ -1012,7 +1015,7 @@ function initDashboard(D) {
   tb2.appendChild(tr2);
 
   // --- Gas FY25 Chart ---
-  chartInstances.push(new Chart(document.getElementById('chartGas25'),{type:'bar',data:{labels:MONTHS,datasets:[
+  chartInstances.push(new Chart(document.getElementById('chartGas25'),{type:'bar',data:{labels:MONTHS_PRIOR,datasets:[
     {label:'Gas Cost ($)',data:fy26gas.cost,backgroundColor:C.accent,borderRadius:3,yAxisID:'y'},
     {label:'Gas MMBTU',data:fy26gas.mmbtu,type:'line',borderColor:C.primary,backgroundColor:C.primaryLight,pointRadius:4,tension:0.3,yAxisID:'y1'}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{
@@ -1040,7 +1043,7 @@ function initDashboard(D) {
   tb3.appendChild(tr3);
 
   // --- Energy Use Chart ---
-  chartInstances.push(new Chart(document.getElementById('chartEnergyUse'),{type:'bar',data:{labels:MONTHS,datasets:[
+  chartInstances.push(new Chart(document.getElementById('chartEnergyUse'),{type:'bar',data:{labels:MONTHS_CUR,datasets:[
     {label:'Electric MMBTU',data:energyUse.elecActual,backgroundColor:C.primary,stack:'s1',borderRadius:2},
     {label:'Gas MMBTU',data:energyUse.gasActual,backgroundColor:C.accent,stack:'s1',borderRadius:2},
     {label:'Total Forecast',data:energyUse.totalFcast,type:'line',borderColor:C.blue,borderDash:[5,5],pointRadius:4,tension:0.3,fill:false}
@@ -1083,7 +1086,7 @@ function initDashboard(D) {
   tb5.appendChild(tr5);
 
   // --- Cumulative Chart ---
-  chartInstances.push(new Chart(document.getElementById('chartCumulative'),{type:'line',data:{labels:MONTHS,datasets:[
+  chartInstances.push(new Chart(document.getElementById('chartCumulative'),{type:'line',data:{labels:MONTHS_CUR,datasets:[
     {label:'Actual (Cumulative)',data:cumul.actual,borderColor:C.primary,backgroundColor:C.primaryLight,fill:true,pointRadius:4,tension:0.3,borderWidth:2.5},
     {label:'Forecast (Cumulative)',data:cumul.forecast,borderColor:C.blue,backgroundColor:C.blueLight,fill:true,pointRadius:4,borderDash:[6,3],tension:0.3}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(0)+'M'}}},
