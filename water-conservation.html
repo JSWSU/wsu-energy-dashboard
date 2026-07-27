@@ -2265,15 +2265,16 @@ function anomalyEventCost(a) {
   return excess > 0 ? excess * TOP10_RATE_PER_KGAL : 0;
 }
 
-// Cost impact for a row, preferring authoritative Top 10 / Stale detail (which
-// aggregates across trigger months) and falling back to per-anomaly excess for
-// rows that only carry a single anomaly detection.
+// Cost impact for a row. Anomaly-only rows (built from a single detection,
+// carrying `_raw`) get the per-anomaly excess so 2 rows on one building don't
+// both read as the same aggregated building total. Aggregate-view rows get
+// the authoritative Top 10 / Stale total when available.
 function rowCostImpact(r) {
+  if (r._raw) return anomalyEventCost(r._raw);
   const key = r.bldgNo + '|' + r.service;
   if (G_top10Detail[key]) return G_top10Detail[key].eventCost;
   if (G_staleDetail[key]) return G_staleDetail[key].eventCost;
-  const w = r.worstAnomaly || r._raw;
-  if (w) return anomalyEventCost(w);
+  if (r.worstAnomaly) return anomalyEventCost(r.worstAnomaly);
   return null;
 }
 
@@ -2582,16 +2583,20 @@ function renderAnomalyTab(filter) {
 
     // Cost Impact cell: event cost to date for Top 10, Stale-High-Dollar, and
     // any anomaly row. Headline is EVENT COST TO DATE \u2014 actual excess x rate,
-    // never annualized. Full arithmetic lives in the expanded row.
+    // never annualized. Anomaly-only rows (single detection per row) show the
+    // per-anomaly excess so two rows on one building do not both read as the
+    // same aggregate total. Aggregate-view rows show the T10 or Stale total
+    // when the building is on either curated list.
     const key = r.bldgNo + '|' + r.service;
-    const t10  = G_top10Detail[key];
-    const stl  = G_staleDetail[key];
+    const isSingleAnom = !!r._raw;
+    const t10  = !isSingleAnom ? G_top10Detail[key] : null;
+    const stl  = !isSingleAnom ? G_staleDetail[key] : null;
     const cval = rowCostImpact(r);
     let costStr;
     if (t10) {
-      costStr = '<span style="font-weight:600;color:var(--red)" title="Top 10 event cost to date. Click row for full arithmetic.">' + fmtMoney(t10.eventCost) + '</span>';
+      costStr = '<span style="font-weight:600;color:var(--red)" title="Top 10 event cost to date (building total across trigger months). Click row for full arithmetic.">' + fmtMoney(t10.eventCost) + '</span>';
     } else if (stl) {
-      costStr = '<span style="font-weight:600;color:var(--accent)" title="Stale-but-high-dollar event cost (data ' + stl.monthsSinceLastData + ' month' + (stl.monthsSinceLastData === 1 ? '' : 's') + ' old). Click row for full arithmetic.">' + fmtMoney(stl.eventCost) + '</span>';
+      costStr = '<span style="font-weight:600;color:var(--accent)" title="Stale-but-high-dollar event cost, building total (data ' + stl.monthsSinceLastData + ' month' + (stl.monthsSinceLastData === 1 ? '' : 's') + ' old). Click row for full arithmetic.">' + fmtMoney(stl.eventCost) + '</span>';
     } else if (cval != null && cval > 0) {
       costStr = '<span style="color:var(--red)" title="Anomaly event cost: (usage - baseline) x $' + TOP10_RATE_PER_KGAL.toFixed(2) + '/kGal">' + fmtMoney(cval) + '</span>';
     } else {
@@ -3396,24 +3401,25 @@ function createAllNewTasks() {
 function exportFieldActionList() {
   const topRows   = Object.values(G_top10Detail).sort((a, b) => b.eventCost - a.eventCost);
   const staleRows = Object.values(G_staleDetail).sort((a, b) => b.eventCost - a.eventCost);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[c]);
   const bldgName = (bldgNo, service) => {
     const map = service === 'Irrigation Water' ? G_irrigByBldg
       : service === 'Well Water' ? G_wellByBldg : G_domByBldg;
     return (map[bldgNo] && map[bldgNo].bldgName) || '';
   };
   const monthCells = d => d.months.map(m =>
-    '<li>' + monthLabel(m.mk) + ': ' + fmt(m.usage, 1) + ' kGal &minus; baseline ' +
-    fmt(m.baseline, 1) + ' kGal (' + m.baselineSrc + ') = <strong>' +
+    '<li>' + esc(monthLabel(m.mk)) + ': ' + fmt(m.usage, 1) + ' kGal &minus; baseline ' +
+    fmt(m.baseline, 1) + ' kGal (' + esc(m.baselineSrc) + ') = <strong>' +
     fmt(m.excess, 1) + ' kGal</strong> &times; $' + m.cost.toFixed(2).replace(/\.00$/, '') +
     ' &rarr; <strong>' + fmtMoney(m.cost) + '</strong></li>').join('');
   const rowHtml = (d, isStale) => {
     const netSign = d.netYtdKGal >= 0 ? '+' : '';
     const staleLine = isStale
-      ? '<div class="stale">Meter last reported ' + monthLabel(d.lastDataMk) + ' (' + d.monthsSinceLastData +
+      ? '<div class="stale">Meter last reported ' + esc(monthLabel(d.lastDataMk)) + ' (' + d.monthsSinceLastData +
         ' month' + (d.monthsSinceLastData === 1 ? '' : 's') + ' behind campus). Field verify before assuming ongoing.</div>'
       : '';
     return '<div class="row">' +
-      '<h3>' + d.bldgNo + ' ' + bldgName(d.bldgNo, d.service) + ' &mdash; ' + d.service + '</h3>' +
+      '<h3>' + esc(d.bldgNo) + ' ' + esc(bldgName(d.bldgNo, d.service)) + ' &mdash; ' + esc(d.service) + '</h3>' +
       '<div class="hd">Event cost to date: <strong>' + fmtMoney(d.eventCost) +
         '</strong> &nbsp;|&nbsp; ' + fmt(d.excessKGal, 1) + ' kGal excess &nbsp;|&nbsp; ' +
         d.months.length + ' trigger month' + (d.months.length === 1 ? '' : 's') + '</div>' +
