@@ -1453,6 +1453,27 @@ function sanitizeOutliers(rows, url) {
   return rows;
 }
 
+// SkySpark occasionally emits TWO aggregate rows for the same building-month
+// when a new point is created alongside the original (e.g. 0093N_IR_001 next
+// to 0093NIR_001, same Calsense controller). Both rows land in the export
+// with byMeter=false and would double-count if summed. Keep the row with the
+// largest meter list per (bldgNo, startDate).
+function dedupeAggregateRows(rows) {
+  const bestBy = {};
+  rows.forEach(r => {
+    if (r.byMeter) return;
+    const key = (r.bldgNo || '') + '|' + (r.startDate || '');
+    const count = (r.meters || '').split(',').length;
+    const prior = bestBy[key];
+    if (!prior || count > prior.count) bestBy[key] = { row: r, count: count };
+  });
+  return rows.filter(r => {
+    if (r.byMeter) return true;
+    const key = (r.bldgNo || '') + '|' + (r.startDate || '');
+    return bestBy[key] && bestBy[key].row === r;
+  });
+}
+
 function aggregateByBuilding(rows, convertFn) {
   const map = {};
   rows.forEach(r => {
@@ -1462,6 +1483,11 @@ function aggregateByBuilding(rows, convertFn) {
     // Null usage = no data, not zero: leave the month absent so charts show a
     // gap and tables show an em dash instead of a fake 0.0
     if (!mk || typeof r.usage !== 'number' || !isFinite(r.usage)) return;
+    // SkySpark virtual "total dcw" points (e.g. "0099 total dcw volume" =
+    // physical - Calsense) can go negative when the Calsense reading exceeds
+    // the physical meter. That is a garbage-in/garbage-out artifact, not a
+    // real reading; treat as no data.
+    if (r.usage < 0) return;
     const val = convertFn(r.usage);
     map[key].total += val;
     map[key].months[mk] = (map[key].months[mk] || 0) + val;
@@ -1474,7 +1500,9 @@ function aggregateByMonth(rows, convertFn) {
   rows.forEach(r => {
     const mk = parseMonthKey(r.startDate);
     if (!mk) return;
-    const raw = typeof r.usage === 'number' && isFinite(r.usage) ? r.usage : 0;
+    // Same guard as aggregateByBuilding: negatives from SkySpark virtual
+    // "total dcw" points are artifacts, not readings; treat as no data.
+    const raw = typeof r.usage === 'number' && isFinite(r.usage) && r.usage >= 0 ? r.usage : 0;
     map[mk] = (map[mk] || 0) + convertFn(raw);
   });
   return map;
@@ -3679,9 +3707,9 @@ function renderDataInfo(domestic, irrigation, totals) {
     ]);
     G_meterClass = meterClass || {};
     const merged = applyMeterUploads(domRepo, irrRepo, wellRepo);
-    const domestic = overlayByMeter(merged.domestic);
-    const irrigation = overlayByMeter(merged.irrigation);
-    const well = overlayByMeter(merged.well);
+    const domestic   = dedupeAggregateRows(overlayByMeter(merged.domestic));
+    const irrigation = dedupeAggregateRows(overlayByMeter(merged.irrigation));
+    const well       = dedupeAggregateRows(overlayByMeter(merged.well));
     collectByMeterDetail(domestic, 'Domestic Water');
     collectByMeterDetail(irrigation, 'Irrigation Water');
     collectByMeterDetail(well, 'Well Water');
