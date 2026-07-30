@@ -18,6 +18,8 @@ import win32com.client
 from inland_workbook import DEFAULT_WORKBOOK
 
 OUT_PATH = DEFAULT_WORKBOOK.parent / "data-fy25.json"
+OLD_REPORT = (r"R:\Energy Services Admin\Energy Files\Annual Elect & Steam Use"
+              r"\FY2025\Energy Cost Projection Report July 2025.xlsx")
 
 
 def _num(v, default=0.0):
@@ -85,44 +87,49 @@ def main() -> int:
         def g(cal, f):
             return [hist.get(k, {}).get(f, 0.0) for k in cal]
 
-        # ---- current year of this page = FY26 actuals ----
+        # ---- FY25 official numbers from the archived report workbook ----
+        rpt = xl.Workbooks.Open(OLD_REPORT, UpdateLinks=0, ReadOnly=True,
+                                IgnoreReadOnlyRecommended=True, Notify=False)
+        ws_r = rpt.Sheets("Report")
+
+        def col(rows, c):
+            return [_num(ws_r.Cells(r, c).Value) for r in rows]
+
+        R = range(3, 15)          # cost section, Jul 2024 - Jun 2025
+        RU = range(62, 74)        # energy use section
+        totA, elecA, gasA = col(R, 2), col(R, 3), col(R, 4)
+        totF, elecF2, gasF2 = col(R, 5), col(R, 6), col(R, 7)
+        kinF, aviF = col(R, 8), col(R, 9)
+        use_totA, use_elecA, use_gasA = col(RU, 2), col(RU, 3), col(RU, 4)
+        use_totF = col(RU, 5)
+        kwhA = col(RU, 9)
+        rpt.Close(SaveChanges=False)
+
+        # Consolidated-derived (still needed for prior-year sections)
         elec26, gas26 = g(FY26_CAL, "elec"), g(FY26_CAL, "gas")
         kwh26 = g(FY26_CAL, "kwh")
         emm26, gmm26 = g(FY26_CAL, "elecMM"), g(FY26_CAL, "gasMM")
-        kin26, avi26 = g(FY26_CAL, "kintecGas"), g(FY26_CAL, "avistaGas")
-
-        # Forecast comparison series: same method as the FY27 page, based on
-        # FY25 with elec YoY trend from Jul-Dec 2024 vs Jul-Dec 2023.
-        e_new = sum(hist.get((2023, m), {}).get("elec", 0.0) for m in range(7, 13))
-        e_old = sum(hist.get((2022, m), {}).get("elec", 0.0) for m in range(7, 13))
-        elec_factor = (e_new / e_old) if e_old else 1.0
-        # Guard: incomplete base history produces a nonsense ratio. A real YoY
-        # trend for campus electric is a few percent; outside that, base data
-        # is missing -> no trend adjustment.
-        if not (0.8 <= elec_factor <= 1.3):
-            elec_factor = 1.0
-        hedge = 10.0
-        elecF = [hist.get(k, {}).get("elec", 0.0) * elec_factor for k in FY25_CAL]
-        gasF = [hist.get(k, {}).get("gas", 0.0) * (1 + hedge / 100) for k in FY25_CAL]
-        totF = [e + gsc for e, gsc in zip(elecF, gasF)]
 
         fy_cur = {
-            "totalActual": [int(round(e + gsc)) for e, gsc in zip(elec26, gas26)],
-            "elecActual": [int(round(x)) for x in elec26],
-            "gasActual": [int(round(x)) for x in gas26],
+            "totalActual": [int(round(x)) for x in totA],
+            "elecActual": [int(round(x)) for x in elecA],
+            "gasActual": [int(round(x)) for x in gasA],
             "totalFcast": [int(round(x)) for x in totF],
-            "elecFcast": [int(round(x)) for x in elecF],
-            "gasFcast": [int(round(x)) for x in gasF],
-            # Pie + gas tables want the Kintec/Avista split; use FY26 actuals.
-            "kintecFcast": [int(round(x)) for x in kin26],
-            "avistaFcast": [int(round(x)) for x in avi26],
-            "hedge": hedge,
+            "elecFcast": [int(round(x)) for x in elecF2],
+            "gasFcast": [int(round(x)) for x in gasF2],
+            "kintecFcast": [int(round(x)) for x in kinF],
+            "avistaFcast": [int(round(x)) for x in aviF],
+            "hedge": 0.0,
+            "isActual": [True] * 12,
             "forecastMeta": {
-                "method": "FY2025 actuals vs a same-month-FY2024 forecast",
-                "elecFactor": round(elec_factor, 3),
-                "gasHedgePct": hedge,
-                "baseWindow": "Jul 2023 - Jun 2024 billing history",
-                
+                "method": "Official FY2025 report: actuals vs the 5-year-average forecast made at the time",
+                "elecFactor": 1.0,
+                "gasHedgePct": 0.0,
+                "baseWindow": "FY2020-FY2024 5-year monthly averages",
+                "dataNote": ("All figures from the archived Energy Cost Projection Report "
+                             "July 2025. FY2024 comparison data on the Year-over-Year and "
+                             "Price-vs-Volume tabs is approximate for Jul-Nov 2023 "
+                             "(summary-level source rows); FY2024 HDD was not tracked."),
             },
         }
 
@@ -137,18 +144,18 @@ def main() -> int:
             "avista": [int(round(x)) for x in g(FY25_CAL, "avistaGas")],
         }
 
-        # ---- energy use (FY26) ----
-        totmm26 = [e + gm for e, gm in zip(emm26, gmm26)]
+        # ---- energy use from the official report ----
+        energy_use = {
+            "totalActual": [int(round(x)) for x in use_totA],
+            "elecActual": [int(round(x)) for x in use_elecA],
+            "gasActual": [int(round(x)) for x in use_gasA],
+            "totalFcast": [int(round(x)) for x in use_totF],
+            "kwhActual": [int(round(x)) for x in kwhA],
+            "kwhRate": [round(e / k, 4) if k else 0.0 for e, k in zip(elecA, kwhA)],
+        }
+        totmm26 = use_totA
         totmm25F = [hist.get(k, {}).get("elecMM", 0.0) + hist.get(k, {}).get("gasMM", 0.0)
                     for k in FY25_CAL]
-        energy_use = {
-            "totalActual": [int(round(x)) for x in totmm26],
-            "elecActual": [int(round(x)) for x in emm26],
-            "gasActual": [int(round(x)) for x in gmm26],
-            "totalFcast": [int(round(x)) for x in totmm25F],
-            "kwhActual": [int(round(x)) for x in kwh26],
-            "kwhRate": [round(e / k, 4) if k else 0.0 for e, k in zip(elec26, kwh26)],
-        }
 
         # ---- YoY MMBTU: prior = FY25, current = FY26 ----
         emm25, gmm25b = g(FY25_CAL, "elecMM"), g(FY25_CAL, "gasMM")
