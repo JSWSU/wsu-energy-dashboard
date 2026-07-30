@@ -414,8 +414,8 @@
       <div class="kpi-card delta" data-kpi="delta">
         <span class="kpi-expand-icon">&#9660;</span>
         <span class="kpi-tooltip">Cumulative difference between forecast and actual costs. Positive = under budget; negative = over budget.</span>
-        <div class="kpi-label">Forecast vs Actual</div>
-        <div class="kpi-value red"><span id="kpiDelta">--</span></div>
+        <div class="kpi-label">Budget Variance</div>
+        <div class="kpi-value" id="kpiDeltaWrap"><span id="kpiDelta">--</span></div>
         <div class="kpi-sub"><span id="kpiDeltaPct">--</span></div>
         <div class="kpi-expand"></div>
       </div>
@@ -812,9 +812,10 @@ function initDashboard(D) {
 
   document.getElementById('kpiActualYTD').textContent = fmtDollarM(totalAct);
   document.getElementById('kpiForecast').textContent = fmtDollarM(totalFcast);
-  const deltaSign = delta >= 0 ? '+' : '-';
-  document.getElementById('kpiDelta').textContent = deltaSign + fmtDollarM(Math.abs(delta));
-  document.getElementById('kpiDeltaPct').textContent = fmtPct(deltaPct) + (delta >= 0 ? ' over actuals' : ' under actuals');
+  // delta = forecast - actual; positive means actual spending came in UNDER forecast
+  document.getElementById('kpiDelta').textContent = fmtDollarM(Math.abs(delta)) + (delta >= 0 ? ' under' : ' over');
+  document.getElementById('kpiDeltaWrap').className = 'kpi-value ' + (delta >= 0 ? 'green' : 'red');
+  document.getElementById('kpiDeltaPct').textContent = fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' below forecast' : ' above forecast');
   document.getElementById('kpiMMBTU').textContent = fmtNum(totalMMBTU);
   document.getElementById('kpiMMBTUSub').textContent = 'MMBTU (Elec: ' + fmtNum(totalElecMMBTU) + ' | Gas: ' + fmtNum(totalGasMMBTU) + ')';
   document.getElementById('kpiElecCost').textContent = fmtDollarM(totalElec);
@@ -1215,7 +1216,7 @@ function initDashboard(D) {
     const kpis = [
       { label: FY.label+' Actual + Forecast', value: fmtDollarM(totalAct), sub: 'Actuals + forecast remaining', cls: '', valCls: '' },
       { label: FY.label+' Forecast', value: fmtDollarM(totalFcast), sub: 'Full-year projection', cls: 'forecast', valCls: 'blue' },
-      { label: 'Forecast vs Actual', value: (delta >= 0 ? '+' : '-') + fmtDollarM(Math.abs(delta)), sub: fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' over actuals' : ' under actuals'), cls: 'delta', valCls: delta >= 0 ? 'green' : 'red' },
+      { label: 'Budget Variance', value: fmtDollarM(Math.abs(delta)) + (delta >= 0 ? ' under' : ' over'), sub: fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' below forecast' : ' above forecast'), cls: 'delta', valCls: delta >= 0 ? 'green' : 'red' },
       { label: 'Total Energy Use', value: fmtNum(totalMMBTU) + ' MMBTU', sub: 'Elec: ' + fmtNum(totalElecMMBTU) + ' | Gas: ' + fmtNum(totalGasMMBTU), cls: 'energy', valCls: '' },
       { label: 'Electric Cost', value: fmtDollarM(totalElec), sub: (totalElec / totalAct * 100).toFixed(1) + '% of total', cls: '', valCls: '' },
       { label: 'Gas Cost', value: fmtDollarM(totalGas), sub: (totalGas / totalAct * 100).toFixed(1) + '% of total', cls: '', valCls: '' },
