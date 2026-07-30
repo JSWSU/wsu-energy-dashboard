@@ -658,11 +658,11 @@
 // ==================== FISCAL YEAR CONFIG ====================
 // >>> CHANGE THIS ONE OBJECT FOR FY ROLLOVER -- everything else reads from it <<<
 const FY = {
-  label: 'FY2026',                    // prior-year archive page
-  range: 'July 2026 \u2013 June 2027', // e.g. 'July 2027 \u2013 June 2028'
-  startYear: 2025,                     // calendar year of July (first month)
-  endYear: 2026,                       // calendar year of June (last month)
-  priorLabel: 'FY2025'                 // prior year label for YoY comparisons
+  label: 'FY2026',
+  range: 'July 2025 – June 2026',
+  startYear: 2025,
+  endYear: 2026,
+  priorLabel: 'FY2025'
 };
 const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
 const MONTHS_CUR = MONTHS.map((m,i) => m + " '" + String(i < 6 ? FY.startYear : FY.endYear).slice(-2));
