@@ -807,6 +807,15 @@ function initDashboard(D) {
         yoy = D.yoy, cumul = D.cumul, hdd = D.hdd, kintec = D.kintec,
         variance = D.variance;
 
+  // --- Determine actual vs forecast months ---
+  // Explicit flags from the exporter (workbook IsComplete row); fall back to
+  // value comparison for older data.json files.
+  const isActual = fy27.isActual || fy27.totalActual.map((v, i) => v !== fy27.totalFcast[i]);
+  const actualMonthCount = isActual.filter(Boolean).length;
+  // Mask helper: actual-series value only where real bills exist, else null
+  // (Chart.js skips null bars/points, so forecast-only months show no actual)
+  const maskAct = arr => arr.map((v, i) => isActual[i] ? v : null);
+
   // --- KPI Cards ---
   const totalAct = sum(fy27.totalActual), totalFcast = sum(fy27.totalFcast);
   const totalElec = sum(fy27.elecActual), totalGas = sum(fy27.gasActual);
@@ -854,14 +863,6 @@ function initDashboard(D) {
     document.getElementById('verifiedBadge').innerHTML = '<span class="verified">Verified vs Consolidated Data</span>';
   }
 
-  // --- Determine actual vs forecast months ---
-  // Explicit flags from the exporter (workbook IsComplete row); fall back to
-  // value comparison for older data.json files.
-  const isActual = fy27.isActual || fy27.totalActual.map((v, i) => v !== fy27.totalFcast[i]);
-  const actualMonthCount = isActual.filter(Boolean).length;
-  // Mask helper: actual-series value only where real bills exist, else null
-  // (Chart.js skips null bars/points, so forecast-only months show no actual)
-  const maskAct = arr => arr.map((v, i) => isActual[i] ? v : null);
 
   // --- Budget Status Banner ---
   const banner = document.getElementById('budgetBanner');
