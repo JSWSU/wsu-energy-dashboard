@@ -978,18 +978,19 @@ function initDashboard(D) {
 
   chartInstances.push(new Chart(document.getElementById('chartMMBTU'), {
     type:'bar', data:{ labels:MONTHS_CUR, datasets:[
-      {label:'Electric MMBTU',data:maskAct(energyUse.elecActual),backgroundColor:C.primary,stack:'s1',borderRadius:2},
-      {label:'Gas MMBTU',data:maskAct(energyUse.gasActual),backgroundColor:C.accent,stack:'s1',borderRadius:2}
+      {label:'Electric MMBTU'+(actualMonthCount?'':' (Forecast)'),data:energyUse.elecActual,backgroundColor:actualMonthCount?C.primary:C.primaryLight,borderColor:C.primary,borderWidth:actualMonthCount?0:1,stack:'s1',borderRadius:2},
+      {label:'Gas MMBTU'+(actualMonthCount?'':' (Forecast)'),data:energyUse.gasActual,backgroundColor:actualMonthCount?C.accent:'rgba(198,146,20,0.25)',borderColor:C.accent,borderWidth:actualMonthCount?0:1,stack:'s1',borderRadius:2}
     ]}, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)}}},
       scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}
   }));
 
   const pieElec = sum(fy27.elecActual), pieKintec = sum(fy27.kintecFcast), pieAvista = sum(fy27.avistaFcast);
+  const pieSuffix = actualMonthCount ? ' (Actual)' : ' (Forecast)';
   const pieTotal = pieElec + pieKintec + pieAvista;
   chartInstances.push(new Chart(document.getElementById('chartPie'), {
     type:'doughnut', data:{
-      labels:['Electric (Actual)','Gas - Kintec','Gas - Avista'],
+      labels:['Electric'+pieSuffix,'Gas - Kintec'+pieSuffix,'Gas - Avista'+pieSuffix],
       datasets:[{data:[pieElec,pieKintec,pieAvista],backgroundColor:[C.primary,C.accent,C.orange],borderWidth:2}]
     }, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmtDollarM(ctx.raw)+' ('+(ctx.raw/pieTotal*100).toFixed(1)+'%)'}},legend:{position:'bottom'}}}
@@ -1067,8 +1068,8 @@ function initDashboard(D) {
 
   // --- Energy Use Chart ---
   chartInstances.push(new Chart(document.getElementById('chartEnergyUse'),{type:'bar',data:{labels:MONTHS_CUR,datasets:[
-    {label:'Electric MMBTU',data:maskAct(energyUse.elecActual),backgroundColor:C.primary,stack:'s1',borderRadius:2},
-    {label:'Gas MMBTU',data:maskAct(energyUse.gasActual),backgroundColor:C.accent,stack:'s1',borderRadius:2},
+    {label:'Electric MMBTU'+(actualMonthCount?'':' (Forecast)'),data:energyUse.elecActual,backgroundColor:actualMonthCount?C.primary:C.primaryLight,borderColor:C.primary,borderWidth:actualMonthCount?0:1,stack:'s1',borderRadius:2},
+    {label:'Gas MMBTU'+(actualMonthCount?'':' (Forecast)'),data:energyUse.gasActual,backgroundColor:actualMonthCount?C.accent:'rgba(198,146,20,0.25)',borderColor:C.accent,borderWidth:actualMonthCount?0:1,stack:'s1',borderRadius:2},
     {label:'Total Forecast',data:energyUse.totalFcast,type:'line',borderColor:C.blue,borderDash:[5,5],pointRadius:4,tension:0.3,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}}));
 
