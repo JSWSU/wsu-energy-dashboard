@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forecasting Demonstration — Volume × Price Method</title>
+<style>
+:root {
+  --primary: #981e32; --primary-dark: #7a1828; --secondary: #5f6b6d;
+  --accent: #c69214; --bg: #f5f5f5; --card-bg: #fff; --text: #2d2d2d;
+  --text-light: #6b7280; --border: #e5e7eb; --green: #059669; --red: #dc2626;
+  --blue: #2563eb; --table-head-bg: #f9fafb; --table-hover: #f9fafb;
+  --info-bg: #f0f9ff; --info-border: #bae6fd; --info-text: #0c4a6e;
+}
+html.dark {
+  --bg: #111827; --card-bg: #1f2937; --text: #e5e7eb; --text-light: #9ca3af;
+  --border: #374151; --green: #34d399; --red: #f87171;
+  --table-head-bg: #1a2332; --table-hover: #253347;
+  --info-bg: #1e293b; --info-border: #334155; --info-text: #7dd3fc;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); }
+header { background:var(--primary); color:#fff; padding:18px 28px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+header h1 { font-size:21px; }
+header .sub { font-size:12.5px; opacity:.85; margin-top:3px; }
+.container { max-width:1200px; margin:0 auto; padding:18px 24px 40px; }
+.card { background:var(--card-bg); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:20px 22px; margin-bottom:18px; }
+.card h2 { color:var(--primary); font-size:17px; margin-bottom:6px; }
+html.dark .card h2 { color:var(--accent); }
+.card .lede { font-size:13.5px; color:var(--text-light); line-height:1.6; margin-bottom:14px; }
+.chart-container { position:relative; height:330px; }
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:18px; }
+.kpi-card { background:var(--card-bg); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:15px 18px; border-left:4px solid var(--primary); }
+.kpi-label { font-size:11.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-light); }
+.kpi-value { font-size:24px; font-weight:700; margin:4px 0 2px; }
+.kpi-sub { font-size:12px; color:var(--text-light); }
+.info-box { font-size:13px; color:var(--text-light); background:var(--info-bg); border:1px solid var(--info-border); border-radius:6px; padding:10px 14px; margin-bottom:16px; line-height:1.6; }
+.info-box b { color:var(--info-text); }
+.btn-row { display:flex; justify-content:space-between; align-items:center; margin:0 0 14px; flex-wrap:wrap; gap:8px; }
+.btn { display:inline-block; background:var(--primary); color:#fff; padding:8px 18px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+.btn.gold { background:var(--accent); }
+.plan ol { margin:8px 0 4px 22px; font-size:13.5px; line-height:1.85; }
+.plan li b { color:var(--primary); }
+html.dark .plan li b { color:var(--accent); }
+.dark-toggle { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+.dark-toggle-switch { width:38px; height:20px; border-radius:10px; background:rgba(255,255,255,.35); border:none; cursor:pointer; position:relative; }
+.dark-toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .2s; }
+html.dark .dark-toggle-switch::after { transform:translateX(18px); }
+footer { text-align:center; font-size:12px; color:var(--text-light); padding:18px 0 26px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Forecasting Demonstration — Volume &times; Price</h1>
+    <div class="sub">Proposed method, built on FY2020&ndash;FY2026 history &bull; <span id="lastUpdated">…</span></div>
+  </div>
+  <div class="dark-toggle">
+    <span>Dark Mode</span>
+    <button class="dark-toggle-switch" id="darkToggle" aria-label="Toggle dark mode"></button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="btn-row">
+    <a class="btn" href="index.html">&larr; FY2026 report</a>
+    <a class="btn gold" href="trends.html">Multi-Year Trends</a>
+    <a class="btn" href="rates-demo.html">Rates Demonstration &rarr;</a>
+  </div>
+
+  <div class="info-box"><b>The idea in one sentence:</b> stop forecasting dollars directly; forecast
+    energy volume (which is stable and weather-driven) and price it with numbers that are already
+    known (the Kinect hedge book and the published Avista tariff).</div>
+
+  <div class="kpi-grid" id="kpis"></div>
+
+  <div class="card">
+    <h2>1. The problem: the current method misses when prices move</h2>
+    <div class="lede">The official 5-year-average method (reconstructed exactly, 0.00% vs surviving
+      stored projections) worked in stable years and failed badly in the FY2023 gas spike. Averaging
+      history means a price shock takes five years to propagate into the forecast.</div>
+    <div class="chart-container"><canvas id="chartBacktest"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>2. Evidence: campus energy volume is weather</h2>
+    <div class="lede" id="regLede"></div>
+    <div class="chart-container"><canvas id="chartScatter"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>3. Evidence: the FY2023 miss was price, not usage</h2>
+    <div class="lede" id="decompLede"></div>
+    <div class="chart-container" style="height:260px"><canvas id="chartDecomp"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>4. The price side is largely already known</h2>
+    <div class="lede">WSU's gas is bought forward in fixed-price Kinect packages. The FY2026 invoices
+      show most volume was hedged at known prices; only the swing residual floats with the market.
+      Electric prices come from the published Avista tariff. Hedged volume &times; contract price is
+      arithmetic, not forecasting.</div>
+    <div class="chart-container"><canvas id="chartHedge"></canvas></div>
+  </div>
+
+  <div class="card plan">
+    <h2>5. Rollout plan</h2>
+    <ol>
+      <li><b>Parallel column first.</b> Add the volume &times; price forecast beside the current method
+        on the FY2027 page for a full year. No method change until it proves out.</li>
+      <li><b>Volume model.</b> Gas volume = regression on 30-year-normal HDD (shown above); electric
+        volume = 3-year monthly average (stable). Re-fit each July.</li>
+      <li><b>Gas price.</b> Hedged Dths at contract package prices straight from the Kinect invoices;
+        swing residual at a stated market assumption with the exposure quantified.</li>
+      <li><b>Electric price.</b> Approved Avista tariff schedule, not a trend factor.</li>
+      <li><b>Error bands.</b> Publish the historical miss range with every forecast
+        (&plusmn;8% normal years, +40% recorded gas-shock worst case) so leadership sees uncertainty.</li>
+      <li><b>Monthly true-up.</b> As bills post, show variance split into weather, volume, and price
+        components using the HDD regression, so every miss has a named cause.</li>
+    </ol>
+  </div>
+</div>
+
+<footer>WSU Facilities Services &bull; Forecasting Demonstration &bull; companion: <a href="rates-demo.html">Rates Demonstration</a></footer>
+
+<script src="chart.umd.min.js"></script>
+<script>
+const chartInstances = [];
+function applyChartTheme() {
+  const dark = document.documentElement.classList.contains('dark');
+  Chart.defaults.color = dark ? '#9ca3af' : '#6b7280';
+  Chart.defaults.borderColor = dark ? '#374151' : '#e5e7eb';
+}
+if (localStorage.getItem('wsuDarkMode') === 'on') document.documentElement.classList.add('dark');
+document.getElementById('darkToggle').addEventListener('click', () => {
+  const on = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('wsuDarkMode', on ? 'on' : 'off');
+  applyChartTheme();
+  chartInstances.forEach(c => c.update());
+});
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+applyChartTheme();
+
+const C = { primary:'#981e32', primaryLight:'rgba(152,30,50,0.15)', blue:'#2563eb',
+            blueLight:'rgba(37,99,235,0.18)', accent:'#c69214', green:'#059669', red:'#dc2626' };
+const fmtM = v => '$' + (v/1e6).toFixed(1) + 'M';
+const fmtNum = v => Math.round(v).toLocaleString('en-US');
+
+fetch('data-forecast-demo.json').then(r => r.json()).then(D => {
+  document.getElementById('lastUpdated').textContent = D.lastUpdated;
+
+  // KPIs
+  const kpis = [
+    { label:'Volume stability (CV)', value: D.stability.cvMMBTU + '%', sub:'annual MMBTU variation, FY20-FY25' },
+    { label:'Cost volatility (CV)', value: D.stability.cvCost + '%', sub: (D.stability.cvCost/D.stability.cvMMBTU).toFixed(1) + '× more volatile than volume' },
+    { label:'Gas volume vs weather', value: 'R² ' + D.regression.r2.toFixed(2), sub: D.regression.slope + ' MMBTU per heating degree day' },
+    { label:'FY23 miss from price', value: Math.round(D.fy23Decomp.priceEffect / (D.fy23Decomp.priceEffect + Math.abs(D.fy23Decomp.volumeEffect)) * 100) + '%', sub: fmtM(D.fy23Decomp.priceEffect) + ' price vs ' + fmtM(D.fy23Decomp.volumeEffect) + ' volume' },
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k =>
+    '<div class="kpi-card"><div class="kpi-label">' + k.label + '</div>' +
+    '<div class="kpi-value">' + k.value + '</div><div class="kpi-sub">' + k.sub + '</div></div>').join('');
+
+  // 1. Backtest
+  chartInstances.push(new Chart(document.getElementById('chartBacktest'), {
+    type: 'bar',
+    data: { labels: D.backtest.map(b => b.fy),
+      datasets: [{ label: 'Forecast miss (actual vs 5-yr-avg forecast)',
+        data: D.backtest.map(b => b.missPct),
+        backgroundColor: D.backtest.map(b => Math.abs(b.missPct) > 10 ? C.red : C.primary), borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => {
+          const b = D.backtest[ctx.dataIndex];
+          return ['Actual ' + fmtM(b.actual) + ' vs forecast ' + fmtM(b.forecast),
+                  'Miss: ' + (b.missPct >= 0 ? '+' : '') + b.missPct + '%'];
+        } } } },
+      scales: { y: { title: { display: true, text: '% over (+) / under (-) forecast' },
+        ticks: { callback: v => v + '%' } } } }
+  }));
+
+  // 2. Scatter + regression line
+  const reg = D.regression;
+  const xMax = Math.max(...reg.points.map(p => p.x));
+  chartInstances.push(new Chart(document.getElementById('chartScatter'), {
+    data: { datasets: [
+      { type: 'scatter', label: 'Monthly gas use vs HDD (FY20-FY25)',
+        data: reg.points.map(p => ({ x: p.x, y: p.y, l: p.l })),
+        backgroundColor: 'rgba(152,30,50,0.55)', pointRadius: 4 },
+      { type: 'line', label: 'Fit: ' + reg.slope + ' MMBTU/HDD',
+        data: [{ x: 0, y: reg.intercept }, { x: xMax, y: reg.intercept + reg.slope * xMax }],
+        borderColor: C.blue, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx =>
+        ctx.raw.l ? ctx.raw.l + ': ' + fmtNum(ctx.raw.y) + ' MMBTU at ' + ctx.raw.x + ' HDD'
+                  : 'fit line' } } },
+      scales: { x: { title: { display: true, text: 'Monthly heating degree days (KPUW)' } },
+                y: { title: { display: true, text: 'Monthly gas use (MMBTU)' }, ticks: { callback: v => fmtNum(v) } } } }
+  }));
+  document.getElementById('regLede').textContent =
+    'Every actual month FY2020 through FY2025, gas MMBTU against heating degree days. R² = ' +
+    reg.r2.toFixed(3) + ': weather explains ' + Math.round(reg.r2 * 100) +
+    '% of monthly gas volume. Forecast the volume at 30-year-normal weather and the stable half of the problem is solved.';
+
+  // 3. FY23 decomposition
+  const dc = D.fy23Decomp;
+  chartInstances.push(new Chart(document.getElementById('chartDecomp'), {
+    type: 'bar',
+    data: { labels: ['Total miss', 'Price effect', 'Volume effect'],
+      datasets: [{ data: [dc.missTotal, dc.priceEffect, dc.volumeEffect],
+        backgroundColor: [C.primary, C.red, C.green], borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fmtM(ctx.raw) } } },
+      scales: { x: { ticks: { callback: v => fmtM(v) } } } }
+  }));
+  document.getElementById('decompLede').textContent =
+    'FY2023 came in ' + fmtM(dc.missTotal) + ' over forecast. Splitting that miss: blended price ran $' +
+    dc.actRate + '/MMBTU against a $' + dc.fcRate + ' forecast (' + fmtM(dc.priceEffect) +
+    '), while volume was actually BELOW forecast (' + fmtM(dc.volumeEffect) +
+    '). A volume model cannot fix a price miss; a hedge-book price can.';
+
+  // 4. Hedge coverage
+  chartInstances.push(new Chart(document.getElementById('chartHedge'), {
+    data: { labels: D.hedge.map(h => h.label),
+      datasets: [
+        { type: 'bar', label: 'Hedged (fixed-price packages)', data: D.hedge.map(h => h.hedgedDths),
+          backgroundColor: C.primary, stack: 's', borderRadius: 2, yAxisID: 'y' },
+        { type: 'bar', label: 'Swing (market)', data: D.hedge.map(h => Math.max(0, h.usageDths - h.hedgedDths)),
+          backgroundColor: 'rgba(198,146,20,0.45)', stack: 's', borderRadius: 2, yAxisID: 'y' },
+        { type: 'line', label: 'Weighted hedge price ($/Dth)', data: D.hedge.map(h => h.wtdHedgePrice),
+          borderColor: C.blue, borderWidth: 2.5, pointRadius: 4, tension: 0.3, yAxisID: 'y1' }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx =>
+        ctx.dataset.yAxisID === 'y1' ? '$' + ctx.raw.toFixed(2) + '/Dth' :
+        ctx.dataset.label + ': ' + fmtNum(ctx.raw) + ' Dths' } } },
+      scales: { x: { stacked: true },
+        y: { stacked: true, title: { display: true, text: 'Dths' }, ticks: { callback: v => fmtNum(v) } },
+        y1: { position: 'right', grid: { drawOnChartArea: false },
+              title: { display: true, text: '$/Dth' }, ticks: { callback: v => '$' + v } } } }
+  }));
+}).catch(e => {
+  document.querySelector('.container').innerHTML =
+    '<div class="card"><h2>Could not load data</h2><p>' + e.message + '</p></div>';
+});
+</script>
+</body>
+</html>

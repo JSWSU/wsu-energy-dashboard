@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rates Development Demonstration — Cost Basis &amp; Fuel Series</title>
+<style>
+:root {
+  --primary: #981e32; --primary-dark: #7a1828; --secondary: #5f6b6d;
+  --accent: #c69214; --bg: #f5f5f5; --card-bg: #fff; --text: #2d2d2d;
+  --text-light: #6b7280; --border: #e5e7eb; --green: #059669; --red: #dc2626;
+  --blue: #2563eb; --table-head-bg: #f9fafb; --table-hover: #f9fafb;
+  --info-bg: #f0f9ff; --info-border: #bae6fd; --info-text: #0c4a6e;
+}
+html.dark {
+  --bg: #111827; --card-bg: #1f2937; --text: #e5e7eb; --text-light: #9ca3af;
+  --border: #374151; --green: #34d399; --red: #f87171;
+  --table-head-bg: #1a2332; --table-hover: #253347;
+  --info-bg: #1e293b; --info-border: #334155; --info-text: #7dd3fc;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); }
+header { background:var(--primary); color:#fff; padding:18px 28px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+header h1 { font-size:21px; }
+header .sub { font-size:12.5px; opacity:.85; margin-top:3px; }
+.container { max-width:1200px; margin:0 auto; padding:18px 24px 40px; }
+.card { background:var(--card-bg); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:20px 22px; margin-bottom:18px; }
+.card h2 { color:var(--primary); font-size:17px; margin-bottom:6px; }
+html.dark .card h2 { color:var(--accent); }
+.card .lede { font-size:13.5px; color:var(--text-light); line-height:1.6; margin-bottom:14px; }
+.chart-container { position:relative; height:330px; }
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:18px; }
+.kpi-card { background:var(--card-bg); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:15px 18px; border-left:4px solid var(--primary); }
+.kpi-label { font-size:11.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-light); }
+.kpi-value { font-size:24px; font-weight:700; margin:4px 0 2px; }
+.kpi-sub { font-size:12px; color:var(--text-light); }
+.info-box { font-size:13px; color:var(--text-light); background:var(--info-bg); border:1px solid var(--info-border); border-radius:6px; padding:10px 14px; margin-bottom:16px; line-height:1.6; }
+.info-box b { color:var(--info-text); }
+.btn-row { display:flex; justify-content:space-between; align-items:center; margin:0 0 14px; flex-wrap:wrap; gap:8px; }
+.btn { display:inline-block; background:var(--primary); color:#fff; padding:8px 18px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+.btn.gold { background:var(--accent); }
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13.5px; }
+th { background:var(--table-head-bg); text-align:right; padding:9px 12px; border-bottom:2px solid var(--border); font-size:12px; text-transform:uppercase; letter-spacing:.3px; color:var(--text-light); }
+th:first-child, td:first-child { text-align:left; }
+td { padding:8px 12px; text-align:right; border-bottom:1px solid var(--border); }
+tr:hover td { background:var(--table-hover); }
+.fcast { color:var(--blue); font-style:italic; }
+.plan ol { margin:8px 0 4px 22px; font-size:13.5px; line-height:1.85; }
+.plan li b { color:var(--primary); }
+html.dark .plan li b { color:var(--accent); }
+.dark-toggle { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+.dark-toggle-switch { width:38px; height:20px; border-radius:10px; background:rgba(255,255,255,.35); border:none; cursor:pointer; position:relative; }
+.dark-toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .2s; }
+html.dark .dark-toggle-switch::after { transform:translateX(18px); }
+footer { text-align:center; font-size:12px; color:var(--text-light); padding:18px 0 26px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Rates Development Demonstration</h1>
+    <div class="sub">Cost-basis options and fuel-specific series for the FY2028 rate cycle &bull; <span id="lastUpdated">…</span></div>
+  </div>
+  <div class="dark-toggle">
+    <span>Dark Mode</span>
+    <button class="dark-toggle-switch" id="darkToggle" aria-label="Toggle dark mode"></button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="btn-row">
+    <a class="btn" href="forecast-demo.html">&larr; Forecasting Demonstration</a>
+    <a class="btn gold" href="trends.html">Multi-Year Trends</a>
+    <a class="btn" href="index.html">FY2026 report &rarr;</a>
+  </div>
+
+  <div class="info-box"><b>The question this page answers:</b> when internal utility rates are rebuilt
+    each fall, what cost basis should they stand on? Eight years of history lets us simulate each
+    option against what actually happened, instead of arguing hypotheticals.</div>
+
+  <div class="kpi-grid" id="kpis"></div>
+
+  <div class="card">
+    <h2>1. Spike inheritance: what each cost basis would have charged</h2>
+    <div class="lede">Simulated rule: rates for year N are set from the blended $/MMBTU of the prior
+      1, 2, or 3 years. The solid line is what cost actually did. A single-year basis tracks best in
+      calm years and passes the FY2023 spike straight into FY2024 rates; smoothing buys stability at
+      the cost of lag. This is a real tradeoff, and now it is a measured one.</div>
+    <div class="chart-container"><canvas id="chartBasis"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>2. The simulation, year by year</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Rate Year</th><th>Realized $/MMBTU</th><th>1-yr basis</th><th>2-yr basis</th><th>3-yr basis</th><th>Best</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <h2>3. Rates need fuel-specific series, and we have them</h2>
+    <div class="lede">Blended $/MMBTU hides opposite stories: electric cost per unit is steady and
+      tariff-driven, while gas is where every shock lives. Steam and gas rates should ride the gas
+      series; electric rates the tariff series. Monthly splits exist back to FY2015 in the archives.</div>
+    <div class="chart-container"><canvas id="chartFuel"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>4. The FY2028 gas basis is largely already contracted</h2>
+    <div class="lede">The Kinect hedge book fixes most gas volume at known prices (FY2026 coverage
+      shown below). For the FY2028 rate build this means the gas component can be priced from actual
+      forward contracts plus a quantified swing exposure, instead of extrapolating history.</div>
+    <div class="chart-container"><canvas id="chartHedge"></canvas></div>
+  </div>
+
+  <div class="card plan">
+    <h2>5. Rollout plan (feeds the October 2026 FY28 rate kickoff)</h2>
+    <ol>
+      <li><b>Keep the locked philosophy, test the basis.</b> FY-2 volumes + FY-1 costs stays the
+        default; bring the 2-yr-basis simulation to Kate and Phil as a measured alternative with
+        this page as the exhibit.</li>
+      <li><b>Add a true-up mechanism.</b> Whatever basis is chosen, an explicit annual
+        reconciliation (realized vs charged, rolled into next year) caps the damage of any FY23-style
+        year. Simulate its behavior on this history first.</li>
+      <li><b>Split the rate build by fuel.</b> Steam/gas rates from the gas series + hedge-book
+        forward prices; electric rates from the Avista tariff + realized campus $/kWh.</li>
+      <li><b>Publish rate adequacy.</b> One standing chart: internal billed rate vs realized cost
+        per unit, updated annually, so drift is visible before it compounds.</li>
+      <li><b>Document the seasonality cross-subsidy.</b> Winter months cost 2-3&times; summer;
+        keep flat annual rates if desired, but record the shape so the choice is deliberate.</li>
+    </ol>
+  </div>
+</div>
+
+<footer>WSU Facilities Services &bull; Rates Development Demonstration &bull; companion: <a href="forecast-demo.html">Forecasting Demonstration</a></footer>
+
+<script src="chart.umd.min.js"></script>
+<script>
+const chartInstances = [];
+function applyChartTheme() {
+  const dark = document.documentElement.classList.contains('dark');
+  Chart.defaults.color = dark ? '#9ca3af' : '#6b7280';
+  Chart.defaults.borderColor = dark ? '#374151' : '#e5e7eb';
+}
+if (localStorage.getItem('wsuDarkMode') === 'on') document.documentElement.classList.add('dark');
+document.getElementById('darkToggle').addEventListener('click', () => {
+  const on = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('wsuDarkMode', on ? 'on' : 'off');
+  applyChartTheme();
+  chartInstances.forEach(c => c.update());
+});
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+applyChartTheme();
+
+const C = { primary:'#981e32', blue:'#2563eb', accent:'#c69214', green:'#059669',
+            red:'#dc2626', gray:'#6b7280' };
+const fmtNum = v => Math.round(v).toLocaleString('en-US');
+
+fetch('data-rates-demo.json').then(r => r.json()).then(D => {
+  document.getElementById('lastUpdated').textContent = D.lastUpdated;
+
+  // Worst-year error per basis (spike exposure)
+  const worst = {};
+  [1,2,3].forEach(n => {
+    let w = 0;
+    D.sims.forEach(s => {
+      if (s.realized && !s.isForecast && s['basis'+n]) {
+        w = Math.max(w, Math.abs(s['basis'+n] - s.realized) / s.realized * 100);
+      }
+    });
+    worst[n] = w.toFixed(1);
+  });
+
+  const kpis = [
+    { label:'1-yr basis: avg | worst error', value: D.basisSummary["1"] + '% | ' + worst[1] + '%', sub:'most accurate on average, full spike exposure' },
+    { label:'2-yr basis: avg | worst error', value: D.basisSummary["2"] + '% | ' + worst[2] + '%', sub:'the measured middle ground' },
+    { label:'3-yr basis: avg | worst error', value: D.basisSummary["3"] + '% | ' + worst[3] + '%', sub:'most stable, slowest to track real cost' },
+    { label:'FY26 hedge coverage', value: Math.round(D.hedgeFwd.months.reduce((a,m)=>a+m.hedgedPct,0)/D.hedgeFwd.months.length) + '%', sub:'of gas volume at known fixed prices' },
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k =>
+    '<div class="kpi-card"><div class="kpi-label">' + k.label + '</div>' +
+    '<div class="kpi-value">' + k.value + '</div><div class="kpi-sub">' + k.sub + '</div></div>').join('');
+
+  // 1. Basis simulation
+  chartInstances.push(new Chart(document.getElementById('chartBasis'), {
+    type: 'line',
+    data: { labels: D.sims.map(s => s.fy), datasets: [
+      { label: 'Realized cost', data: D.sims.map(s => s.realized),
+        borderColor: C.primary, borderWidth: 3, pointRadius: 4, tension: 0.25,
+        pointStyle: D.sims.map(s => s.isForecast ? 'rectRot' : 'circle') },
+      { label: '1-yr basis rate', data: D.sims.map(s => s.basis1),
+        borderColor: C.red, borderDash: [4,3], borderWidth: 1.8, pointRadius: 2, tension: 0.25 },
+      { label: '2-yr basis rate', data: D.sims.map(s => s.basis2),
+        borderColor: C.blue, borderDash: [6,4], borderWidth: 1.8, pointRadius: 2, tension: 0.25 },
+      { label: '3-yr basis rate', data: D.sims.map(s => s.basis3),
+        borderColor: C.gray, borderDash: [2,3], borderWidth: 1.8, pointRadius: 2, tension: 0.25 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + (ctx.raw ?? 0).toFixed(2) + '/MMBTU' } } },
+      scales: { y: { title: { display: true, text: '$/MMBTU' }, ticks: { callback: v => '$' + v } } } }
+  }));
+
+  // 2. Table
+  const tb = document.getElementById('tbody');
+  D.sims.forEach(s => {
+    if (!s.realized) return;
+    const errs = [1,2,3].map(n => s['basis'+n] ? Math.abs(s['basis'+n] - s.realized) : Infinity);
+    const best = ['1-yr','2-yr','3-yr'][errs.indexOf(Math.min(...errs))];
+    const tr = document.createElement('tr');
+    if (s.isForecast) tr.className = 'fcast';
+    tr.innerHTML = '<td>' + s.fy + (s.isForecast ? ' (forecast)' : '') + '</td>' +
+      '<td>$' + s.realized.toFixed(2) + '</td>' +
+      [1,2,3].map(n => '<td>' + (s['basis'+n] ? '$' + s['basis'+n].toFixed(2) : '—') + '</td>').join('') +
+      '<td>' + (s.isForecast ? '—' : best) + '</td>';
+    tb.appendChild(tr);
+  });
+
+  // 3. Fuel series
+  chartInstances.push(new Chart(document.getElementById('chartFuel'), {
+    type: 'line',
+    data: { labels: D.fuel.map(f => f.fy), datasets: [
+      { label: 'Electric $/MMBTU', data: D.fuel.map(f => f.elecRate),
+        borderColor: C.primary, borderWidth: 2.5, pointRadius: 4, tension: 0.25 },
+      { label: 'Gas $/MMBTU', data: D.fuel.map(f => f.gasRate),
+        borderColor: C.accent, borderWidth: 2.5, pointRadius: 4, tension: 0.25 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + ctx.raw.toFixed(2) } } },
+      scales: { y: { title: { display: true, text: '$/MMBTU' }, ticks: { callback: v => '$' + v } } } }
+  }));
+
+  // 4. Hedge coverage + price
+  chartInstances.push(new Chart(document.getElementById('chartHedge'), {
+    data: { labels: D.hedgeFwd.months.map(m => m.label), datasets: [
+      { type: 'bar', label: 'Hedged % of volume', data: D.hedgeFwd.months.map(m => m.hedgedPct),
+        backgroundColor: 'rgba(152,30,50,0.55)', borderRadius: 2, yAxisID: 'y' },
+      { type: 'line', label: 'Weighted hedge price ($/Dth)', data: D.hedgeFwd.months.map(m => m.wtdPrice),
+        borderColor: C.blue, borderWidth: 2.5, pointRadius: 4, tension: 0.3, yAxisID: 'y1' },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx =>
+        ctx.dataset.yAxisID === 'y1' ? '$' + ctx.raw.toFixed(2) + '/Dth' : ctx.raw + '% hedged' } } },
+      scales: { y: { min: 0, max: 130, title: { display: true, text: '% hedged' }, ticks: { callback: v => v + '%' } },
+        y1: { position: 'right', grid: { drawOnChartArea: false },
+              title: { display: true, text: '$/Dth' }, ticks: { callback: v => '$' + v } } } }
+  }));
+}).catch(e => {
+  document.querySelector('.container').innerHTML =
+    '<div class="card"><h2>Could not load data</h2><p>' + e.message + '</p></div>';
+});
+</script>
+</body>
+</html>
