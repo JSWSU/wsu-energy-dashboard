@@ -803,9 +803,11 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById(tab.dataset.tab).classList.add('active');
-    setTimeout(() => {
+    const nudgeCharts = () => {
       if (typeof chartInstances !== 'undefined') chartInstances.forEach(c => { try { c.resize(); c.update('none'); } catch(e){} });
-    }, 60);
+    };
+    setTimeout(nudgeCharts, 60);
+    setTimeout(nudgeCharts, 350);
   });
 });
 
