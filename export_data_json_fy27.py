@@ -323,16 +323,16 @@ def main() -> int:
             "fy27mmbtu": read_col(ws_exec, 127, 138, 6),
             "mmbtuDelta": read_col(ws_exec, 127, 138, 7),
             "mmbtuDeltaPct": read_col_pct(ws_exec, 127, 138, 8),
-            "fy26hdd": read_col(ws_exec, 127, 138, 9),
-            "fy27hdd": read_col(ws_exec, 127, 138, 10),
+            "fy26hdd": read_col(ws_hdd, 6, 17, 4),
+            "fy27hdd": read_col(ws_hdd, 6, 17, 8),
             "hddDeltaPct": read_col_pct_text(ws_exec, 127, 138, 11),
             "normalHdd": read_col(ws_exec, 127, 138, 12),
         }
 
-        # HDD: col C = FY26 (was FY25), col D = FY27 (was FY26)
+        # HDD sheet: col C = FY2025, col D = FY2026, col E = 30-yr normal, col H = FY2027
         hdd = {
-            "fy26": read_col(ws_hdd, 6, 17, 3),
-            "fy27": read_col(ws_hdd, 6, 17, 4),
+            "fy26": read_col(ws_hdd, 6, 17, 4),
+            "fy27": read_col(ws_hdd, 6, 17, 8),
             "normal": read_col(ws_hdd, 6, 17, 5),
         }
 

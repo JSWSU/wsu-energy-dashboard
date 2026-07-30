@@ -129,7 +129,7 @@ def main() -> int:
                 "dataNote": ("All figures from the archived Energy Cost Projection Report "
                              "July 2025. FY2024 comparison data on the Year-over-Year and "
                              "Price-vs-Volume tabs is approximate for Jul-Nov 2023 "
-                             "(summary-level source rows); FY2024 HDD was not tracked."),
+                             "(summary-level source rows)."),
             },
         }
 
@@ -185,7 +185,9 @@ def main() -> int:
         # ---- HDD: sheet cols C=FY25, D=FY26, E=normal ----
         hdd_cur = [int(_num(ws_hdd.Cells(r, 3).Value)) for r in range(6, 18)]   # sheet col C = FY25
         hdd_n = [int(_num(ws_hdd.Cells(r, 5).Value)) for r in range(6, 18)]
-        hdd_prior = [0] * 12   # FY2024 HDD not tracked
+        import json as _json
+        _sidecar = Path(r"C:\Users\john.slagboom\Desktop\Git\hdd-fy24.json")
+        hdd_prior = _json.loads(_sidecar.read_text())["fy24"]   # FY2024 HDD from ACIS API
         hdd = {"fy26": hdd_prior, "fy27": hdd_cur, "normal": hdd_n}
         hdd_25 = hdd_prior   # variance section prior slot
         hdd_26 = hdd_cur     # variance section current slot

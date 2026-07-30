@@ -658,11 +658,11 @@
 // ==================== FISCAL YEAR CONFIG ====================
 // >>> CHANGE THIS ONE OBJECT FOR FY ROLLOVER -- everything else reads from it <<<
 const FY = {
-  label: 'FY2027',                    // e.g. 'FY2028'
-  range: 'July 2026 \u2013 June 2027', // e.g. 'July 2027 \u2013 June 2028'
-  startYear: 2026,                     // calendar year of July (first month)
-  endYear: 2027,                       // calendar year of June (last month)
-  priorLabel: 'FY2026'                 // prior year label for YoY comparisons
+  label: 'FY2027',
+  range: 'July 2026 – June 2027',
+  startYear: 2026,
+  endYear: 2027,
+  priorLabel: 'FY2026'
 };
 const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
 const MONTHS_CUR = MONTHS.map((m,i) => m + " '" + String(i < 6 ? FY.startYear : FY.endYear).slice(-2));
@@ -770,6 +770,20 @@ const C = {
   const setH2 = (sectionId, text) => { const h = document.querySelector('#'+sectionId+' h2'); if(h) h.textContent = text; };
   setH2('monthly', FY.label+' Actuals vs Forecasts');
   const pieH = document.getElementById('pieHeader'); if (pieH) pieH.textContent = FY.label + ' Cost Distribution';
+  // Static card titles that must track the page's fiscal year
+  const setCardH2 = (canvasId, text) => {
+    const cv = document.getElementById(canvasId);
+    if (!cv) return;
+    const card = cv.closest('.card');
+    const h = card && card.querySelector('h2');
+    if (h) h.textContent = text;
+  };
+  setCardH2('chartGas25', FY.priorLabel + ' Gas MMBTU / Cost');
+  setCardH2('chartEnergyUse', FY.label + ' Energy Use: Actual vs Forecast');
+  setCardH2('chartYoY', 'Fiscal Year MMBTU Comparison (' + FY.priorLabel + ' vs ' + FY.label + ')');
+  setCardH2('chartCumulative', FY.label + ' Cumulative Cost: Actual vs Forecast');
+  setCardH2('chartVarianceCost', prShort + ' vs ' + fyShort + ' Cost Comparison');
+  setCardH2('chartVarianceMmbtu', prShort + ' vs ' + fyShort + ' MMBTU Comparison');
   // Methodology note
   const methLi = document.querySelector('#sources .notes li:last-child');
   if(methLi && methLi.textContent.includes('FY2026')) {
@@ -813,9 +827,15 @@ function initDashboard(D) {
   document.getElementById('kpiActualYTD').textContent = fmtDollarM(totalAct);
   document.getElementById('kpiForecast').textContent = fmtDollarM(totalFcast);
   // delta = forecast - actual; positive means actual spending came in UNDER forecast
-  document.getElementById('kpiDelta').textContent = fmtDollarM(Math.abs(delta)) + (delta >= 0 ? ' under' : ' over');
-  document.getElementById('kpiDeltaWrap').className = 'kpi-value ' + (delta >= 0 ? 'green' : 'red');
-  document.getElementById('kpiDeltaPct').textContent = fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' below forecast' : ' above forecast');
+  if (actualMonthCount === 0) {
+    document.getElementById('kpiDelta').textContent = '—';
+    document.getElementById('kpiDeltaWrap').className = 'kpi-value';
+    document.getElementById('kpiDeltaPct').textContent = 'No actual bills posted yet';
+  } else {
+    document.getElementById('kpiDelta').textContent = fmtDollarM(Math.abs(delta)) + (delta >= 0 ? ' under' : ' over');
+    document.getElementById('kpiDeltaWrap').className = 'kpi-value ' + (delta >= 0 ? 'green' : 'red');
+    document.getElementById('kpiDeltaPct').textContent = fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' below forecast' : ' above forecast');
+  }
   document.getElementById('kpiMMBTU').textContent = fmtNum(totalMMBTU);
   document.getElementById('kpiMMBTUSub').textContent = 'MMBTU (Elec: ' + fmtNum(totalElecMMBTU) + ' | Gas: ' + fmtNum(totalGasMMBTU) + ')';
   document.getElementById('kpiElecCost').textContent = fmtDollarM(totalElec);
