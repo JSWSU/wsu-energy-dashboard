@@ -534,8 +534,8 @@
     <div class="card"><div class="table-wrap">
       <table id="tableYoY"><thead><tr>
         <th>Month</th>
-        <th>FY25 Total</th><th>FY25 Elec</th><th>FY25 Gas</th>
-        <th>FY26 Total</th><th>FY26 Elec</th><th>FY26 Gas</th>
+        <th class="th-pr">FY25 Total</th><th class="th-pr">FY25 Elec</th><th class="th-pr">FY25 Gas</th>
+        <th class="th-cur">FY26 Total</th><th class="th-cur">FY26 Elec</th><th class="th-cur">FY26 Gas</th>
       </tr></thead><tbody></tbody></table>
     </div>
     <div class="notes"><strong>Year-over-Year Change:</strong><ul id="yoyNotes"></ul></div>
@@ -561,9 +561,9 @@
     </div>
     <div class="card"><h2>Price vs Volume Variance Analysis</h2><div class="table-wrap">
       <table id="tableVariance"><thead><tr>
-        <th>Month</th><th>FY25 Cost</th><th>FY26 Cost</th><th>$ Variance</th>
-        <th>FY25 MMBTU</th><th>FY26 MMBTU</th><th>MMBTU Var.</th><th>MMBTU %</th>
-        <th>FY25 HDD</th><th>FY26 HDD</th><th>HDD %</th><th>30-Yr Normal</th>
+        <th>Month</th><th class="th-pr">FY25 Cost</th><th class="th-cur">FY26 Cost</th><th>$ Variance</th>
+        <th class="th-pr">FY25 MMBTU</th><th class="th-cur">FY26 MMBTU</th><th>MMBTU Var.</th><th>MMBTU %</th>
+        <th class="th-pr">FY25 HDD</th><th class="th-cur">FY26 HDD</th><th>HDD %</th><th>30-Yr Normal</th>
       </tr></thead><tbody></tbody></table>
     </div></div>
   </div>
@@ -573,7 +573,7 @@
     <div class="card"><h2>Heating Degree Days - Pullman-Moscow Airport (KPUW)</h2><div class="chart-container"><canvas id="chartHDD"></canvas></div></div>
     <div class="card"><div class="table-wrap">
       <table id="tableHDD"><thead><tr>
-        <th>Month</th><th>FY2025 HDD</th><th>FY2026 HDD</th><th>30-Yr Normal</th>
+        <th>Month</th><th class="th-prl">FY2025 HDD</th><th class="th-curl">FY2026 HDD</th><th>30-Yr Normal</th>
       </tr></thead><tbody></tbody></table>
     </div>
     <div class="notes"><strong>Notes:</strong><ul>
@@ -784,6 +784,11 @@ const C = {
   setCardH2('chartCumulative', FY.label + ' Cumulative Cost: Actual vs Forecast');
   setCardH2('chartVarianceCost', prShort + ' vs ' + fyShort + ' Cost Comparison');
   setCardH2('chartVarianceMmbtu', prShort + ' vs ' + fyShort + ' MMBTU Comparison');
+  // Table headers tagged th-pr/th-cur (short FY) and th-prl/th-curl (long FY)
+  qsa('th.th-pr').forEach(el => el.textContent = el.textContent.replace(/^FY\d+/, prShort));
+  qsa('th.th-cur').forEach(el => el.textContent = el.textContent.replace(/^FY\d+/, fyShort));
+  qsa('th.th-prl').forEach(el => el.textContent = el.textContent.replace(/^FY\d+/, FY.priorLabel));
+  qsa('th.th-curl').forEach(el => el.textContent = el.textContent.replace(/^FY\d+/, FY.label));
   // Methodology note
   const methLi = document.querySelector('#sources .notes li:last-child');
   if(methLi && methLi.textContent.includes('FY2026')) {
@@ -798,6 +803,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById(tab.dataset.tab).classList.add('active');
+    if (window.chartInstances) chartInstances.forEach(c => { try { c.resize(); } catch(e){} });
   });
 });
 
