@@ -46,6 +46,13 @@ html.dark .plan li b { color:var(--accent); }
 .dark-toggle-switch { width:38px; height:20px; border-radius:10px; background:rgba(255,255,255,.35); border:none; cursor:pointer; position:relative; }
 .dark-toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .2s; }
 html.dark .dark-toggle-switch::after { transform:translateX(18px); }
+.verdict { border-left:5px solid var(--green); }
+.verdict h2 { color:var(--green) !important; }
+.verdict .big { font-size:14.5px; line-height:1.65; margin-bottom:12px; }
+.verdict ul { margin:4px 0 4px 22px; font-size:13.5px; line-height:1.9; }
+.verdict li b { color:var(--primary); }
+html.dark .verdict li b { color:var(--accent); }
+.sowhat { font-size:13.5px; font-weight:600; color:var(--info-text); background:var(--info-bg); border-left:4px solid var(--blue); border-radius:0 6px 6px 0; padding:9px 14px; margin-top:12px; line-height:1.5; }
 footer { text-align:center; font-size:12px; color:var(--text-light); padding:18px 0 26px; }
 </style>
 </head>
@@ -73,6 +80,21 @@ footer { text-align:center; font-size:12px; color:var(--text-light); padding:18p
     energy volume (which is stable and weather-driven) and price it with numbers that are already
     known (the Kinect hedge book and the published Avista tariff).</div>
 
+  <div class="card verdict">
+    <h2>Bottom line</h2>
+    <div class="big">Campus energy <b>usage</b> is so predictable it is basically solved: weather
+      explains 98% of gas use and annual volume barely moves. Every big forecast miss in the last
+      six years came from <b>price</b>, and most of next year's prices are already sitting in
+      signed contracts and published tariffs. The forecast should be rebuilt as
+      <b>predictable&nbsp;usage &times; already-known prices</b>.</div>
+    <b style="font-size:13px;">The one decision this page asks for:</b>
+    <ul>
+      <li><b>Approve a side-by-side trial.</b> Run the volume &times; price forecast next to the
+        current method on the FY2027 page for this year. Zero risk (nothing changes), small effort
+        (data is already extracted). If it tracks better by spring, it becomes the FY2028 method.</li>
+    </ul>
+  </div>
+
   <div class="kpi-grid" id="kpis"></div>
 
   <div class="card">
@@ -81,18 +103,21 @@ footer { text-align:center; font-size:12px; color:var(--text-light); padding:18p
       stored projections) worked in stable years and failed badly in the FY2023 gas spike. Averaging
       history means a price shock takes five years to propagate into the forecast.</div>
     <div class="chart-container"><canvas id="chartBacktest"></canvas></div>
+    <div class="sowhat">So what: in calm years any method works. In a gas-shock year the current method misses by $7-8M. Whatever we change must target price, because that is the only thing that has ever hurt us.</div>
   </div>
 
   <div class="card">
     <h2>2. Evidence: campus energy volume is weather</h2>
     <div class="lede" id="regLede"></div>
     <div class="chart-container"><canvas id="chartScatter"></canvas></div>
+    <div class="sowhat">So what: usage is not a guess. Put 30-year-normal weather into this line and the volume half of the forecast is done, defensibly, every year.</div>
   </div>
 
   <div class="card">
     <h2>3. Evidence: the FY2023 miss was price, not usage</h2>
     <div class="lede" id="decompLede"></div>
     <div class="chart-container" style="height:260px"><canvas id="chartDecomp"></canvas></div>
+    <div class="sowhat">So what: FY2023 is the proof. Usage came in ON forecast; price caused the entire miss. A better usage model would have fixed nothing that year.</div>
   </div>
 
   <div class="card">
@@ -102,6 +127,7 @@ footer { text-align:center; font-size:12px; color:var(--text-light); padding:18p
       Electric prices come from the published Avista tariff. Hedged volume &times; contract price is
       arithmetic, not forecasting.</div>
     <div class="chart-container"><canvas id="chartHedge"></canvas></div>
+    <div class="sowhat">So what: most of next year’s gas cost is already signed at known prices. Reading the contracts beats predicting the market, and the unhedged slice becomes a stated, quantified risk instead of a surprise.</div>
   </div>
 
   <div class="card plan">
