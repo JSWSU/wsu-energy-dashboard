@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WSU Energy Cost — Multi-Year Trends</title>
+<style>
+:root {
+  --primary: #981e32; --primary-dark: #7a1828; --secondary: #5f6b6d;
+  --accent: #c69214; --bg: #f5f5f5; --card-bg: #fff; --text: #2d2d2d;
+  --text-light: #6b7280; --border: #e5e7eb; --green: #059669; --red: #dc2626;
+  --blue: #2563eb; --table-head-bg: #f9fafb; --table-hover: #f9fafb;
+  --info-bg: #f0f9ff; --info-border: #bae6fd; --info-text: #0c4a6e;
+}
+html.dark {
+  --bg: #111827; --card-bg: #1f2937; --text: #e5e7eb; --text-light: #9ca3af;
+  --border: #374151; --green: #34d399; --red: #f87171;
+  --table-head-bg: #1a2332; --table-hover: #253347;
+  --info-bg: #1e293b; --info-border: #334155; --info-text: #7dd3fc;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); }
+header { background:var(--primary); color:#fff; padding:18px 28px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+header h1 { font-size:21px; }
+header .sub { font-size:12.5px; opacity:.85; margin-top:3px; }
+.container { max-width:1400px; margin:0 auto; padding:18px 24px 40px; }
+.card { background:var(--card-bg); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:20px 22px; margin-bottom:18px; }
+.card h2 { color:var(--primary); font-size:16px; margin-bottom:12px; }
+html.dark .card h2 { color:var(--accent); }
+.chart-container { position:relative; height:340px; }
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin-bottom:18px; }
+.kpi-card { background:var(--card-bg); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:15px 18px; border-left:4px solid var(--primary); }
+.kpi-label { font-size:11.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-light); }
+.kpi-value { font-size:24px; font-weight:700; margin:4px 0 2px; }
+.kpi-sub { font-size:12px; color:var(--text-light); }
+.info-box { font-size:12.5px; color:var(--text-light); background:var(--info-bg); border:1px solid var(--info-border); border-radius:6px; padding:9px 14px; margin-bottom:16px; line-height:1.55; }
+.info-box b { color:var(--info-text); }
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13.5px; }
+th { background:var(--table-head-bg); text-align:right; padding:9px 12px; border-bottom:2px solid var(--border); font-size:12px; text-transform:uppercase; letter-spacing:.3px; color:var(--text-light); }
+th:first-child, td:first-child { text-align:left; }
+td { padding:8px 12px; text-align:right; border-bottom:1px solid var(--border); }
+tr:hover td { background:var(--table-hover); }
+.fcast { color:var(--blue); font-style:italic; }
+.btn-row { display:flex; justify-content:space-between; align-items:center; margin:0 0 14px; flex-wrap:wrap; gap:8px; }
+.btn { display:inline-block; background:var(--primary); color:#fff; padding:8px 18px; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+.dark-toggle { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+.dark-toggle-switch { width:38px; height:20px; border-radius:10px; background:rgba(255,255,255,.35); border:none; cursor:pointer; position:relative; }
+.dark-toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .2s; }
+html.dark .dark-toggle-switch::after { transform:translateX(18px); }
+#authGate { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:99; }
+.auth-card { background:var(--card-bg); border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,.15); padding:34px 38px; text-align:center; max-width:360px; }
+.auth-card h2 { color:var(--primary); margin-bottom:8px; }
+.auth-card p { font-size:13px; color:var(--text-light); margin-bottom:16px; }
+.auth-card input { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; margin-bottom:12px; background:var(--bg); color:var(--text); }
+.auth-card button { width:100%; padding:10px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; }
+footer { text-align:center; font-size:12px; color:var(--text-light); padding:18px 0 26px; }
+</style>
+</head>
+<body>
+<div id="authGate">
+  <div class="auth-card">
+    <h2>Authorized Access Only</h2>
+    <p>Multi-Year Energy Trends &bull; WSU Facilities Services</p>
+    <input type="password" id="pw" placeholder="Password" onkeydown="if(event.key==='Enter')tryAuth()">
+    <button onclick="tryAuth()">Enter</button>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>WSU Energy Cost &amp; Use — Multi-Year Trends</h1>
+    <div class="sub">FY2020 – FY2027 &bull; Last Updated: <span id="lastUpdated">…</span></div>
+  </div>
+  <div class="dark-toggle">
+    <span>Dark Mode</span>
+    <button class="dark-toggle-switch" id="darkToggle" aria-label="Toggle dark mode"></button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="btn-row">
+    <a class="btn" href="fy25.html">&larr; FY2025 report</a>
+    <a class="btn" href="index.html">FY2026 report</a>
+    <a class="btn" href="fy27.html">FY2027 forecast &rarr;</a>
+  </div>
+
+  <div class="info-box" id="sourcesNote"></div>
+
+  <div class="kpi-grid" id="kpis"></div>
+
+  <div class="card"><h2>Annual Total Energy Cost</h2><div class="chart-container"><canvas id="chartCost"></canvas></div></div>
+  <div class="card"><h2>Annual Energy Use (MMBTU)</h2><div class="chart-container"><canvas id="chartUse"></canvas></div></div>
+  <div class="card"><h2>Blended Energy Rate ($/MMBTU)</h2><div class="chart-container"><canvas id="chartRate"></canvas></div></div>
+  <div class="card"><h2>Monthly Total Cost by Fiscal Year</h2><div class="chart-container"><canvas id="chartMonthly"></canvas></div></div>
+
+  <div class="card">
+    <h2>Annual Summary</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Fiscal Year</th><th>Total Cost</th><th>Cost vs Prior</th><th>Energy Use (MMBTU)</th><th>$/MMBTU</th><th>Notes</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<footer>WSU Facilities Services &bull; Multi-Year Energy Trends &bull; Sources on file in the Annual Elect &amp; Steam Use archives</footer>
+
+<script src="chart.umd.min.js"></script>
+<script>
+// ---- Auth (shared convention with the report pages) ----
+function tryAuth() {
+  if (document.getElementById('pw').value === 'Energy@WSU') {
+    localStorage.setItem('wsuEnergyAuth', 'yes');
+    document.getElementById('authGate').style.display = 'none';
+  }
+}
+if (localStorage.getItem('wsuEnergyAuth') === 'yes') {
+  document.getElementById('authGate').style.display = 'none';
+}
+
+// ---- Dark mode ----
+const chartInstances = [];
+function applyChartTheme() {
+  const dark = document.documentElement.classList.contains('dark');
+  Chart.defaults.color = dark ? '#9ca3af' : '#6b7280';
+  Chart.defaults.borderColor = dark ? '#374151' : '#e5e7eb';
+}
+if (localStorage.getItem('wsuDarkMode') === 'on') document.documentElement.classList.add('dark');
+document.getElementById('darkToggle').addEventListener('click', () => {
+  const on = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('wsuDarkMode', on ? 'on' : 'off');
+  applyChartTheme();
+  chartInstances.forEach(c => c.update());
+});
+
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.padding = 16;
+applyChartTheme();
+
+const fmtM = v => '$' + (v / 1e6).toFixed(1) + 'M';
+const fmtDollar = v => '$' + Math.round(v).toLocaleString('en-US');
+const fmtNum = v => Math.round(v).toLocaleString('en-US');
+const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
+
+fetch('data-trends.json').then(r => r.json()).then(D => {
+  document.getElementById('lastUpdated').textContent = D.lastUpdated;
+  const FYS = Object.keys(D.annual).sort();
+  const annual = FYS.map(fy => D.annual[fy]);
+  const isF = annual.map(a => a.forecast);
+
+  document.getElementById('sourcesNote').innerHTML =
+    '<b>About this page:</b> ' + D.notes.sources +
+    ' <b>FY2026:</b> ' + D.notes.FY2026 + ' <b>FY2027:</b> ' + D.notes.FY2027;
+
+  // KPIs
+  const actuals = FYS.filter((fy, i) => !isF[i]);
+  const costs = actuals.map(fy => D.annual[fy].cost);
+  const peakFY = actuals[costs.indexOf(Math.max(...costs))];
+  const lowFY = actuals[costs.indexOf(Math.min(...costs))];
+  const kpis = [
+    { label: 'Years Covered', value: FYS.length, sub: FYS[0] + ' – ' + FYS[FYS.length-1] + ' (FY27 forecast)' },
+    { label: 'Avg Annual Cost (actual years)', value: fmtM(costs.reduce((a,b)=>a+b,0) / costs.length), sub: actuals.length + ' complete years' },
+    { label: 'Peak Cost Year', value: peakFY, sub: fmtM(D.annual[peakFY].cost) + ' — natural gas price spike' },
+    { label: 'Lowest Cost Year', value: lowFY, sub: fmtM(D.annual[lowFY].cost) },
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k =>
+    '<div class="kpi-card"><div class="kpi-label">' + k.label + '</div>' +
+    '<div class="kpi-value">' + k.value + '</div><div class="kpi-sub">' + k.sub + '</div></div>').join('');
+
+  const C = { primary: '#981e32', primaryLight: 'rgba(152,30,50,0.15)', blue: '#2563eb',
+              blueLight: 'rgba(37,99,235,0.18)', accent: '#c69214', gray: '#6b7280' };
+  const barColors = isF.map(f => f ? C.blueLight : C.primary);
+  const barBorders = isF.map(f => f ? C.blue : C.primary);
+
+  chartInstances.push(new Chart(document.getElementById('chartCost'), {
+    type: 'bar',
+    data: { labels: FYS, datasets: [{ label: 'Total Cost', data: annual.map(a => a.cost),
+      backgroundColor: barColors, borderColor: barBorders, borderWidth: isF.map(f => f ? 1.5 : 0), borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fmtDollar(ctx.raw) + (isF[ctx.dataIndex] ? ' (forecast)' : '') } } },
+      scales: { y: { ticks: { callback: v => fmtM(v) } } } }
+  }));
+
+  chartInstances.push(new Chart(document.getElementById('chartUse'), {
+    type: 'bar',
+    data: { labels: FYS, datasets: [{ label: 'MMBTU', data: annual.map(a => a.mmbtu),
+      backgroundColor: isF.map(f => f ? 'rgba(198,146,20,0.2)' : C.accent),
+      borderColor: C.accent, borderWidth: isF.map(f => f ? 1.5 : 0), borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fmtNum(ctx.raw) + ' MMBTU' + (isF[ctx.dataIndex] ? ' (forecast)' : '') } } },
+      scales: { y: { ticks: { callback: v => fmtNum(v) } } } }
+  }));
+
+  chartInstances.push(new Chart(document.getElementById('chartRate'), {
+    type: 'line',
+    data: { labels: FYS, datasets: [{ label: '$/MMBTU', data: annual.map(a => a.rate),
+      borderColor: C.primary, backgroundColor: C.primaryLight, fill: true,
+      pointRadius: annual.map((a,i) => isF[i] ? 6 : 4),
+      pointStyle: annual.map((a,i) => isF[i] ? 'rectRot' : 'circle'),
+      pointBackgroundColor: annual.map((a,i) => isF[i] ? C.blue : C.primary), tension: 0.3, borderWidth: 2.5 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => '$' + ctx.raw.toFixed(2) + '/MMBTU' + (isF[ctx.dataIndex] ? ' (forecast)' : '') } } },
+      scales: { y: { ticks: { callback: v => '$' + v } } } }
+  }));
+
+  // Monthly cost lines: older years muted, last two actual years + forecast highlighted
+  const muted = ['#c7ccd1', '#aeb6bd', '#959fa8', '#7d8994', '#657380'];
+  const mds = FYS.map((fy, i) => {
+    const rec = D.years[fy];
+    const isFor = isF[i];
+    const recent = i >= FYS.length - 3;
+    return {
+      label: fy + (isFor ? ' (forecast)' : ''),
+      data: rec.cost,
+      borderColor: isFor ? C.blue : (fy === 'FY2026' ? C.primary : (fy === 'FY2025' ? C.accent : muted[i % muted.length])),
+      borderDash: isFor ? [6, 4] : [],
+      borderWidth: recent ? 2.5 : 1.3,
+      pointRadius: recent ? 3 : 0,
+      tension: 0.3, fill: false,
+    };
+  });
+  chartInstances.push(new Chart(document.getElementById('chartMonthly'), {
+    type: 'line', data: { labels: MONTHS, datasets: mds },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtDollar(ctx.raw) } } },
+      scales: { y: { ticks: { callback: v => fmtM(v) } } } }
+  }));
+
+  // Table
+  const tb = document.getElementById('tbody');
+  FYS.forEach((fy, i) => {
+    const a = D.annual[fy];
+    const prev = i > 0 ? D.annual[FYS[i-1]].cost : null;
+    const dPct = prev ? ((a.cost - prev) / prev * 100) : null;
+    const note = fy === 'FY2026' ? 'June partial' : (a.forecast ? 'Forecast' : '');
+    const tr = document.createElement('tr');
+    if (a.forecast) tr.className = 'fcast';
+    tr.innerHTML = '<td>' + fy + '</td><td>' + fmtDollar(a.cost) + '</td>' +
+      '<td>' + (dPct === null ? '—' : (dPct >= 0 ? '+' : '') + dPct.toFixed(1) + '%') + '</td>' +
+      '<td>' + fmtNum(a.mmbtu) + '</td><td>$' + a.rate.toFixed(2) + '</td><td>' + note + '</td>';
+    tb.appendChild(tr);
+  });
+}).catch(e => {
+  document.querySelector('.container').innerHTML =
+    '<div class="card"><h2>Could not load data</h2><p>' + e.message + '</p></div>';
+});
+</script>
+</body>
+</html>
