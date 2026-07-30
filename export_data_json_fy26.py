@@ -171,11 +171,11 @@ def main() -> int:
         ca, cf, cma, cmf = cum(act), cum(fca), cum(mact), cum(mfc)
         cumul = {
             "actual": ca, "forecast": cf,
-            "delta": [a - f for a, f in zip(ca, cf)],
-            "deltaPct": [round((a - f) / f * 100, 1) if f else 0.0 for a, f in zip(ca, cf)],
+            "delta": [f - a for a, f in zip(ca, cf)],
+            "deltaPct": [round((f - a) / f * 100, 1) if f else 0.0 for a, f in zip(ca, cf)],
             "mmbtuAct": cma, "mmbtuFcast": cmf,
-            "mmbtuDelta": [a - f for a, f in zip(cma, cmf)],
-            "mmbtuDeltaPct": [round((a - f) / f * 100, 1) if f else 0.0 for a, f in zip(cma, cmf)],
+            "mmbtuDelta": [f - a for a, f in zip(cma, cmf)],
+            "mmbtuDeltaPct": [round((f - a) / f * 100, 1) if f else 0.0 for a, f in zip(cma, cmf)],
         }
 
         # ---- HDD: sheet cols C=FY25, D=FY26, E=normal ----

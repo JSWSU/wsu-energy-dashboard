@@ -306,12 +306,12 @@ def main() -> int:
         cumul = {
             "actual": cum_a,
             "forecast": cum_f,
-            "delta": [a - f for a, f in zip(cum_a, cum_f)],
-            "deltaPct": [round((a - f) / f * 100, 1) if f else 0.0 for a, f in zip(cum_a, cum_f)],
+            "delta": [f - a for a, f in zip(cum_a, cum_f)],
+            "deltaPct": [round((f - a) / f * 100, 1) if f else 0.0 for a, f in zip(cum_a, cum_f)],
             "mmbtuAct": cum_ma,
             "mmbtuFcast": cum_mf,
-            "mmbtuDelta": [a - f for a, f in zip(cum_ma, cum_mf)],
-            "mmbtuDeltaPct": [round((a - f) / f * 100, 1) if f else 0.0 for a, f in zip(cum_ma, cum_mf)],
+            "mmbtuDelta": [f - a for a, f in zip(cum_ma, cum_mf)],
+            "mmbtuDeltaPct": [round((f - a) / f * 100, 1) if f else 0.0 for a, f in zip(cum_ma, cum_mf)],
         }
 
         # Variance: rows 127-138, prior=FY26 (col B/E/I), current=FY27 (col C/F/J)
