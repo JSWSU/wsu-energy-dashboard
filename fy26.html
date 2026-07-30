@@ -834,12 +834,13 @@ function initDashboard(D) {
   }
 
   // --- Determine actual vs forecast months ---
-  // A month is "actual" if the totalActual differs from totalFcast (actuals replaced forecast)
-  const isActual = [];
-  for (let i = 0; i < 12; i++) {
-    isActual.push(fy27.totalActual[i] !== fy27.totalFcast[i]);
-  }
+  // Explicit flags from the exporter (workbook IsComplete row); fall back to
+  // value comparison for older data.json files.
+  const isActual = fy27.isActual || fy27.totalActual.map((v, i) => v !== fy27.totalFcast[i]);
   const actualMonthCount = isActual.filter(Boolean).length;
+  // Mask helper: actual-series value only where real bills exist, else null
+  // (Chart.js skips null bars/points, so forecast-only months show no actual)
+  const maskAct = arr => arr.map((v, i) => isActual[i] ? v : null);
 
   // --- Budget Status Banner ---
   const banner = document.getElementById('budgetBanner');
@@ -957,7 +958,7 @@ function initDashboard(D) {
   // --- Dashboard Charts ---
   chartInstances.push(new Chart(document.getElementById('chartMonthly'), {
     type:'bar', data:{ labels:MONTHS_CUR, datasets:[
-      {label:'Actual',data:fy27.totalActual,backgroundColor:C.primary,borderRadius:3},
+      {label:'Actual',data:maskAct(fy27.totalActual),backgroundColor:C.primary,borderRadius:3},
       {label:'Forecast',data:fy27.totalFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1.5,borderRadius:3}
     ]}, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollar(ctx.raw)}}},
@@ -966,8 +967,8 @@ function initDashboard(D) {
 
   chartInstances.push(new Chart(document.getElementById('chartBreakdown'), {
     type:'bar', data:{ labels:MONTHS_CUR, datasets:[
-      {label:'Electric (Actual)',data:fy27.elecActual,backgroundColor:C.primary,stack:'actual',borderRadius:2},
-      {label:'Gas (Actual)',data:fy27.gasActual,backgroundColor:C.accent,stack:'actual',borderRadius:2},
+      {label:'Electric (Actual)',data:maskAct(fy27.elecActual),backgroundColor:C.primary,stack:'actual',borderRadius:2},
+      {label:'Gas (Actual)',data:maskAct(fy27.gasActual),backgroundColor:C.accent,stack:'actual',borderRadius:2},
       {label:'Electric (Forecast)',data:fy27.elecFcast,backgroundColor:C.blueLight,borderColor:C.blue,borderWidth:1,stack:'forecast',borderRadius:2},
       {label:'Gas (Forecast)',data:fy27.gasFcast,backgroundColor:'rgba(198,146,20,0.2)',borderColor:C.accent,borderWidth:1,stack:'forecast',borderRadius:2}
     ]}, options:{responsive:true,maintainAspectRatio:false,
@@ -977,8 +978,8 @@ function initDashboard(D) {
 
   chartInstances.push(new Chart(document.getElementById('chartMMBTU'), {
     type:'bar', data:{ labels:MONTHS_CUR, datasets:[
-      {label:'Electric MMBTU',data:energyUse.elecActual,backgroundColor:C.primary,stack:'s1',borderRadius:2},
-      {label:'Gas MMBTU',data:energyUse.gasActual,backgroundColor:C.accent,stack:'s1',borderRadius:2}
+      {label:'Electric MMBTU',data:maskAct(energyUse.elecActual),backgroundColor:C.primary,stack:'s1',borderRadius:2},
+      {label:'Gas MMBTU',data:maskAct(energyUse.gasActual),backgroundColor:C.accent,stack:'s1',borderRadius:2}
     ]}, options:{responsive:true,maintainAspectRatio:false,
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtNum(ctx.raw)}}},
       scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}
@@ -994,14 +995,35 @@ function initDashboard(D) {
       plugins:{tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmtDollarM(ctx.raw)+' ('+(ctx.raw/pieTotal*100).toFixed(1)+'%)'}},legend:{position:'bottom'}}}
   }));
 
+  // --- Leadership chart: FY Total Energy Spend, Cumulative: Actual v. Forecast ---
+  (function addLeadershipChart(){
+    const sec = document.getElementById('dashboard');
+    if (!sec) return;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<h2>' + FY.label + ' Total Energy Spend, Cumulative Total ($USD): Actual v. Forecast</h2>' +
+      '<div class="chart-container"><canvas id="chartCumulBars"></canvas></div>';
+    sec.appendChild(card);
+    chartInstances.push(new Chart(document.getElementById('chartCumulBars'), {
+      type:'bar', data:{ labels:MONTHS_CUR, datasets:[
+        {label:'Total Energy $ Actual',data:maskAct(cumul.actual),backgroundColor:C.primary,borderRadius:2},
+        {label:'Total Energy $ Forecast',data:cumul.forecast,backgroundColor:'#6b7280',borderRadius:2}
+      ]}, options:{responsive:true,maintainAspectRatio:false,
+        plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollar(ctx.raw)}}},
+        scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(0)+'M'}}}}
+    }));
+  })();
+
   // --- Monthly Detail Table ---
   const tb1 = document.querySelector('#tableMonthly tbody');
   for(let i=0;i<12;i++){const tr=document.createElement('tr');
     if(!isActual[i]) tr.className='forecast-row';
-    tr.innerHTML=`<td>${MONTH_FULL[i]}</td><td>${fmtDollar(fy27.totalActual[i])}</td><td>${fmtDollar(fy27.elecActual[i])}</td><td>${fmtDollar(fy27.gasActual[i])}</td><td class="forecast">${fmtDollar(fy27.totalFcast[i])}</td><td class="forecast">${fmtDollar(fy27.elecFcast[i])}</td><td class="forecast">${fmtDollar(fy27.gasFcast[i])}</td><td class="forecast">${fmtDollar(fy27.kintecFcast[i])}</td><td class="forecast">${fmtDollar(fy27.avistaFcast[i])}</td><td>${fy27.hedge}%</td>`;
+    const dA=v=>isActual[i]?fmtDollar(v):'—';
+    tr.innerHTML=`<td>${MONTH_FULL[i]}</td><td>${dA(fy27.totalActual[i])}</td><td>${dA(fy27.elecActual[i])}</td><td>${dA(fy27.gasActual[i])}</td><td class="forecast">${fmtDollar(fy27.totalFcast[i])}</td><td class="forecast">${fmtDollar(fy27.elecFcast[i])}</td><td class="forecast">${fmtDollar(fy27.gasFcast[i])}</td><td class="forecast">${fmtDollar(fy27.kintecFcast[i])}</td><td class="forecast">${fmtDollar(fy27.avistaFcast[i])}</td><td>${fy27.hedge}%</td>`;
     tb1.appendChild(tr);}
   const tr1=document.createElement('tr');tr1.className='total-row';
-  tr1.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(totalAct)}</td><td>${fmtDollar(totalElec)}</td><td>${fmtDollar(totalGas)}</td><td class="forecast">${fmtDollar(totalFcast)}</td><td class="forecast">${fmtDollar(sum(fy27.elecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.gasFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.kintecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.avistaFcast))}</td><td>${fy27.hedge}%</td>`;
+  const sumAct=arr=>arr.reduce((a,v,i)=>a+(isActual[i]?v:0),0);
+  tr1.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(sumAct(fy27.totalActual))}</td><td>${fmtDollar(sumAct(fy27.elecActual))}</td><td>${fmtDollar(sumAct(fy27.gasActual))}</td><td class="forecast">${fmtDollar(totalFcast)}</td><td class="forecast">${fmtDollar(sum(fy27.elecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.gasFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.kintecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.avistaFcast))}</td><td>${fy27.hedge}%</td>`;
   tb1.appendChild(tr1);
 
   // --- Gas FY25 Table ---
@@ -1045,8 +1067,8 @@ function initDashboard(D) {
 
   // --- Energy Use Chart ---
   chartInstances.push(new Chart(document.getElementById('chartEnergyUse'),{type:'bar',data:{labels:MONTHS_CUR,datasets:[
-    {label:'Electric MMBTU',data:energyUse.elecActual,backgroundColor:C.primary,stack:'s1',borderRadius:2},
-    {label:'Gas MMBTU',data:energyUse.gasActual,backgroundColor:C.accent,stack:'s1',borderRadius:2},
+    {label:'Electric MMBTU',data:maskAct(energyUse.elecActual),backgroundColor:C.primary,stack:'s1',borderRadius:2},
+    {label:'Gas MMBTU',data:maskAct(energyUse.gasActual),backgroundColor:C.accent,stack:'s1',borderRadius:2},
     {label:'Total Forecast',data:energyUse.totalFcast,type:'line',borderColor:C.blue,borderDash:[5,5],pointRadius:4,tension:0.3,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}}));
 
@@ -1088,7 +1110,7 @@ function initDashboard(D) {
 
   // --- Cumulative Chart ---
   chartInstances.push(new Chart(document.getElementById('chartCumulative'),{type:'line',data:{labels:MONTHS_CUR,datasets:[
-    {label:'Actual (Cumulative)',data:cumul.actual,borderColor:C.primary,backgroundColor:C.primaryLight,fill:true,pointRadius:4,tension:0.3,borderWidth:2.5},
+    {label:'Actual (Cumulative)',data:maskAct(cumul.actual),borderColor:C.primary,backgroundColor:C.primaryLight,fill:true,pointRadius:4,tension:0.3,borderWidth:2.5},
     {label:'Forecast (Cumulative)',data:cumul.forecast,borderColor:C.blue,backgroundColor:C.blueLight,fill:true,pointRadius:4,borderDash:[6,3],tension:0.3}
   ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'$'+(v/1e6).toFixed(0)+'M'}}},
     plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtDollarM(ctx.raw)}}}}}));
