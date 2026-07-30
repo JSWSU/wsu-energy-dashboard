@@ -378,7 +378,7 @@
   </div>
 </header>
 <div class="container">
-  <div style="text-align:right;font-size:12px;margin:4px 0;"><a href="fy27.html" style="color:var(--text-light);">View FY2027 (current year) forecast dashboard &rarr;</a></div>
+  <div style="text-align:right;font-size:12px;margin:4px 0;"><a href="index.html" style="color:var(--text-light);">&larr; Back to FY2026 report</a></div>
 <div class="nav-tabs">
     <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
     <button class="nav-tab" data-tab="monthly">Monthly Detail</button>
@@ -658,11 +658,11 @@
 // ==================== FISCAL YEAR CONFIG ====================
 // >>> CHANGE THIS ONE OBJECT FOR FY ROLLOVER -- everything else reads from it <<<
 const FY = {
-  label: 'FY2026',                    // prior-year archive page
+  label: 'FY2027',                    // e.g. 'FY2028'
   range: 'July 2026 \u2013 June 2027', // e.g. 'July 2027 \u2013 June 2028'
-  startYear: 2025,                     // calendar year of July (first month)
-  endYear: 2026,                       // calendar year of June (last month)
-  priorLabel: 'FY2025'                 // prior year label for YoY comparisons
+  startYear: 2026,                     // calendar year of July (first month)
+  endYear: 2027,                       // calendar year of June (last month)
+  priorLabel: 'FY2026'                 // prior year label for YoY comparisons
 };
 const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
 const MONTHS_CUR = MONTHS.map((m,i) => m + " '" + String(i < 6 ? FY.startYear : FY.endYear).slice(-2));
@@ -1261,7 +1261,7 @@ function initDashboard(D) {
 }
 
 // ==================== FETCH & GO ====================
-fetch('data-fy26.json')
+fetch('data.json')
   .then(r => {
     if(!r.ok) throw new Error('data.json not found. Click the "Export Data" button in your Excel workbook first, then upload data.json to this folder.');
     return r.json();
