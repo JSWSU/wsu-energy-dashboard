@@ -179,7 +179,7 @@ fetch('data-rates-demo.json').then(r => r.json()).then(D => {
     { label:'1-yr basis: avg | worst error', value: D.basisSummary["1"] + '% | ' + worst[1] + '%', sub:'most accurate on average, full spike exposure' },
     { label:'2-yr basis: avg | worst error', value: D.basisSummary["2"] + '% | ' + worst[2] + '%', sub:'the measured middle ground' },
     { label:'3-yr basis: avg | worst error', value: D.basisSummary["3"] + '% | ' + worst[3] + '%', sub:'most stable, slowest to track real cost' },
-    { label:'FY26 hedge coverage', value: Math.round(D.hedgeFwd.months.reduce((a,m)=>a+m.hedgedPct,0)/D.hedgeFwd.months.length) + '%', sub:'of gas volume at known fixed prices' },
+    { label:'FY26 hedge coverage', value: Math.round(D.hedgeFwd.months.reduce((a,m)=>a+m.hedgedPct,0)/D.hedgeFwd.months.length) + '%', sub:'avg monthly coverage; over 100% = excess hedged volume sold back at market (negative swing)' },
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k =>
     '<div class="kpi-card"><div class="kpi-label">' + k.label + '</div>' +
