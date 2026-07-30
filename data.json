@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "July 27, 2026",
+  "lastUpdated": "July 30, 2026",
   "fy27": {
     "totalActual": [
       1741166,
@@ -114,6 +114,20 @@
       24569
     ],
     "hedge": 10.0,
+    "isActual": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
     "forecastMeta": {
       "method": "Same month last complete year; electric x YoY trend, gas + hedge; usage held flat",
       "elecFactor": 1.049,
