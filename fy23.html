@@ -378,7 +378,7 @@
   </div>
 </header>
 <div class="container">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;gap:8px;flex-wrap:wrap;"><a href="fy24.html" style="display:inline-block;background:var(--primary);color:#fff;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,0.15);">&larr; FY2024 report</a><a href="trends.html" style="display:inline-block;background:var(--accent);color:#fff;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,0.15);">Multi-Year Trends</a><a href="index.html" style="display:inline-block;background:var(--primary);color:#fff;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,0.15);">View FY2026 report &rarr;</a></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;gap:8px;flex-wrap:wrap;"><a href="fy22.html" style="display:inline-block;background:var(--primary);color:#fff;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,0.15);">&larr; FY2022 report</a><a href="trends.html" style="display:inline-block;background:var(--accent);color:#fff;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,0.15);">Multi-Year Trends</a><a href="fy24.html" style="display:inline-block;background:var(--primary);color:#fff;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,0.15);">FY2024 report &rarr;</a></div>
 <div class="nav-tabs">
     <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
     <button class="nav-tab" data-tab="monthly">Monthly Detail</button>
@@ -658,11 +658,11 @@
 // ==================== FISCAL YEAR CONFIG ====================
 // >>> CHANGE THIS ONE OBJECT FOR FY ROLLOVER -- everything else reads from it <<<
 const FY = {
-  label: 'FY2025',
-  range: 'July 2024 – June 2025',
-  startYear: 2024,
-  endYear: 2025,
-  priorLabel: 'FY2024'
+  label: 'FY2023',
+  range: 'July 2022 – June 2023',
+  startYear: 2022,
+  endYear: 2023,
+  priorLabel: 'FY2022'
 };
 const MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
 const MONTHS_CUR = MONTHS.map((m,i) => m + " '" + String(i < 6 ? FY.startYear : FY.endYear).slice(-2));
@@ -1293,7 +1293,7 @@ function initDashboard(D) {
 }
 
 // ==================== FETCH & GO ====================
-fetch('data-fy25.json')
+fetch('data-fy23.json')
   .then(r => {
     if(!r.ok) throw new Error('data.json not found. Click the "Export Data" button in your Excel workbook first, then upload data.json to this folder.');
     return r.json();
