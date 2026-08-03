@@ -138,11 +138,17 @@ def merge_rows(existing_rows, new_rows):
 
     Returns (merged_rows, stats) where stats is a dict with counts.
     """
-    # Index existing rows by key
+    # Index existing rows by key. Exact-key duplicates (identical bldgNo,
+    # meters, startDate) collapse here, last occurrence wins (newest append).
     index = {}
+    exact_dupes = 0
     for row in existing_rows:
         k = row_key(row)
+        if k in index:
+            exact_dupes += 1
         index[k] = row
+    if exact_dupes:
+        print(f"    Exact-duplicate rows collapsed: {exact_dupes}")
 
     added = 0
     updated = 0
@@ -179,20 +185,54 @@ def merge_rows(existing_rows, new_rows):
     untouched = len(total_existing_keys - total_new_keys)
     unchanged += untouched
 
-    merged = sorted(index.values(), key=sort_key)
+    # ── Site-month dedup (keep-latest) ──
+    # A site-month must appear ONCE per granularity. When a SkySpark export
+    # row's meter list changes for an existing site-month, the (bldgNo,
+    # meters, startDate) key changes and both rows would survive, doubling
+    # the dashboard. Collapse: per (bldgNo, startDate) among non-byMeter
+    # rows (byMeter rows are keyed by their own meter identity), prefer the
+    # row from this run's new data, then the longest meter list, then usage.
+    new_keys = set(row_key(r) for r in new_rows)
+    from collections import defaultdict as _dd
+    groups = _dd(list)
+    for r in index.values():
+        by = bool(r.get("byMeter"))
+        gk = (r.get("bldgNo", ""), r.get("startDate", ""), by,
+              r.get("meters", "") if by else "")
+        groups[gk].append(r)
+    merged, dropped = [], []
+    for gk, rows in groups.items():
+        if len(rows) == 1:
+            merged.append(rows[0])
+            continue
+        rows.sort(key=lambda r: (row_key(r) in new_keys,
+                                 len(str(r.get("meters", ""))),
+                                 has_usage(r)), reverse=True)
+        merged.append(rows[0])
+        for loser in rows[1:]:
+            dropped.append((gk, rows[0], loser))
+    if dropped:
+        print(f"    Superseded rows dropped ({len(dropped)}):")
+        for gk, keep, lose in dropped:
+            print(f"      - {gk[0]} {gk[1]}: kept meters='{keep.get('meters','')}' "
+                  f"usage={keep.get('usage')} | dropped meters='{lose.get('meters','')}' "
+                  f"usage={lose.get('usage')}")
+
+    merged = sorted(merged, key=sort_key)
 
     stats = {
         "added": added,
         "updated": updated,
         "unchanged": unchanged,
         "skipped_no_regress": skipped_no_regress,
+        "superseded_dropped": len(dropped) + exact_dupes,
     }
     return merged, stats
 
 
 # ── Validation ─────────────────────────────────────────────────
 
-def validate_merge(merged_rows, existing_rows):
+def validate_merge(merged_rows, existing_rows, superseded_dropped=0):
     """Validate merged result. Returns list of error strings (empty = pass)."""
     errors = []
 
@@ -201,6 +241,15 @@ def validate_merge(merged_rows, existing_rows):
     if len(keys) != len(set(keys)):
         dupes = len(keys) - len(set(keys))
         errors.append(f"Duplicate keys found: {dupes} duplicates")
+
+    # FAIL LOUD: a site-month may appear only once among non-byMeter rows
+    sm = [ (r.get("bldgNo", ""), r.get("startDate", "")) for r in merged_rows
+           if not r.get("byMeter") ]
+    if len(sm) != len(set(sm)):
+        from collections import Counter as _C
+        for k, n in _C(sm).items():
+            if n > 1:
+                errors.append(f"Duplicate site-month after dedup: {k} x{n}")
 
     # Check no data regression (rows that had usage still have it)
     existing_index = {row_key(r): r for r in existing_rows}
@@ -211,9 +260,10 @@ def validate_merge(merged_rows, existing_rows):
             if has_usage(old) and not has_usage(row):
                 errors.append(f"Data regression: {k} had usage, now missing")
 
-    # Check row count didn't decrease
-    if len(merged_rows) < len(existing_rows):
-        errors.append(f"Row count decreased: {len(existing_rows)} -> {len(merged_rows)}")
+    # Row count may decrease only by the superseded rows deliberately dropped
+    if len(merged_rows) < len(existing_rows) - superseded_dropped:
+        errors.append(f"Row count decreased beyond dedup: {len(existing_rows)} -> "
+                      f"{len(merged_rows)} (dedup accounts for {superseded_dropped})")
 
     return errors
 
@@ -291,7 +341,8 @@ def main():
         merged_rows, stats = merge_rows(existing_rows, new_rows)
 
         # Validate
-        errors = validate_merge(merged_rows, existing_rows)
+        errors = validate_merge(merged_rows, existing_rows,
+                                stats.get("superseded_dropped", 0))
         if errors:
             print(f"    ERRORS — skipping write:")
             for e in errors:
