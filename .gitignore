@@ -14,3 +14,4 @@ push-data.sh
 logs/
 folder-scan.json
 sops/
+data/steam_plant_BACKUP-*.json
