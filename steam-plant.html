@@ -658,7 +658,7 @@
     <div class="card">
       <div class="help-section">
         <h2>Dashboard Overview</h2>
-        <p style="font-size:0.85rem; margin-bottom:1rem;">This dashboard visualizes WSU steam plant operations data covering 5 boilers (B1-B5), 2 steam plants (CASP and GWSP), 3 generators, fuel oil storage, and plant water systems. Data spans from FY21 (July 2020) forward.</p>
+        <p style="font-size:0.85rem; margin-bottom:1rem;">This dashboard visualizes WSU steam plant operations data covering 5 boilers (B1-B5), 2 steam plants (CASP and GWSP), 3 generators, fuel oil storage, and plant water systems. Data spans from FY21 (July 2020) through the last month shown in the header; the dataset updates only when new plant monthly ENERGY files are imported on the Data Management tab (it is not on the weekly SkySpark pipeline).</p>
       </div>
 
       <div class="help-section">
@@ -1122,6 +1122,36 @@ async function init() {
   const lastMonth = monthLabel(M[M.length - 1].month);
   document.getElementById('headerSub').textContent = firstMonth + ' \u2013 ' + lastMonth + ' \u2022 ' + M.length + ' Months \u2022 5 Boilers, 2 Plants, 3 Generators';
 
+  // Data-identity card (matches the energy-page fiscal-year card): period,
+  // data-as-of, and a staleness warning when the last data month is old.
+  (function() {
+    let card = document.getElementById('dataIdentityCard');
+    if (!card) {
+      card = document.createElement('div');
+      card.id = 'dataIdentityCard';
+      card.style.cssText = 'display:flex;align-items:baseline;gap:0.5rem;flex-wrap:wrap;' +
+        'background:var(--card-bg);border:1px solid var(--border);border-left:5px solid var(--primary);' +
+        'border-radius:8px;padding:0.6rem 1.1rem;margin:0.75rem auto;max-width:1400px;' +
+        'font-size:0.95rem;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.06)';
+      const nav = document.querySelector('.nav-tabs');
+      nav.parentNode.insertBefore(card, nav);
+    }
+    const asOf = (DATA.meta && DATA.meta.lastUpdated) ? DATA.meta.lastUpdated : 'unknown';
+    const lastD = new Date(M[M.length - 1].month + '-15');
+    const ageDays = Math.floor((Date.now() - lastD) / 86400000);
+    let warn = '';
+    if (ageDays > 60) {
+      warn = '<span style="margin-left:auto;color:#dc2626;font-weight:600">\u26A0\uFE0F data ends ' +
+        lastMonth + ' \u2014 ' + Math.floor(ageDays / 30) +
+        ' months behind; awaiting plant monthly ENERGY files</span>';
+    } else {
+      warn = '<span style="margin-left:auto;color:var(--text-light)">current</span>';
+    }
+    card.innerHTML = '<b>Steam Plant Operations</b>' +
+      '<span>\u2022 ' + firstMonth + ' \u2013 ' + lastMonth + '</span>' +
+      '<span style="color:var(--text-light)">\u2022 data as of ' + asOf + '</span>' + warn;
+  })();
+
   renderOverviewTab(M, labels);
   renderGasTab(M, labels);
   renderSteamTab(M, labels);
@@ -1178,7 +1208,10 @@ function renderOverviewTab(M, labels) {
 
       return {
         label: label, value: fmtShort(fytd) + unitStr,
-        sub: prior + ' same period: ' + fmtShort(priorTotal) + ' ' + pctChangeHtml(pct) + '<br>Projected ' + fy + ' total: ' + fmtShort(proj) + unitStr,
+        sub: prior + ' same period: ' + fmtShort(priorTotal) + ' ' + pctChangeHtml(pct) +
+          (monthsElapsed >= 12
+            ? '<br>' + fy + ' full-year total: ' + fmtShort(fytd) + unitStr
+            : '<br>Projected ' + fy + ' total (partial data, ' + monthsElapsed + ' of 12 months): ' + fmtShort(proj) + unitStr),
         cls: cls, tip: tip, table: tableHtml
       };
     });
@@ -2418,6 +2451,7 @@ function renderDataManagement() {
     renderRuntimeTab(DATA.monthly, labels);
     renderWaterTab(DATA.monthly, labels);
     renderDataManagement();
+    renderUPTab();
 
     preview.classList.remove('visible');
     pendingImport = null;
