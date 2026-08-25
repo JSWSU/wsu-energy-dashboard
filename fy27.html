@@ -303,6 +303,19 @@
   .print-btn:hover { background: rgba(255,255,255,0.25); }
   .print-btn svg { width: 14px; height: 14px; fill: currentColor; }
   /* --- Budget Status Banner --- */
+  .fy-card {
+    display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-left: 5px solid var(--primary); border-radius: 8px;
+    padding: 0.6rem 1.1rem; margin-bottom: 0.75rem;
+    font-size: 0.95rem; color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .fy-card-main { display: contents; }
+  .fy-card-label { display: none; }
+  .fy-card-year { font-weight: 700; }
+  .fy-card-range::before { content: "2"; margin-right: 0.5rem; color: var(--text-light); }
+  .fy-card-status { margin-left: auto; color: var(--text-light); }
   .budget-banner {
     display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1.25rem;
     border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.85rem; font-weight: 500;
@@ -393,6 +406,14 @@
 
   <!-- DASHBOARD -->
   <div id="dashboard" class="section active">
+    <div class="fy-card">
+      <div class="fy-card-main">
+        <span class="fy-card-label">Now Viewing</span>
+        <span class="fy-card-year" id="fyCardYear">--</span>
+      </div>
+      <span class="fy-card-range" id="fyCardRange">--</span>
+      <span class="fy-card-status" id="fyCardStatus"></span>
+    </div>
     <div id="budgetBanner" class="budget-banner" style="display:none;"></div>
     <div class="kpi-grid">
       <div class="kpi-card" data-kpi="actualYTD">
@@ -875,6 +896,9 @@ function initDashboard(D) {
 
 
   // --- Budget Status Banner ---
+  document.getElementById('fyCardYear').textContent = FY.label;
+  document.getElementById('fyCardRange').textContent = FY.range;
+
   const banner = document.getElementById('budgetBanner');
   // Find the last actual month's cumulative delta to assess budget status
   const lastActualIdx = isActual.lastIndexOf(true);
@@ -896,6 +920,7 @@ function initDashboard(D) {
     }
     banner.className = 'budget-banner ' + cls;
     banner.innerHTML = '<span class="banner-icon">' + icon + '</span><span class="banner-label">' + label + '</span><span class="banner-detail">' + detail + ' (' + actualMonthCount + ' of 12 months actual)</span>';
+    document.getElementById('fyCardStatus').textContent = actualMonthCount + ' of 12 months actual • data as of ' + D.lastUpdated;
     banner.style.display = 'flex';
   }
 
