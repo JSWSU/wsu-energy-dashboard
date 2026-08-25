@@ -86,6 +86,16 @@
   html.dark .dark-toggle-switch::after { transform: translateX(18px); }
   .container { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
   /* Nav Tabs */
+  .fy-card {
+    display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-left: 5px solid var(--primary); border-radius: 8px;
+    padding: 0.6rem 1.1rem; margin: 0.75rem 0;
+    font-size: 0.95rem; color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .fy-card b { font-weight: 700; }
+  .fy-card .fy-note { margin-left: auto; color: var(--text-light); }
   .nav-tabs {
     display: flex; gap: 0.25rem; background: var(--card-bg); border-radius: 8px;
     padding: 0.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto;
@@ -384,7 +394,8 @@
 
 <div class="container">
   <!-- Nav Tabs -->
-  <div class="nav-tabs" id="navTabs">
+  <div class="fy-card" id="periodCard" style="display:none"><b>Campus Metering</b><span id="periodCardRange"></span><span class="fy-note" id="periodCardNote"></span></div>
+<div class="nav-tabs" id="navTabs">
     <button class="nav-tab active" data-tab="overview">Overview</button>
     <button class="nav-tab" data-tab="electric">Electric</button>
     <button class="nav-tab" data-tab="thermal">Thermal</button>
@@ -795,11 +806,63 @@ function monthLabel(key) {
 // ============================================================
 //  DATA LOADING
 // ============================================================
+
+// Water-row resolver (domestic_water.json / irrigation.json).
+// The SkySpark export mixes three row kinds that must not be summed blindly:
+//  1. Aggregate rows (no byMeter flag) whose meter list can contain TWO
+//     parallel Calsense stacks recording the SAME water (07/27/2026 audit,
+//     e.g. "0081C_IR_001 (CS3000), 0081CIR_001 (CS3000)"): usage = 2x truth.
+//     Signature: meter names collapse to the same id once punctuation is
+//     stripped. Scale usage by uniqueIds/totalIds.
+//  2. Per-meter detail rows (byMeter=true) that duplicate the aggregate for
+//     the same building-month: summing both kinds double-counts (363
+//     domestic building-months as of 08/25/2026).
+//  3. byMeter-only months with no aggregate row: keep them.
+// Rule: normalize stacks first, then per (bldgNo,startDate) keep the
+// aggregate row when one exists, else keep the detail rows.
+function normalizeParallelStacks(rows) {
+  let scaled = 0;
+  rows.forEach(r => {
+    if (r.byMeter) return;
+    if (typeof r.usage !== 'number' || !(r.usage > 0)) return;
+    const ids = String(r.meters || '').split(',').map(s =>
+      s.replace(/\(.*?\)/g, '').replace(/[^0-9A-Za-z]/g, '').toUpperCase()).filter(Boolean);
+    if (ids.length < 2) return;
+    const uniq = new Set(ids).size;
+    if (uniq < ids.length) {
+      r.usage = r.usage * uniq / ids.length;
+      scaled++;
+    }
+  });
+  if (scaled) console.warn('[normalizeParallelStacks] scaled ' + scaled + ' stack-sum aggregate row(s)');
+  return rows;
+}
+function resolveAggDetailOverlap(rows) {
+  const hasAgg = new Set();
+  rows.forEach(r => {
+    if (!r.byMeter && typeof r.usage === 'number' && r.usage > 0) {
+      hasAgg.add((r.bldgNo || '') + '|' + (r.startDate || ''));
+    }
+  });
+  let dropped = 0;
+  const out = rows.filter(r => {
+    if (!r.byMeter) return true;
+    if (hasAgg.has((r.bldgNo || '') + '|' + (r.startDate || ''))) { dropped++; return false; }
+    return true;
+  });
+  if (dropped) console.warn('[resolveAggDetailOverlap] dropped ' + dropped + ' detail row(s) shadowed by aggregates');
+  return out;
+}
+
 async function loadJSON(url) {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('Failed to load ' + url);
   const data = await resp.json();
-  return sanitizeOutliers(data.rows || [], url);
+  let rows = data.rows || [];
+  if (/domestic_water|irrigation/.test(url)) {
+    rows = resolveAggDetailOverlap(normalizeParallelStacks(rows));
+  }
+  return sanitizeOutliers(rows, url);
 }
 
 function sanitizeOutliers(rows, url) {
@@ -808,10 +871,15 @@ function sanitizeOutliers(rows, url) {
     const key = (r.bldgNo || '') + '|' + (r.service || '') + '|' + (r.meters || '');
     (groups[key] = groups[key] || []).push(r);
   });
-  const preGap = new Set(['01-01-2025','02-01-2025','03-01-2025','04-01-2025','05-01-2025','06-01-2025','07-01-2025']);
+  // Baseline = each group's earliest 7 months with real usage (was a
+  // hardcoded Jan-Jul 2025 window that aged out of relevance)
   let nulled = 0;
   Object.values(groups).forEach(grp => {
-    const pre = grp.filter(r => preGap.has(r.startDate) && typeof r.usage === 'number' && r.usage > 0).map(r => r.usage);
+    const dated = grp.filter(r => typeof r.usage === 'number' && r.usage > 0 && r.startDate)
+      .slice().sort((a, b) => parseMonthKey(a.startDate) < parseMonthKey(b.startDate) ? -1 : 1);
+    const baseRows = dated.slice(0, 7);
+    const preGap = new Set(baseRows.map(r => r.startDate));
+    const pre = baseRows.map(r => r.usage);
     if (pre.length < 3) return;
     const preMax = Math.max.apply(null, pre);
     if (preMax < 1000) return;
@@ -819,7 +887,6 @@ function sanitizeOutliers(rows, url) {
     grp.forEach(r => {
       if (typeof r.usage !== 'number' || r.usage <= 0) return;
       const sd = r.startDate || '';
-      if (!/2025|2026/.test(sd)) return;
       if (preGap.has(sd)) return;
       if (r.usage > limit) {
         console.warn('[sanitizeOutliers]', url, r.bldgNo, sd, 'usage=', r.usage, 'preMax=', preMax, 'limit=', limit);
@@ -863,8 +930,8 @@ function aggregateByBuilding(rows, convertFn) {
     const key = r.bldgNo || 'Unknown';
     if (!map[key]) map[key] = { bldgNo: key, bldgName: r.bldgName || '', total: 0, months: {} };
     const mk = parseMonthKey(r.startDate);
-    const raw = typeof r.usage === 'number' && isFinite(r.usage) ? r.usage : 0;
-    const val = convertFn(raw);
+    if (typeof r.usage !== 'number' || !isFinite(r.usage) || r.usage < 0) return;
+    const val = convertFn(r.usage);
     map[key].total += val;
     map[key].months[mk] = (map[key].months[mk] || 0) + val;
   });
@@ -876,16 +943,21 @@ function aggregateByMonth(rows, convertFn) {
   rows.forEach(r => {
     const mk = parseMonthKey(r.startDate);
     if (!mk) return;
-    const raw = typeof r.usage === 'number' && isFinite(r.usage) ? r.usage : 0;
-    map[mk] = (map[mk] || 0) + convertFn(raw);
+    if (typeof r.usage !== 'number' || !isFinite(r.usage) || r.usage < 0) return;
+    map[mk] = (map[mk] || 0) + convertFn(r.usage);
   });
   return map;
 }
 
 function getSortedMonths(data) {
+  // Only count a month if at least one row carries real usage; the exports
+  // pre-create null placeholder rows months into the future.
   const all = new Set();
   [data.electric, data.condensate, data.domesticWater, data.irrigation, data.chw].forEach(arr => {
-    arr.forEach(r => { const mk = parseMonthKey(r.startDate); if (mk) all.add(mk); });
+    arr.forEach(r => {
+      if (typeof r.usage !== 'number' || !(r.usage > 0)) return;
+      const mk = parseMonthKey(r.startDate); if (mk) all.add(mk);
+    });
   });
   return [...all].sort();
 }
@@ -1229,6 +1301,11 @@ loadAllData().then(data => {
   document.getElementById('headerSubtitle').textContent =
     dateInfo.shortRange + ' \u2022 ' + data.sites.length + ' Sites \u2022 Pullman Campus';
   document.getElementById('dataPeriod').textContent = dateInfo.longRange;
+  // Period-identity card (matches the energy pages)
+  const pc = document.getElementById('periodCard');
+  pc.style.display = '';
+  document.getElementById('periodCardRange').textContent = '• data through ' + dateInfo.longRange.split('–')[1].trim();
+  document.getElementById('periodCardNote').textContent = 'auto-refreshed from SkySpark every Monday';
   document.querySelectorAll('.export-dates').forEach(el => {
     el.textContent = dateInfo.firstISO + '..' + dateInfo.lastEndISO;
   });
