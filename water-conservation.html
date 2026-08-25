@@ -839,7 +839,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Top 10 Top Dollar Issues</strong>
-          Filter button on the Anomaly Review tab. Computed live from the loaded data and restricted to CURRENT issues: only buildings with real data in the two most recent campus data months are ranked. Recent months are compared to the same months in 2025 (fallback: 2025 median). Ranking is by annualized run rate so the largest ongoing issues surface first, but the DISPLAYED headline is <strong>event cost to date</strong>, the actual excess kGal &times; rate (FY27 proposed, $6.85 per kGal) for the trigger months only. Every row expands to show the full arithmetic, net year-to-date vs 2025 as context (negatives allowed), and the annualized figure explicitly labeled as reference only. Stale meters never appear here no matter how large their old numbers; those belong in field verification. Recomputes automatically whenever the data updates.
+          Filter button on the Anomaly Review tab. Computed live from the loaded data and restricted to CURRENT issues: only buildings with real data in the two most recent campus data months are ranked. Recent months are compared to the same months in 2025 (fallback: 2025 median). Ranking is by annualized run rate so the largest ongoing issues surface first, but the DISPLAYED headline is <strong>event cost to date</strong>, the actual excess kGal &times; rate (FY27, $7.31 per kGal) for the trigger months only. Every row expands to show the full arithmetic, net year-to-date vs 2025 as context (negatives allowed), and the annualized figure explicitly labeled as reference only. Stale meters never appear here no matter how large their old numbers; those belong in field verification. Recomputes automatically whenever the data updates.
         </div>
         <div class="help-tab-card">
           <strong>Task Tracker</strong>
@@ -1458,6 +1458,26 @@ function sanitizeOutliers(rows, url) {
 // to 0093NIR_001, same Calsense controller). Both rows land in the export
 // with byMeter=false and would double-count if summed. Keep the row with the
 // largest meter list per (bldgNo, startDate).
+
+// Parallel-Calsense stack normalizer (same logic as metering.html).
+// Aggregate rows can list TWO stacks recording the SAME water
+// (07/27/2026 audit): meter names collapse to one id once punctuation is
+// stripped (0081C_IR_001 vs 0081CIR_001). Scale usage by unique/total.
+function normalizeParallelStacks(rows) {
+  let scaled = 0;
+  rows.forEach(r => {
+    if (r.byMeter) return;
+    if (typeof r.usage !== 'number' || !(r.usage > 0)) return;
+    const ids = String(r.meters || '').split(',').map(s =>
+      s.replace(/\(.*?\)/g, '').replace(/[^0-9A-Za-z]/g, '').toUpperCase()).filter(Boolean);
+    if (ids.length < 2) return;
+    const uniq = new Set(ids).size;
+    if (uniq < ids.length) { r.usage = r.usage * uniq / ids.length; scaled++; }
+  });
+  if (scaled) console.warn('[normalizeParallelStacks] scaled ' + scaled + ' stack-sum aggregate row(s)');
+  return rows;
+}
+
 function dedupeAggregateRows(rows) {
   const bestBy = {};
   rows.forEach(r => {
@@ -2191,8 +2211,16 @@ function getTaskStatusLabel(anomaly, tasks) {
 // as a labeled reference. Net YTD vs 2025 is shown as context (negatives
 // allowed). Stale meters are excluded by the recency gate (must have data
 // in the two most recent campus data months to be ranked).
-const TOP10_RATE_PER_KGAL = 6.85;   // FY27 proposed $0.00685/gal
-const TOP10_RATE_LABEL    = '$6.85/kGal (FY27 proposed, $0.00685/gal)';
+
+// 08/24/2026 submetering ruling (Jeff Lannigan): Columbia (0678), Kamiak
+// (0660), and Terrace (0650) irrigation meters are NESTED inside their
+// domestic master meters; their gallons are already inside the domestic
+// totals, so dom+irrig sums must not add them again. Chinook (0679) was
+// ruled PARALLEL and stays additive.
+const NESTED_IR_BLDGS = new Set(['0678', '0660', '0650']);
+function irrigForTotal(bldgNo, irrig) { return NESTED_IR_BLDGS.has(bldgNo) ? 0 : irrig; }
+const TOP10_RATE_PER_KGAL = 7.311;  // FY27 adopted $0.007311/gal (utility-mo-rates-fy27.json)
+const TOP10_RATE_LABEL    = '$7.31/kGal (FY27, $0.007311/gal)';
 let G_top10Keys   = new Set();
 let G_top10Detail = {};   // key = bldgNo|service -> {eventCost, excessKGal, months[], netYtdKGal, netYtdCost, annualizedRef, rate}
 let G_staleKeys   = new Set();
@@ -3048,12 +3076,12 @@ function renderTrendsTab(domestic, irrigation) {
     });
   });
   const top10 = Object.values(allBldg)
-    .map(b => ({ ...b, total: b.dom + b.irrig }))
+    .map(b => ({ ...b, total: b.dom + irrigForTotal(b.bldgNo, b.irrig) }))
     .sort((a, b) => b.total - a.total).slice(0, 10);
 
   barChart('chartTopWater', top10.map(b => bldgLabel(b)), [
     { label: 'Domestic (kGal)', data: top10.map(b => b.dom), backgroundColor: COLORS.domestic },
-    { label: 'Irrigation (kGal)', data: top10.map(b => b.irrig), backgroundColor: COLORS.irrigation }
+    { label: 'Irrigation (kGal)', data: top10.map(b => irrigForTotal(b.bldgNo, b.irrig)), backgroundColor: COLORS.irrigation }
   ], { horizontal: true, stacked: true });
 }
 
@@ -3081,7 +3109,8 @@ function renderBuildingTab(searchQuery) {
     allBldg[k].irrigMonths = v.months;
   });
 
-  let buildings = Object.values(allBldg).sort((a, b) => (b.dom + b.irrig) - (a.dom + a.irrig));
+  let buildings = Object.values(allBldg).sort((a, b) =>
+    (b.dom + irrigForTotal(b.bldgNo, b.irrig)) - (a.dom + irrigForTotal(a.bldgNo, a.irrig)));
   if (searchQuery) {
     buildings = buildings.filter(b =>
       b.bldgNo.toLowerCase().includes(searchQuery) ||
@@ -3707,9 +3736,9 @@ function renderDataInfo(domestic, irrigation, totals) {
     ]);
     G_meterClass = meterClass || {};
     const merged = applyMeterUploads(domRepo, irrRepo, wellRepo);
-    const domestic   = dedupeAggregateRows(overlayByMeter(merged.domestic));
-    const irrigation = dedupeAggregateRows(overlayByMeter(merged.irrigation));
-    const well       = dedupeAggregateRows(overlayByMeter(merged.well));
+    const domestic   = dedupeAggregateRows(normalizeParallelStacks(overlayByMeter(merged.domestic)));
+    const irrigation = dedupeAggregateRows(normalizeParallelStacks(overlayByMeter(merged.irrigation)));
+    const well       = dedupeAggregateRows(normalizeParallelStacks(overlayByMeter(merged.well)));
     collectByMeterDetail(domestic, 'Domestic Water');
     collectByMeterDetail(irrigation, 'Irrigation Water');
     collectByMeterDetail(well, 'Well Water');
