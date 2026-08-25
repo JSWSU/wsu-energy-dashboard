@@ -922,6 +922,22 @@ function sanitizeOutliers(rows, url) {
       }
     });
   });
+  // First-read guard: a meter's first month online can record its whole
+  // accumulated register as one month (0802 Feb 2026: 23.57M kWh vs 10k
+  // normal). Null the first positive month when it exceeds 50x the median
+  // of at least 3 later months.
+  Object.values(groups).forEach(grp => {
+    const pos = grp.filter(r => typeof r.usage === 'number' && r.usage > 0 && r.startDate)
+      .slice().sort((a, b) => parseMonthKey(a.startDate) < parseMonthKey(b.startDate) ? -1 : 1);
+    if (pos.length < 4) return;
+    const rest = pos.slice(1).map(r => r.usage).sort((a, b) => a - b);
+    const med = rest[Math.floor(rest.length / 2)];
+    if (med > 0 && pos[0].usage > 50 * med) {
+      console.warn('[sanitizeOutliers] first-read artifact nulled:', url, pos[0].bldgNo, pos[0].startDate, 'usage=', pos[0].usage, 'median=', med);
+      pos[0].usage = null;
+      nulled++;
+    }
+  });
   if (nulled > 0) console.warn('[sanitizeOutliers] nulled ' + nulled + ' row(s) in ' + url);
   return rows;
 }
