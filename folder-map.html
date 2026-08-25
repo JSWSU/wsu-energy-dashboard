@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Energy Group Folder Map</title>
 <script src="chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@3.1.0"></script>
+<script src="chartjs-chart-treemap.min.js"></script>
 <style>
   :root {
     --primary: #981e32;
@@ -237,9 +237,50 @@
   @media (max-width: 480px) {
     .kpi-grid { grid-template-columns: 1fr; }
   }
+  #authGate {
+    position: fixed; inset: 0; z-index: 9999; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  #authGate .auth-header {
+    width: 100%; background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; text-align: center; padding: 2.5rem 1rem 2rem;
+  }
+  #authGate .auth-header h1 { font-size: 1.4rem; font-weight: 700; }
+  #authGate .auth-header p { opacity: 0.85; font-size: 0.85rem; margin-top: 0.25rem; }
+  #authGate .auth-card {
+    background: var(--card-bg); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    padding: 2.5rem; margin-top: 3rem; width: min(400px, 90vw); text-align: center;
+  }
+  #authGate .auth-card h2 { font-size: 1.1rem; color: var(--text); margin-bottom: 0.5rem; }
+  #authGate .auth-card p { font-size: 0.82rem; color: var(--text-light); margin-bottom: 1.5rem; }
+  #authGate .auth-input {
+    width: 100%; padding: 0.7rem 1rem; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 0.95rem; outline: none; background: var(--bg); color: var(--text);
+  }
+  #authGate .auth-input:focus { border-color: var(--primary); }
+  #authGate .auth-btn {
+    width: 100%; margin-top: 1rem; padding: 0.7rem; background: var(--primary); color: #fff;
+    border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+  }
+  #authGate .auth-btn:hover { background: var(--primary-dark); }
+  #authGate .auth-error { color: #dc2626; font-size: 0.8rem; margin-top: 0.75rem; min-height: 1.2rem; }
 </style>
 </head>
 <body>
+<div id="authGate">
+  <div class="auth-header">
+    <h1>WSU Energy Group Folder Map</h1>
+    <p>Shared Drive Map &bull; WSU Facilities Services</p>
+  </div>
+  <div class="auth-card">
+    <h2>Restricted Access</h2>
+    <p>Enter the dashboard password to continue.</p>
+    <input type="password" class="auth-input" id="authInput" placeholder="Password" autocomplete="off">
+    <button class="auth-btn" id="authBtn">Sign In</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
 
 <!-- Header -->
 <header>
@@ -8617,13 +8658,13 @@ const SCAN_DATA = {
         "totalFiles": 711
       },
       {
-        "name": "Avista NG - Electrical Master Account Invoices - 530022514",
+        "name": "Avista NG - Electrical Master Account Invoices - 5300XXXXX",
         "count": 4,
         "paths": [
-          "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514",
-          "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514",
-          "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514",
-          "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514"
+          "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX",
+          "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX",
+          "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX",
+          "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX"
         ],
         "totalSize": 1006334212,
         "totalFiles": 80
@@ -15407,7 +15448,7 @@ const SCAN_DATA = {
         "modified": "2024-04-08"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX",
         "depth": 8,
         "size": 251583553,
         "files": 20,
@@ -20146,7 +20187,7 @@ const SCAN_DATA = {
         "modified": "2024-04-08"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX",
         "depth": 7,
         "size": 251583553,
         "files": 20,
@@ -30921,62 +30962,62 @@ const SCAN_DATA = {
         "modified": "2013-11-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Dec 08.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Dec 08.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Jan 09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Jan 09.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Dec 08.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Dec 08.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Jan 09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Jan 09.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Dec 08.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Dec 08.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Jan 09.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Jan 09.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Dec 08.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Dec 08.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Jan 09.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Jan 09.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista1-5-11.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista1-5-11.pdf",
         "size": 15221063,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista1-5-11.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista1-5-11.pdf",
         "size": 15221063,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista1-5-11.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista1-5-11.pdf",
         "size": 15221063,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista1-5-11.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista1-5-11.pdf",
         "size": 15221063,
         "modified": "2011-01-20"
       },
@@ -31056,22 +31097,22 @@ const SCAN_DATA = {
         "modified": "2022-07-12"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Feb09 -.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Feb09 -.pdf",
         "size": 14154859,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Feb09 -.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Feb09 -.pdf",
         "size": 14154859,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Feb09 -.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Feb09 -.pdf",
         "size": 14154859,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Feb09 -.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Feb09 -.pdf",
         "size": 14154859,
         "modified": "2009-04-27"
       },
@@ -31086,22 +31127,22 @@ const SCAN_DATA = {
         "modified": "2013-07-11"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 3-8-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 3-8-10.pdf",
         "size": 13833082,
         "modified": "2010-03-12"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 3-8-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 3-8-10.pdf",
         "size": 13833082,
         "modified": "2010-03-12"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 3-8-10.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 3-8-10.pdf",
         "size": 13833082,
         "modified": "2010-03-12"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 3-8-10.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 3-8-10.pdf",
         "size": 13833082,
         "modified": "2010-03-12"
       },
@@ -31116,62 +31157,62 @@ const SCAN_DATA = {
         "modified": "2012-09-28"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 6-2-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 6-2-10.pdf",
         "size": 13157900,
         "modified": "2010-06-21"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 6-2-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 6-2-10.pdf",
         "size": 13157900,
         "modified": "2010-06-21"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 6-2-10.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 6-2-10.pdf",
         "size": 13157900,
         "modified": "2010-06-21"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 6-2-10.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 6-2-10.pdf",
         "size": 13157900,
         "modified": "2010-06-21"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 4-5-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 4-5-10.pdf",
         "size": 13042520,
         "modified": "2010-04-07"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 4-5-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 4-5-10.pdf",
         "size": 13042520,
         "modified": "2010-04-07"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 4-5-10.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 4-5-10.pdf",
         "size": 13042520,
         "modified": "2010-04-07"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 4-5-10.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 4-5-10.pdf",
         "size": 13042520,
         "modified": "2010-04-07"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 5-4-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 5-4-10.pdf",
         "size": 13037033,
         "modified": "2010-05-20"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 5-4-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 5-4-10.pdf",
         "size": 13037033,
         "modified": "2010-05-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 5-4-10.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 5-4-10.pdf",
         "size": 13037033,
         "modified": "2010-05-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 5-4-10.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 5-4-10.pdf",
         "size": 13037033,
         "modified": "2010-05-20"
       },
@@ -31181,42 +31222,42 @@ const SCAN_DATA = {
         "modified": "2016-03-21"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\12-01-09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\12-01-09.pdf",
         "size": 13013655,
         "modified": "2010-01-08"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\12-01-09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\12-01-09.pdf",
         "size": 13013655,
         "modified": "2010-01-08"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\12-01-09.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\12-01-09.pdf",
         "size": 13013655,
         "modified": "2010-01-08"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\12-01-09.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\12-01-09.pdf",
         "size": 13013655,
         "modified": "2010-01-08"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 12-28-09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 12-28-09.pdf",
         "size": 12852384,
         "modified": "2010-01-08"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 12-28-09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 12-28-09.pdf",
         "size": 12852384,
         "modified": "2010-01-08"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 12-28-09.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 12-28-09.pdf",
         "size": 12852384,
         "modified": "2010-01-08"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 12-28-09.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 12-28-09.pdf",
         "size": 12852384,
         "modified": "2010-01-08"
       },
@@ -31231,102 +31272,102 @@ const SCAN_DATA = {
         "modified": "2014-12-29"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 2-3-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 2-3-10.pdf",
         "size": 12803680,
         "modified": "2010-02-03"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 2-3-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 2-3-10.pdf",
         "size": 12803680,
         "modified": "2010-02-03"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 2-3-10.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 2-3-10.pdf",
         "size": 12803680,
         "modified": "2010-02-03"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\big avista 2-3-10.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\big avista 2-3-10.pdf",
         "size": 12803680,
         "modified": "2010-02-03"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 12-1-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 12-1-10.pdf",
         "size": 12521236,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 12-1-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 12-1-10.pdf",
         "size": 12521236,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 12-1-10.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 12-1-10.pdf",
         "size": 12521236,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 12-1-10.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 12-1-10.pdf",
         "size": 12521236,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\April 09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\April 09.pdf",
         "size": 12419850,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\March 09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\March 09.pdf",
         "size": 12419850,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\April 09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\April 09.pdf",
         "size": 12419850,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\March 09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\March 09.pdf",
         "size": 12419850,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\April 09.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\April 09.pdf",
         "size": 12419850,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\March 09.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\March 09.pdf",
         "size": 12419850,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\April 09.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\April 09.pdf",
         "size": 12419850,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\March 09.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\March 09.pdf",
         "size": 12419850,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\8-4-09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\8-4-09.pdf",
         "size": 12399595,
         "modified": "2009-08-20"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\8-4-09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\8-4-09.pdf",
         "size": 12399595,
         "modified": "2009-08-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\8-4-09.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\8-4-09.pdf",
         "size": 12399595,
         "modified": "2009-08-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\8-4-09.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\8-4-09.pdf",
         "size": 12399595,
         "modified": "2009-08-20"
       },
@@ -31336,82 +31377,82 @@ const SCAN_DATA = {
         "modified": "2013-07-11"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 11-2-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 11-2-10.pdf",
         "size": 11928274,
         "modified": "2010-11-03"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 11-2-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 11-2-10.pdf",
         "size": 11928274,
         "modified": "2010-11-03"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 11-2-10.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 11-2-10.pdf",
         "size": 11928274,
         "modified": "2010-11-03"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 11-2-10.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 11-2-10.pdf",
         "size": 11928274,
         "modified": "2010-11-03"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 9-1-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 9-1-10.pdf",
         "size": 11746069,
         "modified": "2010-09-13"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 9-1-10.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 9-1-10.pdf",
         "size": 11746069,
         "modified": "2010-09-13"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 9-1-10.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 9-1-10.pdf",
         "size": 11746069,
         "modified": "2010-09-13"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 9-1-10.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 9-1-10.pdf",
         "size": 11746069,
         "modified": "2010-09-13"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\10-1-09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\10-1-09.pdf",
         "size": 11730143,
         "modified": "2009-10-05"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\10-1-09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\10-1-09.pdf",
         "size": 11730143,
         "modified": "2009-10-05"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\10-1-09.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\10-1-09.pdf",
         "size": 11730143,
         "modified": "2009-10-05"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\10-1-09.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\10-1-09.pdf",
         "size": 11730143,
         "modified": "2009-10-05"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 8-4-10_2010080413555000.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 8-4-10_2010080413555000.pdf",
         "size": 11518989,
         "modified": "2010-08-16"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 8-4-10_2010080413555000.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 8-4-10_2010080413555000.pdf",
         "size": 11518989,
         "modified": "2010-08-16"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 8-4-10_2010080413555000.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 8-4-10_2010080413555000.pdf",
         "size": 11518989,
         "modified": "2010-08-16"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista 8-4-10_2010080413555000.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista 8-4-10_2010080413555000.pdf",
         "size": 11518989,
         "modified": "2010-08-16"
       },
@@ -32824,62 +32865,62 @@ const SCAN_DATA = {
         "modified": "2013-11-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Dec 08.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Dec 08.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Jan 09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Jan 09.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Dec 08.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Dec 08.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Jan 09.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Jan 09.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Dec 08.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Dec 08.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Jan 09.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Jan 09.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Dec 08.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Dec 08.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Jan 09.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Jan 09.pdf",
         "size": 15553092,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista1-5-11.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista1-5-11.pdf",
         "size": 15221063,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista1-5-11.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista1-5-11.pdf",
         "size": 15221063,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista1-5-11.pdf",
+        "path": "Energy Services Admin\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista1-5-11.pdf",
         "size": 15221063,
         "modified": "2011-01-20"
       },
       {
-        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\avista1-5-11.pdf",
+        "path": "Energy Services Admin\\Energy Files - Copy\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\avista1-5-11.pdf",
         "size": 15221063,
         "modified": "2011-01-20"
       },
@@ -32919,12 +32960,12 @@ const SCAN_DATA = {
         "modified": "2016-05-13"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Feb09 -.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Avista agreements\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Feb09 -.pdf",
         "size": 14154859,
         "modified": "2009-04-27"
       },
       {
-        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 530022514\\Feb09 -.pdf",
+        "path": "Energy Services Admin\\ECS Enercon SCADA\\Energy Files\\Energy Files\\Utility Invoices\\Avista Invoices\\Avista NG - Electrical Master Account Invoices - 5300XXXXX\\Feb09 -.pdf",
         "size": 14154859,
         "modified": "2009-04-27"
       }
@@ -33189,8 +33230,8 @@ function buildAuditRows() {
       category: 'duplicate',
       categoryLabel: 'Duplicates',
       path: (d.paths || []).join(', ') || d.name,
-      size: d.size || 0,
-      files: d.files || 0,
+      size: d.totalSize || d.size || 0,
+      files: d.totalFiles || d.files || 0,
       modified: '',
       details: d.details || ('Folder "' + d.name + '" appears ' + d.count + ' times')
     });
@@ -33401,6 +33442,40 @@ document.addEventListener('DOMContentLoaded', function() {
   renderTreemap();
   initAuditTable();
 });
+
+// AUTH GATE (shared with metering/water dashboards)
+(function() {
+  const gate = document.getElementById('authGate');
+  const input = document.getElementById('authInput');
+  const btn = document.getElementById('authBtn');
+  const err = document.getElementById('authError');
+  if (localStorage.getItem('wsuMeteringAuth') === 'ok') {
+    gate.style.display = 'none';
+  }
+  function tryAuth() {
+    if (input.value === 'Energy@WSU') {
+      localStorage.setItem('wsuMeteringAuth', 'ok');
+      gate.style.display = 'none';
+      err.textContent = '';
+    } else {
+      err.textContent = 'Incorrect password. Please try again.';
+      input.value = '';
+      input.focus();
+    }
+  }
+  btn.addEventListener('click', tryAuth);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+})();
+
+// SCAN-DATE BINDING + STALENESS WARNING
+(function() {
+  const sd = (typeof SCAN_DATA !== 'undefined' && SCAN_DATA.scanDate) ? SCAN_DATA.scanDate : null;
+  if (!sd) return;
+  const hdr = document.querySelector('header p, .header p');
+  const age = Math.floor((Date.now() - new Date(sd + 'T00:00:00')) / 86400000);
+  const stale = age > 60 ? ' • ⚠️ snapshot is ' + age + ' days old' : '';
+  if (hdr) hdr.innerHTML = '\\fais007\ENERGY GROUP &mdash; Scanned ' + sd + stale;
+})();
 </script>
 </body>
 </html>
