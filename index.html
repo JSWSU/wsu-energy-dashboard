@@ -174,6 +174,9 @@
     /* --- Table --- */
     .ps-table-section { margin: 0 0 6px; }
     .ps-table-section h3 { font-size: 9pt; font-weight: 600; color: #981e32; margin-bottom: 3px; }
+    .ps-chart-section { margin: 6px 0 0; }
+    .ps-chart-section h3 { font-size: 9pt; font-weight: 600; color: #981e32; margin-bottom: 3px; }
+    #psCumulChart { width: 100%; max-height: 2.5in; object-fit: contain; page-break-inside: avoid; }
     .ps-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
     .ps-table thead th {
       background: #f9fafb; padding: 3px 6px; text-align: right; font-weight: 600;
@@ -648,6 +651,10 @@
       </tr></thead>
       <tbody id="psMonthlyBody"></tbody>
     </table>
+  </div>
+  <div class="ps-chart-section">
+    <h3>Total Energy Spend, Cumulative Total ($USD) &mdash; Actual v. Forecast</h3>
+    <img id="psCumulChart" alt="Cumulative actual vs forecast chart">
   </div>
   <div class="ps-footer">
     WSU Facilities Services &bull; Energy Cost Projection FY2026 &bull; Confidential
@@ -1290,6 +1297,27 @@ function initDashboard(D) {
     psBody.appendChild(trT);
 
   })();
+
+  // Cumulative chart snapshot for the print summary (always light theme)
+  window.addEventListener('beforeprint', function() {
+    const cv = document.getElementById('chartCumulBars');
+    const img = document.getElementById('psCumulChart');
+    if (!cv || !img) return;
+    const chart = Chart.getChart(cv);
+    if (!chart) { img.src = cv.toDataURL('image/png'); return; }
+    const wasDark = document.documentElement.classList.contains('dark');
+    if (wasDark) {
+      Chart.defaults.color = '#666';
+      Chart.defaults.borderColor = 'rgba(0,0,0,0.1)';
+      chart.options.animation = false;
+      chart.update();
+    }
+    img.src = chart.toBase64Image();
+    if (wasDark) {
+      applyChartTheme();
+      chart.update();
+    }
+  });
 }
 
 // ==================== FETCH & GO ====================
