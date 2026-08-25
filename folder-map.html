@@ -218,12 +218,14 @@
   footer a { color: var(--primary); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
   /* Print */
+  .print-scan-date { display: none; }
   @media print {
     @page { size: landscape; margin: 0.5in; }
     * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
     body { background: #fff !important; }
     html.dark { --bg:#f5f5f5; --card-bg:#fff; --text:#2d2d2d; --text-light:#6b7280; --border:#e5e7eb; }
     header, .nav-tabs, .dark-toggle, .header-actions, .filter-bar, .search-bar { display: none !important; }
+    .print-scan-date { display: block !important; font-size: 0.85rem; font-weight: 600; color: #2d2d2d; margin: 0 0 0.5rem; }
     .section { display: block !important; page-break-inside: avoid; }
     .card { box-shadow: none; border: 1px solid #e5e7eb; }
   }
@@ -286,7 +288,7 @@
 <header>
   <div class="header-text">
     <h1>Energy Group Folder Map</h1>
-    <p>\\fais007\ENERGY GROUP &mdash; Scanned 2026-03-02</p>
+    <p>\\fais007\ENERGY GROUP</p>
   </div>
   <div class="header-actions">
     <a href="metering.html">Campus Metering</a>
@@ -301,6 +303,7 @@
 </header>
 
 <div class="container">
+  <div class="print-scan-date" id="printScanDate"></div>
   <!-- Nav Tabs -->
   <div class="nav-tabs" id="navTabs">
     <button class="nav-tab active" data-tab="map">Storage Map</button>
@@ -332,7 +335,7 @@
         <div class="kpi-label">Date Span</div>
         <div class="kpi-value" id="kpiDates">--</div>
         <div class="kpi-sub" id="kpiDatesSub"></div>
-        <div class="kpi-tooltip">Range from oldest to newest file modification date</div>
+        <div class="kpi-tooltip">Range from oldest to newest file modification date. The 1985 oldest year comes from legacy-format file timestamps in the scan; an earlier project record lists a different oldest year, and timestamps that old can be unreliable. Confirm at the next re-scan.</div>
       </div>
     </div>
 
@@ -354,8 +357,10 @@
     <div class="card">
       <h2>Audit Findings</h2>
       <div class="info-box">
-        Automated scan results identifying potential cleanup opportunities: duplicate folder names,
+        Automated results from the <span id="auditScanDate">03/02/2026</span> scan, identifying potential cleanup opportunities: duplicate folder names,
         deep nesting, legacy file formats, oversized files, empty folders, and old files.
+        Findings are a point-in-time snapshot, not live status. Cleanup plan approved 03/02/2026; execution pending; findings unchanged since the scan.
+        Note: the scan script truncates three categories, so their counts are floors, not totals: duplicates show the top 200 by size, legacy formats the top 500, and old files the top 200.
       </div>
       <input type="text" class="search-bar" id="auditSearch" placeholder="Search by path...">
       <div class="filter-bar" id="auditFilterBar">
@@ -33005,16 +33010,23 @@ function applyChartTheme() {
 // DARK MODE
 // ============================================================
 function initDarkMode() {
-  const saved = localStorage.getItem('wsuFolderMapDark');
+  // Shared ecosystem key. Migrate the legacy per-page key once, then drop it.
+  const legacy = localStorage.getItem('wsuFolderMapDark');
+  let saved = localStorage.getItem('wsuDarkMode');
+  if (saved === null && legacy !== null) {
+    saved = legacy;
+    localStorage.setItem('wsuDarkMode', legacy);
+  }
+  if (legacy !== null) localStorage.removeItem('wsuFolderMapDark');
   if (saved === 'on') document.documentElement.classList.add('dark');
   applyChartTheme();
 
   document.getElementById('darkToggle').addEventListener('click', function() {
     document.documentElement.classList.toggle('dark');
     const isDark = document.documentElement.classList.contains('dark');
-    localStorage.setItem('wsuFolderMapDark', isDark ? 'on' : 'off');
+    localStorage.setItem('wsuDarkMode', isDark ? 'on' : 'off');
     applyChartTheme();
-    chartInstances.forEach(c => c.update());
+    chartInstances.forEach(c => { c.options.color = Chart.defaults.color; c.update(); });
   });
 }
 
@@ -33349,6 +33361,16 @@ function renderAuditTable() {
   summary.innerHTML = '<strong>' + fmtNum(rows.length) + '</strong> finding' + (rows.length !== 1 ? 's' : '') +
     ' &bull; <strong>' + fmtBytes(totalSize) + '</strong> total size';
 
+  // Scan-script truncation caps: these categories export only the top N,
+  // so counts are floors, not true totals.
+  const CAT_CAPS = { duplicate: 200, legacy: 500, old: 200 };
+  if (CAT_CAPS[auditFilter]) {
+    summary.innerHTML += ' &bull; scan exports only the top ' + CAT_CAPS[auditFilter] +
+      ' in this category; the true total is larger';
+  } else if (auditFilter === 'all') {
+    summary.innerHTML += ' &bull; duplicates, legacy, and old-file counts are capped by the scan (top 200 / 500 / 200)';
+  }
+
   // Limit
   const limited = rows.length > ROW_LIMIT;
   const displayRows = limited ? rows.slice(0, ROW_LIMIT) : rows;
@@ -33471,10 +33493,17 @@ document.addEventListener('DOMContentLoaded', function() {
 (function() {
   const sd = (typeof SCAN_DATA !== 'undefined' && SCAN_DATA.scanDate) ? SCAN_DATA.scanDate : null;
   if (!sd) return;
+  const p = sd.split('-');
+  const sdFmt = p.length === 3 ? p[1] + '/' + p[2] + '/' + p[0] : sd;
   const hdr = document.querySelector('header p, .header p');
   const age = Math.floor((Date.now() - new Date(sd + 'T00:00:00')) / 86400000);
   const stale = age > 60 ? ' • ⚠️ snapshot is ' + age + ' days old' : '';
-  if (hdr) hdr.innerHTML = '\\fais007\ENERGY GROUP &mdash; Scanned ' + sd + stale;
+  const label = '\\\\fais007\\ENERGY GROUP • Scanned ' + sdFmt;
+  if (hdr) hdr.textContent = label + stale;
+  const auditSd = document.getElementById('auditScanDate');
+  if (auditSd) auditSd.textContent = sdFmt;
+  const ps = document.getElementById('printScanDate');
+  if (ps) ps.textContent = 'Energy Group Folder Map • ' + label + ' • snapshot is ' + age + ' days old at print time';
 })();
 </script>
 </body>

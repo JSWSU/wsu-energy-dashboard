@@ -86,6 +86,17 @@
   }
   .btn-action:hover { background: rgba(255,255,255,0.25); }
   .container { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
+  /* Period-identity card (matches the energy pages) */
+  .fy-card {
+    display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-left: 5px solid var(--primary); border-radius: 8px;
+    padding: 0.6rem 1.1rem; margin: 0.75rem 0;
+    font-size: 0.95rem; color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .fy-card b { font-weight: 700; }
+  .fy-card .fy-note { margin-left: auto; color: var(--text-light); }
   /* Nav Tabs */
   .nav-tabs {
     display: flex; gap: 0.25rem; background: var(--card-bg); border-radius: 8px;
@@ -656,6 +667,7 @@
 
 <div class="container">
   <!-- Nav Tabs -->
+  <div class="fy-card" id="periodCard" style="display:none"><b>Water Conservation</b><span id="periodCardRange"></span><span class="fy-note" id="periodCardNote"></span></div>
   <div class="nav-tabs" id="navTabs">
     <button class="nav-tab active" data-tab="anomalies">Anomaly Review</button>
     <button class="nav-tab" data-tab="tasks">Task Tracker</button>
@@ -755,6 +767,7 @@
     </div>
     <div class="card">
       <h2>Campus Irrigation Trend (kGal)</h2>
+      <div class="info-box" id="irrigCoverageNote" style="display:none;margin-bottom:0.75rem;"></div>
       <div class="chart-container"><canvas id="chartIrrigTrend"></canvas></div>
     </div>
     <div class="card">
@@ -780,7 +793,7 @@
         <div class="help-step">
           <div class="help-step-num">1</div>
           <div class="help-step-title">Before the Meeting</div>
-          <p>Update water data from SkySpark (see "Updating Data" below). Export the task list from Smartsheet as CSV and import it into the Task Tracker tab. Check the Data Info tab to verify data quality.</p>
+          <p>Water data refreshes automatically every Monday at 07:10, so no manual update is normally needed. Export the task list from Smartsheet as CSV and import it into the Task Tracker tab. Check the Data Info tab to verify data quality and freshness.</p>
         </div>
         <div class="help-step">
           <div class="help-step-num">2</div>
@@ -798,10 +811,13 @@
     <!-- Section 2: Updating Data -->
     <div class="card help-section">
       <h2>Updating Data from SkySpark</h2>
-      <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Water data is exported from the SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code> and published through the update pipeline. Do not upload raw exports straight to GitHub: the pipeline merges new rows into the existing files and applies the outlier sanitization passes first.</p>
-      <h3>Update Steps</h3>
+      <div class="info-box" style="margin-bottom:0.75rem;">
+        <strong>Automatic refresh:</strong> the data pipeline runs every Monday at 07:10. It exports from SkySpark, merges, sanitizes, and pushes the updated files to GitHub. No manual work is needed on the normal path. The period card above the tabs shows the last month with data.
+      </div>
+      <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Water data comes from the SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code>. Do not upload raw exports straight to GitHub: the pipeline merges new rows into the existing files and applies the outlier sanitization passes first.</p>
+      <h3>Manual Fallback Steps (only if the Monday pipeline fails)</h3>
       <ol class="help-sync-steps">
-        <li>In the SkySpark Shell, run <code>task_exportToIO(2026-03-01..2026-05-31)</code> with the date range you need (overlapping months already loaded is safe; the merge fills gaps and never regresses good values)</li>
+        <li>In the SkySpark Shell, run <code>task_exportToIO(2026-06-01..2026-08-31)</code> with the date range you need (overlapping months already loaded is safe; the merge fills gaps and never regresses good values)</li>
         <li>Download the 7 JSON files from the SkySpark Files <code>io/</code> folder</li>
         <li>Copy them into <code>C:\Users\john.slagboom\Desktop\Git\data\new\</code></li>
         <li>From <code>C:\Users\john.slagboom\Desktop\Git\</code> run <code>bash update-data.sh</code> (merges, sanitizes, pushes to GitHub, clears staging)</li>
@@ -809,6 +825,20 @@
       </ol>
       <div class="info-box" style="margin-top:0.75rem;">
         <strong>Note:</strong> Both files are shared with the <a href="metering.html">Campus Metering</a> dashboard. Updating them here updates metering data too. See the <strong>Data Info</strong> tab for pipeline details and data quality checks after updating.
+      </div>
+    </div>
+
+    <!-- Known Data Issues -->
+    <div class="card help-section">
+      <h2>Known Data Issues</h2>
+      <div class="info-box" style="margin-bottom:0.75rem;">
+        <strong>Housing village submeters (ruling 08/24/2026):</strong> the Columbia (0678), Kamiak (0660), and Terrace (0650) irrigation meters are nested inside their domestic master meters. Their gallons already sit inside the domestic totals, so this dashboard excludes them from combined water totals. Chinook (0679) was ruled parallel: its irrigation is real and additive. The Sensus drive-by route reads each meter once; there is no route double-count.
+      </div>
+      <div class="info-box" style="margin-bottom:0.75rem;">
+        <strong>Chinook (0679) irrigation gap:</strong> Chinook irrigation is real usage, roughly 2 million gallons per year, but every 0679 irrigation row from SkySpark is null while the meters await provisioning. The dashboard therefore shows no Chinook irrigation. Treat Chinook totals as domestic-only until the meters come online.
+      </div>
+      <div class="info-box">
+        <strong>Calsense sites dark for Jul 2026:</strong> 12 of the 17 Calsense-audited irrigation sites report null for Jul 2026, peak season (0003B, 0066D, 0079A, 0079B, 0082A, 0085B, 0093E, 0120M, 0314A, 0801A, 0807A, 0812S). While dark, these sites are invisible to spike detection and cannot appear in the Top 10. Check the Stale-but-High-Dollar view before trusting campus irrigation totals for Jul 2026.
       </div>
     </div>
 
@@ -839,7 +869,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Top 10 Top Dollar Issues</strong>
-          Filter button on the Anomaly Review tab. Computed live from the loaded data and restricted to CURRENT issues: only buildings with real data in the two most recent campus data months are ranked. Recent months are compared to the same months in 2025 (fallback: 2025 median). Ranking is by annualized run rate so the largest ongoing issues surface first, but the DISPLAYED headline is <strong>event cost to date</strong>, the actual excess kGal &times; rate (FY27, $7.31 per kGal) for the trigger months only. Every row expands to show the full arithmetic, net year-to-date vs 2025 as context (negatives allowed), and the annualized figure explicitly labeled as reference only. Stale meters never appear here no matter how large their old numbers; those belong in field verification. Recomputes automatically whenever the data updates.
+          Filter button on the Anomaly Review tab. Computed live from the loaded data and restricted to CURRENT issues: only buildings with real data in the two most recent campus data months are ranked. Recent months are compared to the same months in the prior year (fallback: prior-year median). Ranking is by annualized run rate so the largest ongoing issues surface first, but the DISPLAYED headline is <strong>event cost to date</strong>, the actual excess kGal &times; rate (FY27, $7.31 per kGal) for the trigger months only. Every row expands to show the full arithmetic, net year-to-date vs the prior year as context (negatives allowed), and the annualized figure explicitly labeled as reference only. Stale meters never appear here no matter how large their old numbers; those belong in field verification. Recomputes automatically whenever the data updates.
         </div>
         <div class="help-tab-card">
           <strong>Task Tracker</strong>
@@ -855,7 +885,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Data Info</strong>
-          Data source details, the data update pipeline steps, unit conversions, file inventory, and automated data quality checks with integrity verification. Also hosts the <strong>Meter-Level Data Upload</strong>: upload the ByMeter Altura report CSVs to override the standard feed with fresher per-meter data, add the Well Water service, and unlock by-meter breakdown tables in expanded rows.
+          Data source details, the data update pipeline steps, unit conversions, file inventory, and automated data quality checks with integrity verification. Also hosts the <strong>Meter-Level Data Upload</strong>: upload the ByMeter Altura report CSVs to override the standard feed with fresher per-meter data and unlock by-meter breakdown tables in expanded rows. Well Water loads automatically from <code>well_water.json</code>; uploads override it.
         </div>
       </div>
     </div>
@@ -965,8 +995,9 @@
       <div class="info-box">
         Upload the <strong>ByMeter Altura report CSVs</strong> (Domestic Water, Irrigation Water, Well Water; columns:
         id, Building Number, Building Name, Data Source, Meter, Service, Unit, Start Date, End Date, Usage; values in gallons).
-        Uploaded months <strong>override the standard feed</strong> for those buildings, Well Water appears as its own service filter,
-        and expanded building rows gain a by-meter breakdown table. Data persists in this browser until cleared; re-upload a newer
+        Uploaded months <strong>override the standard feed</strong> for those buildings,
+        and expanded building rows gain a by-meter breakdown table. Well Water already loads automatically from
+        <code>data/well_water.json</code>; an uploaded Well Water CSV replaces it. Data persists in this browser until cleared; re-upload a newer
         export for a service to replace it.
       </div>
       <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.75rem; flex-wrap:wrap;">
@@ -984,6 +1015,7 @@
         A <strong>Conflict</strong> is a genuine source disagreement to resolve in the field or the workbook, never a guess.
         Badges appear next to each meter in the expanded by-meter tables, along with a reporting-health indicator
         (green dot = current, STALE = 2-3 months old, SILENT = 4+ months).
+        <p style="margin-top:0.4rem;"><strong>File date:</strong> <span id="mcBuildDate">unknown</span>. The weekly Monday pipeline does not rebuild this file; rerun <code>build_meter_class.py</code> after meter changes.</p>
       </div>
       <div class="table-wrap">
         <table>
@@ -996,13 +1028,15 @@
       <h2>Data Sources</h2>
       <div class="info-box">
         <p><strong>Data Period:</strong> <span id="diDateRange">Loading...</span></p>
+        <p><strong>Last month with data:</strong> <span id="diLastData">Loading...</span></p>
         <p><strong>Source:</strong> SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code></p>
         <p><strong>Export Method:</strong> <code>task_exportToIO</code> Shell task exports all 7 dashboard JSON files (including <code>domestic_water.json</code> and <code>irrigation.json</code>) to the SkySpark <code>io/</code> folder</p>
       </div>
       <h2>Data Update Pipeline</h2>
       <div class="info-box">
+        <p><strong>Normal path:</strong> the pipeline runs automatically every Monday at 07:10 and pushes fresh files to GitHub. The steps below are the manual fallback.</p>
         <p><strong>Step 1:</strong> In the SkySpark Shell, run the export task as a single line with the desired date range:</p>
-        <p><code>task_exportToIO(2026-03-01..2026-05-31)</code></p>
+        <p><code>task_exportToIO(2026-06-01..2026-08-31)</code></p>
         <p><strong>Step 2:</strong> Download the 7 JSON files from the SkySpark Files <code>io/</code> folder.</p>
         <p><strong>Step 3:</strong> Copy them into <code>C:\Users\john.slagboom\Desktop\Git\data\new\</code></p>
         <p><strong>Step 4:</strong> From <code>C:\Users\john.slagboom\Desktop\Git\</code> run <code>bash update-data.sh</code></p>
@@ -1193,6 +1227,7 @@ let G_wellByBldg = {};
 let G_meterDetail = {};   // 'bldgNo|service' -> { meterName: { 'YYYY-MM': kGal } } from uploads
 let G_uploadInfo = null;  // { uploadedAt, files, counts } when meter uploads are active
 let G_meterClass = {};    // normalized meter name -> { cls, route, refs, note } from data/meter_class.json
+let G_meterClassDate = null;  // Last-Modified header of data/meter_class.json (build-date display)
 
 function meterClassKey(name) {
   if (!name) return null;
@@ -2204,8 +2239,9 @@ function getTaskStatusLabel(anomaly, tasks) {
 
 // Top 10 Top Dollar Issues: computed at load from the data itself, never hardcoded.
 // For each building/service, take its latest one or two months that have real
-// (nonzero) 2026 data, compare each against the same calendar month in 2025
-// (fallback: 2025 median). Ranking uses annualized run rate to surface the
+// (nonzero) current-year data, compare each against the same calendar month in
+// the prior year (fallback: prior-year median). Years derive from the latest
+// data month, so the logic survives the January rollover. Ranking uses annualized run rate to surface the
 // biggest ongoing issues; the DISPLAYED headline is event cost to date
 // (excess kGal x rate for the trigger months only). Annualized appears only
 // as a labeled reference. Net YTD vs 2025 is shown as context (negatives
@@ -2226,6 +2262,8 @@ let G_top10Detail = {};   // key = bldgNo|service -> {eventCost, excessKGal, mon
 let G_staleKeys   = new Set();
 let G_staleDetail = {};   // stale-but-high-dollar: buildings gated out by recency, ranked by same event-cost math
 let G_maxDataIdx  = 0;    // most-recent campus data month index (populated by computeTop10TopDollar)
+let G_top10CurYear  = '';   // derived from latest data month (e.g. '2026')
+let G_top10BaseYear = '';   // baseline year = current year minus 1 (e.g. '2025')
 
 function computeTop10TopDollar() {
   const monthIdx = mk => parseInt(mk.slice(0, 4), 10) * 12 + parseInt(mk.slice(5, 7), 10);
@@ -2233,6 +2271,11 @@ function computeTop10TopDollar() {
   [G_domByBldg, G_irrigByBldg].forEach(map => Object.values(map).forEach(b =>
     Object.keys(b.months).forEach(mk => { if (b.months[mk] > 0) maxIdx = Math.max(maxIdx, monthIdx(mk)); })));
   G_maxDataIdx = maxIdx;
+  if (!maxIdx) { G_staleKeys = new Set(); return new Set(); }
+  const curYear  = String(Math.floor((maxIdx - 1) / 12));
+  const baseYear = String(Math.floor((maxIdx - 1) / 12) - 1);
+  G_top10CurYear = curYear;
+  G_top10BaseYear = baseYear;
   const cutoff = maxIdx - 1;
   const scored = [];
   const stale  = [];
@@ -2241,14 +2284,14 @@ function computeTop10TopDollar() {
   [[G_domByBldg, 'Domestic Water'], [G_irrigByBldg, 'Irrigation Water']].forEach(pair => {
     const map = pair[0], service = pair[1];
     Object.values(map).forEach(b => {
-      const keys26 = Object.keys(b.months).filter(mk => mk.startsWith('2026-') && b.months[mk] > 0).sort();
+      const keys26 = Object.keys(b.months).filter(mk => mk.startsWith(curYear + '-') && b.months[mk] > 0).sort();
       if (!keys26.length) return;
       const latestIdx = monthIdx(keys26[keys26.length - 1]);
       const isStale   = latestIdx < cutoff;
       // Stale meters still get scored (against their own last-known-data months),
       // but land on the Stale-High-Dollar list instead of the Top 10.
       const recent = isStale ? keys26.slice(-2) : keys26.slice(-2).filter(mk => monthIdx(mk) >= cutoff);
-      const vals25 = Object.keys(b.months).filter(mk => mk.startsWith('2025-'))
+      const vals25 = Object.keys(b.months).filter(mk => mk.startsWith(baseYear + '-'))
         .map(mk => b.months[mk]).filter(v => v > 0).sort((a, c) => a - c);
       const med25 = vals25.length ? vals25[Math.floor(vals25.length / 2)] : 0;
       const monthDetail = [];
@@ -2256,7 +2299,7 @@ function computeTop10TopDollar() {
       recent.forEach(mk => {
         const cal = mk.split('-')[1];
         const priors = Object.keys(b.months)
-          .filter(m => m.startsWith('2025-') && m.split('-')[1] === cal)
+          .filter(m => m.startsWith(baseYear + '-') && m.split('-')[1] === cal)
           .map(m => b.months[m]).filter(v => v > 0);
         const base = priors.length ? priors.reduce((s, v) => s + v, 0) / priors.length : med25;
         const e = b.months[mk] - base;
@@ -2266,19 +2309,19 @@ function computeTop10TopDollar() {
             mk: mk,
             usage: b.months[mk],
             baseline: base,
-            baselineSrc: priors.length ? ('2025-' + cal) : '2025 median',
+            baselineSrc: priors.length ? (baseYear + '-' + cal) : baseYear + ' median',
             excess: e,
             cost: e * TOP10_RATE_PER_KGAL
           });
         }
       });
       if (excess <= 0) return;
-      // Year-to-date context: sum 2026 real months vs same calendar months in 2025.
+      // Year-to-date context: sum current-year real months vs same calendar months in the prior year.
       // Net can be NEGATIVE (building is below prior year year-to-date, even during a spike).
-      const ytdKeys = Object.keys(b.months).filter(mk => mk.startsWith('2026-') && b.months[mk] > 0);
+      const ytdKeys = Object.keys(b.months).filter(mk => mk.startsWith(curYear + '-') && b.months[mk] > 0);
       const ytd26 = ytdKeys.reduce((s, mk) => s + b.months[mk], 0);
       const ytd25 = ytdKeys.reduce((s, mk) => {
-        const v = b.months['2025-' + mk.split('-')[1]];
+        const v = b.months[baseYear + '-' + mk.split('-')[1]];
         return s + (v > 0 ? v : 0);
       }, 0);
       const netYtdKGal = ytd26 - ytd25;
@@ -2495,11 +2538,11 @@ function renderAnomalyTab(filter) {
           '(' + fmt(totalExcess, 0) + ' kGal above prior-year baseline, trigger months: ' + monthSpan + ').</div>' +
         '<div class="t10-formula">' +
           'Event cost = &Sigma; (excess kGal per trigger month) &times; rate. Rate = ' + TOP10_RATE_LABEL + '. ' +
-          'Baseline per row = same calendar month in 2025 (fallback: 2025 median).' +
+          'Baseline per row = same calendar month in ' + G_top10BaseYear + ' (fallback: ' + G_top10BaseYear + ' median).' +
         '</div>' +
         '<div class="t10-ref">' +
-          '<strong>Context:</strong> combined net year-to-date vs 2025 same-months = ' + fmtMoney(totalNetYtd) +
-            ' (' + fmt(detail.reduce((s, d) => s + d.netYtdKGal, 0), 0) + ' kGal). Negative means below 2025 YTD even with the current spike.' +
+          '<strong>Context:</strong> combined net year-to-date vs ' + G_top10BaseYear + ' same-months = ' + fmtMoney(totalNetYtd) +
+            ' (' + fmt(detail.reduce((s, d) => s + d.netYtdKGal, 0), 0) + ' kGal). Negative means below ' + G_top10BaseYear + ' YTD even with the current spike.' +
           '<br><strong>Reference only (not a headline):</strong> annualized run rate for the same excess &times; 12 = ' +
             fmtMoney(totalAnnual) + '/yr. Do not report this as the year figure &mdash; it fabricates a year that has not happened.' +
         '</div>' + staleNote;
@@ -2920,11 +2963,11 @@ function toggleSiteChart(row) {
           '<div class="t10-cb-headline">Total event cost to date: ' + fmtMoney(t10row.eventCost) +
             ' (' + fmt(t10row.excessKGal, 1) + ' kGal excess)</div>' +
           '<div class="t10-cb-context">' +
-            '<strong>Net YTD vs 2025:</strong> ' + netSign + fmt(t10row.netYtdKGal, 1) + ' kGal = ' +
+            '<strong>Net YTD vs ' + G_top10BaseYear + ':</strong> ' + netSign + fmt(t10row.netYtdKGal, 1) + ' kGal = ' +
             fmtMoney(t10row.netYtdCost) +
             (t10row.netYtdKGal < 0
-              ? ' &mdash; this building is BELOW its 2025 year-to-date total even with the current spike.'
-              : ' &mdash; year-to-date this building is above 2025 by this much.') +
+              ? ' &mdash; this building is BELOW its ' + G_top10BaseYear + ' year-to-date total even with the current spike.'
+              : ' &mdash; year-to-date this building is above ' + G_top10BaseYear + ' by this much.') +
           '</div>' +
           '<div class="t10-cb-ref">' +
             '<strong>Reference only (do not report as a year figure):</strong> ' +
@@ -3065,6 +3108,46 @@ function renderTrendsTab(domestic, irrigation) {
     detectCampusAnomaliesYoY(getYearCampusData(irrigByMonth, year), year, G_irrigByBldg)
   );
   lineChart('chartIrrigTrend', CALENDAR_MONTHS, irrigDatasets, irrigAnomalies);
+
+  // Coverage disclosure: year lines can differ in meter coverage. For each
+  // current-year month, compute the share of usage from buildings with no
+  // usage in the SAME month of the prior year (new metering coverage). Show
+  // the note when any substantial month (>= 1,000 kGal) has >= 10% of its
+  // total coming from such buildings, so a coverage-driven jump cannot read
+  // as a campus-wide surge.
+  const covEl = document.getElementById('irrigCoverageNote');
+  if (covEl && G_years.length > 1) {
+    const curY = String(G_years[G_years.length - 1]);
+    const priorY = String(G_years[G_years.length - 2]);
+    let worst = null;
+    for (let m = 1; m <= 12; m++) {
+      const mm = String(m).padStart(2, '0');
+      let tot = 0, nw = 0, nwCount = 0, biggest = null;
+      Object.values(G_irrigByBldg).forEach(b => {
+        const c = b.months[curY + '-' + mm] || 0;
+        if (c <= 0) return;
+        tot += c;
+        if (!(b.months[priorY + '-' + mm] > 0)) {
+          nw += c; nwCount++;
+          if (!biggest || c > biggest.kgal) biggest = { label: bldgLabel(b), kgal: c };
+        }
+      });
+      if (tot >= 1000 && nw / tot >= 0.10 && (!worst || nw / tot > worst.share)) {
+        worst = { mm: mm, tot: tot, nw: nw, share: nw / tot, nwCount: nwCount, biggest: biggest };
+      }
+    }
+    if (worst) {
+      const mkLabel = monthLabel(curY + '-' + worst.mm);
+      covEl.style.display = '';
+      covEl.innerHTML = '<strong>Coverage note:</strong> in ' + mkLabel + ', ' +
+        fmt(worst.nw, 0) + ' kGal (' + (worst.share * 100).toFixed(0) + '% of the month total) came from ' +
+        worst.nwCount + ' building(s) with no usage in the same month of ' + priorY +
+        (worst.biggest ? ', largest: ' + worst.biggest.label + ' at ' + fmt(worst.biggest.kgal, 0) + ' kGal' : '') +
+        '. Much of that is new metering coverage, not new consumption, so the year lines are not a like-for-like comparison.';
+    } else {
+      covEl.style.display = 'none';
+    }
+  }
 
   // Top 10 buildings by total water (stacked)
   const allBldg = {};
@@ -3482,9 +3565,9 @@ function exportFieldActionList() {
         d.months.length + ' trigger month' + (d.months.length === 1 ? '' : 's') + '</div>' +
       staleLine +
       '<ul class="months">' + monthCells(d) + '</ul>' +
-      '<div class="ctx"><strong>Net YTD vs 2025:</strong> ' + netSign + fmt(d.netYtdKGal, 1) +
+      '<div class="ctx"><strong>Net YTD vs ' + G_top10BaseYear + ':</strong> ' + netSign + fmt(d.netYtdKGal, 1) +
         ' kGal = ' + fmtMoney(d.netYtdCost) +
-        (d.netYtdKGal < 0 ? ' &mdash; building is BELOW its 2025 year-to-date total even with this spike.' : ' &mdash; building is above 2025 by this much year-to-date.') +
+        (d.netYtdKGal < 0 ? ' &mdash; building is BELOW its ' + G_top10BaseYear + ' year-to-date total even with this spike.' : ' &mdash; building is above ' + G_top10BaseYear + ' by this much year-to-date.') +
       '</div>' +
       '<div class="ref"><strong>Reference only (do not report):</strong> annualized run rate = ' +
         fmtMoney(d.annualizedRef) + '/yr.</div>' +
@@ -3556,7 +3639,7 @@ window.addEventListener('beforeprint', function() {
 // ============================================================
 //  DATA VERIFICATION & DATA INFO TAB
 // ============================================================
-function runWaterVerification(domestic, irrigation, totals) {
+function runWaterVerification(domestic, irrigation, well, totals) {
   const checks = [];
   const utilities = {};
   const kpiCheck = {};
@@ -3576,12 +3659,13 @@ function runWaterVerification(domestic, irrigation, totals) {
       else { valid++; bldgs.add(r.bldgNo); }
       rawSum += u;
       const mk = parseMonthKey(r.startDate);
-      if (mk) {
+      // Count a month toward the date range only when it has real usage.
+      // Placeholder rows (null or zero usage in future months) must not
+      // stretch the reported data period.
+      if (mk && u > 0) {
         dates.add(mk);
-        if (u > 0) {
-          if (!bldgMonths[r.bldgNo]) bldgMonths[r.bldgNo] = new Set();
-          bldgMonths[r.bldgNo].add(mk);
-        }
+        if (!bldgMonths[r.bldgNo]) bldgMonths[r.bldgNo] = new Set();
+        bldgMonths[r.bldgNo].add(mk);
       }
     });
 
@@ -3593,11 +3677,13 @@ function runWaterVerification(domestic, irrigation, totals) {
     let gapBuildings = 0;
     Object.values(bldgMonths).forEach(ms => { if (ms.size < totalMonths) gapBuildings++; });
 
-    utilities[name] = { rows: rows.length, valid, naCount, negCount, zeroCount, buildings: bldgs.size, dateRange, rawSum, gapBuildings, totalMonths };
+    const lastDataMonth = sortedDates.length > 0 ? monthLabel(sortedDates[sortedDates.length - 1]) : 'None';
+    utilities[name] = { rows: rows.length, valid, naCount, negCount, zeroCount, buildings: bldgs.size, dateRange, lastDataMonth, rawSum, gapBuildings, totalMonths };
   }
 
   analyzeUtility(domestic, 'Domestic Water');
   analyzeUtility(irrigation, 'Irrigation');
+  if (well && well.length) analyzeUtility(well, 'Well Water');
 
   // Check 1: Row counts
   const rowDetail = Object.entries(utilities).map(([k, v]) => k + ': ' + fmt(v.rows)).join(' | ');
@@ -3625,11 +3711,17 @@ function runWaterVerification(domestic, irrigation, totals) {
   const zeroPct = totalRows > 0 ? (totalZero / totalRows * 100).toFixed(1) : 0;
   checks.push({ name: 'Zero-Usage Months', status: 'pass', detail: fmt(totalZero) + ' zero-usage rows (' + zeroPct + '%) across all utilities' });
 
-  // Check 5: Date range consistency
-  const allRanges = Object.values(utilities).map(v => v.dateRange);
-  const rangeConsistent = allRanges.every(r => r === allRanges[0]);
-  checks.push({ name: 'Date Range', status: rangeConsistent ? 'pass' : 'warn',
-    detail: rangeConsistent ? 'All utilities: ' + allRanges[0] : Object.entries(utilities).map(([k,v]) => k + ': ' + v.dateRange).join(' | ') });
+  // Check 5: Date range / data currency. Ranges count only months with real
+  // usage (placeholder rows excluded). Utilities may start in different months
+  // (Well Water starts earlier), so the pass condition is a shared LAST month
+  // with data, not identical full ranges.
+  const lastMonths = Object.values(utilities).map(v => v.lastDataMonth);
+  const endConsistent = lastMonths.every(m => m === lastMonths[0]);
+  const rangeDetail = Object.entries(utilities).map(([k,v]) => k + ': ' + v.dateRange).join(' | ');
+  checks.push({ name: 'Date Range', status: endConsistent ? 'pass' : 'warn',
+    detail: (endConsistent
+      ? 'All utilities have real data through ' + lastMonths[0] + '. '
+      : 'Utilities end in different months. ') + rangeDetail });
 
   // Check 6: Monthly continuity
   const totalGaps = Object.values(utilities).reduce((s, v) => s + v.gapBuildings, 0);
@@ -3667,27 +3759,36 @@ function runWaterVerification(domestic, irrigation, totals) {
   return { overall, passCount, warnCount, failCount, checks, utilities, kpiCheck };
 }
 
-function renderDataInfo(domestic, irrigation, totals) {
+function renderDataInfo(domestic, irrigation, well, totals) {
   const statusIcon = s => '<span class="dq-icon ' + s + '">' + (s === 'pass' ? '\u2713' : s === 'warn' ? '\u26a0' : '\u2717') + '</span>';
 
-  // Date range header
-  const allDates = [...domestic, ...irrigation].map(r => parseMonthKey(r.startDate)).filter(Boolean).sort();
-  if (allDates.length > 0) {
-    document.getElementById('diDateRange').textContent = monthLabel(allDates[0]) + ' \u2013 ' + monthLabel(allDates[allDates.length - 1]) +
-      ' (' + new Set(allDates).size + ' months)';
+  // Date range header: only months with real usage count. Files carry empty
+  // placeholder rows for future months (null usage through Dec 2026 today);
+  // those must not stretch the reported data period.
+  const realDates = [...domestic, ...irrigation]
+    .filter(r => typeof r.usage === 'number' && isFinite(r.usage) && r.usage > 0)
+    .map(r => parseMonthKey(r.startDate)).filter(Boolean).sort();
+  if (realDates.length > 0) {
+    const lastMk = realDates[realDates.length - 1];
+    document.getElementById('diDateRange').textContent = monthLabel(realDates[0]) + ' \u2013 ' + monthLabel(lastMk) +
+      ' (' + new Set(realDates).size + ' months with data; empty placeholder rows for later months are excluded)';
+    document.getElementById('diLastData').textContent =
+      monthLabel(lastMk).split(' ')[0] + ' ' + lastMk.slice(0, 4);
   }
 
   // File inventory
   const fileMeta = [
     { file: 'domestic_water.json', rows: domestic.length, desc: 'Domestic water (gal), Export Format' },
-    { file: 'irrigation.json', rows: irrigation.length, desc: 'Irrigation water (gal), Export Format' }
+    { file: 'irrigation.json', rows: irrigation.length, desc: 'Irrigation water (gal), Export Format' },
+    { file: 'well_water.json', rows: (well || []).length, desc: 'Well water byMeter (gal); loads automatically, uploads override' },
+    { file: 'meter_class.json', rows: Object.keys(G_meterClass).length, desc: 'Meter collection classes; rebuilt by build_meter_class.py, not by the weekly pipeline' }
   ];
   document.getElementById('tblFiles').innerHTML = fileMeta.map(f =>
     '<tr><td style="text-align:left"><code>' + f.file + '</code></td><td>' + fmt(f.rows) + '</td><td style="text-align:left">' + f.desc + '</td></tr>'
   ).join('');
 
   // Run verification
-  const vr = runWaterVerification(domestic, irrigation, totals);
+  const vr = runWaterVerification(domestic, irrigation, well, totals);
 
   // Summary badges
   document.getElementById('dqSummary').innerHTML =
@@ -3728,13 +3829,30 @@ function renderDataInfo(domestic, irrigation, totals) {
 // ============================================================
 (async function init() {
   try {
-    const [domRepo, irrRepo, wellRepo, meterClass] = await Promise.all([
+    const [domRepoRaw, irrRepoRaw, wellRepo, meterClass] = await Promise.all([
       loadJSON('data/domestic_water.json'),
       loadJSON('data/irrigation.json'),
       loadJSON('data/well_water.json').catch(() => []),
-      fetch('data/meter_class.json').then(r => r.ok ? r.json() : {}).catch(() => ({}))
+      fetch('data/meter_class.json')
+        .then(r => { G_meterClassDate = r.headers.get('Last-Modified'); return r.ok ? r.json() : {}; })
+        .catch(() => ({}))
     ]);
     G_meterClass = meterClass || {};
+    // 0650 Terrace: master domestic meter 0650_DW_001 was mis-tagged Irrigation
+    // in SkySpark until 08/03/2026, so its 2025 history sits in irrigation.json
+    // (4.1M gal incl. 2.45M gal in Dec 2025). Reclassify those rows as Domestic
+    // Water at load so the irrigation trend and YoY baselines stay clean. Rows
+    // move to domestic only when domestic has no real row for that month yet.
+    // Remove this block once the upstream files are re-exported clean.
+    const misTagged0650 = r => r.bldgNo === '0650' && String(r.meters || '').indexOf('0650_DW_001') !== -1;
+    const irrRepo = irrRepoRaw.filter(r => !misTagged0650(r));
+    const domHave = new Set(domRepoRaw
+      .filter(r => typeof r.usage === 'number' && r.usage > 0)
+      .map(r => r.bldgNo + '|' + r.startDate));
+    const domRepo = domRepoRaw.concat(irrRepoRaw
+      .filter(r => misTagged0650(r) && typeof r.usage === 'number' && r.usage > 0 &&
+                   !domHave.has(r.bldgNo + '|' + r.startDate))
+      .map(r => Object.assign({}, r, { service: 'Domestic Water' })));
     const merged = applyMeterUploads(domRepo, irrRepo, wellRepo);
     const domestic   = dedupeAggregateRows(normalizeParallelStacks(overlayByMeter(merged.domestic)));
     const irrigation = dedupeAggregateRows(normalizeParallelStacks(overlayByMeter(merged.irrigation)));
@@ -3765,6 +3883,17 @@ function renderDataInfo(domestic, irrigation, totals) {
       Object.values(G_domByBldg).some(b => (b.months[mk] || 0) > 0) ||
       Object.values(G_irrigByBldg).some(b => (b.months[mk] || 0) > 0);
     const recentMonths = G_months.filter(hasDataIn).slice(-3);
+
+    // Period-identity card (matches the energy pages): last month with real
+    // usage, never a null-placeholder month.
+    const realMonths = G_months.filter(hasDataIn);
+    if (realMonths.length) {
+      const lastMk = realMonths[realMonths.length - 1];
+      document.getElementById('periodCard').style.display = '';
+      document.getElementById('periodCardRange').textContent =
+        '\u2022 data through ' + monthLabel(lastMk).split(' ')[0] + ' ' + lastMk.slice(0, 4);
+      document.getElementById('periodCardNote').textContent = 'auto-refreshed from SkySpark every Monday';
+    }
     const domSpikes = detectBuildingAnomaliesYoY(G_domByBldg, recentMonths, G_months, 'Domestic Water');
     const irrigSpikes = detectBuildingAnomaliesYoY(G_irrigByBldg, recentMonths, G_months, 'Irrigation Water');
     const winterIrrig = detectWinterIrrigation(G_irrigByBldg, recentMonths);
@@ -3781,32 +3910,13 @@ function renderDataInfo(domestic, irrigation, totals) {
     // Render building index
     renderBuildingTab();
 
-    // One-shot cleanup 07/22/2026: the old Create Tasks button bulk-created 23
-    // anomaly tasks ignoring the active filter. Remove today's untouched
-    // auto-created anomaly tasks once, then never run again. Safe to delete
-    // this block after 08/2026.
-    if (!localStorage.getItem('wsu_task_purge_20260722b')) {
-      const all = loadTasks();
-      const keep = all.filter(t => !(
-        (t.entryDate === '07/22/26' || t.entryDate === '2026-07-22') &&
-        t.status === 'Open - Not Started' &&
-        (t.wo === 'NA' || !t.wo) && !t.assignedTo && !t.actionNote &&
-        (t.description || '').indexOf('Top 10 Top Dollar issue') !== 0
-      ));
-      if (keep.length !== all.length) {
-        saveTasks(keep);
-        console.warn('[task purge 07/22/2026] removed ' + (all.length - keep.length) + ' bulk-created task(s)');
-      }
-      localStorage.setItem('wsu_task_purge_20260722b', 'done');
-    }
-
     // Render task tracker
     renderTaskTab();
 
     // Render data info tab
     const totalDom = Object.values(G_domByBldg).reduce((s, b) => s + b.total, 0);
     const totalIrrig = Object.values(G_irrigByBldg).reduce((s, b) => s + b.total, 0);
-    renderDataInfo(domestic, irrigation, { dom: totalDom, irrig: totalIrrig });
+    renderDataInfo(domestic, irrigation, well, { dom: totalDom, irrig: totalIrrig });
 
     // Meter collection-class rollup (Data Info tab)
     const mcCounts = {};
@@ -3823,6 +3933,12 @@ function renderDataInfo(domestic, irrigation, totals) {
         '<tr><td style="text-align:left"><span class="mc-badge ' + mcMeaning[c][0] + '" style="margin-left:0">' + c + '</span></td>' +
         '<td>' + mcCounts[c] + '</td><td style="text-align:left">' + mcMeaning[c][1] + '</td></tr>'
       ).join('') || '<tr><td colspan="3" style="text-align:left">meter_class.json not loaded</td></tr>';
+    const mcDateEl = document.getElementById('mcBuildDate');
+    if (mcDateEl) {
+      mcDateEl.textContent = G_meterClassDate
+        ? new Date(G_meterClassDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+        : 'unknown';
+    }
 
     // Meter-level upload controls
     const upStatus = document.getElementById('uploadStatus');

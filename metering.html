@@ -339,7 +339,10 @@
   }
   footer a { color: var(--primary); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
-  /* Print */
+  /* Print. Intentional divergence from the hidden #printSummary pattern the
+     other dashboards use: this page prints ALL tabs in sequence, one section
+     per page, with the period card supplying the as-of date. Documented
+     08/25/2026. */
   @media print {
     @page { size: landscape; margin: 0.5in; }
     * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
@@ -451,6 +454,9 @@
   <!-- ==================== THERMAL TAB ==================== -->
   <div class="section" id="sec-thermal">
     <div class="kpi-grid" id="kpiThermal"></div>
+    <div class="info-box">
+      <strong>CHW data limits:</strong> CHW energy comes from plant-level BTU meters, not individual buildings. Five building BTU meters have dead temperature inputs and produce no usable data; repair tickets are open with the vendor, and those loads are missing from the CHW figures. CHW data also lags the other utilities by about one month.
+    </div>
     <div class="card">
       <h2>Monthly Thermal Trend (MMBtu)</h2>
       <div class="chart-container"><canvas id="chartThermalTrend"></canvas></div>
@@ -461,7 +467,7 @@
         <div class="chart-container tall"><canvas id="chartSteamTop"></canvas></div>
       </div>
       <div class="card">
-        <h2>Top 15 Buildings &mdash; CHW Energy (MMBtu)</h2>
+        <h2>CHW Plants (MMBtu)</h2>
         <div class="chart-container tall"><canvas id="chartChwETop"></canvas></div>
       </div>
     </div>
@@ -470,6 +476,9 @@
   <!-- ==================== WATER TAB ==================== -->
   <div class="section" id="sec-water">
     <div class="kpi-grid" id="kpiWater"></div>
+    <div class="info-box">
+      <strong>Housing village meters (ruling of 08/24/2026):</strong> The Sensus meters at Columbia Village (0678), Kamiak Village (0660), and Terrace View (0650) are nested submeters; their usage is a subset of the village master meters, not additive. Chinook Village (0679) meters are parallel and additive. The export carries no separate master rows for these complexes, so campus totals here are not known to double count, but any comparison against Housing master billing must account for the nesting. See the Data Info tab for detail.
+    </div>
     <div class="card">
       <h2>Monthly Water Trend (kGal)</h2>
       <div class="chart-container"><canvas id="chartWaterTrend"></canvas></div>
@@ -495,6 +504,7 @@
   <!-- ==================== CONNECTORS TAB ==================== -->
   <div class="section" id="sec-connectors">
     <div class="kpi-grid" id="kpiConn"></div>
+    <div class="info-box" id="connAsOf" style="display:none"></div>
     <div class="filter-bar" id="connFilterBar">
       <button class="filter-btn active" data-filter="all">All</button>
       <button class="filter-btn" data-filter="ok">OK</button>
@@ -513,11 +523,17 @@
       <div class="info-box">
         <p><strong>Data Period:</strong> <span id="dataPeriod">Loading...</span></p>
         <p><strong>Source:</strong> SkySpark <code>wsumeters</code> project at <code>skyspark.fais.wsu.edu</code></p>
-        <p><strong>Export Method:</strong> Existing <code>view_*</code> functions with Export Format, run via Shell</p>
+        <p><strong>Export Method:</strong> Existing <code>view_*</code> functions with Export Format, run by the automated pipeline</p>
       </div>
-      <h2>Export Commands</h2>
+      <h2>Known Data Issue: Housing Village Meters</h2>
       <div class="info-box">
-        <p>Run these in the SkySpark Shell to refresh data:</p>
+        <p><strong>Ruling of 08/24/2026:</strong> The Sensus water meters at Columbia Village (0678), Kamiak Village (0660), and Terrace View (0650) are nested submeters. Their usage is a subset of the village master meters, not additive on top of them. Chinook Village (0679) meters are parallel and additive.</p>
+        <p style="margin-top:0.5rem">This dashboard reports each utility separately and sums the rows the export provides. The export carries no separate master rows for these complexes, so an in-file double count is not known to exist. Do not add these building rows to Housing master billing figures without accounting for the nesting.</p>
+      </div>
+      <h2>Data Refresh</h2>
+      <div class="info-box">
+        <p><strong>Automatic (normal path):</strong> The pipeline script <code>auto-update-data.py</code> in the repo root runs every Monday at 07:10. It exports fresh data from SkySpark, rewrites the seven JSON files in <code>data/</code>, and pushes to GitHub Pages. No manual step is needed.</p>
+        <p style="margin-top:0.5rem"><strong>Manual fallback:</strong> If the pipeline fails or an off-cycle refresh is needed, run these in the SkySpark Shell, then upload the exports to <code>data/</code> and push:</p>
         <p><code>view_elecMeters(<span class="export-dates">...</span>, "Energy (kWh)", "Site", "Export Format")</code></p>
         <p><code>view_condensate(<span class="export-dates">...</span>, "Site", "Export Format")</code></p>
         <p><code>view_water(<span class="export-dates">...</span>, "Site", "Domestic", "Export Format")</code></p>
@@ -538,7 +554,7 @@
       <h2>File Inventory</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th style="text-align:left">File</th><th>Rows</th><th style="text-align:left">Description</th></tr></thead>
+          <thead><tr><th style="text-align:left">File</th><th>Rows</th><th style="text-align:left">Updated</th><th style="text-align:left">Description</th></tr></thead>
           <tbody id="tblFiles"></tbody>
         </table>
       </div>
@@ -553,7 +569,7 @@
       <p style="font-size:0.78rem;color:var(--text-light);margin-bottom:0.5rem">Independent recalculation from raw data vs. dashboard KPIs</p>
       <div class="table-wrap"><table class="dq-kpi-table"><thead><tr><th>Utility</th><th>Raw Sum</th><th>Converted</th><th>Dashboard KPI</th><th>Match</th></tr></thead><tbody id="dqKpi"></tbody></table></div>
       <h3 style="margin-top:1.25rem">Per-Utility Breakdown</h3>
-      <div class="table-wrap"><table class="dq-table"><thead><tr><th>Utility</th><th>Rows</th><th>Valid</th><th>NA/Invalid</th><th>Negative</th><th>Zero</th><th>Buildings</th><th>Date Range</th></tr></thead><tbody id="dqUtility"></tbody></table></div>
+      <div class="table-wrap"><table class="dq-table"><thead><tr><th>Utility</th><th>Rows</th><th>Valid</th><th>NA/Invalid</th><th>Future Placeholder</th><th>Negative</th><th>Zero</th><th>Buildings</th><th>Date Range</th></tr></thead><tbody id="dqUtility"></tbody></table></div>
     </div>
   </div>
 </div>
@@ -788,6 +804,13 @@ function fmt(n, dec) {
   return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 
+function fmtDateMDY(d) {
+  // Full-year format: 08/25/2026
+  if (!d || isNaN(d.getTime())) return '';
+  const p = n => (n < 10 ? '0' : '') + n;
+  return p(d.getMonth() + 1) + '/' + p(d.getDate()) + '/' + d.getFullYear();
+}
+
 function parseMonthKey(startDate) {
   // startDate format: "MM-DD-YYYY" -> "YYYY-MM"
   if (!startDate) return '';
@@ -854,9 +877,13 @@ function resolveAggDetailOverlap(rows) {
   return out;
 }
 
+const fileFreshness = {}; // url -> Date from the HTTP Last-Modified header
+
 async function loadJSON(url) {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error('Failed to load ' + url);
+  const lm = resp.headers.get('Last-Modified');
+  fileFreshness[url] = lm ? new Date(lm) : null;
   const data = await resp.json();
   let rows = data.rows || [];
   if (/domestic_water|irrigation/.test(url)) {
@@ -1100,15 +1127,29 @@ function runVerification(data, totals) {
 
   // Helper: analyze one utility dataset
   function analyzeUtility(rows, name) {
-    let valid = 0, naCount = 0, negCount = 0, zeroCount = 0, rawSum = 0;
+    let valid = 0, naCount = 0, negCount = 0, zeroCount = 0, rawSum = 0, placeholderCount = 0;
     const bldgs = new Set();
     const dates = new Set();
     const bldgMonths = {};  // bldgNo -> Set of month keys
 
+    // Last month with real usage: null rows after it are export-created
+    // future placeholders, not genuine NA problems.
+    let maxRealMk = '';
+    rows.forEach(r => {
+      if (typeof r.usage === 'number' && isFinite(r.usage) && r.usage > 0) {
+        const mk = parseMonthKey(r.startDate);
+        if (mk > maxRealMk) maxRealMk = mk;
+      }
+    });
+
     rows.forEach(r => {
       const u = r.usage;
       const isNum = typeof u === 'number' && isFinite(u);
-      if (!isNum) { naCount++; return; }
+      if (!isNum) {
+        const mk0 = parseMonthKey(r.startDate);
+        if (maxRealMk && mk0 > maxRealMk) placeholderCount++; else naCount++;
+        return;
+      }
       if (u < 0) negCount++;
       if (u === 0) zeroCount++;
       else { valid++; bldgs.add(r.bldgNo); }
@@ -1131,7 +1172,7 @@ function runVerification(data, totals) {
     let gapBuildings = 0;
     Object.values(bldgMonths).forEach(ms => { if (ms.size < totalMonths) gapBuildings++; });
 
-    utilities[name] = { rows: rows.length, valid, naCount, negCount, zeroCount, buildings: bldgs.size, dateRange, rawSum, gapBuildings, totalMonths };
+    utilities[name] = { rows: rows.length, valid, naCount, placeholderCount, negCount, zeroCount, buildings: bldgs.size, dateRange, rawSum, gapBuildings, totalMonths };
     return { rawSum, bldgs };
   }
 
@@ -1150,9 +1191,11 @@ function runVerification(data, totals) {
   const totalNA = Object.values(utilities).reduce((s, v) => s + v.naCount, 0);
   const totalRows = Object.values(utilities).reduce((s, v) => s + v.rows, 0);
   const naPct = totalRows > 0 ? (totalNA / totalRows * 100).toFixed(2) : 0;
-  const naDetail = totalNA === 0
+  const totalPlaceholder = Object.values(utilities).reduce((s, v) => s + v.placeholderCount, 0);
+  let naDetail = totalNA === 0
     ? 'No NA/invalid values found across all datasets'
     : totalNA + ' NA/invalid values (' + naPct + '%) ' + Object.entries(utilities).filter(([,v]) => v.naCount > 0).map(([k,v]) => k + ': ' + v.naCount).join(', ');
+  if (totalPlaceholder > 0) naDetail += ' | ' + fmt(totalPlaceholder) + ' future placeholder rows (null months the export pre-creates) counted separately, not as NA';
   checks.push({ name: 'NA/Invalid Values', status: totalNA === 0 ? 'pass' : 'warn', detail: naDetail });
 
   // Check 3: Negative values
@@ -1278,6 +1321,7 @@ function renderVerification(vr) {
     '<td>' + fmt(u.rows) + '</td>' +
     '<td>' + fmt(u.valid) + '</td>' +
     '<td>' + (u.naCount > 0 ? '<span style="color:var(--red)">' + u.naCount + '</span>' : '0') + '</td>' +
+    '<td>' + fmt(u.placeholderCount) + '</td>' +
     '<td>' + (u.negCount > 0 ? '<span style="color:var(--red)">' + u.negCount + '</span>' : '0') + '</td>' +
     '<td>' + fmt(u.zeroCount) + '</td>' +
     '<td>' + u.buildings + '</td>' +
@@ -1305,7 +1349,10 @@ loadAllData().then(data => {
   const pc = document.getElementById('periodCard');
   pc.style.display = '';
   document.getElementById('periodCardRange').textContent = '• data through ' + dateInfo.longRange.split('–')[1].trim();
-  document.getElementById('periodCardNote').textContent = 'auto-refreshed from SkySpark every Monday';
+  let newestFile = null;
+  Object.values(fileFreshness).forEach(d => { if (d && (!newestFile || d > newestFile)) newestFile = d; });
+  document.getElementById('periodCardNote').textContent = 'auto-refreshed from SkySpark Mondays 07:10' +
+    (newestFile ? ' • files updated ' + fmtDateMDY(newestFile) : '');
   document.querySelectorAll('.export-dates').forEach(el => {
     el.textContent = dateInfo.firstISO + '..' + dateInfo.lastEndISO;
   });
@@ -1599,6 +1646,12 @@ loadAllData().then(data => {
     { label: 'Disabled', value: fmt(connDisabled + connOther), sub: 'Intentionally off + other', cls: '',
       tooltip: 'Connectors intentionally disabled or in an unknown state' }
   ]);
+  const connLm = fileFreshness['data/connectors.json'];
+  if (connLm) {
+    const connAsOfEl = document.getElementById('connAsOf');
+    connAsOfEl.style.display = '';
+    connAsOfEl.textContent = 'Connector status as of ' + fmtDateMDY(connLm) + ' (weekly pipeline snapshot, not live status).';
+  }
   buildConnectorTable(data.connectors);
 
   // ==================== DATA INFO TAB ====================
@@ -1611,9 +1664,10 @@ loadAllData().then(data => {
     { file: 'sites.json', rows: data.sites.length, desc: 'Site/building metadata' },
     { file: 'connectors.json', rows: data.connectors.length, desc: 'Connector status records' }
   ];
-  document.getElementById('tblFiles').innerHTML = fileMeta.map(f =>
-    `<tr><td style="text-align:left"><code>${f.file}</code></td><td>${fmt(f.rows)}</td><td style="text-align:left">${f.desc}</td></tr>`
-  ).join('');
+  document.getElementById('tblFiles').innerHTML = fileMeta.map(f => {
+    const lm = fileFreshness['data/' + f.file];
+    return `<tr><td style="text-align:left"><code>${f.file}</code></td><td>${fmt(f.rows)}</td><td style="text-align:left">${lm ? fmtDateMDY(lm) : 'n/a'}</td><td style="text-align:left">${f.desc}</td></tr>`;
+  }).join('');
 
 }).catch(err => {
   document.getElementById('loading').innerHTML =
@@ -1627,6 +1681,7 @@ function buildUtilityTable(tableId, searchId, byBldg, months, unit) {
   const tbl = document.getElementById(tableId);
   const thead = tbl.querySelector('thead');
   const tbody = tbl.querySelector('tbody');
+  const moLabelShort = months.length + '-mo';
 
   // Header
   let hdr = '<tr><th style="text-align:left">Bldg #</th><th style="text-align:left">Building Name</th><th>' + moLabelShort + ' Total (' + unit + ')</th>';
@@ -1750,6 +1805,21 @@ function buildBuildingCards(data, elecByBldg, steamByBldg, chwEByBldg, domByBldg
 // ============================================================
 //  CONNECTOR TABLE
 // ============================================================
+function glossConnErr(err) {
+  // Plain-language hint for the most common raw BACnet error strings
+  if (!err) return '';
+  const rules = [
+    [/TSM_TIMEOUT|AbortErr/i, 'device did not answer (timeout)'],
+    [/ReadTimeout|read timed out/i, 'network read timed out'],
+    [/Connection refused|ConnectException/i, 'device refused the connection'],
+    [/UnknownHost/i, 'hostname not found on the network'],
+    [/No route to host|unreachable/i, 'device unreachable on the network'],
+    [/SEGMENTATION/i, 'device rejected message segmentation']
+  ];
+  for (const [re, txt] of rules) { if (re.test(err)) return txt; }
+  return '';
+}
+
 function buildConnectorTable(connectors) {
   const tbl = document.getElementById('tblConn');
   const thead = tbl.querySelector('thead');
@@ -1767,7 +1837,8 @@ function buildConnectorTable(connectors) {
     tbody.innerHTML = rows.map(c => {
       const status = c.connStatus || 'unknown';
       const dotCls = status === 'ok' ? 'ok' : status === 'fault' ? 'fault' : 'disabled';
-      return `<tr><td style="text-align:left">${c.dis || ''}</td><td style="text-align:left"><span class="dot ${dotCls}"></span>${status}</td><td style="text-align:left;font-size:0.75rem;color:var(--text-light);">${c.connErr || ''}</td></tr>`;
+      const gloss = glossConnErr(c.connErr);
+      return `<tr><td style="text-align:left">${c.dis || ''}</td><td style="text-align:left"><span class="dot ${dotCls}"></span>${status}</td><td style="text-align:left;font-size:0.75rem;color:var(--text-light);">${c.connErr || ''}${gloss ? '<br><em>' + gloss + '</em>' : ''}</td></tr>`;
     }).join('');
   }
 
