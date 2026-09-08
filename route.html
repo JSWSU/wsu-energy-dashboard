@@ -32,6 +32,22 @@ tr:last-child td{border-bottom:none}
 a.small{color:var(--primary);font-size:12px;text-decoration:none}
 footer{color:var(--muted);font-size:12px;padding:14px 16px;text-align:center}
 #map{height:460px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px}
+.stop{overflow-x:auto}
+@media(max-width:640px){
+ body{font-size:14px}
+ .wrap{padding:8px}
+ header{padding:10px 12px}
+ #map{height:340px}
+ th:nth-child(5),td:nth-child(5){display:none}
+ th,td{padding:5px 6px}
+ .note,.attn-note{white-space:normal}
+ .maplinks a{display:inline-block;padding:9px 0;margin-right:20px;font-size:16px}
+ .summary a{display:inline-block;padding:7px 0}
+ .stop-head{gap:6px}
+ .stop-meta{margin-left:0;width:100%}
+ .mono{font-size:11.5px}
+ td:nth-child(4){overflow-wrap:anywhere}
+}
 @media print{#map{display:none}}
 .stopmarker{background:var(--primary);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5)}
 @media print{
