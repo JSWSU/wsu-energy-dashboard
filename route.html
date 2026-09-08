@@ -1,6 +1,8 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sensus AMR Drive Route</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{--primary:#981e32;--primary-dark:#7a1828;--accent:#c69214;--bg:#f5f5f5;--card:#fff;
 --text:#2d2d2d;--muted:#6b7280;--border:#e5e7eb;--warn-bg:#fff3cd;--warn-border:#c69214;}
@@ -29,6 +31,9 @@ tr:last-child td{border-bottom:none}
 .legend{font-size:13px}
 a.small{color:var(--primary);font-size:12px;text-decoration:none}
 footer{color:var(--muted);font-size:12px;padding:14px 16px;text-align:center}
+#map{height:460px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px}
+@media print{#map{display:none}}
+.stopmarker{background:var(--primary);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5)}
 @media print{
  body{background:#fff;font-size:11.5px}
  header{background:#fff;color:#000;border-bottom:3px solid #981e32;padding:6px 0}
@@ -43,6 +48,30 @@ footer{color:var(--muted);font-size:12px;padding:14px 16px;text-align:center}
 <header><h1>Sensus AMR Drive Route</h1><p>Radio water meter reading loop. Start and end: McCluskey Services Building, 2425 E Grimes Way. 42 stops, 157 meters, 19.6 km. Route solved 09/08/2026. Highlighted rows need extra attention.</p></header>
 <div class="wrap">
 <div class="summary"><b>Drive the whole route:</b> open each leg in Google Maps; the waypoints are preloaded in route order. Start the next leg where the last one ends.<br><a href="https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=46.728993,-117.144701&destination=46.722780,-117.137942&waypoints=46.728993,-117.144701%7C46.743102,-117.137231%7C46.736921,-117.129215%7C46.736444,-117.132086%7C46.734738,-117.133873%7C46.732504,-117.132821%7C46.730481,-117.131725%7C46.730654,-117.136611%7C46.729118,-117.139731" style="color:var(--primary);font-weight:600">Leg 1: McCluskey to stop 10</a> &middot; <a href="https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=46.722780,-117.137942&destination=46.731374,-117.158857&waypoints=46.722874,-117.139932%7C46.697122,-117.148393%7C46.723471,-117.160516%7C46.723251,-117.163519%7C46.726487,-117.162398%7C46.725400,-117.159589%7C46.726059,-117.156936%7C46.729988,-117.154466%7C46.732598,-117.158274" style="color:var(--primary);font-weight:600">Leg 2: stop 10 to stop 20</a> &middot; <a href="https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=46.731374,-117.158857&destination=46.741211,-117.159123&waypoints=46.731604,-117.161680%7C46.729868,-117.162701%7C46.731543,-117.164411%7C46.730613,-117.165881%7C46.729179,-117.166951%7C46.730998,-117.169930%7C46.734701,-117.163674%7C46.740632,-117.161268%7C46.741449,-117.162228" style="color:var(--primary);font-weight:600">Leg 3: stop 20 to stop 30</a> &middot; <a href="https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=46.741211,-117.159123&destination=46.727832,-117.152082&waypoints=46.741970,-117.154813%7C46.740007,-117.152625%7C46.739528,-117.150844%7C46.734927,-117.156451%7C46.733218,-117.154087%7C46.733441,-117.150864%7C46.731187,-117.151427%7C46.730205,-117.151841%7C46.729223,-117.150113" style="color:var(--primary);font-weight:600">Leg 4: stop 30 to stop 40</a> &middot; <a href="https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=46.727832,-117.152082&destination=46.728993,-117.144701&waypoints=46.726018,-117.147801%7C46.727310,-117.146287" style="color:var(--primary);font-weight:600">Leg 5: stop 40 to McCluskey</a></div>
+<div id="map"></div>
+<script>
+var DEPOT=[46.728993, -117.144701];
+var STOPS=[{"o": 1, "lat": 46.728993, "lon": -117.144701, "site": "0837 MCSVSSHP837 McCluskey Shop"}, {"o": 2, "lat": 46.743102, "lon": -117.137231, "site": "0160A/0183 VET LG ANIM"}, {"o": 3, "lat": 46.736921, "lon": -117.129215, "site": "0121 Old Tukey Orchard IR All"}, {"o": 4, "lat": 46.736444, "lon": -117.132086, "site": "0141G GOLF TURF MT off Terre Vie"}, {"o": 5, "lat": 46.734738, "lon": -117.133873, "site": "0141H VET QUAR141H off Terre Vie"}, {"o": 6, "lat": 46.732504, "lon": -117.132821, "site": "0198A VET RES BLG by Steffen Ctr"}, {"o": 7, "lat": 46.730481, "lon": -117.131725, "site": "0182 WILDLIFE BIO"}, {"o": 8, "lat": 46.730654, "lon": -117.136611, "site": "0180/0180A/0180C STEF CENTER small orchard"}, {"o": 9, "lat": 46.729118, "lon": -117.139731, "site": "0090/0167 ENVIR HEALTH"}, {"o": 10, "lat": 46.72278, "lon": -117.137942, "site": "0195 USDA Machine Shop (East)"}, {"o": 11, "lat": 46.722874, "lon": -117.139932, "site": "0195 USDA Machine Shop (Center)"}, {"o": 12, "lat": 46.697122, "lon": -117.148393, "site": "0401C SPIL-WELL"}, {"o": 13, "lat": 46.723471, "lon": -117.160516, "site": "0679 Chinook Village"}, {"o": 14, "lat": 46.723251, "lon": -117.163519, "site": "0680 Yakama Village"}, {"o": 15, "lat": 46.726487, "lon": -117.162398, "site": "0805 McEachern"}, {"o": 16, "lat": 46.7254, "lon": -117.159589, "site": "0678 Columbia Village"}, {"o": 17, "lat": 46.726059, "lon": -117.156936, "site": "0120C CF-RAPTOR"}, {"o": 18, "lat": 46.729988, "lon": -117.154466, "site": "0114/0114B/0115/0138 AG SEED HSE"}, {"o": 19, "lat": 46.732598, "lon": -117.158274, "site": "0860 PLANT SCI Biotech/VBR"}, {"o": 20, "lat": 46.731374, "lon": -117.158857, "site": "0812/0826 INFO TECH"}, {"o": 21, "lat": 46.731604, "lon": -117.16168, "site": "0009 HOLL FIELDHS"}, {"o": 22, "lat": 46.729868, "lon": -117.162701, "site": "0094 JOHNSON TWR on ped mall"}, {"o": 23, "lat": 46.731543, "lon": -117.164411, "site": "0037/0062 HOLLAND LIB on ped mall"}, {"o": 24, "lat": 46.730613, "lon": -117.165881, "site": "0033E MURROW EAST"}, {"o": 25, "lat": 46.729179, "lon": -117.166951, "site": "0016/0086 MATH ANNEX"}, {"o": 26, "lat": 46.730998, "lon": -117.16993, "site": "0031/0057/0071 PRES RESIDEN"}, {"o": 27, "lat": 46.734701, "lon": -117.163674, "site": "0072 Scott-Coman Hall"}, {"o": 28, "lat": 46.740632, "lon": -117.161268, "site": "0660 Kamiak Apts"}, {"o": 29, "lat": 46.741449, "lon": -117.162228, "site": "0665 Steptoe Village"}, {"o": 30, "lat": 46.741211, "lon": -117.159123, "site": "0650 Terrace Apts"}, {"o": 31, "lat": 46.74197, "lon": -117.154813, "site": "0676 Chief Joseph Apts"}, {"o": 32, "lat": 46.740007, "lon": -117.152625, "site": "0677 Nez Perce Village"}, {"o": 33, "lat": 46.739528, "lon": -117.150844, "site": "0865/0865A Marriott pair"}, {"o": 34, "lat": 46.734927, "lon": -117.156451, "site": "0372G BAILEY CLUBH"}, {"o": 35, "lat": 46.733218, "lon": -117.154087, "site": "0118 INSTR GRNHSE"}, {"o": 36, "lat": 46.733441, "lon": -117.150864, "site": "0675 Valley Crest Apts"}, {"o": 37, "lat": 46.731187, "lon": -117.151427, "site": "0098/0109B/0109E/0109F/0109G/0111/0136/0817/0817A MEATS LAB"}, {"o": 38, "lat": 46.730205, "lon": -117.151841, "site": "0111A ENTOM SHOP"}, {"o": 39, "lat": 46.729223, "lon": -117.150113, "site": "0066A/0066C PP-SVC GARAG"}, {"o": 40, "lat": 46.727832, "lon": -117.152082, "site": "0169 VET ANIM 169"}, {"o": 41, "lat": 46.726018, "lon": -117.147801, "site": "0165D ELK RESEARCH off Dairy Rd"}, {"o": 42, "lat": 46.72731, "lon": -117.146287, "site": "0353/0357/0358B/0358C/0358E/0358J CHEM STO"}];
+var LEGS=[[0, 10], [10, 20], [20, 30], [30, 40], [40, 43]];
+
+var map=L.map('map');
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+var pts=[DEPOT].concat(STOPS.map(function(s){return [s.lat,s.lon];})).concat([DEPOT]);
+var colors=['#981e32','#2563eb','#059669','#c69214','#7c3aed','#dc2626'];
+for(var l=0;l<LEGS.length;l++){
+  var seg=pts.slice(LEGS[l][0],LEGS[l][1]+1);
+  L.polyline(seg,{color:colors[l%colors.length],weight:4,opacity:0.85}).addTo(map)
+   .bindTooltip('Leg '+(l+1),{sticky:true});
+}
+STOPS.forEach(function(s){
+  L.marker([s.lat,s.lon],{icon:L.divIcon({className:'',html:'<div class="stopmarker">'+s.o+'</div>',iconSize:[22,22],iconAnchor:[11,11]})})
+   .addTo(map).bindPopup('<b>Stop '+s.o+'</b><br>'+s.site+'<br><a href="#stop'+s.o+'">details</a>');
+});
+L.marker(DEPOT,{icon:L.divIcon({className:'',html:'<div class="stopmarker" style="background:#000;width:26px;height:26px;font-size:9px">START</div>',iconSize:[26,26],iconAnchor:[13,13]})})
+ .addTo(map).bindPopup('<b>McCluskey Services Building</b><br>Start and end');
+map.fitBounds(L.latLngBounds(pts).pad(0.06));
+
+</script>
 <div class="summary legend"><b>How to use:</b> drive the stops in order; tap Google Maps or Apple Maps at each stop for turn-by-turn. Poll every meter listed at the stop before moving on. <span class="badge">ATTENTION</span> rows tell you what to do differently. LOCATION is the meter position note from the route file (Ext Vlt = exterior vault or pit; a number = room).</div>
 <div class="stop" id="stop1">
 <div class="stop-head"><span class="stop-no">1</span><span class="stop-site">0837 MCSVSSHP837 McCluskey Shop</span><span class="stop-meta">1 meter &middot; 1 need attention &middot; 46.728993, -117.144701</span></div>
@@ -54,8 +83,8 @@ footer{color:var(--muted);font-size:12px;padding:14px 16px;text-align:center}
 <div class="stop-head"><span class="stop-no">2</span><span class="stop-site">0160A/0183 VET LG ANIM</span><span class="stop-meta">2 meters &middot; 46.743102, -117.137231</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.743102,-117.137231">Google Maps</a><a href="https://maps.apple.com/?ll=46.743102,-117.137231&q=0160A/0183">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200016</td><td class="mono">0160A</td><td>VET LG ANIM &middot; Ext Vlt</td><td class="mono">46.743185, -117.137245</td><td><a class="small" href="https://maps.google.com/?q=46.74318537258503,-117.1372451359098">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200023</td><td class="mono">0183</td><td>BOT FLD LAB &middot; Ext Vlt</td><td class="mono">46.743019, -117.137218</td><td><a class="small" href="https://maps.google.com/?q=46.74301917508056,-117.1372175965092">map</a></td></tr>
+<tr class=""><td class="mono">0160ADW_001</td><td class="mono">200016</td><td class="mono">0160A</td><td>VET LG ANIM &middot; Ext Vlt</td><td class="mono">46.743185, -117.137245</td><td><a class="small" href="https://maps.google.com/?q=46.74318537258503,-117.1372451359098">map</a></td></tr>
+<tr class=""><td class="mono">0183_DW_001</td><td class="mono">200023</td><td class="mono">0183</td><td>BOT FLD LAB &middot; Ext Vlt</td><td class="mono">46.743019, -117.137218</td><td><a class="small" href="https://maps.google.com/?q=46.74301917508056,-117.1372175965092">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop3">
 <div class="stop-head"><span class="stop-no">3</span><span class="stop-site">0121 Old Tukey Orchard IR All</span><span class="stop-meta">1 meter &middot; 46.736921, -117.129215</span></div>
@@ -67,40 +96,40 @@ footer{color:var(--muted);font-size:12px;padding:14px 16px;text-align:center}
 <div class="stop-head"><span class="stop-no">4</span><span class="stop-site">0141G GOLF TURF MT off Terre Vie</span><span class="stop-meta">1 meter &middot; 46.736444, -117.132086</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.736444,-117.132086">Google Maps</a><a href="https://maps.apple.com/?ll=46.736444,-117.132086&q=0141G">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200014</td><td class="mono">0141G</td><td>GOLF TURF MT off Terre View &middot; Ext Vlt</td><td class="mono">46.736444, -117.132086</td><td><a class="small" href="https://maps.google.com/?q=46.73644411334663,-117.132086198592">map</a></td></tr>
+<tr class=""><td class="mono">0141GDW_001</td><td class="mono">200014</td><td class="mono">0141G</td><td>GOLF TURF MT off Terre View &middot; Ext Vlt</td><td class="mono">46.736444, -117.132086</td><td><a class="small" href="https://maps.google.com/?q=46.73644411334663,-117.132086198592">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop5">
 <div class="stop-head"><span class="stop-no">5</span><span class="stop-site">0141H VET QUAR141H off Terre Vie</span><span class="stop-meta">1 meter &middot; 46.734738, -117.133873</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.734738,-117.133873">Google Maps</a><a href="https://maps.apple.com/?ll=46.734738,-117.133873&q=0141H">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200015</td><td class="mono">0141H</td><td>VET QUAR141H off Terre View &middot; Ext Vlt</td><td class="mono">46.734738, -117.133873</td><td><a class="small" href="https://maps.google.com/?q=46.73473827967074,-117.1338733141867">map</a></td></tr>
+<tr class=""><td class="mono">0141HDW_001</td><td class="mono">200015</td><td class="mono">0141H</td><td>VET QUAR141H off Terre View &middot; Ext Vlt</td><td class="mono">46.734738, -117.133873</td><td><a class="small" href="https://maps.google.com/?q=46.73473827967074,-117.1338733141867">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop6">
 <div class="stop-head"><span class="stop-no">6</span><span class="stop-site">0198A VET RES BLG by Steffen Ctr</span><span class="stop-meta">1 meter &middot; 46.732504, -117.132821</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.732504,-117.132821">Google Maps</a><a href="https://maps.apple.com/?ll=46.732504,-117.132821&q=0198A">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200024</td><td class="mono">0198A</td><td>VET RES BLG by Steffen Ctr &middot; Ext Vlt</td><td class="mono">46.732504, -117.132821</td><td><a class="small" href="https://maps.google.com/?q=46.73250448897359,-117.1328214055625">map</a></td></tr>
+<tr class=""><td class="mono">0198ADW_001</td><td class="mono">200024</td><td class="mono">0198A</td><td>VET RES BLG by Steffen Ctr &middot; Ext Vlt</td><td class="mono">46.732504, -117.132821</td><td><a class="small" href="https://maps.google.com/?q=46.73250448897359,-117.1328214055625">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop7">
 <div class="stop-head"><span class="stop-no">7</span><span class="stop-site">0182 WILDLIFE BIO</span><span class="stop-meta">1 meter &middot; 46.730481, -117.131725</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.730481,-117.131725">Google Maps</a><a href="https://maps.apple.com/?ll=46.730481,-117.131725&q=0182">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200022</td><td class="mono">0182</td><td>WILDLIFE BIO &middot; Ext Vlt</td><td class="mono">46.730481, -117.131725</td><td><a class="small" href="https://maps.google.com/?q=46.73048056229986,-117.1317246215527">map</a></td></tr>
+<tr class=""><td class="mono">0182_DW_001</td><td class="mono">200022</td><td class="mono">0182</td><td>WILDLIFE BIO &middot; Ext Vlt</td><td class="mono">46.730481, -117.131725</td><td><a class="small" href="https://maps.google.com/?q=46.73048056229986,-117.1317246215527">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop8">
 <div class="stop-head"><span class="stop-no">8</span><span class="stop-site">0180/0180A/0180C STEF CENTER small orchard</span><span class="stop-meta">3 meters &middot; 46.730654, -117.136611</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.730654,-117.136611">Google Maps</a><a href="https://maps.apple.com/?ll=46.730654,-117.136611&q=0180/0180A/0180C">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200021</td><td class="mono">0180C</td><td>STEF GRNHSE &middot; 101</td><td class="mono">46.730713, -117.136888</td><td><a class="small" href="https://maps.google.com/?q=46.73071297365546,-117.1368878937289">map</a></td></tr>
 <tr class=""><td class="mono">0180ADW_001</td><td class="mono">200134</td><td class="mono">0180A</td><td>Steffen Center Offices/Shops &middot; Rm107</td><td class="mono">46.730483, -117.136450</td><td><a class="small" href="https://maps.google.com/?q=46.73048275225245,-117.136449724924">map</a></td></tr>
+<tr class=""><td class="mono">0180CDW_001</td><td class="mono">200021</td><td class="mono">0180C</td><td>STEF GRNHSE &middot; 101</td><td class="mono">46.730713, -117.136888</td><td><a class="small" href="https://maps.google.com/?q=46.73071297365546,-117.1368878937289">map</a></td></tr>
 <tr class=""><td class="mono">0180_DW_001</td><td class="mono">200020</td><td class="mono">0180</td><td>STEF CENTER small orchard &middot; Ext Vlt</td><td class="mono">46.730766, -117.136495</td><td><a class="small" href="https://maps.google.com/?q=46.73076584519616,-117.1364950880729">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop9">
 <div class="stop-head"><span class="stop-no">9</span><span class="stop-site">0090/0167 ENVIR HEALTH</span><span class="stop-meta">2 meters &middot; 46.729118, -117.139731</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.729118,-117.139731">Google Maps</a><a href="https://maps.apple.com/?ll=46.729118,-117.139731&q=0090/0167">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200008</td><td class="mono">0090</td><td>ENVIR HEALTH &middot; Ext Vlt</td><td class="mono">46.729179, -117.139328</td><td><a class="small" href="https://maps.google.com/?q=46.72917862187259,-117.1393280900003">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200018</td><td class="mono">0167</td><td>SM ANIM HOLD &middot; Ext Vlt</td><td class="mono">46.729057, -117.140133</td><td><a class="small" href="https://maps.google.com/?q=46.72905746325349,-117.1401326717432">map</a></td></tr>
+<tr class=""><td class="mono">0090_DW_001</td><td class="mono">200008</td><td class="mono">0090</td><td>ENVIR HEALTH &middot; Ext Vlt</td><td class="mono">46.729179, -117.139328</td><td><a class="small" href="https://maps.google.com/?q=46.72917862187259,-117.1393280900003">map</a></td></tr>
+<tr class=""><td class="mono">0167_DW_001</td><td class="mono">200018</td><td class="mono">0167</td><td>SM ANIM HOLD &middot; Ext Vlt</td><td class="mono">46.729057, -117.140133</td><td><a class="small" href="https://maps.google.com/?q=46.72905746325349,-117.1401326717432">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop10">
 <div class="stop-head"><span class="stop-no">10</span><span class="stop-site">0195 USDA Machine Shop (East)</span><span class="stop-meta">3 meters &middot; 1 need attention &middot; 46.722780, -117.137942</span></div>
@@ -191,70 +220,70 @@ footer{color:var(--muted);font-size:12px;padding:14px 16px;text-align:center}
 <div class="stop-head"><span class="stop-no">17</span><span class="stop-site">0120C CF-RAPTOR</span><span class="stop-meta">1 meter &middot; 46.726059, -117.156936</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.726059,-117.156936">Google Maps</a><a href="https://maps.apple.com/?ll=46.726059,-117.156936&q=0120C">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200012</td><td class="mono">0120C</td><td>CF-RAPTOR &middot; 101</td><td class="mono">46.726059, -117.156936</td><td><a class="small" href="https://maps.google.com/?q=46.72605861445776,-117.1569358286752">map</a></td></tr>
+<tr class=""><td class="mono">0120CDW_001</td><td class="mono">200012</td><td class="mono">0120C</td><td>CF-RAPTOR &middot; 101</td><td class="mono">46.726059, -117.156936</td><td><a class="small" href="https://maps.google.com/?q=46.72605861445776,-117.1569358286752">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop18">
 <div class="stop-head"><span class="stop-no">18</span><span class="stop-site">0114/0114B/0115/0138 AG SEED HSE</span><span class="stop-meta">4 meters &middot; 46.729988, -117.154466</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.729988,-117.154466">Google Maps</a><a href="https://maps.apple.com/?ll=46.729988,-117.154466&q=0114/0114B/0115/0138">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200011</td><td class="mono">0115</td><td>AG SEED HSE &middot; Ext Vlt</td><td class="mono">46.729643, -117.154152</td><td><a class="small" href="https://maps.google.com/?q=46.72964333514324,-117.1541521104029">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200058</td><td class="mono">0114</td><td>PLT SCI GRHS &middot; 12A</td><td class="mono">46.730131, -117.154408</td><td><a class="small" href="https://maps.google.com/?q=46.73013123692905,-117.1544080372854">map</a></td></tr>
 <tr class=""><td class="mono">0114BDW_001</td><td class="mono">200046</td><td class="mono">0114B</td><td>USDA ARC114B &middot; 101</td><td class="mono">46.729924, -117.155007</td><td><a class="small" href="https://maps.google.com/?q=46.72992399500827,-117.1550071844829">map</a></td></tr>
+<tr class=""><td class="mono">0114_DW_001</td><td class="mono">200058</td><td class="mono">0114</td><td>PLT SCI GRHS &middot; 12A</td><td class="mono">46.730131, -117.154408</td><td><a class="small" href="https://maps.google.com/?q=46.73013123692905,-117.1544080372854">map</a></td></tr>
+<tr class=""><td class="mono">0115_DW_001</td><td class="mono">200011</td><td class="mono">0115</td><td>AG SEED HSE &middot; Ext Vlt</td><td class="mono">46.729643, -117.154152</td><td><a class="small" href="https://maps.google.com/?q=46.72964333514324,-117.1541521104029">map</a></td></tr>
 <tr class=""><td class="mono">0138_DW_001</td><td class="mono">200160</td><td class="mono">0138</td><td>Alumni Center &middot; Vault</td><td class="mono">46.730256, -117.154298</td><td><a class="small" href="https://maps.google.com/?q=46.73025624614404,-117.1542975870355">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop19">
 <div class="stop-head"><span class="stop-no">19</span><span class="stop-site">0860 PLANT SCI Biotech/VBR</span><span class="stop-meta">2 meters &middot; 46.732598, -117.158274</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.732598,-117.158274">Google Maps</a><a href="https://maps.apple.com/?ll=46.732598,-117.158274&q=0860">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200056</td><td class="mono">0860</td><td>PLANT SCI Biotech/VBR &middot; 140</td><td class="mono">46.732598, -117.158274</td><td><a class="small" href="https://maps.google.com/?q=46.73259812285066,-117.158274399679">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200057</td><td class="mono">0860</td><td>PLANT SCI Biotech/VBR &middot; 140</td><td class="mono">46.732598, -117.158274</td><td><a class="small" href="https://maps.google.com/?q=46.73259812285066,-117.158274399679">map</a></td></tr>
+<tr class=""><td class="mono">0860_DW_001</td><td class="mono">200056</td><td class="mono">0860</td><td>PLANT SCI Biotech/VBR &middot; 140</td><td class="mono">46.732598, -117.158274</td><td><a class="small" href="https://maps.google.com/?q=46.73259812285066,-117.158274399679">map</a></td></tr>
+<tr class=""><td class="mono">0860_DW_002</td><td class="mono">200057</td><td class="mono">0860</td><td>PLANT SCI Biotech/VBR &middot; 140</td><td class="mono">46.732598, -117.158274</td><td><a class="small" href="https://maps.google.com/?q=46.73259812285066,-117.158274399679">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop20">
 <div class="stop-head"><span class="stop-no">20</span><span class="stop-site">0812/0826 INFO TECH</span><span class="stop-meta">2 meters &middot; 46.731374, -117.158857</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.731374,-117.158857">Google Maps</a><a href="https://maps.apple.com/?ll=46.731374,-117.158857&q=0812/0826">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200035</td><td class="mono">0826</td><td>VOGEL PLANT drive up to dock &middot; B16</td><td class="mono">46.731763, -117.158409</td><td><a class="small" href="https://maps.google.com/?q=46.7317629226977,-117.1584087445126">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200034</td><td class="mono">0812</td><td>INFO TECH &middot; B100F</td><td class="mono">46.730985, -117.159304</td><td><a class="small" href="https://maps.google.com/?q=46.73098539279609,-117.1593035727508">map</a></td></tr>
+<tr class=""><td class="mono">0812_DW_001</td><td class="mono">200034</td><td class="mono">0812</td><td>INFO TECH &middot; B100F</td><td class="mono">46.730985, -117.159304</td><td><a class="small" href="https://maps.google.com/?q=46.73098539279609,-117.1593035727508">map</a></td></tr>
+<tr class=""><td class="mono">0826_DW_001</td><td class="mono">200035</td><td class="mono">0826</td><td>VOGEL PLANT drive up to dock &middot; B16</td><td class="mono">46.731763, -117.158409</td><td><a class="small" href="https://maps.google.com/?q=46.7317629226977,-117.1584087445126">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop21">
 <div class="stop-head"><span class="stop-no">21</span><span class="stop-site">0009 HOLL FIELDHS</span><span class="stop-meta">1 meter &middot; 46.731604, -117.161680</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.731604,-117.16168">Google Maps</a><a href="https://maps.apple.com/?ll=46.731604,-117.16168&q=0009">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200026</td><td class="mono">0009</td><td>HOLL FIELDHS &middot; 100/107</td><td class="mono">46.731604, -117.161680</td><td><a class="small" href="https://maps.google.com/?q=46.73160428844681,-117.1616801045142">map</a></td></tr>
+<tr class=""><td class="mono">0009_DW_001</td><td class="mono">200026</td><td class="mono">0009</td><td>HOLL FIELDHS &middot; 100/107</td><td class="mono">46.731604, -117.161680</td><td><a class="small" href="https://maps.google.com/?q=46.73160428844681,-117.1616801045142">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop22">
 <div class="stop-head"><span class="stop-no">22</span><span class="stop-site">0094 JOHNSON TWR on ped mall</span><span class="stop-meta">1 meter &middot; 46.729868, -117.162701</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.729868,-117.162701">Google Maps</a><a href="https://maps.apple.com/?ll=46.729868,-117.162701&q=0094">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200033</td><td class="mono">0094</td><td>JOHNSON TWR on ped mall &middot; B1</td><td class="mono">46.729868, -117.162701</td><td><a class="small" href="https://maps.google.com/?q=46.72986794046604,-117.1627008267738">map</a></td></tr>
+<tr class=""><td class="mono">0094_DW_001</td><td class="mono">200033</td><td class="mono">0094</td><td>JOHNSON TWR on ped mall &middot; B1</td><td class="mono">46.729868, -117.162701</td><td><a class="small" href="https://maps.google.com/?q=46.72986794046604,-117.1627008267738">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop23">
 <div class="stop-head"><span class="stop-no">23</span><span class="stop-site">0037/0062 HOLLAND LIB on ped mall</span><span class="stop-meta">2 meters &middot; 46.731543, -117.164411</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.731543,-117.164411">Google Maps</a><a href="https://maps.apple.com/?ll=46.731543,-117.164411&q=0037/0062">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200028</td><td class="mono">0062</td><td>HOLLAND LIB on ped mall &middot; B10</td><td class="mono">46.731287, -117.164173</td><td><a class="small" href="https://maps.google.com/?q=46.73128669502819,-117.1641727612538">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200037</td><td class="mono">0037</td><td>VANDOREN on ped mall &middot; 2</td><td class="mono">46.731798, -117.164650</td><td><a class="small" href="https://maps.google.com/?q=46.73179841696447,-117.1646501868158">map</a></td></tr>
+<tr class=""><td class="mono">0037_DW_001</td><td class="mono">200037</td><td class="mono">0037</td><td>VANDOREN on ped mall &middot; 2</td><td class="mono">46.731798, -117.164650</td><td><a class="small" href="https://maps.google.com/?q=46.73179841696447,-117.1646501868158">map</a></td></tr>
+<tr class=""><td class="mono">0062_DW_001</td><td class="mono">200028</td><td class="mono">0062</td><td>HOLLAND LIB on ped mall &middot; B10</td><td class="mono">46.731287, -117.164173</td><td><a class="small" href="https://maps.google.com/?q=46.73128669502819,-117.1641727612538">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop24">
 <div class="stop-head"><span class="stop-no">24</span><span class="stop-site">0033E MURROW EAST</span><span class="stop-meta">1 meter &middot; 46.730613, -117.165881</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.730613,-117.165881">Google Maps</a><a href="https://maps.apple.com/?ll=46.730613,-117.165881&q=0033E">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200036</td><td class="mono">0033E</td><td>MURROW EAST &middot; 117C</td><td class="mono">46.730613, -117.165881</td><td></td></tr>
+<tr class=""><td class="mono">0033EDW_001</td><td class="mono">200036</td><td class="mono">0033E</td><td>MURROW EAST &middot; 117C</td><td class="mono">46.730613, -117.165881</td><td></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop25">
 <div class="stop-head"><span class="stop-no">25</span><span class="stop-site">0016/0086 MATH ANNEX</span><span class="stop-meta">2 meters &middot; 46.729179, -117.166951</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.729179,-117.166951">Google Maps</a><a href="https://maps.apple.com/?ll=46.729179,-117.166951&q=0016/0086">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200005</td><td class="mono">0016</td><td>MATH ANNEX &middot; Ext Vlt</td><td class="mono">46.729562, -117.167233</td><td><a class="small" href="https://maps.google.com/?q=46.72956246389153,-117.1672330558656">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200032</td><td class="mono">0086</td><td>CLEVELAND &middot; B2</td><td class="mono">46.728795, -117.166669</td><td><a class="small" href="https://maps.google.com/?q=46.7287946184476,-117.1666691819181">map</a></td></tr>
+<tr class=""><td class="mono">0016_DW_001</td><td class="mono">200005</td><td class="mono">0016</td><td>MATH ANNEX &middot; Ext Vlt</td><td class="mono">46.729562, -117.167233</td><td><a class="small" href="https://maps.google.com/?q=46.72956246389153,-117.1672330558656">map</a></td></tr>
+<tr class=""><td class="mono">0086_DW_001</td><td class="mono">200032</td><td class="mono">0086</td><td>CLEVELAND &middot; B2</td><td class="mono">46.728795, -117.166669</td><td><a class="small" href="https://maps.google.com/?q=46.7287946184476,-117.1666691819181">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop26">
 <div class="stop-head"><span class="stop-no">26</span><span class="stop-site">0031/0057/0071 PRES RESIDEN</span><span class="stop-meta">3 meters &middot; 46.730998, -117.169930</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.730998,-117.16993">Google Maps</a><a href="https://maps.apple.com/?ll=46.730998,-117.16993&q=0031/0057/0071">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200006</td><td class="mono">0031</td><td>PRES RESIDEN &middot; Ext Vlt</td><td class="mono">46.731465, -117.168865</td><td><a class="small" href="https://maps.google.com/?q=46.73146513903816,-117.1688648606193">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200027</td><td class="mono">0057</td><td>THERM FLUIDS &middot; 10A</td><td class="mono">46.730606, -117.170372</td><td><a class="small" href="https://maps.google.com/?q=46.73060551298523,-117.1703719222635">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200031</td><td class="mono">0071</td><td>ALBRK LAB &middot; 30</td><td class="mono">46.730923, -117.170552</td><td><a class="small" href="https://maps.google.com/?q=46.73092290570423,-117.1705515644679">map</a></td></tr>
+<tr class=""><td class="mono">0031_DW_001</td><td class="mono">200006</td><td class="mono">0031</td><td>PRES RESIDEN &middot; Ext Vlt</td><td class="mono">46.731465, -117.168865</td><td><a class="small" href="https://maps.google.com/?q=46.73146513903816,-117.1688648606193">map</a></td></tr>
+<tr class=""><td class="mono">0057_DW_001</td><td class="mono">200027</td><td class="mono">0057</td><td>THERM FLUIDS &middot; 10A</td><td class="mono">46.730606, -117.170372</td><td><a class="small" href="https://maps.google.com/?q=46.73060551298523,-117.1703719222635">map</a></td></tr>
+<tr class=""><td class="mono">0071_DW_001</td><td class="mono">200031</td><td class="mono">0071</td><td>ALBRK LAB &middot; 30</td><td class="mono">46.730923, -117.170552</td><td><a class="small" href="https://maps.google.com/?q=46.73092290570423,-117.1705515644679">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop27">
 <div class="stop-head"><span class="stop-no">27</span><span class="stop-site">0072 Scott-Coman Hall</span><span class="stop-meta">1 meter &middot; 46.734701, -117.163674</span></div>
@@ -344,14 +373,14 @@ footer{color:var(--muted);font-size:12px;padding:14px 16px;text-align:center}
 <div class="stop-head"><span class="stop-no">34</span><span class="stop-site">0372G BAILEY CLUBH</span><span class="stop-meta">2 meters &middot; 46.734927, -117.156451</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.734927,-117.156451">Google Maps</a><a href="https://maps.apple.com/?ll=46.734927,-117.156451&q=0372G">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200053</td><td class="mono">0372G</td><td>BAILEY CLUBH &middot; 132</td><td class="mono">46.734927, -117.156451</td><td><a class="small" href="https://maps.google.com/?q=46.73492731539133,-117.1564511737208">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200054</td><td class="mono">0372G</td><td>BAILEY CLUBH &middot; 132</td><td class="mono">46.734927, -117.156451</td><td><a class="small" href="https://maps.google.com/?q=46.73492731539133,-117.1564511737208">map</a></td></tr>
+<tr class=""><td class="mono">0372GDW_001</td><td class="mono">200053</td><td class="mono">0372G</td><td>BAILEY CLUBH &middot; 132</td><td class="mono">46.734927, -117.156451</td><td><a class="small" href="https://maps.google.com/?q=46.73492731539133,-117.1564511737208">map</a></td></tr>
+<tr class=""><td class="mono">0372GDW_002</td><td class="mono">200054</td><td class="mono">0372G</td><td>BAILEY CLUBH &middot; 132</td><td class="mono">46.734927, -117.156451</td><td><a class="small" href="https://maps.google.com/?q=46.73492731539133,-117.1564511737208">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop35">
 <div class="stop-head"><span class="stop-no">35</span><span class="stop-site">0118 INSTR GRNHSE</span><span class="stop-meta">1 meter &middot; 46.733218, -117.154087</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.733218,-117.154087">Google Maps</a><a href="https://maps.apple.com/?ll=46.733218,-117.154087&q=0118">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200052</td><td class="mono">0118</td><td>INSTR GRNHSE &middot; 100</td><td class="mono">46.733218, -117.154087</td><td><a class="small" href="https://maps.google.com/?q=46.73321756862884,-117.1540866729315">map</a></td></tr>
+<tr class=""><td class="mono">0118_DW_001</td><td class="mono">200052</td><td class="mono">0118</td><td>INSTR GRNHSE &middot; 100</td><td class="mono">46.733218, -117.154087</td><td><a class="small" href="https://maps.google.com/?q=46.73321756862884,-117.1540866729315">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop36">
 <div class="stop-head"><span class="stop-no">36</span><span class="stop-site">0675 Valley Crest Apts</span><span class="stop-meta">3 meters &middot; 1 need attention &middot; 46.733441, -117.150864</span></div>
@@ -365,51 +394,51 @@ footer{color:var(--muted);font-size:12px;padding:14px 16px;text-align:center}
 <div class="stop-head"><span class="stop-no">37</span><span class="stop-site">0098/0109B/0109E/0109F/0109G/0111/0136/0817/0817A MEATS LAB</span><span class="stop-meta">8 meters &middot; 46.731187, -117.151427</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.731187,-117.151427">Google Maps</a><a href="https://maps.apple.com/?ll=46.731187,-117.151427&q=0098/0109B/0109E/0109F/0109G/0111/0136/0817/0817A">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200009</td><td class="mono">0098</td><td>MEATS LAB &middot; Ext Vlt</td><td class="mono">46.731571, -117.152248</td><td><a class="small" href="https://maps.google.com/?q=46.73157124718669,-117.1522480688729">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200010</td><td class="mono">0109B</td><td>USDA HEADHSE &middot; 2</td><td class="mono">46.731096, -117.151060</td><td><a class="small" href="https://maps.google.com/?q=46.73109559375614,-117.1510602418765">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200013</td><td class="mono">0136</td><td>SCREENHOUSE2 off NE Wilson ST &middot; Ext Vlt</td><td class="mono">46.731559, -117.150666</td><td><a class="small" href="https://maps.google.com/?q=46.73155858052311,-117.1506664941371">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200025</td><td class="mono">0817A</td><td>IBC GREENHSE &middot; Ext Vlt</td><td class="mono">46.730802, -117.151990</td><td><a class="small" href="https://maps.google.com/?q=46.7308023697289,-117.1519897313398">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200048</td><td class="mono">0109E</td><td>USDA POTTING &middot; 100</td><td class="mono">46.731579, -117.151061</td><td><a class="small" href="https://maps.google.com/?q=46.73157916787445,-117.1510610563022">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200049</td><td class="mono">0109F</td><td>USDA GH WEST &middot; 101A</td><td class="mono">46.730980, -117.151092</td><td><a class="small" href="https://maps.google.com/?q=46.73097954094089,-117.1510924209452">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200050</td><td class="mono">0109G</td><td>USDA GH EAST &middot; 101A</td><td class="mono">46.730984, -117.150736</td><td><a class="small" href="https://maps.google.com/?q=46.73098441308274,-117.1507362260811">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200055</td><td class="mono">0817</td><td>IBC PLANT &middot; 101</td><td class="mono">46.731554, -117.152020</td><td><a class="small" href="https://maps.google.com/?q=46.73155447092638,-117.1520200462884">map</a></td></tr>
+<tr class=""><td class="mono">0098_DW_001</td><td class="mono">200009</td><td class="mono">0098</td><td>MEATS LAB &middot; Ext Vlt</td><td class="mono">46.731571, -117.152248</td><td><a class="small" href="https://maps.google.com/?q=46.73157124718669,-117.1522480688729">map</a></td></tr>
+<tr class=""><td class="mono">0109BDW_001</td><td class="mono">200010</td><td class="mono">0109B</td><td>USDA HEADHSE &middot; 2</td><td class="mono">46.731096, -117.151060</td><td><a class="small" href="https://maps.google.com/?q=46.73109559375614,-117.1510602418765">map</a></td></tr>
+<tr class=""><td class="mono">0109EDW_001</td><td class="mono">200048</td><td class="mono">0109E</td><td>USDA POTTING &middot; 100</td><td class="mono">46.731579, -117.151061</td><td><a class="small" href="https://maps.google.com/?q=46.73157916787445,-117.1510610563022">map</a></td></tr>
+<tr class=""><td class="mono">0109FDW_001</td><td class="mono">200049</td><td class="mono">0109F</td><td>USDA GH WEST &middot; 101A</td><td class="mono">46.730980, -117.151092</td><td><a class="small" href="https://maps.google.com/?q=46.73097954094089,-117.1510924209452">map</a></td></tr>
+<tr class=""><td class="mono">0109GDW_001</td><td class="mono">200050</td><td class="mono">0109G</td><td>USDA GH EAST &middot; 101A</td><td class="mono">46.730984, -117.150736</td><td><a class="small" href="https://maps.google.com/?q=46.73098441308274,-117.1507362260811">map</a></td></tr>
+<tr class=""><td class="mono">0136_DW_001</td><td class="mono">200013</td><td class="mono">0136</td><td>SCREENHOUSE2 off NE Wilson ST &middot; Ext Vlt</td><td class="mono">46.731559, -117.150666</td><td><a class="small" href="https://maps.google.com/?q=46.73155858052311,-117.1506664941371">map</a></td></tr>
+<tr class=""><td class="mono">0817ADW_001</td><td class="mono">200025</td><td class="mono">0817A</td><td>IBC GREENHSE &middot; Ext Vlt</td><td class="mono">46.730802, -117.151990</td><td><a class="small" href="https://maps.google.com/?q=46.7308023697289,-117.1519897313398">map</a></td></tr>
+<tr class=""><td class="mono">0817_DW_001</td><td class="mono">200055</td><td class="mono">0817</td><td>IBC PLANT &middot; 101</td><td class="mono">46.731554, -117.152020</td><td><a class="small" href="https://maps.google.com/?q=46.73155447092638,-117.1520200462884">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop38">
 <div class="stop-head"><span class="stop-no">38</span><span class="stop-site">0111A ENTOM SHOP</span><span class="stop-meta">2 meters &middot; 46.730205, -117.151841</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.730205,-117.151841">Google Maps</a><a href="https://maps.apple.com/?ll=46.730205,-117.151841&q=0111A">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200051</td><td class="mono">0111</td><td>ENTOM GREENHOUSE 0111 &middot; 6A</td><td class="mono">46.730556, -117.151972</td><td><a class="small" href="https://maps.google.com/?q=46.73055596294294,-117.1519717356115">map</a></td></tr>
 <tr class=""><td class="mono">0111ADW_001</td><td class="mono">200045</td><td class="mono">0111A</td><td>ENTOM SHOP &middot; 48</td><td class="mono">46.730205, -117.151841</td><td><a class="small" href="https://maps.google.com/?q=46.73020498115152,-117.1518407056055">map</a></td></tr>
+<tr class=""><td class="mono">0111_DW_001</td><td class="mono">200051</td><td class="mono">0111</td><td>ENTOM GREENHOUSE 0111 &middot; 6A</td><td class="mono">46.730556, -117.151972</td><td><a class="small" href="https://maps.google.com/?q=46.73055596294294,-117.1519717356115">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop39">
 <div class="stop-head"><span class="stop-no">39</span><span class="stop-site">0066A/0066C PP-SVC GARAG</span><span class="stop-meta">2 meters &middot; 46.729223, -117.150113</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.729223,-117.150113">Google Maps</a><a href="https://maps.apple.com/?ll=46.729223,-117.150113&q=0066A/0066C">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200038</td><td class="mono">0066A</td><td>PP-SVC GARAG &middot; 10</td><td class="mono">46.729356, -117.149634</td><td><a class="small" href="https://maps.google.com/?q=46.72935599410557,-117.1496339376317">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200039</td><td class="mono">0066C</td><td>PP-MOTR POOL &middot; 2</td><td class="mono">46.729090, -117.150591</td><td><a class="small" href="https://maps.google.com/?q=46.72909017244901,-117.1505905083806">map</a></td></tr>
+<tr class=""><td class="mono">0066ADW_001</td><td class="mono">200038</td><td class="mono">0066A</td><td>PP-SVC GARAG &middot; 10</td><td class="mono">46.729356, -117.149634</td><td><a class="small" href="https://maps.google.com/?q=46.72935599410557,-117.1496339376317">map</a></td></tr>
+<tr class=""><td class="mono">0066CDW_001</td><td class="mono">200039</td><td class="mono">0066C</td><td>PP-MOTR POOL &middot; 2</td><td class="mono">46.729090, -117.150591</td><td><a class="small" href="https://maps.google.com/?q=46.72909017244901,-117.1505905083806">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop40">
 <div class="stop-head"><span class="stop-no">40</span><span class="stop-site">0169 VET ANIM 169</span><span class="stop-meta">1 meter &middot; 46.727832, -117.152082</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.727832,-117.152082">Google Maps</a><a href="https://maps.apple.com/?ll=46.727832,-117.152082&q=0169">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200019</td><td class="mono">0169</td><td>VET ANIM 169 &middot; Ext Vlt</td><td class="mono">46.727832, -117.152082</td><td><a class="small" href="https://maps.google.com/?q=46.72783233651818,-117.1520818423747">map</a></td></tr>
+<tr class=""><td class="mono">0169_DW_001</td><td class="mono">200019</td><td class="mono">0169</td><td>VET ANIM 169 &middot; Ext Vlt</td><td class="mono">46.727832, -117.152082</td><td><a class="small" href="https://maps.google.com/?q=46.72783233651818,-117.1520818423747">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop41">
 <div class="stop-head"><span class="stop-no">41</span><span class="stop-site">0165D ELK RESEARCH off Dairy Rd</span><span class="stop-meta">1 meter &middot; 46.726018, -117.147801</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.726018,-117.147801">Google Maps</a><a href="https://maps.apple.com/?ll=46.726018,-117.147801&q=0165D">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200017</td><td class="mono">0165D</td><td>ELK RESEARCH off Dairy Rd &middot; Ext Vlt</td><td class="mono">46.726018, -117.147801</td><td><a class="small" href="https://maps.google.com/?q=46.7260176653331,-117.1478010494124">map</a></td></tr>
+<tr class=""><td class="mono">0165DDW_001</td><td class="mono">200017</td><td class="mono">0165D</td><td>ELK RESEARCH off Dairy Rd &middot; Ext Vlt</td><td class="mono">46.726018, -117.147801</td><td><a class="small" href="https://maps.google.com/?q=46.7260176653331,-117.1478010494124">map</a></td></tr>
 </tbody></table></div>
 <div class="stop" id="stop42">
 <div class="stop-head"><span class="stop-no">42</span><span class="stop-site">0353/0357/0358B/0358C/0358E/0358J CHEM STO</span><span class="stop-meta">6 meters &middot; 46.727310, -117.146287</span></div>
 <div class="maplinks"><a href="https://maps.google.com/?q=46.72731,-117.146287">Google Maps</a><a href="https://maps.apple.com/?ll=46.72731,-117.146287&q=0353/0357/0358B/0358C/0358E/0358J">Apple Maps</a></div>
 <table><thead><tr><th>Meter</th><th>Radio ref</th><th>Bldg</th><th>Location</th><th>Lat, Long</th><th>Pin</th></tr></thead><tbody>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200040</td><td class="mono">0358B</td><td>SURPLUSSTORE &middot; M52</td><td class="mono">46.727310, -117.146287</td><td></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200041</td><td class="mono">0353</td><td>CREAM ANNEX &middot; M100</td><td class="mono">46.728101, -117.146726</td><td><a class="small" href="https://maps.google.com/?q=46.72810111153611,-117.1467259890285">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200042</td><td class="mono">0358J</td><td>UNIV STORES &middot; 115</td><td class="mono">46.726434, -117.146230</td><td><a class="small" href="https://maps.google.com/?q=46.72643397709138,-117.146230209653">map</a></td></tr>
-<tr class=""><td class="mono">(untagged)</td><td class="mono">200043</td><td class="mono">0357</td><td>RECYCLE FAC &middot; 130</td><td class="mono">46.727835, -117.145320</td><td><a class="small" href="https://maps.google.com/?q=46.72783517449338,-117.1453202096176">map</a></td></tr>
+<tr class=""><td class="mono">0353_DW_001</td><td class="mono">200041</td><td class="mono">0353</td><td>CREAM ANNEX &middot; M100</td><td class="mono">46.728101, -117.146726</td><td><a class="small" href="https://maps.google.com/?q=46.72810111153611,-117.1467259890285">map</a></td></tr>
+<tr class=""><td class="mono">0357_DW_001</td><td class="mono">200043</td><td class="mono">0357</td><td>RECYCLE FAC &middot; 130</td><td class="mono">46.727835, -117.145320</td><td><a class="small" href="https://maps.google.com/?q=46.72783517449338,-117.1453202096176">map</a></td></tr>
+<tr class=""><td class="mono">0358BDW_001</td><td class="mono">200040</td><td class="mono">0358B</td><td>SURPLUSSTORE &middot; M52</td><td class="mono">46.727310, -117.146287</td><td></td></tr>
 <tr class=""><td class="mono">0358CDW_001</td><td class="mono">200001</td><td class="mono">0358C</td><td>CHEM STO &middot; 110</td><td class="mono">46.727738, -117.146403</td><td><a class="small" href="https://maps.google.com/?q=46.72773834276508,-117.1464034198728">map</a></td></tr>
 <tr class=""><td class="mono">0358EDW_001</td><td class="mono">200002</td><td class="mono">0358E</td><td>ANTHRO STOR &middot; Ext Vlt</td><td class="mono">46.727316, -117.146812</td><td><a class="small" href="https://maps.google.com/?q=46.72731626891571,-117.1468117976769">map</a></td></tr>
+<tr class=""><td class="mono">0358JDW_001</td><td class="mono">200042</td><td class="mono">0358J</td><td>UNIV STORES &middot; 115</td><td class="mono">46.726434, -117.146230</td><td><a class="small" href="https://maps.google.com/?q=46.72643397709138,-117.146230209653">map</a></td></tr>
 </tbody></table></div>
 <div class="summary">Return to <b>McCluskey Services Building</b>, 2425 E Grimes Way. <a href="https://maps.google.com/?q=46.728993,-117.144701">Google Maps</a> &middot; <a href="https://maps.apple.com/?ll=46.728993,-117.144701&q=McCluskey%20Services%20Building">Apple Maps</a></div>
 </div><footer>WSU Facilities Services, Utilities and Energy &middot; generated 09/08/2026 from the 08/31/2026 route data. Print this page for a paper route sheet.</footer></body></html>
