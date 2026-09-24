@@ -64,7 +64,7 @@ def clean_sentence(desc):
     d = re.sub(r"\([^)]*\)", "", d)                      # parentheticals usually hold paths and figures
     d = re.sub(r"\s*\)", "", d)                           # a stray close paren left by a nested one
     d = re.split(r";|\. |\|", d)[0]
-    d = d.split("\\")[0]                                  # cut at the first backslash: no file or server paths
+    d = d.split("\\")[0].rstrip(" ,:")                    # cut at the first backslash: no file or server paths
     d = re.sub(r"\s+(?:at|in|to|under|from|into|on|lives|is)(\s+[A-Za-z])?\s*$", "", d)  # dangling words after the cut
     d = MONEY_RE.sub("[amount]", d)
     d = re.sub(r"\s{2,}", " ", d).strip(" ,:")
