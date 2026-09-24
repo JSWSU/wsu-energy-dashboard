@@ -163,3 +163,9 @@ Department:                   WSU Facilities Services
 POC:			      John Slagboom (john.slagboom@wsu.edu / energy.1@wsu.edu)
 Campus:                       Pullman
 Documentation last reviewed:  February 2026
+
+PROCESSES PAGE (09/24/2026)
+  processes.html + data/processes.json: register of every recurring Energy Group process
+  (cadence, owner, how to run, last run, status). Built by export_processes_json.py from the
+  gitignored sops\ library; refreshed by update-data.sh, the housing water bill engine, the
+  plan-process-check skill, or update-processes.bat. Details: docs/PROCESSES-PAGE.txt

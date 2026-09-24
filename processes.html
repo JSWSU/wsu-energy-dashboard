@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>WSU Energy Group Processes</title>
+<style>
+  :root {
+    --primary: #981e32; --primary-dark: #7a1828; --secondary: #5f6b6d; --accent: #c69214;
+    --bg: #f5f5f5; --card-bg: #fff; --text: #2d2d2d; --text-light: #6b7280; --border: #e5e7eb;
+    --green: #059669; --red: #dc2626; --blue: #2563eb; --amber: #b45309;
+    --table-head-bg: #f9fafb; --table-hover: #f9fafb; --info-bg: #f0f9ff; --info-border: #bae6fd; --info-text: #0c4a6e;
+  }
+  html.dark {
+    --bg: #111827; --card-bg: #1f2937; --text: #e5e7eb; --text-light: #9ca3af; --border: #374151;
+    --green: #34d399; --red: #f87171; --amber: #fbbf24; --table-head-bg: #1a2332; --table-hover: #253347;
+    --info-bg: #1e293b; --info-border: #334155; --info-text: #7dd3fc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+  header { background: var(--primary); color: #fff; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
+  header h1 { font-size: 1.35rem; font-weight: 700; }
+  header p { opacity: 0.9; font-size: 0.85rem; }
+  .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .header-actions a { color: #fff; text-decoration: none; font-size: 0.8rem; padding: 0.35rem 0.7rem; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+  .header-actions a:hover { background: rgba(255,255,255,0.15); }
+  .dark-toggle { display: flex; align-items: center; gap: 0.4rem; margin-left: 0.5rem; }
+  .dark-toggle-label { font-size: 0.75rem; opacity: 0.85; color: #fff; }
+  .dark-toggle-switch { width: 38px; height: 20px; border-radius: 10px; background: rgba(255,255,255,0.35); border: none; position: relative; cursor: pointer; }
+  .dark-toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
+  html.dark .dark-toggle-switch { background: var(--accent); }
+  html.dark .dark-toggle-switch::after { transform: translateX(18px); }
+  .container { max-width: 1400px; margin: 0 auto; padding: 1.25rem 1.5rem 3rem; }
+  .card { background: var(--card-bg); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+  .card h2 { color: var(--primary); font-size: 1.05rem; margin-bottom: 0.75rem; }
+  html.dark .card h2 { color: var(--accent); }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+  .kpi-card { background: var(--card-bg); border-radius: 10px; padding: 0.9rem 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 5px solid var(--border); cursor: pointer; }
+  .kpi-card.sel { outline: 2px solid var(--accent); }
+  .kpi-card .kpi-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light); }
+  .kpi-card .kpi-value { font-size: 1.6rem; font-weight: 700; }
+  .kpi-card.attention { border-left-color: var(--red); }
+  .kpi-card.due { border-left-color: var(--amber); }
+  .kpi-card.notrun { border-left-color: var(--secondary); }
+  .kpi-card.ok { border-left-color: var(--green); }
+  .kpi-card.adhoc { border-left-color: var(--blue); }
+  .steps { counter-reset: s; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; }
+  .steps li { position: relative; padding: 0.75rem 0.9rem 0.75rem 2.6rem; background: var(--table-head-bg); border: 1px solid var(--border); border-radius: 8px; font-size: 0.88rem; }
+  .steps li::before { counter-increment: s; content: counter(s); position: absolute; left: 0.8rem; top: 0.7rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--primary); color: #fff; font-weight: 700; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; }
+  .steps b { display: block; margin-bottom: 0.15rem; }
+  code { font-family: Consolas, 'Courier New', monospace; font-size: 0.82em; background: var(--table-head-bg); border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.35rem; word-break: break-all; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  th, td { padding: 0.55rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--table-head-bg); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-light); white-space: nowrap; }
+  tr.proc { cursor: pointer; }
+  tr.proc:hover { background: var(--table-hover); }
+  tr.proc td:first-child::before { content: '\25B6'; display: inline-block; font-size: 0.65rem; margin-right: 0.4rem; color: var(--text-light); transition: transform 0.2s; }
+  tr.proc.expanded td:first-child::before { transform: rotate(90deg); }
+  tr.detail { display: none; }
+  tr.detail.visible { display: table-row; }
+  tr.detail td { background: var(--table-head-bg); padding: 0.9rem 1.2rem 1rem 2.2rem; }
+  .detail-grid { display: grid; grid-template-columns: 170px 1fr; gap: 0.3rem 1rem; font-size: 0.86rem; }
+  .detail-grid dt { color: var(--text-light); }
+  .pill { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; color: #fff; white-space: nowrap; }
+  .pill.ATTENTION { background: var(--red); }
+  .pill.DUE { background: var(--amber); }
+  .pill.NOTRUN { background: var(--secondary); }
+  .pill.OK { background: var(--green); }
+  .pill.ADHOC { background: var(--blue); }
+  .muted { color: var(--text-light); }
+  .cad { font-size: 0.78rem; color: var(--text-light); }
+  .info-box { background: var(--info-bg); border: 1px solid var(--info-border); color: var(--info-text); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.85rem; margin-top: 0.75rem; }
+  .search-bar { width: 100%; padding: 0.55rem 0.8rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); font-size: 0.9rem; margin-bottom: 0.75rem; }
+  .search-bar:focus { outline: none; border-color: var(--primary); }
+  footer { text-align: center; padding: 1rem; font-size: 0.78rem; color: var(--text-light); }
+  footer a { color: var(--text-light); }
+  #authGate { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; flex-direction: column; align-items: center; }
+  #authGate .auth-header { width: 100%; background: var(--primary); color: #fff; padding: 1.25rem 1.5rem; text-align: center; }
+  #authGate .auth-header h1 { font-size: 1.4rem; font-weight: 700; }
+  #authGate .auth-header p { opacity: 0.85; font-size: 0.85rem; margin-top: 0.25rem; }
+  #authGate .auth-card { background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 2rem; margin-top: 4rem; width: 360px; max-width: 92vw; text-align: center; }
+  #authGate .auth-card h2 { font-size: 1.1rem; color: var(--text); margin-bottom: 0.5rem; }
+  #authGate .auth-card p { font-size: 0.82rem; color: var(--text-light); margin-bottom: 1.5rem; }
+  #authGate .auth-input { width: 100%; padding: 0.65rem 0.9rem; border: 2px solid var(--border); border-radius: 8px; font-size: 1rem; margin-bottom: 0.75rem; }
+  #authGate .auth-input:focus { outline: none; border-color: var(--primary); }
+  #authGate .auth-btn { width: 100%; padding: 0.65rem; background: var(--primary); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+  #authGate .auth-btn:hover { background: var(--primary-dark); }
+  #authGate .auth-error { color: var(--red); font-size: 0.8rem; margin-top: 0.75rem; min-height: 1.2rem; }
+  html.dark #authGate .auth-input { background: var(--bg); color: var(--text); border-color: var(--border); }
+  @media print {
+    header .header-actions, #authGate, .search-bar, .dark-toggle { display: none !important; }
+    body { background: #fff; color: #000; }
+    tr.detail { display: table-row !important; }
+    .card, .kpi-card { box-shadow: none; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+
+<div id="authGate">
+  <div class="auth-header">
+    <h1>WSU Energy Group Processes</h1>
+    <p>Recurring process register &bull; WSU Facilities Services</p>
+  </div>
+  <div class="auth-card">
+    <h2>Enter password</h2>
+    <p>Internal register for the Energy Group's recurring processes.</p>
+    <input type="password" class="auth-input" id="authInput" placeholder="Password" autocomplete="off">
+    <button class="auth-btn" id="authBtn">Enter</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<header>
+  <div class="header-text">
+    <h1>Energy Group Processes</h1>
+    <p>Every recurring process: what it is, how often, who owns it, how to run it, and when it last ran. Register built <span id="generated">...</span></p>
+  </div>
+  <div class="header-actions">
+    <a href="index.html">Energy Cost</a>
+    <a href="metering.html">Campus Metering</a>
+    <a href="water-conservation.html">Water Conservation</a>
+    <a href="steam-plant.html">Steam Plant</a>
+    <a href="folder-map.html">Folder Map</a>
+    <a href="route.html">AMR Drive Route</a>
+    <div class="dark-toggle">
+      <span class="dark-toggle-label">Dark Mode</span>
+      <button class="dark-toggle-switch" id="darkToggle" aria-label="Toggle dark mode"></button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="kpi-grid" id="kpis"></div>
+
+  <div class="card">
+    <h2>How to run any process on this page</h2>
+    <ol class="steps">
+      <li><b>Open the process folder.</b> Local: <code id="libLocal">...</code>. Backup copy (any PC): <code id="libBackup">...</code>. One folder per process.</li>
+      <li><b>Read README.txt first.</b> One screen: what the process does, when it runs, how to run it, and the LAST VERIFIED date.</li>
+      <li><b>Run it.</b> Scripted processes: double-click <code>run.bat</code>. Manual processes: follow <code>SOP.txt</code> step by step. Each run writes a line to <code>last-run.log</code>, which this page reads.</li>
+      <li><b>Or ask Claude Code.</b> Open Claude Code in <code>C:\Users\john.slagboom</code> and type the trigger phrase shown in the row. Claude reads the SOP folder and runs it; it does not re-derive the process.</li>
+    </ol>
+    <div class="info-box">New laptop or nothing here works? Follow <code id="restoreNote">...</code>. The SOP folders and the Claude configuration are both backed up on the shared drive; nothing depends on one PC or one person.</div>
+  </div>
+
+  <div class="card">
+    <h2>Process register</h2>
+    <input class="search-bar" id="search" placeholder="Filter by name, cadence, owner or trigger phrase...">
+    <div class="table-wrap">
+      <table id="procTable">
+        <thead>
+          <tr>
+            <th>Process</th>
+            <th>Status</th>
+            <th>Cadence</th>
+            <th>Last run</th>
+            <th>Last verified</th>
+            <th>Owner</th>
+            <th>Run it</th>
+            <th>Tell Claude</th>
+          </tr>
+        </thead>
+        <tbody id="procBody"></tbody>
+      </table>
+    </div>
+    <div class="info-box" id="legend"></div>
+  </div>
+
+</div>
+
+<footer>
+  WSU Facilities Services &bull; Energy Group &bull;
+  <a href="index.html">Energy Cost</a> &bull;
+  <a href="metering.html">Campus Metering</a> &bull;
+  <a href="water-conservation.html">Water Conservation</a> &bull;
+  <a href="steam-plant.html">Steam Plant Operations</a> &bull;
+  <a href="folder-map.html">Folder Map</a>
+</footer>
+
+<script>
+  // Auth gate (shared key with the metering and water conservation dashboards)
+  const gate = document.getElementById('authGate');
+  const input = document.getElementById('authInput');
+  const btn = document.getElementById('authBtn');
+  const err = document.getElementById('authError');
+  if (localStorage.getItem('wsuMeteringAuth') === 'ok') gate.style.display = 'none';
+  function tryAuth() {
+    if (input.value === 'Energy@WSU') { localStorage.setItem('wsuMeteringAuth', 'ok'); gate.style.display = 'none'; }
+    else { err.textContent = 'Incorrect password'; input.value = ''; input.focus(); }
+  }
+  btn.addEventListener('click', tryAuth);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+
+  // Dark mode
+  if (localStorage.getItem('wsuDarkMode') === 'on') document.documentElement.classList.add('dark');
+  document.getElementById('darkToggle').addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('wsuDarkMode', document.documentElement.classList.contains('dark') ? 'on' : 'off');
+  });
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const cls = s => s.replace(/\s+/g, '');
+  const STATE_TEXT = {
+    'ATTENTION': 'last run FAILED; open the folder and fix it before the next run',
+    'DUE': 'no successful run inside the cadence window',
+    'NOT RUN': 'no run has been logged yet',
+    'OK': 'ran inside the cadence window',
+    'AD HOC': 'runs when needed; no due date'
+  };
+  let DATA = null, filterState = null;
+
+  function render() {
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    const body = document.getElementById('procBody');
+    body.innerHTML = '';
+    let shown = 0;
+    DATA.processes.forEach(p => {
+      if (filterState && p.state !== filterState) return;
+      const hay = [p.name, p.id, p.cadence, p.owner, p.claude_trigger, p.what].join(' ').toLowerCase();
+      if (q && !hay.includes(q)) return;
+      shown++;
+      const tr = document.createElement('tr');
+      tr.className = 'proc';
+      const lastRun = p.last_run ? `${esc(p.last_run)} <span class="muted">${esc(p.last_result || '')}</span>` : '<span class="muted">none logged</span>';
+      tr.innerHTML = `
+        <td><b>${esc(p.name)}</b><div class="cad">${esc(p.id)}</div></td>
+        <td><span class="pill ${cls(p.state)}">${esc(p.state)}</span></td>
+        <td>${esc(p.cadence)}</td>
+        <td>${lastRun}</td>
+        <td>${p.last_verified ? esc(p.last_verified) : '<span class="muted">not recorded</span>'}</td>
+        <td>${esc(p.owner)}</td>
+        <td>${esc(p.run_how)}</td>
+        <td><code>${esc(p.claude_trigger)}</code></td>`;
+      const td = document.createElement('tr');
+      td.className = 'detail';
+      td.innerHTML = `<td colspan="8">
+        <dl class="detail-grid">
+          <dt>What it does</dt><dd>${esc(p.what)}</dd>
+          <dt>Status meaning</dt><dd>${esc(STATE_TEXT[p.state] || '')}</dd>
+          <dt>Process folder (local)</dt><dd><code>${esc(p.folder_local)}</code></dd>
+          <dt>Process folder (backup)</dt><dd><code>${esc(p.folder_backup)}</code></dd>
+          <dt>Files to read</dt><dd>README.txt, then SOP.txt (steps, WHAT YOU SHOULD SEE, IF IT BREAKS), config.json (the rules the script reads), last-run.log (history)</dd>
+          <dt>If it breaks</dt><dd>Stop. Tell Claude: <code>plan-process-check recall ${esc(p.id)}, it failed at step N</code></dd>
+        </dl></td>`;
+      tr.addEventListener('click', () => { tr.classList.toggle('expanded'); td.classList.toggle('visible'); });
+      body.appendChild(tr); body.appendChild(td);
+    });
+    if (!shown) body.innerHTML = '<tr><td colspan="8" class="muted">No process matches.</td></tr>';
+  }
+
+  function renderKpis() {
+    const c = DATA.counts;
+    const items = [
+      ['ATTENTION', 'attention', 'Attention'], ['DUE', 'due', 'Due'], ['NOT RUN', 'notrun', 'Not run'],
+      ['OK', 'ok', 'OK'], ['AD HOC', 'adhoc', 'Ad hoc']
+    ];
+    const grid = document.getElementById('kpis');
+    grid.innerHTML = `<div class="kpi-card" data-state=""><div class="kpi-label">All processes</div><div class="kpi-value">${DATA.processes.length}</div></div>` +
+      items.map(([k, css, label]) => `<div class="kpi-card ${css}" data-state="${k}"><div class="kpi-label">${label}</div><div class="kpi-value">${c[k] || 0}</div></div>`).join('');
+    grid.querySelectorAll('.kpi-card').forEach(el => el.addEventListener('click', () => {
+      filterState = el.dataset.state || null;
+      grid.querySelectorAll('.kpi-card').forEach(x => x.classList.toggle('sel', x === el && !!filterState));
+      render();
+    }));
+  }
+
+  fetch('data/processes.json?v=' + Date.now())
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(d => {
+      DATA = d;
+      document.getElementById('generated').textContent = d.generated;
+      document.getElementById('libLocal').textContent = d.library_local;
+      document.getElementById('libBackup').textContent = d.library_backup;
+      document.getElementById('restoreNote').textContent = d.restore_note;
+      const w = d.windows_days || {};
+      document.getElementById('legend').innerHTML =
+        `<b>Status rules.</b> OK: a run is logged within the cadence window (weekly ${w.weekly} days, monthly ${w.monthly} days, annual ${w.annual} days). ` +
+        `DUE: the last run is older than that. ATTENTION: the last logged run FAILED. NOT RUN: the folder has no run log yet. AD HOC: runs on demand. ` +
+        `Click a status card to filter, click a row for the folder paths and what to do if it breaks. This page holds no readings, dollars or bill data; those stay in each process folder.`;
+      renderKpis(); render();
+    })
+    .catch(e => { document.getElementById('procBody').innerHTML = `<tr><td colspan="8" class="muted">Could not load data/processes.json (${esc(e.message)}).</td></tr>`; });
+  document.getElementById('search').addEventListener('input', render);
+</script>
+</body>
+</html>
