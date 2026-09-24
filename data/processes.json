@@ -1,5 +1,5 @@
 {
- "generated": "09/24/2026 15:36",
+ "generated": "09/24/2026 15:37",
  "generated_by": "export_processes_json.py (reads the SOP library; never edits it)",
  "library_local": "C:\\Users\\john.slagboom\\Desktop\\Git\\sops",
  "library_backup": "R:\\0 - Meter+Billing Process Docs\\sops",
@@ -70,7 +70,7 @@
    "name": "Skyspark manual reads csv bridge",
    "cadence": "monthly",
    "cadence_class": "monthly",
-   "what": "MOVED 06/11/2026: the full toolkit now lives at C",
+   "what": "MOVED 06/11/2026: the full toolkit now lives",
    "owner": "Shuangling Li",
    "run_how": "follow SOP.txt (no script)",
    "claude_trigger": "plan-process-check recall skyspark-manual-reads-csv-bridge",
