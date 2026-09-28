@@ -175,7 +175,7 @@
 <header>
   <div>
     <h1>Schweitzer Engineering Hall: Energy Explorer</h1>
-    <p>WSU Pullman building 0802 &bull; 66,288 sq ft &bull; <span id="hdrUpdated">Loading...</span></p>
+    <p>WSU Pullman building 0802 &bull; 67,805 gross sq ft &bull; <span id="hdrUpdated">Loading...</span></p>
   </div>
   <div class="header-actions">
     <a href="metering.html">Campus Metering</a>
@@ -236,7 +236,7 @@
         </div>
       </div>
     </div>
-    <div class="info-box">The 3D model is a schematic. Each tile is one heating and cooling zone, grouped by floor, in room-number order. Tile positions are not the real room locations. Pipes at the left end carry electricity, chilled water and heating water up through the floors. The moving dots speed up when the building uses more.</div>
+    <div class="info-box">The floor plans come from WSU Facilities reference drawings and are approximate. Only rooms served by a building-control zone are shown and colored; zones without a room sit in a strip at the south edge of their floor. Pipes beside the building carry electricity, chilled water and heating water up through the floors. The moving dots speed up when the building uses more.</div>
   </div>
 
   <!-- ===================== ENERGY ===================== -->
@@ -335,16 +335,16 @@ import * as THREE from 'three';
 import { OrbitControls } from './lib/three/OrbitControls.js';
 
 // ============================ CONSTANTS ============================
-const SQFT = 66288;
+const SQFT = 67805;  // gross sq ft, WSU Facilities R-sheets
 const RATES = { elec: 0.1037, chw: 0.1823, from: '2026-07-01' };  // FY27 rates, "Utility Rates for FY27" email 12/22/2025
 const KBTU_PER_KWH = 3.412;
 const COLORS = { elec: '#f59e0b', chw: '#06b6d4', hhw: '#ef4444', water: '#3b82f6', oat: '#8b5cf6' };
 const FLOORS = [
   { sys: 'Ground Floor', label: 'Ground floor', rooms: 'G rooms',   y: 0,  h: 3.2 },
-  { sys: 'Floor-01',     label: 'Level 1',      rooms: '100 rooms', y: 7,  h: 3.2 },
-  { sys: 'Mezzanine',    label: 'Mezzanine',    rooms: 'M rooms',   y: 14, h: 3.2, partial: 0.55 },
-  { sys: 'Floor-02',     label: 'Level 2',      rooms: '200 rooms', y: 21, h: 3.2 },
-  { sys: 'Penthouse',    label: 'Penthouse and roof', rooms: '400 rooms', y: 28, h: 3.2 },
+  { sys: 'Mezzanine',    label: 'Mezzanine',    rooms: 'M rooms',   y: 7,  h: 3.2, partial: 0.55 },
+  { sys: 'Floor-01',     label: 'First floor',  rooms: '100 rooms', y: 14, h: 3.2 },
+  { sys: 'Floor-02',     label: 'Second floor', rooms: '200 rooms', y: 21, h: 3.2 },
+  { sys: 'Penthouse',    label: 'Mechanical penthouse', rooms: '400 rooms', y: 28, h: 3.2 },
 ];
 const PLATE = { w: 54, d: 26 };
 const ZONE_TYPES = new Set(['Supply Air Terminal Unit', 'Fan Coil Unit', 'Radiant Floor', 'Fan']);
@@ -364,9 +364,10 @@ const roomOf = e => { const m = /RM([A-Z]?\d+[A-Z0-9]*)/i.exec(e.alias || e.name
 const niceEquip = name => (name && name.startsWith('p:wsumeters')) ? 'Unassigned meter channel' : name;
 
 // ============================ DATA ============================
-const [P, M] = await Promise.all([
+const [P, M, FP] = await Promise.all([
   fetch('data/0802/points.json', { cache: 'no-cache' }).then(r => r.json()),
   fetch('data/0802/meters.json', { cache: 'no-cache' }).then(r => r.json()),
+  fetch('data/0802/floorplan.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null),
 ]);
 const EQ = new Map(P.equips.map(e => [e.name, e]));
 const PTS_BY_EQ = new Map();
@@ -498,6 +499,13 @@ function zoneVals(e, i) {
            air: flow != null && fmax ? Math.min(100, flow / fmax * 100) : null };
 }
 const modeVal = (z) => ({ temp: z.temp, comfort: z.comfort, co2: z.co2, air: z.air })[mode];
+const VAL_KEYS = ['temp', 'hs', 'cs', 'flow', 'fmax', 'comfort', 'co2', 'rh', 'damper', 'hhwv', 'chwv', 'air'];
+function roomVals(equips, i) {
+  const zs = equips.map(e => zoneVals(e, i));
+  const out = {};
+  for (const k of VAL_KEYS) { const v = zs.map(z => z[k]).filter(x => x != null && !isNaN(x)); out[k] = v.length ? sum(v) / v.length : null; }
+  return out;
+}
 
 // ============================ THREE.JS SCENE ============================
 const host = $('scene');
@@ -542,40 +550,114 @@ const building = new THREE.Group(); scene.add(building);
 const slabMat = new THREE.MeshStandardMaterial({ color: 0xe7e5e4, roughness: 0.9, transparent: true, opacity: 0.88 });
 const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x9fc6e0, transparent: true, opacity: 0.12, roughness: 0.1, depthWrite: false, side: THREE.DoubleSide });
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x981e32, transparent: true, opacity: 0.7 });
-const pickables = [];
-const zoneMeshes = [];
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.8 });
+const glazMat = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, transparent: true, opacity: 0.55 });
+const pickables = [], zoneMeshes = [], floorGroups = {}, floorLabels = {};
+let FOOT = null;
+const zoneSet = new Set(zoneEquips.map(e => e.name));
 
-FLOORS.forEach((f, fi) => {
-  const w = PLATE.w * (f.partial || 1), d = PLATE.d * (f.partial ? Math.max(f.partial, 0.6) : 1);
-  const ox = f.partial ? PLATE.w / 2 - w / 2 : 0;
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, d), slabMat);
-  slab.position.set(ox, f.y, 0); slab.receiveShadow = true; slab.castShadow = true; building.add(slab);
-  const shell = new THREE.Mesh(new THREE.BoxGeometry(w, f.h, d), glassMat);
-  shell.position.set(ox, f.y + f.h / 2 + 0.17, 0); building.add(shell);
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, f.h, d)), edgeMat);
-  edges.position.copy(shell.position); building.add(edges);
-  const lab = textSprite(`${f.label} (${f.rooms})`, 2.2);
-  lab.position.set(ox - w / 2 - 1, f.y + f.h * 0.5, d / 2 + 1.5); lab.center.set(1, 0.5); building.add(lab);
+function roomMat() { return new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.55, emissive: 0x000000, side: THREE.DoubleSide }); }
 
-  // zone tiles on this floor
-  const zs = zoneEquips.filter(e => e.system === f.sys).sort((a, b) => (roomOf(a) || a.name).localeCompare(roomOf(b) || b.name, undefined, { numeric: true }));
-  const areaW = f.sys === 'Ground Floor' ? w * 0.52 : f.sys === 'Penthouse' ? w * 0.4 : w - 4, areaD = d - 4;
-  const xs = f.sys === 'Penthouse' ? w * 0.55 : 0;
-  const x0 = ox - w / 2 + 2 + xs;
-  const cols = Math.max(1, Math.ceil(Math.sqrt(zs.length * areaW / areaD)));
-  const rows = Math.max(1, Math.ceil(zs.length / cols));
-  const cw = Math.min(areaW / cols, 7), cd = Math.min(areaD / rows, 6);
-  zs.forEach((e, i) => {
-    const c = i % cols, r = Math.floor(i / cols);
-    const mat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.55, emissive: 0x000000 });
-    const tile = new THREE.Mesh(new THREE.BoxGeometry(cw * 0.86, 1, cd * 0.86), mat);
-    tile.position.set(x0 + cw * (c + 0.5), f.y + 0.7, -cd * rows / 2 + cd * (r + 0.5));
-    tile.castShadow = true;
-    tile.userData = { kind: 'zone', equip: e, floor: f };
-    building.add(tile); pickables.push(tile); zoneMeshes.push(tile);
+function buildSchematic() {
+  FLOORS.forEach(f => {
+    const g = new THREE.Group(); building.add(g); floorGroups[f.sys] = g; floorLabels[f.sys] = [];
+    const w = PLATE.w * (f.partial || 1), d = PLATE.d * (f.partial ? Math.max(f.partial, 0.6) : 1);
+    const ox = f.partial ? PLATE.w / 2 - w / 2 : 0;
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, d), slabMat);
+    slab.position.set(ox, f.y, 0); slab.receiveShadow = true; g.add(slab);
+    const shell = new THREE.Mesh(new THREE.BoxGeometry(w, f.h, d), glassMat);
+    shell.position.set(ox, f.y + f.h / 2 + 0.17, 0); g.add(shell);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, f.h, d)), edgeMat);
+    edges.position.copy(shell.position); g.add(edges);
+    const lab = textSprite(`${f.label} (${f.rooms})`, 2.2);
+    lab.position.set(ox - w / 2 - 1, f.y + f.h * 0.5, d / 2 + 1.5); lab.center.set(1, 0.5); g.add(lab);
+    const zs = zoneEquips.filter(e => e.system === f.sys).sort((a, b) => (roomOf(a) || a.name).localeCompare(roomOf(b) || b.name, undefined, { numeric: true }));
+    const areaW = f.sys === 'Ground Floor' ? w * 0.52 : f.sys === 'Penthouse' ? w * 0.4 : w - 4, areaD = d - 4;
+    const xs = f.sys === 'Penthouse' ? w * 0.55 : 0, x0 = ox - w / 2 + 2 + xs;
+    const cols = Math.max(1, Math.ceil(Math.sqrt(zs.length * areaW / areaD))), rows = Math.max(1, Math.ceil(zs.length / cols));
+    const cw = Math.min(areaW / cols, 7), cd = Math.min(areaD / rows, 6);
+    zs.forEach((e, i) => {
+      const tile = new THREE.Mesh(new THREE.BoxGeometry(cw * 0.86, 1, cd * 0.86), roomMat());
+      tile.position.set(x0 + cw * (i % cols + 0.5), f.y + 0.7, -cd * rows / 2 + cd * (Math.floor(i / cols) + 0.5));
+      tile.castShadow = true;
+      tile.userData = { kind: 'room', title: roomOf(e) || e.name, label: null, equips: [e], floor: { label: f.label, sys: f.sys }, strip: false };
+      g.add(tile); pickables.push(tile); zoneMeshes.push(tile);
+    });
   });
-});
-const ROOF_Y = FLOORS[4].y;
+  FOOT = { minX: -PLATE.w / 2, maxX: PLATE.w / 2, minZ: -PLATE.d / 2, maxZ: PLATE.d / 2, topY: FLOORS[4].y, step: 7 };
+}
+
+function buildFloorplan(fp) {
+  const S = 1 / 2.8, STEP = 7, WALL_H = 0.7;
+  const ORDER = ['Ground Floor', 'Mezzanine', 'Floor-01', 'Floor-02', 'Penthouse'];
+  const NAME = { 'Ground Floor': 'Ground floor', 'Mezzanine': 'Mezzanine', 'Floor-01': 'First floor', 'Floor-02': 'Second floor', 'Penthouse': 'Mechanical penthouse' };
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  fp.floors.forEach(f => f.walls.forEach(([a, b, c, d]) => { x0 = Math.min(x0, a, c); x1 = Math.max(x1, a, c); y0 = Math.min(y0, b, d); y1 = Math.max(y1, b, d); }));
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const X = x => (x - cx) * S, Z = y => -(y - cy) * S;
+  FOOT = { minX: X(x0), maxX: X(x1), minZ: Z(y1), maxZ: Z(y0), topY: STEP * (ORDER.length - 1), step: STEP };
+  const unit = new THREE.BoxGeometry(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
+  const segMatrix = ([a, b, c, d], h, t) => {
+    const ax = X(a), az = Z(b), bx = X(c), bz = Z(d), dx = bx - ax, dz = bz - az;
+    return new THREE.Matrix4().compose(new THREE.Vector3((ax + bx) / 2, h / 2, (az + bz) / 2),
+      new THREE.Quaternion().setFromAxisAngle(up, -Math.atan2(dz, dx)), new THREE.Vector3(Math.max(Math.hypot(dx, dz), 0.05), h, t));
+  };
+  const placed = new Set();
+  ORDER.forEach((sys, fi) => {
+    const f = fp.floors.find(q => q.system === sys); if (!f) return;
+    const g = new THREE.Group(); g.position.y = fi * STEP; building.add(g); floorGroups[sys] = g; floorLabels[sys] = [];
+    let fx0 = Infinity, fx1 = -Infinity, fz0 = Infinity, fz1 = -Infinity;
+    f.walls.forEach(([a, b, c, d]) => { fx0 = Math.min(fx0, X(a), X(c)); fx1 = Math.max(fx1, X(a), X(c)); fz0 = Math.min(fz0, Z(b), Z(d)); fz1 = Math.max(fz1, Z(b), Z(d)); });
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(fx1 - fx0 + 1, 0.3, fz1 - fz0 + 1), slabMat);
+    slab.position.set((fx0 + fx1) / 2, -0.15, (fz0 + fz1) / 2); slab.receiveShadow = true; g.add(slab);
+    const walls = new THREE.InstancedMesh(unit, wallMat, f.walls.length);
+    f.walls.forEach((s, i) => walls.setMatrixAt(i, segMatrix(s, WALL_H, 0.18)));
+    walls.castShadow = true; g.add(walls);
+    if (f.glazing.length) {
+      const gl = new THREE.InstancedMesh(unit, glazMat, f.glazing.length);
+      f.glazing.forEach((s, i) => gl.setMatrixAt(i, segMatrix(s, WALL_H, 0.12)));
+      g.add(gl);
+    }
+    f.rooms.forEach(r => {
+      const shape = new THREE.Shape(r.poly.map(([x, y]) => new THREE.Vector2(X(x), (y - cy) * S)));
+      const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), roomMat());
+      mesh.rotation.x = -Math.PI / 2; mesh.position.y = 0.05;
+      const equips = r.zones.map(n => EQ.get(n)).filter(Boolean);
+      equips.forEach(e => placed.add(e.name));
+      mesh.userData = { kind: 'room', title: 'Room ' + r.label, label: r.label, equips, floor: { label: NAME[sys], sys }, strip: false };
+      g.add(mesh); pickables.push(mesh); zoneMeshes.push(mesh);
+      const lab = textSprite(r.label, 1.3); lab.position.set(X(r.center[0]), 2.2, Z(r.center[1])); lab.visible = false;
+      g.add(lab); floorLabels[sys].push(lab);
+    });
+    // zones without a room: a strip along the south edge of their floor
+    const strip = fp.unlocated.filter(u => u.system === sys).map(u => EQ.get(u.equip)).filter(e => e && zoneSet.has(e.name));
+    strip.forEach(e => placed.add(e.name));
+    g.userData.strip = strip; g.userData.stripZ = fz1 + 3; g.userData.stripX = fx0;
+    const nm = textSprite(`${NAME[sys]} (${f.gsf.toLocaleString()} sq ft)`, 2);
+    nm.position.set(fx0 - 2, 1.5, fz1); nm.center.set(1, 0.5); g.add(nm);
+  });
+  // any zone missing from floorplan.json (new since the build) joins its floor strip
+  zoneEquips.filter(e => !placed.has(e.name) && floorGroups[e.system]).forEach(e => floorGroups[e.system].userData.strip.push(e));
+  Object.entries(floorGroups).forEach(([sys, g]) => (g.userData.strip || []).forEach((e, i) => {
+    const t = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.6, 2.6), roomMat());
+    t.position.set(g.userData.stripX + 1.6 + i * 3.2, 0.3, g.userData.stripZ);
+    t.userData = { kind: 'room', title: e.name, label: null, equips: [e], floor: { label: NAME[sys], sys }, strip: true };
+    g.add(t); pickables.push(t); zoneMeshes.push(t);
+  }));
+}
+
+let MODE = 'schematic';
+if (FP && FP.floors?.length) { try { buildFloorplan(FP); MODE = 'floorplan'; } catch (err) { console.warn('floor plan build failed', err); } }
+if (MODE === 'schematic') {
+  building.clear(); pickables.length = 0; zoneMeshes.length = 0;
+  Object.keys(floorGroups).forEach(k => delete floorGroups[k]);
+  buildSchematic();
+  const note = document.createElement('div'); note.className = 'info-box';
+  note.textContent = 'The floor plan could not load, so the 3D view shows a schematic of the zones by floor.';
+  $('sec-explore').prepend(note);
+}
+const ROOF_Y = FOOT.topY;
+const equipGroup = new THREE.Group(); building.add(equipGroup);
 
 // mechanical room (ground floor, east end): pumps, loops, heat exchanger
 const mechEquips = P.equips.filter(e => e.system === 'Central Water');
@@ -587,10 +669,10 @@ mechEquips.forEach((e, i) => {
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.3 }));
   m.position.set(mechBase.x + (i % 5) * 2.3, 0.2 + (isPump ? 0.7 : 1.3), mechBase.z + Math.floor(i / 5) * 2.6);
   m.castShadow = true; m.userData = { kind: 'equip', equip: e };
-  building.add(m); pickables.push(m);
+  equipGroup.add(m); pickables.push(m);
 });
 const mechLab = textSprite('Mechanical room: pumps and water loops', 1.6);
-mechLab.position.set(mechBase.x + 4.6, 4.0, mechBase.z - 1.8); building.add(mechLab);
+mechLab.position.set(mechBase.x + 4.6, 4.0, mechBase.z - 1.8); equipGroup.add(mechLab);
 
 // electrical room: one bar per electric meter, height follows kW
 const elecBars = [];
@@ -599,21 +681,21 @@ elecMeters.forEach((m, i) => {
   const bar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1, 0.8), new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0x7c2d12, emissiveIntensity: 0.25 }));
   bar.position.set(mechBase.x + (i % 9) * 1.25, 0.7, 5 + Math.floor(i / 9) * 1.6);
   bar.userData = { kind: 'meter', meter: m, equip: EQ.get(m.equip) };
-  building.add(bar); pickables.push(bar); elecBars.push(bar);
+  equipGroup.add(bar); pickables.push(bar); elecBars.push(bar);
 });
 const elecLab = textSprite('Electric meters (bar height = kW)', 1.6);
-elecLab.position.set(mechBase.x + 5, 4.0, 8.2); building.add(elecLab);
+elecLab.position.set(mechBase.x + 5, 4.0, 8.2); equipGroup.add(elecLab);
 
 // rooftop air handler (DOAS-01) and exhaust fan
 const doas = P.equips.find(e => e.name === 'DOAS-01');
 const ahu = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 5), new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5, metalness: 0.4 }));
 ahu.position.set(-12, ROOF_Y + 1.7, 0); ahu.castShadow = true; ahu.userData = { kind: 'equip', equip: doas };
-building.add(ahu); pickables.push(ahu);
+equipGroup.add(ahu); pickables.push(ahu);
 const fanBlades = new THREE.Group();
 for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.5), new THREE.MeshStandardMaterial({ color: 0x1f2937 })); b.rotation.y = k * Math.PI / 2; b.position.set(Math.cos(k * Math.PI / 2) * 1.1, 0, -Math.sin(k * Math.PI / 2) * 1.1); fanBlades.add(b); }
-fanBlades.position.set(-12, ahu.position.y + 1.6, 0); building.add(fanBlades);
+fanBlades.position.set(-12, ahu.position.y + 1.6, 0); equipGroup.add(fanBlades);
 const ahuLab = textSprite('DOAS-01: fresh air unit', 1.8);
-ahuLab.position.set(-12, ahu.position.y + 4, 0); building.add(ahuLab);
+ahuLab.position.set(-12, ahu.position.y + 4, 0); equipGroup.add(ahuLab);
 
 // utility risers with moving particles
 const riserX = -PLATE.w / 2 - 2, top = ROOF_Y;
@@ -625,19 +707,27 @@ const flows = [
 flows.forEach(f => {
   const pipeMat = new THREE.MeshStandardMaterial({ color: f.color, transparent: true, opacity: 0.5 });
   const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, top + 1, 12), pipeMat);
-  riser.position.set(riserX, top / 2 - 0.5, f.z); building.add(riser);
+  riser.position.set(riserX, top / 2 - 0.5, f.z); equipGroup.add(riser);
   const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 22, 12), pipeMat);
-  feed.rotation.z = Math.PI / 2; feed.position.set(riserX - 11, -0.5, f.z); building.add(feed);
+  feed.rotation.z = Math.PI / 2; feed.position.set(riserX - 11, -0.5, f.z); equipGroup.add(feed);
   const N = 60, pos = new Float32Array(N * 3), phase = new Float32Array(N);
   for (let i = 0; i < N; i++) phase[i] = i / N;
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: f.color, size: 1.1, sizeAttenuation: true, transparent: true }));
-  building.add(pts);
+  equipGroup.add(pts);
   Object.assign(f, { pts, phase, N, speed: 0.1 });
 });
 const campusLab = textSprite('Utility service entrance', 1.6);
-campusLab.position.set(riserX - 16, -2.2, -3); building.add(campusLab);
+campusLab.position.set(riserX - 16, -2.2, -3); equipGroup.add(campusLab);
 building.position.x = 3;
+if (MODE === 'floorplan') {
+  building.position.x = -8;
+  equipGroup.position.x = FOOT.maxX + 44;
+  equipGroup.scale.setScalar(0.7);
+  camera.position.set(74, 60, 84);
+  const eqLab = textSprite('Equipment (schematic, not to location)', 1.6);
+  eqLab.position.set(-12, ROOF_Y + 9, 0); equipGroup.add(eqLab);
+}
 
 function setSceneTheme() {
   scene.background = new THREE.Color(cssVar('--scene-bg') || '#e8ecf1');
@@ -655,10 +745,10 @@ function applyTime(i) {
   curIdx = i;
   $('timeLabel').textContent = fmtHour(hourT(i)) + (i === HLAST ? ' (latest)' : '');
   for (const m of zoneMeshes) {
-    const z = zoneVals(m.userData.equip, i);
+    const z = roomVals(m.userData.equips, i);
     const c = colorFor(modeVal(z));
     m.material.color.copy(c);
-    m.material.emissive.copy(c).multiplyScalar(0.18);
+    m.material.emissive.copy(c).multiplyScalar(m === selected ? 0.45 : 0.18);
     m.userData.z = z;
   }
   // electric bars
@@ -709,7 +799,7 @@ function pick(ev) {
 }
 function label(o) {
   const u = o.userData;
-  if (u.kind === 'zone') return roomOf(u.equip) || u.equip.name;
+  if (u.kind === 'room') return u.title;
   if (u.kind === 'meter') return 'Meter ' + u.meter.key;
   return u.equip?.name || '';
 }
@@ -722,12 +812,13 @@ renderer.domElement.addEventListener('pointermove', ev => {
   renderer.domElement.style.cursor = 'pointer';
   const u = o.userData;
   let html = `<b>${esc(label(o))}</b><br>`;
-  if (u.kind === 'zone') {
+  if (u.kind === 'room') {
     const z = u.z || {};
-    html += `${esc(u.equip.type || 'Radiant zone')} &bull; ${esc(u.floor.label)}<br>Temp ${fmt(z.temp, 1)}°F`;
+    html += `${esc(u.floor.label)}${u.equips.length > 1 ? ` &bull; ${u.equips.length} zones` : ''}<br>Temp ${fmt(z.temp, 1)}°F`;
     if (z.hs != null) html += ` (target ${fmt(z.hs, 0)} to ${fmt(z.cs, 0)}°F)`;
     if (z.co2 != null) html += `<br>CO₂ ${fmt(z.co2)} ppm`;
     if (z.flow != null) html += `<br>Airflow ${fmt(z.flow)} cfm`;
+    html += `<br><span style="opacity:.75">${u.equips.map(e => esc(e.name)).join(', ')}</span>`;
   } else if (u.kind === 'meter') {
     const v = u.meter.q15?.[nearestQ15(hourT(curIdx) + 1800)];
     html += `${u.meter.voltage || ''} V electric meter<br>${fmt(v, 1)} kW`;
@@ -743,25 +834,27 @@ renderer.domElement.addEventListener('pointerdown', ev => { downAt = [ev.clientX
 renderer.domElement.addEventListener('pointerup', ev => {
   if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5) return;
   const o = pick(ev); if (!o) return;
-  if (selected?.userData.kind === 'zone') selected.scale.y = 1;
-  selected = o;
-  if (o.userData.kind === 'zone') o.scale.y = 1.8;
+  const prev = selected; selected = o;
+  if (prev) prev.material.emissive?.copy(prev.material.color).multiplyScalar(0.18);
+  o.material.emissive?.copy(o.material.color).multiplyScalar(0.45);
   renderDetail(o);
 });
 
 let detailChart = null;
 function renderDetail(o) {
-  const u = o.userData, e = u.equip || EQ.get(u.meter?.equip);
+  const u = o.userData;
+  const e = u.kind === 'room' ? u.equips[u.sel || 0] : (u.equip || EQ.get(u.meter?.equip));
   $('detailTitle').textContent = label(o);
   const pts = Object.values(PTS_BY_EQ.get(e?.name) || {});
   let html = `<div class="muted" style="font-size:0.82rem">${esc(e?.name || '')} &bull; ${esc(e?.type || 'Equipment')}${u.floor ? ' &bull; ' + esc(u.floor.label) : ''}</div>`;
-  if (u.kind === 'zone') {
+  if (u.kind === 'room') {
     const z = zoneVals(e, curIdx);
     const cells = [['Temperature', fmt(z.temp, 1) + ' °F'], ['Target band', z.hs != null ? `${fmt(z.hs, 0)} to ${fmt(z.cs, 0)} °F` : '--'],
       ['Airflow', z.flow != null ? fmt(z.flow) + ' cfm' : '--'], ['CO₂', z.co2 != null ? fmt(z.co2) + ' ppm' : '--'],
       ['Humidity', z.rh != null ? fmt(z.rh) + ' %' : '--'], ['Heating valve', z.hhwv != null ? fmt(z.hhwv) + ' %' : '--'],
       ['Cooling valve', z.chwv != null ? fmt(z.chwv) + ' %' : '--'], ['Air damper', z.damper != null ? fmt(z.damper) + ' %' : '--']];
     html += `<div class="detail-grid">${cells.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div><div class="chart-box" style="height:190px"><canvas id="chDetail"></canvas></div>`;
+    if (u.equips.length > 1) html += `<div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.5rem">${u.equips.map((q, k) => `<button class="btn-sm ${k === (u.sel || 0) ? 'primary' : ''}" data-zone="${k}">${esc(q.name)}</button>`).join('')}</div>`;
   } else if (u.kind === 'meter') {
     const v = u.meter.q15?.[nearestQ15(hourT(curIdx) + 1800)];
     html += `<div class="detail-grid"><div><span>Demand</span><b>${fmt(v, 1)} kW</b></div><div><span>Voltage class</span><b>${u.meter.voltage || '--'} V</b></div><div><span>Fed from</span><b>${esc(u.meter.submeterOf || '--')}</b></div></div><div class="chart-box" style="height:190px"><canvas id="chDetail"></canvas></div>`;
@@ -770,12 +863,13 @@ function renderDetail(o) {
   }
   html += `<div style="margin-top:0.7rem;display:flex;gap:0.5rem;flex-wrap:wrap"><button class="btn-sm primary" id="seeAll">See all ${pts.length} points</button></div>`;
   $('detailBody').className = ''; $('detailBody').innerHTML = html;
+  $('detailBody').querySelectorAll('[data-zone]').forEach(b => b.onclick = () => { u.sel = +b.dataset.zone; renderDetail(o); });
   $('seeAll').onclick = () => { document.querySelector('.nav-tab[data-tab="points"]').click(); $('pointSearch').value = e.name; sysFilter = 'All'; renderChips(); renderPoints(); };
   if (detailChart) { detailChart.destroy(); charts.splice(charts.indexOf(detailChart), 1); detailChart = null; }
   const cv = $('chDetail'); if (!cv) return;
   const labels = Array.from({ length: HLAST + 1 }, (_, i) => fmtHour(hourT(i)));
   let ds;
-  if (u.kind === 'zone') {
+  if (u.kind === 'room') {
     const s = n => (pt(e.name, ...[].concat(n))?.h || []).slice(0, HLAST + 1);
     ds = [{ label: 'Room temp', data: s(['zone temp', 'TMP', 'ZN TMP']), borderColor: '#10b981' },
           { label: 'Heat below', data: s('zone temp eff htg sp'), borderColor: '#ef4444', borderDash: [4, 3] },
@@ -1041,6 +1135,22 @@ function buildAbout() {
 
 // ============================ START ============================
 setLegend(); setSceneTheme(); resize(); applyTime(HLAST);
+function worldCenter(m) {
+  m.updateWorldMatrix(true, false); m.geometry.computeBoundingBox();
+  const c = new THREE.Vector3(); m.geometry.boundingBox.getCenter(c); return m.localToWorld(c);
+}
+const byLabel = l => zoneMeshes.find(z => z.userData.label === l && !z.userData.strip);
+window.SEH = {
+  mode: MODE,
+  footprint: () => FOOT,
+  labels: () => zoneMeshes.filter(z => z.userData.label).map(z => z.userData.label),
+  roomWorld(l) { const m = byLabel(l); if (!m) return null; const c = worldCenter(m); return { x: c.x - building.position.x, z: c.z }; },
+  roomScreen(l) {
+    const m = byLabel(l); if (!m || !m.parent.visible) return null;
+    const c = worldCenter(m).project(camera), r = renderer.domElement.getBoundingClientRect();
+    return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height };
+  },
+};
 $('loading').style.display = 'none';
 </script>
 </body>
