@@ -167,6 +167,7 @@
     #scene { height: 380px; }
     .legend { min-width: 0; right: 0.8rem; }
     .scene-hint { display: none; }
+    .floor-btns { top: 5.2rem; }
     #timeLabel { min-width: 0; text-align: left; }
   }
 </style>
@@ -1142,7 +1143,7 @@ function buildAbout() {
       <li><b>Domestic cold water:</b> meter 0802_DW_001 has recorded zero flow since data began, so the page shows no cold water use.</li>
       <li><b>Energy per day</b> = average demand for the day x 24 hours. Today is left out of daily totals because the day is not over.</li>
       <li><b>Cost</b> uses WSU FY27 utility rates in effect 07/01/2026: electricity $${RATES.elec} per kWh and chilled water $${RATES.chw} per ton-hour. Heating water has no per-unit rate, so heating cost is not shown.</li>
-      <li><b>3D model:</b> a schematic. Floors and zones come from the building control system; tile positions are not real room locations.</li>
+      <li><b>3D model:</b> floor plans from WSU Facilities reference drawings (R-sheets, plotted 11/20/2025 and 11/21/2025). They are approximate. Only walls, windows and rooms served by a building-control zone are shown. Square footage is the R-sheet gross area, 67,805 sq ft.</li>
     </ul>`;
 }
 

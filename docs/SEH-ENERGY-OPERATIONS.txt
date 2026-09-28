@@ -36,3 +36,17 @@ TROUBLESHOOTING
 Page stuck on "Loading":   data/0802/*.json missing or invalid. Rerun the exporter.
 3D view blank:             browser has WebGL off. Other tabs still work.
 Exporter HTTP 403:         SkySpark login throttle. Wait 2 minutes, run once.
+
+---
+FLOOR PLAN (Explore the Building tab)
+---
+Source:   R-sheets PDF in C:\Users\john.slagboom\Desktop\Git\private\0802_r-sheets.pdf
+          (gitignored; never push). Plotted 11/20/2025 and 11/21/2025.
+Build:    py C:\Users\john.slagboom\Desktop\Git\build_0802_floorplan.py
+          Writes data/0802/floorplan.json. Prints zones located / unlocated per floor.
+Tests:    py -m pytest C:\Users\john.slagboom\Desktop\Git\tests\floorplan_0802 -q
+Rebuild when: the R-sheets are revised, or new zones appear in the floor strips.
+The build stops when: sheets do not line up (AlignmentError), a CAD layer name or an
+unzoned room would be published (PrivacyError), or a sheet has no walls.
+Weekly job: does NOT rebuild the floor plan. New zones show in their floor strip
+until the next manual build.
