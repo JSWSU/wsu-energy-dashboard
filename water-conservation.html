@@ -870,7 +870,7 @@
         </div>
         <div class="help-tab-card">
           <strong>Top 10 Top Dollar Issues</strong>
-          Filter button on the Anomaly Review tab. Computed live from the loaded data and restricted to CURRENT issues: only buildings with real data in the two most recent campus data months are ranked. Recent months are compared to the same months in the prior year (fallback: prior-year median). Ranking is by annualized run rate so the largest ongoing issues surface first, but the DISPLAYED headline is <strong>event cost to date</strong>, the actual excess kGal &times; rate (FY27, $7.31 per kGal) for the trigger months only. Every row expands to show the full arithmetic, net year-to-date vs the prior year as context (negatives allowed), and the annualized figure explicitly labeled as reference only. Stale meters never appear here no matter how large their old numbers; those belong in field verification. Recomputes automatically whenever the data updates.
+          Filter button on the Anomaly Review tab. Computed live from the loaded data and restricted to CURRENT issues: only buildings with real data in the two most recent campus data months are ranked. Recent months are compared to the same months in the prior year (fallback: prior-year median). Ranking is by annualized run rate so the largest ongoing issues surface first, but the DISPLAYED headline is <strong>event cost to date</strong>, the actual excess kGal &times; rate (FY27, $7.31 per kGal) for the trigger months only. Every row expands to show the full arithmetic, net year-to-date vs the prior year as context (negatives allowed), and the annualized figure explicitly labeled as reference only. Stale meters never appear here no matter how large their old numbers; those belong in field verification. Meters with no prior-year baseline (no same month and no prior-year median) are left out; they are building a baseline, not showing an anomaly. Recomputes automatically whenever the data updates.
         </div>
         <div class="help-tab-card">
           <strong>Task Tracker</strong>
@@ -2302,6 +2302,9 @@ function computeTop10TopDollar() {
         const priors = Object.keys(b.months)
           .filter(m => m.startsWith(baseYear + '-') && m.split('-')[1] === cal)
           .map(m => b.months[m]).filter(v => v > 0);
+        // No prior-year baseline (no same month and no prior-year median): skip the month.
+        // New meters are building a baseline, not an anomaly; never compare them to zero.
+        if (!priors.length && !(med25 > 0)) return;
         const base = priors.length ? priors.reduce((s, v) => s + v, 0) / priors.length : med25;
         const e = b.months[mk] - base;
         if (e > 0) {
