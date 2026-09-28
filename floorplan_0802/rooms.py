@@ -91,3 +91,51 @@ def find_rooms(sheet, s=2):
             if poly and (name not in out or area > out[name]["area_ft2"]):
                 out[name] = {"poly_pt": poly, "area_ft2": area}
     return out
+
+
+def _regions(sheet, s):
+    wall = _rasterize(sheet.seal, sheet.page_size, s)
+    lab, _ = ndimage.label(~wall)
+    border = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])).tolist())
+    return wall, lab, border
+
+
+def _outline(mask, s, min_ft2):
+    comps, n = ndimage.label(mask)
+    out = []
+    for k, sl in enumerate(ndimage.find_objects(comps), start=1):
+        m = comps[sl] == k
+        poly, area = _trace(m, (sl[0].start, sl[1].start), s)
+        if poly and area >= min_ft2:
+            out.append(poly)
+    return out
+
+
+def floor_polygons(sheet, s=2, wall_px=6, min_ft2=50):
+    """Floor outline(s) in page pt: every enclosed area of the sheet, minus areas marked OPEN TO BELOW."""
+    wall, lab, border = _regions(sheet, s)
+    open_regions = set()
+    for x, y in sheet.open_marks:
+        hit = _snap(lab, int(round(y * s)), int(round(x * s)))
+        if hit is not None:
+            open_regions.add(int(lab[hit]))
+    # an area holding an OPEN TO BELOW note is open, even if it also touches rooms (conservative:
+    # rooms that share it are left out of the floor rather than drawing open area as floor)
+    inside = (lab > 0) & ~np.isin(lab, list(border | open_regions))
+    mask = ndimage.binary_fill_holes(ndimage.binary_dilation(inside, iterations=wall_px) & (inside | wall))
+    return _outline(mask, s, min_ft2)
+
+
+def enclosure_polygon(sheet, label, s=2, wall_px=6):
+    """Outline in page pt of the enclosed area that holds one label, walls included."""
+    wall, lab, border = _regions(sheet, s)
+    pos = next(((x, y) for n, x, y in sheet.labels if n == label), None)
+    if pos is None:
+        return None
+    hit = _snap(lab, int(round(pos[1] * s)), int(round(pos[0] * s)))
+    if hit is None or int(lab[hit]) in border:
+        return None
+    region = lab == lab[hit]
+    mask = ndimage.binary_fill_holes(ndimage.binary_dilation(region, iterations=wall_px) & (region | wall))
+    polys = _outline(mask, s, 0)
+    return max(polys, key=len) if polys else None

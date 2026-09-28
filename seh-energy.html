@@ -566,6 +566,10 @@ const wallMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.8
 const glazMat = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, transparent: true, opacity: 0.55 });
 const pickables = [], zoneMeshes = [], floorGroups = {}, floorLabels = {};
 let FOOT = null;
+const FLOOR_AREA = {}, FLOOR_NAME = {}, WALL_MESHES = [];
+let ENCLOSURE_AREA = null;
+slabMat.side = THREE.DoubleSide;
+const enclosureMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8, side: THREE.DoubleSide });
 const zoneSet = new Set(zoneEquips.map(e => e.name));
 
 function roomMat() { return new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.55, emissive: 0x000000, side: THREE.DoubleSide }); }
@@ -602,7 +606,7 @@ function buildSchematic() {
 function buildFloorplan(fp) {
   const S = 1 / 2.8, STEP = 7, WALL_H = 0.7;
   const ORDER = ['Ground Floor', 'Mezzanine', 'Floor-01', 'Floor-02', 'Penthouse'];
-  const NAME = { 'Ground Floor': 'Ground floor', 'Mezzanine': 'Mezzanine', 'Floor-01': 'First floor', 'Floor-02': 'Second floor', 'Penthouse': 'Mechanical penthouse' };
+  const NAME = { 'Ground Floor': 'Ground floor', 'Mezzanine': 'Mezzanine', 'Floor-01': 'First floor', 'Floor-02': 'Second floor', 'Penthouse': 'Roof and mechanical penthouse' };
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   fp.floors.forEach(f => f.walls.forEach(([a, b, c, d]) => { x0 = Math.min(x0, a, c); x1 = Math.max(x1, a, c); y0 = Math.min(y0, b, d); y1 = Math.max(y1, b, d); }));
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -615,16 +619,29 @@ function buildFloorplan(fp) {
       new THREE.Quaternion().setFromAxisAngle(up, -Math.atan2(dz, dx)), new THREE.Vector3(Math.max(Math.hypot(dx, dz), 0.05), h, t));
   };
   const placed = new Set();
+  const toShape = poly => new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(X(x), (y - cy) * S)));
+  const polyArea = poly => Math.abs(poly.reduce((a, [x1, y1], i) => { const [x2, y2] = poly[(i + 1) % poly.length]; return a + x1 * y2 - x2 * y1; }, 0)) / 2;
+  const flat = (poly, mat, y) => { const m = new THREE.Mesh(new THREE.ShapeGeometry(toShape(poly)), mat); m.rotation.x = -Math.PI / 2; m.position.y = y; m.receiveShadow = true; return m; };
   ORDER.forEach((sys, fi) => {
     const f = fp.floors.find(q => q.system === sys); if (!f) return;
     const g = new THREE.Group(); g.position.y = fi * STEP; building.add(g); floorGroups[sys] = g; floorLabels[sys] = [];
     let fx0 = Infinity, fx1 = -Infinity, fz0 = Infinity, fz1 = -Infinity;
     f.walls.forEach(([a, b, c, d]) => { fx0 = Math.min(fx0, X(a), X(c)); fx1 = Math.max(fx1, X(a), X(c)); fz0 = Math.min(fz0, Z(b), Z(d)); fz1 = Math.max(fz1, Z(b), Z(d)); });
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(fx1 - fx0 + 1, 0.3, fz1 - fz0 + 1), slabMat);
-    slab.position.set((fx0 + fx1) / 2, -0.15, (fz0 + fz1) / 2); slab.receiveShadow = true; g.add(slab);
+    // slab: the floor outline from the sheet (open-to-below areas left open); bounding box only if the file has none
+    if (f.floor?.length) {
+      f.floor.forEach(poly => g.add(flat(poly, slabMat, -0.05)));
+      FLOOR_AREA[sys] = f.floor.reduce((a, poly) => a + polyArea(poly), 0);
+    } else {
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(fx1 - fx0 + 1, 0.3, fz1 - fz0 + 1), slabMat);
+      slab.position.set((fx0 + fx1) / 2, -0.15, (fz0 + fz1) / 2); slab.receiveShadow = true; g.add(slab);
+      FLOOR_AREA[sys] = (fx1 - fx0) * (fz1 - fz0) / (S * S);
+    }
+    if (f.enclosure?.length) { g.add(flat(f.enclosure, enclosureMat, 0.02)); ENCLOSURE_AREA = polyArea(f.enclosure); }
+    FLOOR_NAME[sys] = NAME[sys];
     const walls = new THREE.InstancedMesh(unit, wallMat, f.walls.length);
     f.walls.forEach((s, i) => walls.setMatrixAt(i, segMatrix(s, WALL_H, 0.18)));
-    walls.castShadow = true; g.add(walls);
+    walls.castShadow = false;  // wall shadows on the ground looked like an extra floor plan
+    WALL_MESHES.push(walls); g.add(walls);
     if (f.glazing.length) {
       const gl = new THREE.InstancedMesh(unit, glazMat, f.glazing.length);
       f.glazing.forEach((s, i) => gl.setMatrixAt(i, segMatrix(s, WALL_H, 0.12)));
@@ -1177,6 +1194,10 @@ if (MODE === 'floorplan') {
 }
 window.SEH = {
   focusFloor,
+  slabArea: sys => FLOOR_AREA[sys] ?? null,
+  floorName: sys => FLOOR_NAME[sys] ?? null,
+  enclosureArea: () => ENCLOSURE_AREA,
+  wallShadows: () => WALL_MESHES.some(w => w.castShadow),
   roomColor(l) { const m = byLabel(l); return m ? m.material.color.getHexString() : null; },
   stripNames(sys) { return zoneMeshes.filter(z => z.userData.strip && z.userData.floor.sys === sys).map(z => z.userData.title); },
   wallContrast() {

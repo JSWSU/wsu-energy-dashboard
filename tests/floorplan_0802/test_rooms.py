@@ -40,3 +40,29 @@ def test_real_room_105_shape(sheets):
     # Room 105 measures about 44 ft x 58 ft on R-3 (about 2,550 sq ft)
     assert 1800 < got["105"]["area_ft2"] < 3200
     assert 100 < got["128"]["area_ft2"] < 1200
+
+
+def _area_ft2(poly_pt):
+    from floorplan_0802.extract import FT_PER_PT
+    a = 0.0
+    for (x1, y1), (x2, y2) in zip(poly_pt, poly_pt[1:] + poly_pt[:1]):
+        a += x1 * y2 - x2 * y1
+    return abs(a) / 2 * FT_PER_PT ** 2
+
+
+def test_mezzanine_floor_excludes_open_to_below(sheets):
+    mezz = sum(_area_ft2(p) for p in rooms.floor_polygons(sheets[1]))
+    first = sum(_area_ft2(p) for p in rooms.floor_polygons(sheets[2]))
+    assert 3000 < mezz < 8000          # R-2 gross 4,935 sq ft; most of the level is open to below
+    assert 17000 < first < 23500       # R-3 gross 20,679 sq ft
+
+
+def test_penthouse_enclosure_is_room_301(sheets):
+    enc = rooms.enclosure_polygon(sheets[4], "301")
+    assert enc is not None
+    assert 2000 < _area_ft2(enc) < 4500   # R-5 gross 3,368 sq ft
+
+
+def test_second_floor_open_area_is_outlined_on_its_own(sheets):
+    second = sum(_area_ft2(p) for p in rooms.floor_polygons(sheets[3]))
+    assert 17000 < second < 23500      # R-4 gross 21,387 sq ft; A-SPAC-OTBW outlines its open area

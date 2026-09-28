@@ -52,3 +52,12 @@ def test_cli_writes_file_and_passes_privacy(tmp_path):
     assert "located" in res.stdout
     txt = out.read_text(encoding="utf-8")
     assert "A-DOOR" not in txt and ".pdf" not in txt
+
+
+def test_floors_carry_floor_outlines_and_penthouse_enclosure(built):
+    fp, _ = built
+    for f in fp["floors"]:
+        assert f["floor"], f["system"]
+    pent = next(f for f in fp["floors"] if f["system"] == "Penthouse")
+    assert len(pent["enclosure"]) >= 4
+    assert "label" not in json.dumps(pent["enclosure"])

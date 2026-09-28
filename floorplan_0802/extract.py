@@ -1,6 +1,6 @@
 """Read the 0802 R-sheets PDF by CAD layer. Read-only."""
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import fitz
 
@@ -11,7 +11,7 @@ GSF = {"Ground Floor": 17436, "Mezzanine": 4935, "Floor-01": 20679,
        "Floor-02": 21387, "Penthouse": 3368}
 WALL_LAYERS = {"A-WALL", "A-WALL-CURT", "A-WALL-PRHT"}
 GLAZ_LAYERS = {"A-GLAZ", "A-GLAZ-FRAM"}
-SEAL_PREFIXES = ("A-WALL", "A-GLAZ", "A-DOOR", "A-COLS", "A-SPAC-PHWL", "A-FLOR-EVTR")
+SEAL_PREFIXES = ("A-WALL", "A-GLAZ", "A-DOOR", "A-COLS", "A-SPAC-PHWL", "A-FLOR-EVTR", "A-FLOR-OTBW", "A-SPAC-OTBW")
 LABEL_RE = re.compile(r"[GM]?\d{1,3}[A-Z]{0,3}")
 SCALE_WORDS = {"0", "5", "10", "20"}
 
@@ -32,6 +32,7 @@ class Sheet:
     page_size: tuple
     matrix: fitz.Matrix
     rotation: int = 0
+    open_marks: list = field(default_factory=list)
 
 
 def _bezier(p0, p1, p2, p3, n=10):
@@ -83,13 +84,16 @@ def load_sheets(pdf_path):
                 glazing += segs
             if layer.startswith(SEAL_PREFIXES):
                 seal += segs
-        labels = []
+        labels, open_marks = [], []
         for w in page.get_text("words"):
             if LABEL_RE.fullmatch(w[4]) and w[4] not in SCALE_WORDS:
                 labels.append((w[4], (w[0] + w[2]) / 2, (w[1] + w[3]) / 2))
+            elif w[4] == "OPEN":           # sheet note "OPEN TO BELOW": no floor here
+                open_marks.append(((w[0] + w[2]) / 2, (w[1] + w[3]) / 2))
         system = SHEET_SYSTEM[sid]
         sheets.append(Sheet(sid, system, GSF[system], walls, glazing, seal, labels,
-                            (page.mediabox.width, page.mediabox.height), page.rotation_matrix, page.rotation))
+                            (page.mediabox.width, page.mediabox.height), page.rotation_matrix, page.rotation,
+                            open_marks))
     return sorted(sheets, key=lambda s: s.sheet)
 
 

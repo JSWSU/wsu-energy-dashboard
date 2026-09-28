@@ -146,3 +146,21 @@ def test_room_whose_zone_left_points_json_does_not_break_the_page(page):
     page.evaluate("const s=document.getElementById('timeSlider'); s.value=3; s.dispatchEvent(new Event('input'))")
     page.click("#darkToggle")
     assert page.errors == []
+
+
+def test_mezzanine_slab_follows_the_sheet_not_the_footprint(page):
+    # R-2: most of the level is OPEN TO BELOW, so its slab must be far smaller than the First Floor's
+    _open(page)
+    mezz, first = page.evaluate("[SEH.slabArea('Mezzanine'), SEH.slabArea('Floor-01')]")
+    assert 3000 < mezz < 0.35 * first
+
+
+def test_penthouse_is_named_roof_and_has_its_own_enclosure(page):
+    _open(page)
+    assert page.evaluate("SEH.floorName('Penthouse')") == "Roof and mechanical penthouse"
+    assert 2000 < page.evaluate("SEH.enclosureArea()") < 4500
+
+
+def test_walls_cast_no_shadows_on_the_ground(page):
+    _open(page)
+    assert page.evaluate("SEH.wallShadows()") is False

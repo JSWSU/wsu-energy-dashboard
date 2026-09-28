@@ -15,6 +15,7 @@ PDF = os.path.join(HERE, "private", "0802_r-sheets.pdf")
 POINTS = os.path.join(HERE, "data", "0802", "points.json")
 OUT = os.path.join(HERE, "data", "0802", "floorplan.json")
 SQUARE_FT = 8.0
+PENTHOUSE_ROOM = "301"   # the enclosed mechanical penthouse on sheet R-5
 
 
 def _ft_seg(sheet, seg):
@@ -26,7 +27,8 @@ def _ft_seg(sheet, seg):
 def build(pdf=PDF, points=POINTS):
     sheets = extract.load_sheets(pdf)
     extract.check_alignment(sheets)
-    pj = json.load(open(points, encoding="utf-8"))
+    with open(points, encoding="utf-8") as fh:
+        pj = json.load(fh)
     zones = match.zone_equips(pj)
     labels_by_system = {s.system: {n for n, _, _ in s.labels} for s in sheets}
     located, unlocated = match.match_zones(zones, labels_by_system)
@@ -55,10 +57,17 @@ def build(pdf=PDF, points=POINTS):
                 ok = False
             out_rooms.append({"label": label, "poly": poly, "center": [cx, cy], "zones": sorted(names), "traced": ok})
         per_floor[s.system] = len(out_rooms)
-        floors.append({"system": s.system, "sheet": s.sheet, "gsf": s.gsf,
-                       "walls": [_ft_seg(s, g) for g in s.walls],
-                       "glazing": [_ft_seg(s, g) for g in s.glazing],
-                       "rooms": out_rooms})
+        floor = {"system": s.system, "sheet": s.sheet, "gsf": s.gsf,
+                 "walls": [_ft_seg(s, g) for g in s.walls],
+                 "glazing": [_ft_seg(s, g) for g in s.glazing],
+                 "floor": [[list(extract.to_feet(s, x, y)) for x, y in poly] for poly in rooms.floor_polygons(s)],
+                 "rooms": out_rooms}
+        if s.system == "Penthouse":
+            enc = rooms.enclosure_polygon(s, PENTHOUSE_ROOM)
+            if enc is None:
+                raise RuntimeError(f"{s.sheet}: penthouse room {PENTHOUSE_ROOM} not found")
+            floor["enclosure"] = [list(extract.to_feet(s, x, y)) for x, y in enc]
+        floors.append(floor)
 
     fp = {"generated": datetime.datetime.now().astimezone().isoformat(timespec="minutes"),
           "source": "WSU Facilities R-sheets 0802, plotted 11/20/2025 and 11/21/2025",
