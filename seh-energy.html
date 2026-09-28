@@ -637,7 +637,8 @@ function buildFloorplan(fp) {
       const equips = r.zones.map(n => EQ.get(n)).filter(Boolean);
       equips.forEach(e => placed.add(e.name));
       mesh.userData = { kind: 'room', title: 'Room ' + r.label, label: r.label, equips, floor: { label: NAME[sys], sys }, strip: false };
-      g.add(mesh); pickables.push(mesh); zoneMeshes.push(mesh);
+      g.add(mesh); zoneMeshes.push(mesh);
+      if (equips.length) pickables.push(mesh);  // a room whose zones left points.json stays gray and is not clickable
       const lab = textSprite(r.label, 2.2); lab.position.set(X(r.center[0]), 2.2, Z(r.center[1])); lab.visible = false;
       g.add(lab); floorLabels[sys].push(lab);
     });
@@ -858,6 +859,7 @@ let detailChart = null;
 function renderDetail(o) {
   const u = o.userData;
   const e = u.kind === 'room' ? u.equips[u.sel || 0] : (u.equip || EQ.get(u.meter?.equip));
+  if (u.kind === 'room' && !e) { selected = null; return; }
   $('detailTitle').textContent = label(o);
   const pts = Object.values(PTS_BY_EQ.get(e?.name) || {});
   let html = `<div class="muted" style="font-size:0.82rem">${esc(e?.name || '')} &bull; ${esc(e?.type || 'Equipment')}${u.floor ? ' &bull; ' + esc(u.floor.label) : ''}</div>`;

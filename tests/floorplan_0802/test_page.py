@@ -123,3 +123,26 @@ def test_dark_mode_walls_visible(page):
     page.evaluate("SEH.focusFloor('Floor-01')")
     page.wait_for_timeout(800)
     assert page.evaluate("SEH.wallContrast()") > 40
+
+
+def test_room_whose_zone_left_points_json_does_not_break_the_page(page):
+    # Final review Important 1: rename TF.RM107 in points.json; click Room 107, then move the slider
+    def route(r):
+        pj = json.load(open(os.path.join(ROOT, "data", "0802", "points.json"), encoding="utf-8"))
+        for e in pj["equips"]:
+            if e["name"] == "TF.RM107":
+                e["name"] = "TF.RM107X"
+        for p in pj["points"]:
+            if p["equip"] == "TF.RM107":
+                p["equip"] = "TF.RM107X"
+        r.fulfill(status=200, content_type="application/json", body=json.dumps(pj))
+    page.route("**/data/0802/points.json", route)
+    _open(page)
+    page.evaluate("SEH.focusFloor('Floor-01')")
+    page.wait_for_timeout(600)
+    pos = page.evaluate("SEH.roomScreen('107')")
+    assert pos is not None
+    page.mouse.click(pos["x"], pos["y"])
+    page.evaluate("const s=document.getElementById('timeSlider'); s.value=3; s.dispatchEvent(new Event('input'))")
+    page.click("#darkToggle")
+    assert page.errors == []

@@ -39,3 +39,18 @@ def test_alignment_fails_when_a_sheet_moves(sheets):
     moved[1].walls = [(a + 30, b, c + 30, d) for a, b, c, d in moved[1].walls]  # 30 pt = 8.3 ft
     with pytest.raises(extract.AlignmentError, match="R-2"):
         extract.check_alignment(moved)
+
+
+def test_alignment_fails_when_the_penthouse_moves_outside(sheets):
+    # Final review Important 2: R-5 must sit inside the R-3 footprint
+    moved = copy.deepcopy(sheets)
+    moved[4].walls = [(a + 400, b, c + 400, d) for a, b, c, d in moved[4].walls]
+    with pytest.raises(extract.AlignmentError, match="R-5"):
+        extract.check_alignment(moved)
+
+
+def test_alignment_fails_when_a_sheet_is_rotated_differently(sheets):
+    moved = copy.deepcopy(sheets)
+    moved[3].rotation = 90
+    with pytest.raises(extract.AlignmentError, match="R-4"):
+        extract.check_alignment(moved)

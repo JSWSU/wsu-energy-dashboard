@@ -31,6 +31,7 @@ class Sheet:
     labels: list
     page_size: tuple
     matrix: fitz.Matrix
+    rotation: int = 0
 
 
 def _bezier(p0, p1, p2, p3, n=10):
@@ -88,7 +89,7 @@ def load_sheets(pdf_path):
                 labels.append((w[4], (w[0] + w[2]) / 2, (w[1] + w[3]) / 2))
         system = SHEET_SYSTEM[sid]
         sheets.append(Sheet(sid, system, GSF[system], walls, glazing, seal, labels,
-                            (page.mediabox.width, page.mediabox.height), page.rotation_matrix))
+                            (page.mediabox.width, page.mediabox.height), page.rotation_matrix, page.rotation))
     return sorted(sheets, key=lambda s: s.sheet)
 
 
@@ -97,22 +98,27 @@ def to_feet(sheet, x, y):
     return (round(p.x * FT_PER_PT, 2), round(-p.y * FT_PER_PT, 2))
 
 
-def _wall_min(sheet):
+def _wall_box(sheet):
     xs = [v for a, b, c, d in sheet.walls for v in (a, c)]
     ys = [v for a, b, c, d in sheet.walls for v in (b, d)]
-    return min(xs), min(ys)
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 def check_alignment(sheets, tol_ft=2.0):
-    """R-1..R-4 share one page origin; their wall extents must start at the same corner."""
-    ref = next(s for s in sheets if s.sheet == "R-3")
-    rx, ry = _wall_min(ref)
+    """All sheets share one page origin: same rotation, same page size, same wall corner."""
+    ref = next((s for s in sheets if s.sheet == "R-3"), None)
+    if ref is None:
+        raise AlignmentError("sheet R-3 is missing")
+    rx, ry, _, _ = _wall_box(ref)
+    tol = tol_ft / FT_PER_PT
     bad = []
     for s in sheets:
-        if s.sheet in ("R-3", "R-5"):
+        if s.rotation != ref.rotation or s.page_size != ref.page_size:
+            bad.append(f"{s.sheet} (page rotation or size differs from R-3)")
             continue
-        x, y = _wall_min(s)
-        if abs(x - rx) * FT_PER_PT > tol_ft or abs(y - ry) * FT_PER_PT > tol_ft:
+        x, y, _, _ = _wall_box(s)
+        # every sheet, R-5 included (its walls carry the roof outline), starts at the R-3 corner
+        if abs(x - rx) > tol or abs(y - ry) > tol:
             bad.append(f"{s.sheet} (offset {(x - rx) * FT_PER_PT:.1f} ft, {(y - ry) * FT_PER_PT:.1f} ft)")
     if bad:
         raise AlignmentError("sheets do not line up with R-3: " + ", ".join(bad))
