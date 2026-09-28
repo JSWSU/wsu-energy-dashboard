@@ -52,6 +52,11 @@ KNOWN_SPIKES = {
         ("0357", "0357_DW_001 (CSV)", "02-01-2026"): 100_000,  # RECYCLING FACILITY, 223k phantom (historian Feb = 3,000)
         ("0124A,B", "0124ADW_001 (CSV)", "04-01-2026"): None,  # HORTICULTURE GREENHOUSE, 1.15M = real 11,464-unit delta x suspect x100 mult; null until meter-face verified
         ("0071", "0071_DW_001 (CSV)", "02-01-2026"): None,  # ALBROOK HYDRAULICS LAB, 1.66M phantom (register moved 1 unit in Feb; dodges sanitizer, 2025 baseline < 1,000 gal floor)
+        # Added 09/28/2026: Aug 2026 housing import 0019 row-shift (09/11 registers written as 08/31,
+        # route order changed); truth = Housing-Metered-Gallons-2026-08.xlsx. Remove after re-import.
+        ('0665', '0665_DW_015 (CSV), 0665_DW_021 (CSV), 0665_DW_012 (CSV), 0665_DW_006 (CSV), 0665_DW_002 (CSV), 0665_DW_016 (CSV), 0665_DW_014 (CSV), 0665_DW_010 (CSV), 0665_DW_001 (CSV), 0665_DW_003 (CSV), 0665_DW_004 (CSV), 0665_DW_008 (CSV), 0665_DW_020 (CSV), 0665_DW_011 (CSV), 0665_DW_019 (CSV), 0665_DW_009 (CSV), 0665_DW_017 (CSV), 0665_DW_013 (CSV), 0665_DW_005 (CSV), 0665_DW_022 (CSV), 0665_DW_018 (CSV), 0665_DW_007 (CSV)', "08-01-2026"): None,  # STEPTOE VILLAGE, 1.01B phantom (0665_DW_013 1B row + shifted registers)
+        ('0678', '0678_DW_015 (CSV), 0678_DW_007 (CSV), 0678_DW_005 (CSV), 0678_DW_010 (CSV), 0678_DW_008 (CSV), 0678_DW_009 (CSV), 0678_DW_004 (CSV), 0678_DW_013 (CSV), 0678_DW_002 (CSV), 0678_DW_012 (CSV), 0678_DW_001 (CSV), 0678_DW_014 (CSV), 0678_DW_003 (CSV), 0678_DW_011 (CSV), 0678_DW_006 (CSV)', "08-01-2026"): None,  # COLUMBIA VILLAGE, 4.24M vs Jul 514k (same import)
+        ('0111', '0111_DW_001 (CSV)', "08-01-2026"): None,  # ENTOMOLOGY GREENHOUSES, 11.0M vs 1k Aug 2025; unverified, null until meter-face read
     },
 }
 SPIKE_GUARD = 1_000_000  # default guard when an entry's guard is None
