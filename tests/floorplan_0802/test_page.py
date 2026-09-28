@@ -78,3 +78,48 @@ def test_room_with_no_data_renders_gray_without_errors(page):
         if pos:
             page.mouse.move(pos["x"], pos["y"])
     assert page.errors == []
+
+
+def test_first_floor_button_top_down_and_click_room_105(page):
+    _open(page)
+    page.click('.floor-btn[data-floor="Floor-01"]')
+    page.wait_for_timeout(800)
+    pos = page.evaluate("SEH.roomScreen('105')")
+    assert pos is not None
+    page.mouse.click(pos["x"], pos["y"])
+    page.wait_for_timeout(500)
+    assert page.inner_text("#detailTitle") == "Room 105"
+    assert page.locator("#detailBody [data-zone]").count() == 2
+    assert page.evaluate("SEH.roomScreen('230J')") is None      # second floor hidden
+    assert page.errors == []
+
+
+def test_slider_updates_colors_on_focused_floor(page):
+    # Review Focus 3
+    _open(page)
+    page.evaluate("SEH.focusFloor('Floor-01')")
+    a = page.evaluate("SEH.roomColor('105')")
+    page.evaluate("const s=document.getElementById('timeSlider'); s.value=Math.floor(s.max/2); s.dispatchEvent(new Event('input'))")
+    b = page.evaluate("SEH.roomColor('105')")
+    assert a != b
+
+
+def test_new_zone_missing_from_floorplan_still_shows(page):
+    # Review Focus 1: drop FPB.L1-16B from the file; the page must put it in the First Floor strip
+    def route(r):
+        fp = json.load(open(os.path.join(ROOT, "data", "0802", "floorplan.json"), encoding="utf-8"))
+        for f in fp["floors"]:
+            for room in f["rooms"]:
+                room["zones"] = [z for z in room["zones"] if z != "FPB.L1-16B"]
+        r.fulfill(status=200, content_type="application/json", body=json.dumps(fp))
+    _open(page, route)
+    assert "FPB.L1-16B" in page.evaluate("SEH.stripNames('Floor-01')")
+
+
+def test_dark_mode_walls_visible(page):
+    # Review Focus 5: wall pixels must differ from the dark scene background
+    _open(page)
+    page.click("#darkToggle")
+    page.evaluate("SEH.focusFloor('Floor-01')")
+    page.wait_for_timeout(800)
+    assert page.evaluate("SEH.wallContrast()") > 40
