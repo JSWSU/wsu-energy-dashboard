@@ -526,7 +526,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 host.prepend(renderer.domElement);
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 1000);  // near 0.5: 5x finer depth steps than 0.1
 camera.position.set(62, 48, 66);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 14, 0);
@@ -542,7 +542,7 @@ Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60 })
 scene.add(sun);
 
 const ground = new THREE.Mesh(new THREE.CircleGeometry(120, 64), new THREE.MeshStandardMaterial({ color: 0x9aa99a, roughness: 1 }));
-ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true;
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.6;  // below the Ground Floor slab (y -0.05): equal heights z-fight ground.receiveShadow = true;
 scene.add(ground);
 
 function textSprite(text, size = 1.6, color = '#1f2937', bg = 'rgba(255,255,255,0.85)') {
@@ -559,11 +559,11 @@ function textSprite(text, size = 1.6, color = '#1f2937', bg = 'rgba(255,255,255,
 }
 
 const building = new THREE.Group(); scene.add(building);
-const slabMat = new THREE.MeshStandardMaterial({ color: 0xe7e5e4, roughness: 0.9, transparent: true, opacity: 0.88 });
+const slabMat = new THREE.MeshStandardMaterial({ color: 0xe7e5e4, roughness: 0.9 });  // opaque: see-through slabs sorted differently as the view turned
 const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x9fc6e0, transparent: true, opacity: 0.12, roughness: 0.1, depthWrite: false, side: THREE.DoubleSide });
 const edgeMat = new THREE.LineBasicMaterial({ color: 0x981e32, transparent: true, opacity: 0.7 });
 const wallMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.8 });
-const glazMat = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, transparent: true, opacity: 0.55 });
+const glazMat = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, transparent: true, opacity: 0.55, depthWrite: false });
 const pickables = [], zoneMeshes = [], floorGroups = {}, floorLabels = {};
 let FOOT = null;
 const FLOOR_AREA = {}, FLOOR_NAME = {}, WALL_MESHES = [];
@@ -636,7 +636,7 @@ function buildFloorplan(fp) {
       slab.position.set((fx0 + fx1) / 2, -0.15, (fz0 + fz1) / 2); slab.receiveShadow = true; g.add(slab);
       FLOOR_AREA[sys] = (fx1 - fx0) * (fz1 - fz0) / (S * S);
     }
-    if (f.enclosure?.length) { g.add(flat(f.enclosure, enclosureMat, 0.02)); ENCLOSURE_AREA = polyArea(f.enclosure); }
+    if (f.enclosure?.length) { g.add(flat(f.enclosure, enclosureMat, 0.05)); ENCLOSURE_AREA = polyArea(f.enclosure); }
     FLOOR_NAME[sys] = NAME[sys];
     const walls = new THREE.InstancedMesh(unit, wallMat, f.walls.length);
     f.walls.forEach((s, i) => walls.setMatrixAt(i, segMatrix(s, WALL_H, 0.18)));
@@ -650,7 +650,7 @@ function buildFloorplan(fp) {
     f.rooms.forEach(r => {
       const shape = new THREE.Shape(r.poly.map(([x, y]) => new THREE.Vector2(X(x), (y - cy) * S)));
       const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), roomMat());
-      mesh.rotation.x = -Math.PI / 2; mesh.position.y = 0.05;
+      mesh.rotation.x = -Math.PI / 2; mesh.position.y = 0.12;
       const equips = r.zones.map(n => EQ.get(n)).filter(Boolean);
       equips.forEach(e => placed.add(e.name));
       mesh.userData = { kind: 'room', title: 'Room ' + r.label, label: r.label, equips, floor: { label: NAME[sys], sys }, strip: false };
@@ -691,14 +691,19 @@ const equipGroup = new THREE.Group(); building.add(equipGroup);
 
 // mechanical room (ground floor, east end): pumps, loops, heat exchanger
 const mechEquips = P.equips.filter(e => e.system === 'Central Water');
-const mechBase = { x: PLATE.w / 2 - 12, z: -8 };
+const RISERS = [], PUMPS = [];
+// floor plan mode: equipment stands against the east face (schematic, not the real mechanical room)
+const FP_MODE = MODE === 'floorplan';
+const FOOT_CX = (FOOT.minX + FOOT.maxX) / 2, FOOT_CZ = (FOOT.minZ + FOOT.maxZ) / 2;
+const mechBase = FP_MODE ? { x: FOOT.maxX + 4, z: FOOT.minZ + 4 } : { x: PLATE.w / 2 - 12, z: -8 };
+const elecZ0 = FP_MODE ? FOOT_CZ + 6 : 5;
 mechEquips.forEach((e, i) => {
   const isPump = e.type === 'Pump';
   const color = /hhw|HX|HW|BB|HT3/i.test(e.name + e.tags.join()) ? 0xef4444 : /chw/i.test(e.name + e.tags.join()) ? 0x06b6d4 : 0x94a3b8;
   const geo = isPump ? new THREE.CylinderGeometry(0.7, 0.7, 1.4, 20) : new THREE.CylinderGeometry(0.45, 0.45, 2.6, 16);
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.3 }));
   m.position.set(mechBase.x + (i % 5) * 2.3, 0.2 + (isPump ? 0.7 : 1.3), mechBase.z + Math.floor(i / 5) * 2.6);
-  m.castShadow = true; m.userData = { kind: 'equip', equip: e };
+  m.castShadow = true; m.userData = { kind: 'equip', equip: e }; PUMPS.push(m);
   equipGroup.add(m); pickables.push(m);
 });
 const mechLab = textSprite('Mechanical room: pumps and water loops', 1.6);
@@ -709,54 +714,53 @@ const elecBars = [];
 const elecMeters = [MAIN480, MAIN208, ...C480, ...C208].filter(Boolean);
 elecMeters.forEach((m, i) => {
   const bar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1, 0.8), new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0x7c2d12, emissiveIntensity: 0.25 }));
-  bar.position.set(mechBase.x + (i % 9) * 1.25, 0.7, 5 + Math.floor(i / 9) * 1.6);
+  bar.position.set(mechBase.x + (i % 9) * 1.25, 0.7, elecZ0 + Math.floor(i / 9) * 1.6);
   bar.userData = { kind: 'meter', meter: m, equip: EQ.get(m.equip) };
   equipGroup.add(bar); pickables.push(bar); elecBars.push(bar);
 });
 const elecLab = textSprite('Electric meters (bar height = kW)', 1.6);
-elecLab.position.set(mechBase.x + 5, 4.0, 8.2); equipGroup.add(elecLab);
+elecLab.position.set(mechBase.x + 5, 4.0, elecZ0 + 3.2); equipGroup.add(elecLab);
 
 // rooftop air handler (DOAS-01) and exhaust fan
 const doas = P.equips.find(e => e.name === 'DOAS-01');
 const ahu = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 5), new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5, metalness: 0.4 }));
-ahu.position.set(-12, ROOF_Y + 1.7, 0); ahu.castShadow = true; ahu.userData = { kind: 'equip', equip: doas };
+if (FP_MODE) ahu.position.set(FOOT_CX + 13, ROOF_Y + 1.7, FOOT_CZ); else ahu.position.set(-12, ROOF_Y + 1.7, 0); ahu.castShadow = true; ahu.userData = { kind: 'equip', equip: doas };
 equipGroup.add(ahu); pickables.push(ahu);
 const fanBlades = new THREE.Group();
 for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.5), new THREE.MeshStandardMaterial({ color: 0x1f2937 })); b.rotation.y = k * Math.PI / 2; b.position.set(Math.cos(k * Math.PI / 2) * 1.1, 0, -Math.sin(k * Math.PI / 2) * 1.1); fanBlades.add(b); }
-fanBlades.position.set(-12, ahu.position.y + 1.6, 0); equipGroup.add(fanBlades);
+fanBlades.position.set(ahu.position.x, ahu.position.y + 1.6, ahu.position.z); equipGroup.add(fanBlades);
 const ahuLab = textSprite('DOAS-01: fresh air unit', 1.8);
-ahuLab.position.set(-12, ahu.position.y + 4, 0); equipGroup.add(ahuLab);
+ahuLab.position.set(ahu.position.x, ahu.position.y + 4, ahu.position.z); equipGroup.add(ahuLab);
 
 // utility risers with moving particles
-const riserX = -PLATE.w / 2 - 2, top = ROOF_Y;
+const riserX = FP_MODE ? FOOT.maxX + 1.5 : -PLATE.w / 2 - 2, top = ROOF_Y;
+const FEED_DIR = FP_MODE ? 1 : -1;   // service pipes run away from the building
 const flows = [
   { key: 'elec', color: 0xf59e0b, z: -9, label: 'Electricity' },
   { key: 'chw', color: 0x06b6d4, z: -7.2, label: 'Chilled water' },
   { key: 'hhw', color: 0xef4444, z: -5.4, label: 'Heating water' },
 ];
 flows.forEach(f => {
-  const pipeMat = new THREE.MeshStandardMaterial({ color: f.color, transparent: true, opacity: 0.5 });
-  const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, top + 1, 12), pipeMat);
+  const pipeMat = new THREE.MeshStandardMaterial({ color: f.color, transparent: true, opacity: 0.5, depthWrite: false });
+  const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, top + 1, 12), pipeMat); RISERS.push(riser);
   riser.position.set(riserX, top / 2 - 0.5, f.z); equipGroup.add(riser);
   const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 22, 12), pipeMat);
-  feed.rotation.z = Math.PI / 2; feed.position.set(riserX - 11, -0.5, f.z); equipGroup.add(feed);
+  feed.rotation.z = Math.PI / 2; feed.position.set(riserX + FEED_DIR * 11, -0.5, f.z); equipGroup.add(feed);
   const N = 60, pos = new Float32Array(N * 3), phase = new Float32Array(N);
   for (let i = 0; i < N; i++) phase[i] = i / N;
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: f.color, size: 1.1, sizeAttenuation: true, transparent: true }));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: f.color, size: 1.1, sizeAttenuation: true, transparent: true, depthWrite: false }));
   equipGroup.add(pts);
   Object.assign(f, { pts, phase, N, speed: 0.1 });
 });
 const campusLab = textSprite('Utility service entrance', 1.6);
-campusLab.position.set(riserX - 16, -2.2, -3); equipGroup.add(campusLab);
+campusLab.position.set(riserX + FEED_DIR * 16, -2.2, -3); equipGroup.add(campusLab);
 building.position.x = 3;
 if (MODE === 'floorplan') {
-  building.position.x = -8;
-  equipGroup.position.x = FOOT.maxX + 44;
-  equipGroup.scale.setScalar(0.7);
+  building.position.x = -6;
   camera.position.set(74, 60, 84);
   const eqLab = textSprite('Equipment (schematic, not to location)', 1.6);
-  eqLab.position.set(-12, ROOF_Y + 9, 0); equipGroup.add(eqLab);
+  eqLab.position.set(mechBase.x + 8, 8, mechBase.z + 2); equipGroup.add(eqLab);
 }
 
 function setSceneTheme() {
@@ -772,16 +776,22 @@ function setSceneTheme() {
 let curIdx = HLAST;
 const slider = $('timeSlider');
 slider.max = HLAST; slider.value = HLAST;
-function applyTime(i) {
+let lastHour = null;
+// t may be fractional (Play): room colors blend between hour i and hour i + 1
+function applyTime(t, force = true) {
+  const i = Math.floor(t), f = t - i, j = Math.min(i + 1, HLAST);
   curIdx = i;
-  $('timeLabel').textContent = fmtHour(hourT(i)) + (i === HLAST ? ' (latest)' : '');
   for (const m of zoneMeshes) {
     const z = roomVals(m.userData.equips, i);
     const c = colorFor(modeVal(z));
+    if (f > 0 && j !== i) c.lerp(colorFor(modeVal(roomVals(m.userData.equips, j))), f);
     m.material.color.copy(c);
     m.material.emissive.copy(c).multiplyScalar(m === selected ? 0.45 : 0.18);
     m.userData.z = z;
   }
+  if (!force && i === lastHour) return;   // the rest changes once per hour
+  lastHour = i;
+  $('timeLabel').textContent = fmtHour(hourT(i)) + (i === HLAST ? ' (latest)' : '');
   // electric bars
   const qi = nearestQ15(hourT(i) + 1800);
   const mx = Math.max(...elecMeters.map(m => Math.max(...(m.q15 || []).filter(v => v != null), 1)));
@@ -790,19 +800,30 @@ function applyTime(i) {
   flows.forEach(f => { const v = H[f.key][i]; f.speed = v == null ? 0 : 0.02 + 0.5 * Math.max(0, v) / (HMAX[f.key] || 1); f.pts.material.opacity = v ? 1 : 0.2; });
   fanSpeed = (pt('DOAS-01', 'supply fan 1 vfd motor speed cmd')?.h?.[i] ?? 0) / 100;
   renderNow(i);
-  if (selected) renderDetail(selected);
+  if (selected) renderDetail(selected, true);
 }
 function nearestQ15(t) { let lo = 0, hi = M.q15t.length - 1; while (lo < hi) { const mid = (lo + hi) >> 1; M.q15t[mid] < t ? lo = mid + 1 : hi = mid; } return lo; }
 let fanSpeed = 0;
 slider.addEventListener('input', () => { stopPlay(); applyTime(+slider.value); });
 $('liveBtn').addEventListener('click', () => { stopPlay(); slider.value = HLAST; applyTime(HLAST); });
-let playTimer = null;
-function stopPlay() { if (playTimer) { clearInterval(playTimer); playTimer = null; $('playBtn').innerHTML = '&#9654;'; } }
+// Play runs on animation frames at PLAY_RATE hours per second, so colors move smoothly instead of jumping each hour
+const PLAY_RATE = 5;
+let playing = false, playT = 0, playLast = 0;
+function stopPlay() { if (playing) { playing = false; $('playBtn').innerHTML = '&#9654;'; } }
+function playStep(now) {
+  if (!playing) return;
+  playT += (now - playLast) / 1000 * PLAY_RATE; playLast = now;
+  if (playT >= HLAST) { slider.value = HLAST; applyTime(HLAST); return stopPlay(); }
+  slider.value = Math.floor(playT);
+  applyTime(playT, false);
+  requestAnimationFrame(playStep);
+}
 $('playBtn').addEventListener('click', () => {
-  if (playTimer) return stopPlay();
+  if (playing) return stopPlay();
   if (+slider.value >= HLAST) slider.value = 0;
   $('playBtn').innerHTML = '&#10074;&#10074;';
-  playTimer = setInterval(() => { const v = +slider.value + 1; if (v > HLAST) return stopPlay(); slider.value = v; applyTime(v); }, 140);
+  playing = true; playT = +slider.value; playLast = performance.now();
+  requestAnimationFrame(playStep);
 });
 
 function renderNow(i) {
@@ -872,8 +893,9 @@ renderer.domElement.addEventListener('pointerup', ev => {
   renderDetail(o);
 });
 
-let detailChart = null;
-function renderDetail(o) {
+let detailChart = null, CHART_BUILDS = 0;
+let detailFor = null;
+function renderDetail(o, soft = false) {
   const u = o.userData;
   const e = u.kind === 'room' ? u.equips[u.sel || 0] : (u.equip || EQ.get(u.meter?.equip));
   if (u.kind === 'room' && !e) { selected = null; return; }
@@ -895,6 +917,15 @@ function renderDetail(o) {
     html += `<p style="font-size:0.86rem;margin:0.5rem 0">${esc(describeEquip(e))}</p>`;
   }
   html += `<div style="margin-top:0.7rem;display:flex;gap:0.5rem;flex-wrap:wrap"><button class="btn-sm primary" id="seeAll">See all ${pts.length} points</button></div>`;
+  // time steps (slider, Play) only refresh the numbers and the chart's time line; the chart itself is built once per selection
+  if (soft && detailFor === o && detailChart && detailChart.canvas.isConnected) {
+    const tmp = document.createElement('div'); tmp.innerHTML = html;
+    const grid = $('detailBody').querySelector('.detail-grid'), fresh = tmp.querySelector('.detail-grid');
+    if (grid && fresh) grid.innerHTML = fresh.innerHTML;
+    detailChart.draw();
+    return;
+  }
+  detailFor = o;
   $('detailBody').className = ''; $('detailBody').innerHTML = html;
   $('detailBody').querySelectorAll('[data-zone]').forEach(b => b.onclick = () => { u.sel = +b.dataset.zone; renderDetail(o); });
   $('seeAll').onclick = () => { document.querySelector('.nav-tab[data-tab="points"]').click(); $('pointSearch').value = e.name; sysFilter = 'All'; renderChips(); renderPoints(); };
@@ -912,6 +943,7 @@ function renderDetail(o) {
     ds = [{ label: 'kW', data: Array.from({ length: HLAST + 1 }, (_, i) => { const a = []; M.q15t.forEach((t, k) => { if (Math.floor((t - HT0) / HSTEP) === i && q[k] != null) a.push(q[k]); }); return a.length ? sum(a) / a.length : null; }), borderColor: COLORS.elec }];
   }
   ds.forEach(d => Object.assign(d, { pointRadius: 0, borderWidth: 1.6, spanGaps: true }));
+  CHART_BUILDS++;
   detailChart = new Chart(cv, { type: 'line', data: { labels, datasets: ds },
     options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { labels: { boxWidth: 8, font: { size: 11 } } } },
@@ -950,7 +982,7 @@ renderer.setAnimationLoop(() => {
     for (let i = 0; i < f.N; i++) {
       f.phase[i] = (f.phase[i] + dtS * f.speed) % 1;
       const s = f.phase[i] * 2; // 0..1 along the feed, 1..2 up the riser
-      if (s < 1) a.setXYZ(i, riserX - 22 + s * 22, -0.5, f.z);
+      if (s < 1) a.setXYZ(i, riserX + FEED_DIR * 22 * (1 - s), -0.5, f.z);
       else a.setXYZ(i, riserX, -0.5 + (s - 1) * (top + 0.5), f.z);
     }
     a.needsUpdate = true;
@@ -1194,6 +1226,36 @@ if (MODE === 'floorplan') {
 }
 window.SEH = {
   focusFloor,
+  chartBuilds: () => CHART_BUILDS,
+  depthLayout() {
+    const slabs = [], rooms = [], writers = new Set();
+    building.traverse(o => {
+      if (!o.isMesh && !o.isPoints) return;
+      const mats = [].concat(o.material);
+      if (mats.includes(slabMat)) slabs.push(o);
+      if (o.userData.kind === 'room' && o.userData.label) rooms.push(o);
+      mats.forEach(m => { if (m.transparent && m.depthWrite && o.visible) writers.add(m.type + ':' + (m.name || m.color?.getHexString())); });
+    });
+    const wy = o => o.getWorldPosition(new THREE.Vector3()).y;
+    const slabY = Math.min(...slabs.map(wy));
+    const gap = Math.min(...rooms.map(r => r.position.y)) - Math.max(...slabs.map(s => s.position.y));
+    return { groundY: ground.position.y, lowestSlabY: slabY, roomGap: +gap.toFixed(3), transparentDepthWriters: [...writers] };
+  },
+  blendCheck(l) {
+    const m = byLabel(l); if (!m) return null;
+    const keep = curIdx, rgb = () => [m.material.color.r, m.material.color.g, m.material.color.b].map(v => Math.round(v * 255));
+    let out = null;
+    for (let i = 0; i < HLAST && !out; i++) {
+      applyTime(i); const lo = rgb(); applyTime(i + 1); const hi = rgb();
+      if (lo.some((v, k) => Math.abs(v - hi[k]) > 20)) { applyTime(i + 0.5); out = [lo, rgb(), hi]; }
+    }
+    applyTime(keep); return out;
+  },
+  equipLayout() {
+    const loc = o => building.worldToLocal(o.getWorldPosition(new THREE.Vector3()));
+    const px = PUMPS.map(p => loc(p).x);
+    return { riserX: loc(RISERS[0]).x, doasX: loc(ahu).x, doasY: loc(ahu).y, roofY: ROOF_Y, pumpsMinX: Math.min(...px), pumpsMaxX: Math.max(...px) };
+  },
   slabArea: sys => FLOOR_AREA[sys] ?? null,
   floorName: sys => FLOOR_NAME[sys] ?? null,
   enclosureArea: () => ENCLOSURE_AREA,

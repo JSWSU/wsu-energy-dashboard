@@ -164,3 +164,47 @@ def test_penthouse_is_named_roof_and_has_its_own_enclosure(page):
 def test_walls_cast_no_shadows_on_the_ground(page):
     _open(page)
     assert page.evaluate("SEH.wallShadows()") is False
+
+
+def test_time_steps_with_a_room_selected_do_not_rebuild_the_chart(page):
+    # stutter: every slider or Play step used to destroy and rebuild the room chart (12.9 ms vs 1.0 ms)
+    _open(page)
+    page.evaluate("SEH.focusFloor('Floor-01')")
+    page.wait_for_timeout(500)
+    pos = page.evaluate("SEH.roomScreen('105')")
+    page.mouse.click(pos["x"], pos["y"])
+    page.wait_for_timeout(300)
+    before = page.evaluate("SEH.chartBuilds()")
+    page.evaluate("const s=document.getElementById('timeSlider'); for (let i=0;i<20;i++){ s.value=i; s.dispatchEvent(new Event('input')); }")
+    assert page.evaluate("SEH.chartBuilds()") == before
+    assert page.inner_text("#detailTitle") == "Room 105"
+
+
+def test_no_coplanar_or_see_through_depth_writing_surfaces(page):
+    # flicker: grass and Ground Floor slab were both at y = -0.05; transparent slabs wrote depth
+    _open(page)
+    d = page.evaluate("SEH.depthLayout()")
+    assert d["groundY"] < d["lowestSlabY"] - 0.2
+    assert d["roomGap"] >= 0.1
+    assert d["transparentDepthWriters"] == []
+
+
+def test_play_blends_colors_between_hours(page):
+    # Play jumps: a half-hour position must give a color between the two hourly colors
+    _open(page)
+    r = page.evaluate("SEH.blendCheck('105')")
+    assert r is not None, "no hour pair with different colors found"
+    lo, mid, hi = r
+    for a, m, b in zip(lo, mid, hi):
+        assert min(a, b) - 1 <= m <= max(a, b) + 1
+    assert mid != lo and mid != hi
+
+
+def test_equipment_sits_against_the_building(page):
+    _open(page)
+    e = page.evaluate("SEH.equipLayout()")
+    f = page.evaluate("SEH.footprint()")
+    assert f["maxX"] <= e["riserX"] <= f["maxX"] + 4          # risers on the east face
+    assert e["doasY"] >= e["roofY"]                             # DOAS-01 on the roof
+    assert f["minX"] <= e["doasX"] <= f["maxX"]
+    assert f["maxX"] < e["pumpsMinX"] and e["pumpsMaxX"] < f["maxX"] + 25
