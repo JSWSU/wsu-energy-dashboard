@@ -97,7 +97,7 @@ Build report (printed): rooms per floor, zones matched, zones unlocated, overrid
 Explore the Building tab:
 
 1. Load `floorplan.json` with the other two data files. If it fails to load, fall back to the current schematic grid and show a one-line note.
-2. Floors stack with a 14 ft visual gap. Scale 1 unit = 1 ft; the camera distances scale to match.
+2. Floors stack in sheet order (Ground, Mezzanine, First, Second, Penthouse) with a visual gap. Plan feet are scaled by 1/2.8 so the building matches the current scene size (about 53 units wide); camera and equipment sizes stay as they are.
 3. Walls: one merged `BufferGeometry` per floor, each segment extruded 3 ft high and 0.5 ft thick. Glazing: the same, 3 ft high, translucent blue.
 4. Rooms: `ShapeGeometry` from each polygon, lifted 0.1 ft above the slab. Color by the current mode, using the mean of the room's zones at the selected hour. Rooms without data: gray.
 5. Floor strip: along the south edge of each floor, one tile per unlocated zone, same coloring.
@@ -116,13 +116,13 @@ Header and data notes: 67,805 GSF (R-sheets). About the Data states the floor pl
 
 ## Error handling
 
-- Build: alignment mismatch, privacy rule break or zero rooms on a floor stops the build with a clear message. Unmatched zones do not stop it; they go to the report and the floor strip.
+- Build: alignment mismatch, privacy rule break, or a floor with zero wall segments stops the build with a clear message. A located room whose shape cannot be traced (its area leaks outside) gets an 8 ft square at its label point and is listed in the report. Unmatched zones do not stop it; they go to the report and the floor strip.
 - Page: a missing or invalid `floorplan.json` falls back to the schematic grid.
 
 ## Testing
 
 1. Build script: privacy check and alignment check run on every build.
-2. Unit check in the build: at least 58 zones located; Room 105 has zones FPB.L1-16A and FPB.L1-16B.
+2. Unit check in the build: at least 54 of the 71 zones located (43 rooms on 09/28/2026); Room 105 has zones FPB.L1-16A and FPB.L1-16B.
 3. Browser (Playwright, headless): zero console errors; every tab loads; the First Floor button shows a top-down plan; Room 105's polygon center is in the east half of the First Floor bounding box; clicking Room 105 opens its detail panel.
 4. Visual check: screenshots of each floor, light and dark mode, and phone width, compared by eye against sheets R-1 to R-5.
 
