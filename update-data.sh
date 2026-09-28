@@ -38,23 +38,36 @@ py "$SCRIPT_DIR/merge-data.py" "$NEW_DIR"
 
 echo ""
 
-# Step 2: Sanitize -- null Sensus AMR row-shift spikes (post-SkySpark fix)
-echo "Step 2: Sanitizing row-shift spikes (pass 1 -- 20x baseline median)..."
-echo ""
-py "$SCRIPT_DIR/scripts/sensus-pipeline/_null_outliers.py"
-
-echo ""
-echo "Step 3: Sanitizing data-gap catch-up spikes (pass 2 -- 5x pre-gap max)..."
-echo ""
-py "$SCRIPT_DIR/scripts/sensus-pipeline/_null_outliers_v2.py"
-
-echo ""
-echo "Step 4: Fixing known bad rows (CSV spikes, 0092 double-count, negatives)..."
+# Step 2: Apply structural fixes (hardcoded historical spikes + 0092 dedup)
+echo "Step 2: Applying structural fixes (historical spikes, 0092 dedup)..."
 echo ""
 py "$SCRIPT_DIR/scripts/sensus-pipeline/_fix_known_rows.py"
 
 echo ""
+echo "Step 3: Generating QA/QC report (report only -- no rows modified)..."
+echo ""
+py "$SCRIPT_DIR/scripts/sensus-pipeline/_qa_report.py"
 
+echo ""
+echo "REVIEW the QA report at C:\\Users\\john.slagboom\\Desktop\\Git\\data\\reports\\qaqc-metering-*.html before pushing."
+echo "If it lists CRITICAL rows you have not addressed, stop and edit files under"
+echo "C:\\Users\\john.slagboom\\Desktop\\Git\\data\\ first."
+echo ""
+
+# Step 4: Refresh the INTERNAL process register (sops\_register, copied to R:; never published)
+echo "Step 4: Refreshing the internal process register..."
+py "$SCRIPT_DIR/sops/_register/export_processes_json.py" || echo "  (register refresh failed; continuing)"
+
+echo ""
+
+# Step 4b: Schweitzer Engineering Hall (0802) snapshot (non-fatal)
+echo "Step 4b: Refreshing Schweitzer Engineering Hall (0802) data for seh-energy.html..."
+if py "$SCRIPT_DIR/export_0802.py"; then
+    bash "$SCRIPT_DIR/push-data.sh" data/0802/points.json data/0802/meters.json || echo "  (0802 push failed; continuing)"
+else
+    echo "  (0802 export failed; continuing)"
+fi
+echo ""
 # Step 5: Push
 echo "Step 5: Pushing to GitHub..."
 echo ""

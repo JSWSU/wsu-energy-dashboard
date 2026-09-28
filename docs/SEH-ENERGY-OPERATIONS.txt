@@ -1,0 +1,38 @@
+SCHWEITZER ENGINEERING HALL (0802) ENERGY EXPLORER: OPERATIONS
+================================================================
+
+Page:     seh-energy.html  (https://jswsu.github.io/wsu-energy-dashboard/seh-energy.html)
+Audience: students and the public. No password gate.
+Data:     data/0802/points.json  (all 0802 points, latest value, 7-day hourly averages)
+          data/0802/meters.json  (meters: 15-minute for 7 days, daily averages since 02/05/2026)
+Exporter: export_0802.py (read-only SkySpark eval, project wsumeters, site 0802)
+Library:  lib/three/  (three.js r186 from npm, MIT; three.module.min.js imports three.core.min.js)
+          chart.umd.min.js (shared)
+
+---
+REFRESH
+---
+Automatic: update-data.sh Step 4b runs export_0802.py and pushes the two JSON files
+           during the Monday auto-update job. A failure there does not stop the job.
+Manual:    py C:\Users\john.slagboom\Desktop\Git\export_0802.py
+           bash C:\Users\john.slagboom\Desktop\Git\push-data.sh data/0802/points.json data/0802/meters.json
+
+---
+DATA RULES USED BY THE PAGE
+---
+Building electric = 0802_EL_012 (208 V service) + the nine 480 V circuit meters
+                    (0802_EL_002 to 009, 011).
+0802_EL_001 (480 V main) is left out. On 09/28/2026 it read 124 V line to line while its
+circuit meters read 484 to 493 V; its kW reads about one quarter of the circuit sum.
+0802_DW_001 (domestic cold water) recorded zero flow from 02/06/2026 to 09/28/2026.
+Daily energy = daily average demand x 24. The current partial day is excluded.
+Cost = electricity $0.1037/kWh + chilled water $0.1823/ton-hr (FY27 rates, "Utility Rates
+for FY27" email 12/22/2025), counted from 07/01/2026. No heating cost.
+The stacked weekly chart shows negative readings (0802_EL_007, 0802_EL_008) as zero.
+
+---
+TROUBLESHOOTING
+---
+Page stuck on "Loading":   data/0802/*.json missing or invalid. Rerun the exporter.
+3D view blank:             browser has WebGL off. Other tabs still work.
+Exporter HTTP 403:         SkySpark login throttle. Wait 2 minutes, run once.

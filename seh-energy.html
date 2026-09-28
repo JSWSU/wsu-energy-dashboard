@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schweitzer Engineering Hall Energy</title>
+<meta name="description" content="Live energy and building systems data for Schweitzer Engineering Hall (WSU building 0802), from the WSU SkySpark metering system.">
+<script src="chart.umd.min.js"></script>
+<script type="importmap">{ "imports": { "three": "./lib/three/three.module.min.js" } }</script>
+<style>
+  :root {
+    --primary: #981e32; --primary-dark: #7a1828; --secondary: #5f6b6d; --accent: #c69214;
+    --bg: #f5f5f5; --card-bg: #fff; --text: #2d2d2d; --text-light: #6b7280; --border: #e5e7eb;
+    --green: #059669; --red: #dc2626; --blue: #2563eb;
+    --table-head-bg: #f9fafb; --table-hover: #f9fafb;
+    --info-bg: #f0f9ff; --info-border: #bae6fd; --info-text: #0c4a6e;
+    --clr-electric: #f59e0b; --clr-chw: #06b6d4; --clr-hhw: #ef4444; --clr-water: #3b82f6; --clr-oat: #8b5cf6;
+    --scene-bg: #e8ecf1;
+  }
+  html.dark {
+    --bg: #111827; --card-bg: #1f2937; --text: #e5e7eb; --text-light: #9ca3af; --border: #374151;
+    --secondary: #9ca3af; --green: #34d399; --red: #f87171;
+    --table-head-bg: #1a2332; --table-hover: #253347;
+    --info-bg: #1e293b; --info-border: #334155; --info-text: #7dd3fc;
+    --scene-bg: #0b1220;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+  a { color: var(--primary); }
+  html.dark a { color: #f4a3b1; }
+  header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; padding: 1.1rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  header h1 { font-size: 1.45rem; font-weight: 700; }
+  header p { opacity: 0.88; font-size: 0.88rem; }
+  .header-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .header-actions a { color: #fff; text-decoration: none; font-size: 0.85rem; opacity: 0.9; border: 1px solid rgba(255,255,255,0.4); padding: 0.3rem 0.7rem; border-radius: 6px; }
+  .header-actions a:hover { opacity: 1; background: rgba(255,255,255,0.12); }
+  .dark-toggle { display: flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; }
+  .dark-toggle-switch { width: 38px; height: 20px; border-radius: 10px; border: none; background: rgba(255,255,255,0.35); position: relative; cursor: pointer; }
+  .dark-toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
+  html.dark .dark-toggle-switch::after { transform: translateX(18px); }
+  .container { max-width: 1400px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+  .nav-tabs { display: flex; gap: 0.25rem; background: var(--card-bg); border-radius: 10px; padding: 0.25rem; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto; }
+  .nav-tab { flex: 1; min-width: max-content; padding: 0.6rem 1rem; border: none; background: none; color: var(--text-light); font-size: 0.92rem; font-weight: 600; border-radius: 8px; cursor: pointer; }
+  .nav-tab:hover { background: var(--table-hover); color: var(--text); }
+  .nav-tab.active { background: var(--primary); color: #fff; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .card { background: var(--card-bg); border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.25rem; }
+  .card h2 { font-size: 1.08rem; color: var(--primary); margin-bottom: 0.35rem; }
+  html.dark .card h2 { color: #f4a3b1; }
+  .card .sub { color: var(--text-light); font-size: 0.85rem; margin-bottom: 0.85rem; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.9rem; margin-bottom: 1.25rem; }
+  .kpi { background: var(--card-bg); border-radius: 10px; padding: 0.95rem 1.1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--primary); }
+  .kpi.elec { border-color: var(--clr-electric); } .kpi.chw { border-color: var(--clr-chw); } .kpi.hhw { border-color: var(--clr-hhw); }
+  .kpi.water { border-color: var(--clr-water); } .kpi.oat { border-color: var(--clr-oat); } .kpi.cost { border-color: var(--green); }
+  .kpi-label { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light); font-weight: 600; }
+  .kpi-value { font-size: 1.55rem; font-weight: 700; margin: 0.15rem 0; }
+  .kpi-value small { font-size: 0.85rem; font-weight: 600; color: var(--text-light); }
+  .kpi-sub { font-size: 0.8rem; color: var(--text-light); }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  .chart-box { position: relative; height: 320px; }
+  .chart-box.tall { height: 380px; }
+  .info-box { background: var(--info-bg); border: 1px solid var(--info-border); color: var(--info-text); border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.88rem; margin-bottom: 1rem; }
+
+  /* 3D explorer */
+  .explore { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 1.25rem; }
+  .scene-card { padding: 0; overflow: hidden; position: relative; }
+  #scene { position: relative; height: 600px; background: var(--scene-bg); cursor: grab; }
+  #scene:active { cursor: grabbing; }
+  #scene canvas { display: block; }
+  .scene-overlay { position: absolute; top: 0.8rem; left: 0.8rem; display: flex; gap: 0.35rem; flex-wrap: wrap; z-index: 2; max-width: calc(100% - 1.6rem); }
+  .mode-btn { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .mode-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .legend { position: absolute; left: 0.8rem; bottom: 0.8rem; z-index: 2; background: var(--card-bg); border-radius: 8px; padding: 0.5rem 0.7rem; font-size: 0.75rem; box-shadow: 0 1px 4px rgba(0,0,0,0.15); min-width: 220px; }
+  .legend-bar { height: 10px; border-radius: 5px; margin: 0.3rem 0 0.15rem; }
+  .legend-ticks { display: flex; justify-content: space-between; color: var(--text-light); }
+  .legend-flows { display: flex; gap: 0.7rem; margin-top: 0.4rem; color: var(--text-light); flex-wrap: wrap; }
+  .legend-flows span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; background: var(--c); }
+  .scene-hint { position: absolute; right: 0.8rem; bottom: 0.8rem; z-index: 2; font-size: 0.74rem; color: var(--text-light); background: var(--card-bg); padding: 0.25rem 0.55rem; border-radius: 6px; opacity: 0.9; }
+  #tip { position: absolute; z-index: 3; pointer-events: none; background: rgba(17,24,39,0.93); color: #f9fafb; border-radius: 8px; padding: 0.5rem 0.7rem; font-size: 0.8rem; line-height: 1.35; display: none; max-width: 260px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+  #tip b { color: #fcd34d; }
+  .timebar { display: flex; align-items: center; gap: 0.8rem; padding: 0.75rem 1rem; border-top: 1px solid var(--border); background: var(--card-bg); flex-wrap: wrap; }
+  .play-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--primary); color: #fff; font-size: 1rem; cursor: pointer; flex-shrink: 0; }
+  #timeSlider { flex: 1; min-width: 160px; accent-color: var(--primary); }
+  #timeLabel { font-weight: 700; font-size: 0.9rem; min-width: 190px; text-align: right; }
+  .live-btn { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.8rem; cursor: pointer; }
+  .side h3 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+  .now-list { display: grid; gap: 0.55rem; }
+  .now-item { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; font-size: 0.88rem; }
+  .now-item .v { font-weight: 700; font-size: 1.05rem; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .detail-empty { color: var(--text-light); font-size: 0.87rem; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.8rem; font-size: 0.84rem; margin: 0.5rem 0 0.7rem; }
+  .detail-grid div span { display: block; color: var(--text-light); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .detail-grid div b { font-size: 0.98rem; }
+  .btn-sm { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.8rem; cursor: pointer; }
+  .btn-sm.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  /* meter tree */
+  .tree { display: grid; gap: 1rem; }
+  .tree-group h3 { font-size: 0.95rem; margin-bottom: 0.2rem; }
+  .tree-group p { font-size: 0.83rem; color: var(--text-light); margin-bottom: 0.6rem; }
+  .meter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; }
+  .meter { border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem; background: var(--card-bg); }
+  .meter .mname { font-weight: 700; font-size: 0.88rem; }
+  .meter .mrole { font-size: 0.75rem; color: var(--text-light); }
+  .meter .mval { font-size: 1.25rem; font-weight: 700; margin-top: 0.2rem; }
+  .meter .mval small { font-size: 0.78rem; color: var(--text-light); font-weight: 600; }
+  .meter canvas { width: 100%; height: 36px; display: block; margin-top: 0.3rem; }
+  .meter .share { height: 6px; background: var(--border); border-radius: 3px; margin-top: 0.35rem; overflow: hidden; }
+  .meter .share i { display: block; height: 100%; background: var(--clr-electric); }
+  .meter.flag { border-color: #f59e0b; border-style: dashed; }
+  .meter.dead { opacity: 0.75; border-style: dashed; }
+  .tag { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.05rem 0.4rem; border-radius: 4px; background: #fef3c7; color: #92400e; margin-left: 0.3rem; vertical-align: 1px; }
+  html.dark .tag { background: #78350f; color: #fde68a; }
+
+  /* point explorer */
+  .search { width: 100%; padding: 0.7rem 0.9rem; border: 2px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--card-bg); color: var(--text); margin-bottom: 0.7rem; }
+  .search:focus { outline: none; border-color: var(--primary); }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.8rem; }
+  .chip { border: 1px solid var(--border); background: var(--card-bg); color: var(--text); border-radius: 999px; padding: 0.22rem 0.7rem; font-size: 0.8rem; cursor: pointer; }
+  .chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; background: var(--table-head-bg); padding: 0.55rem 0.6rem; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-light); position: sticky; top: 0; }
+  td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--table-hover); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td canvas { width: 140px; height: 28px; display: block; }
+  .muted { color: var(--text-light); }
+  .count-line { font-size: 0.83rem; color: var(--text-light); margin-bottom: 0.4rem; }
+
+  /* learn */
+  .learn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; }
+  .learn-card h3 { font-size: 1rem; margin-bottom: 0.35rem; }
+  .learn-card p, .learn-card li { font-size: 0.9rem; }
+  .learn-card ul { padding-left: 1.1rem; margin-top: 0.35rem; }
+  .learn-card .count { float: right; font-size: 0.75rem; font-weight: 700; background: var(--table-head-bg); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.55rem; color: var(--text-light); }
+  .glossary { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.5rem 1.2rem; font-size: 0.88rem; }
+  .glossary b { color: var(--primary); }
+  html.dark .glossary b { color: #f4a3b1; }
+
+  /* modal */
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
+  #modal.open { display: flex; }
+  .modal-card { background: var(--card-bg); border-radius: 12px; width: min(900px, 100%); padding: 1.2rem; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }
+  .modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 0.6rem; }
+  .modal-head h3 { font-size: 1.05rem; }
+  .modal-close { border: none; background: none; font-size: 1.5rem; cursor: pointer; color: var(--text-light); line-height: 1; }
+  #loading { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; z-index: 100; }
+  .spinner { width: 42px; height: 42px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  footer { text-align: center; font-size: 0.8rem; color: var(--text-light); padding: 1rem; }
+
+  @media (max-width: 1000px) {
+    .explore { grid-template-columns: 1fr; }
+    .chart-row { grid-template-columns: 1fr; }
+    #scene { height: 460px; }
+  }
+  @media (max-width: 600px) {
+    header { padding: 0.9rem 1rem; }
+    header h1 { font-size: 1.15rem; }
+    #scene { height: 380px; }
+    .legend { min-width: 0; right: 0.8rem; }
+    .scene-hint { display: none; }
+    #timeLabel { min-width: 0; text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><div class="muted">Loading building data...</div></div>
+
+<header>
+  <div>
+    <h1>Schweitzer Engineering Hall: Energy Explorer</h1>
+    <p>WSU Pullman building 0802 &bull; 66,288 sq ft &bull; <span id="hdrUpdated">Loading...</span></p>
+  </div>
+  <div class="header-actions">
+    <a href="metering.html">Campus Metering</a>
+    <div class="dark-toggle"><span>Dark Mode</span><button class="dark-toggle-switch" id="darkToggle" aria-label="Toggle dark mode"></button></div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="nav-tabs" id="navTabs">
+    <button class="nav-tab active" data-tab="explore">Explore the Building</button>
+    <button class="nav-tab" data-tab="energy">Energy Use</button>
+    <button class="nav-tab" data-tab="meters">Meters and Circuits</button>
+    <button class="nav-tab" data-tab="points">Every Data Point</button>
+    <button class="nav-tab" data-tab="learn">How the Building Works</button>
+    <button class="nav-tab" data-tab="about">About the Data</button>
+  </div>
+
+  <!-- ===================== EXPLORE ===================== -->
+  <div class="section active" id="sec-explore">
+    <div class="explore">
+      <div class="card scene-card">
+        <div id="scene">
+          <div class="scene-overlay" id="modeBtns">
+            <button class="mode-btn active" data-mode="temp">Room temperature</button>
+            <button class="mode-btn" data-mode="comfort">Comfort</button>
+            <button class="mode-btn" data-mode="co2">CO&#8322; (fresh air)</button>
+            <button class="mode-btn" data-mode="air">Airflow</button>
+          </div>
+          <div class="legend">
+            <div id="legendTitle" style="font-weight:700">Room temperature</div>
+            <div class="legend-bar" id="legendBar"></div>
+            <div class="legend-ticks" id="legendTicks"></div>
+            <div class="legend-flows">
+              <span style="--c:#f59e0b">Electricity</span>
+              <span style="--c:#06b6d4">Chilled water</span>
+              <span style="--c:#ef4444">Heating water</span>
+            </div>
+          </div>
+          <div class="scene-hint">Drag to turn &bull; Scroll to zoom &bull; Click a room</div>
+          <div id="tip"></div>
+        </div>
+        <div class="timebar">
+          <button class="play-btn" id="playBtn" aria-label="Play the last 7 days">&#9654;</button>
+          <input type="range" id="timeSlider" min="0" max="1" value="1" aria-label="Time">
+          <div id="timeLabel">...</div>
+          <button class="live-btn" id="liveBtn">Latest</button>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="card">
+          <h3>At this hour</h3>
+          <div class="now-list" id="nowList"></div>
+        </div>
+        <div class="card" id="detailCard">
+          <h3 id="detailTitle">Pick a room</h3>
+          <div id="detailBody" class="detail-empty">Click any colored tile in the 3D building. You will see its temperature, set points, airflow and fresh air for the last 7 days.</div>
+        </div>
+      </div>
+    </div>
+    <div class="info-box">The 3D model is a schematic. Each tile is one heating and cooling zone, grouped by floor, in room-number order. Tile positions are not the real room locations. Pipes at the left end carry electricity, chilled water and heating water up through the floors. The moving dots speed up when the building uses more.</div>
+  </div>
+
+  <!-- ===================== ENERGY ===================== -->
+  <div class="section" id="sec-energy">
+    <div class="kpi-grid" id="kpiEnergy"></div>
+    <div class="card">
+      <h2>Electricity, last 7 days</h2>
+      <div class="sub">Building demand in kilowatts (kW), every 15 minutes, stacked by metered circuit. Watch it climb on weekday mornings and drop at night and on weekends.</div>
+      <div class="chart-box tall"><canvas id="chWeek"></canvas></div>
+    </div>
+    <div class="chart-row">
+      <div class="card">
+        <h2>A typical day</h2>
+        <div class="sub">Average building electric demand by hour of day, last 7 days: weekdays vs. weekend.</div>
+        <div class="chart-box"><canvas id="chProfile"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Outdoor temperature and energy use</h2>
+        <div class="sub">Each dot is one day. Warm days need more cooling; cold days need more heating.</div>
+        <div class="chart-box"><canvas id="chScatter"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Daily energy since metering began</h2>
+      <div class="sub">All three energy types in the same unit (thousand BTU, kBtu) so you can compare them. The line is the daily average outdoor temperature in Pullman.</div>
+      <div class="chart-box tall"><canvas id="chDaily"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ===================== METERS ===================== -->
+  <div class="section" id="sec-meters">
+    <div class="info-box" id="meterNote"></div>
+    <div class="tree" id="meterTree"></div>
+  </div>
+
+  <!-- ===================== POINTS ===================== -->
+  <div class="section" id="sec-points">
+    <div class="card">
+      <h2>Every data point in the building</h2>
+      <div class="sub" id="pointsSub"></div>
+      <input class="search" id="pointSearch" placeholder="Search: room 230, zone temp, co2, pump, DOAS, kW..." autocomplete="off">
+      <div class="chips" id="sysChips"></div>
+      <div class="count-line" id="pointCount"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Equipment</th><th>Point</th><th style="text-align:right">Latest value</th><th>Last 7 days</th><th>Data since</th></tr></thead>
+          <tbody id="pointRows"></tbody>
+        </table>
+      </div>
+      <div style="text-align:center;margin-top:0.8rem"><button class="btn-sm" id="moreBtn">Show more</button></div>
+    </div>
+  </div>
+
+  <!-- ===================== LEARN ===================== -->
+  <div class="section" id="sec-learn">
+    <div class="learn-grid" id="learnGrid"></div>
+    <div class="card">
+      <h2>Words you will see in the data</h2>
+      <div class="glossary">
+        <div><b>kW (kilowatt)</b>: how fast the building uses electricity right now.</div>
+        <div><b>kWh (kilowatt-hour)</b>: an amount of electricity. 1 kW for 1 hour = 1 kWh.</div>
+        <div><b>BTU/h</b>: how fast heat moves. 12,000 BTU/h = 1 ton of cooling.</div>
+        <div><b>kBtu</b>: 1,000 BTU. 1 kWh = 3.412 kBtu, so all energy types fit on one chart.</div>
+        <div><b>cfm</b>: cubic feet of air per minute, the airflow into a room.</div>
+        <div><b>ppm CO&#8322;</b>: carbon dioxide in the air. People breathe it out. Outdoor air is near 420 ppm.</div>
+        <div><b>Set point (sp)</b>: the target value the controls try to hold.</div>
+        <div><b>Occupied / unoccupied</b>: the schedule mode. Unoccupied mode lets rooms drift to save energy.</div>
+        <div><b>Valve or damper %</b>: how far open. 0% is closed, 100% is fully open.</div>
+        <div><b>Supply / return</b>: water or air going out to the rooms, and coming back.</div>
+        <div><b>Delta T</b>: supply and return temperature difference. Bigger delta T means more heat moved per gallon.</div>
+        <div><b>VFD</b>: variable frequency drive. It slows a fan or pump motor down to save energy.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== ABOUT ===================== -->
+  <div class="section" id="sec-about">
+    <div class="card" id="aboutCard"></div>
+  </div>
+</div>
+
+<footer>WSU Facilities Services, Energy and Utilities &bull; Data: WSU SkySpark metering system &bull; <a href="metering.html">Campus Metering Dashboard</a></footer>
+
+<div id="modal"><div class="modal-card">
+  <div class="modal-head"><div><h3 id="modalTitle"></h3><div class="muted" id="modalSub" style="font-size:0.85rem"></div></div><button class="modal-close" id="modalClose" aria-label="Close">&times;</button></div>
+  <div class="chart-box"><canvas id="chModal"></canvas></div>
+</div></div>
+
+<script>
+// ---------- dark mode (runs before data so the scene starts in the right theme) ----------
+if (localStorage.getItem('wsuDarkMode') === 'on') document.documentElement.classList.add('dark');
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from './lib/three/OrbitControls.js';
+
+// ============================ CONSTANTS ============================
+const SQFT = 66288;
+const RATES = { elec: 0.1037, chw: 0.1823, from: '2026-07-01' };  // FY27 rates, "Utility Rates for FY27" email 12/22/2025
+const KBTU_PER_KWH = 3.412;
+const COLORS = { elec: '#f59e0b', chw: '#06b6d4', hhw: '#ef4444', water: '#3b82f6', oat: '#8b5cf6' };
+const FLOORS = [
+  { sys: 'Ground Floor', label: 'Ground floor', rooms: 'G rooms',   y: 0,  h: 3.2 },
+  { sys: 'Floor-01',     label: 'Level 1',      rooms: '100 rooms', y: 7,  h: 3.2 },
+  { sys: 'Mezzanine',    label: 'Mezzanine',    rooms: 'M rooms',   y: 14, h: 3.2, partial: 0.55 },
+  { sys: 'Floor-02',     label: 'Level 2',      rooms: '200 rooms', y: 21, h: 3.2 },
+  { sys: 'Penthouse',    label: 'Penthouse and roof', rooms: '400 rooms', y: 28, h: 3.2 },
+];
+const PLATE = { w: 54, d: 26 };
+const ZONE_TYPES = new Set(['Supply Air Terminal Unit', 'Fan Coil Unit', 'Radiant Floor', 'Fan']);
+
+// ============================ HELPERS ============================
+const $ = id => document.getElementById(id);
+const fmt = (v, d = 0) => v == null || isNaN(v) ? '--' : Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const sum = a => a.reduce((x, y) => x + (y || 0), 0);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const dt = t => new Date(t * 1000);
+const fmtDate = t => { const d = dt(t); return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`; };
+const fmtHour = t => { const d = dt(t); return d.toLocaleString('en-US', { weekday: 'short', month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric' }); };
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const isDark = () => document.documentElement.classList.contains('dark');
+const lastIdx = arr => { if (!arr) return -1; for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return i; return -1; };
+const roomOf = e => { const m = /RM([A-Z]?\d+[A-Z0-9]*)/i.exec(e.alias || e.name) || /RM([A-Z]+\d*[A-Z0-9]*)/i.exec(e.alias || e.name); return m ? 'Room ' + m[1] : null; };
+const niceEquip = name => (name && name.startsWith('p:wsumeters')) ? 'Unassigned meter channel' : name;
+
+// ============================ DATA ============================
+const [P, M] = await Promise.all([
+  fetch('data/0802/points.json', { cache: 'no-cache' }).then(r => r.json()),
+  fetch('data/0802/meters.json', { cache: 'no-cache' }).then(r => r.json()),
+]);
+const EQ = new Map(P.equips.map(e => [e.name, e]));
+const PTS_BY_EQ = new Map();
+for (const p of P.points) {
+  if (!PTS_BY_EQ.has(p.equip)) PTS_BY_EQ.set(p.equip, {});
+  PTS_BY_EQ.get(p.equip)[p.name] = p;
+}
+const pt = (equip, ...names) => { const m = PTS_BY_EQ.get(equip) || {}; for (const n of names) if (m[n]) return m[n]; return null; };
+const MET = new Map(M.meters.map(m => [m.key, m]));
+
+// hourly timeline
+const HT0 = P.hourlyStart, HSTEP = P.hourlyStep;
+const HLEN = P.points.find(p => p.h)?.h.length || 0;
+let HLAST = 0;
+for (const p of P.points) if (p.h) HLAST = Math.max(HLAST, lastIdx(p.h));
+const hourT = i => HT0 + i * HSTEP;
+
+// electric: building = 208 V service + the 480 V circuits (see About the Data)
+const C480 = M.meters.filter(m => m.submeterOf === '0802_EL_001 (480V)');
+const C208 = M.meters.filter(m => m.submeterOf === '0802_EL_012 (208V)');
+const MAIN208 = MET.get('0802_EL_012'), MAIN480 = MET.get('0802_EL_001');
+const BLDG_PARTS = [...C480, MAIN208];
+const combine = (parts, key, n) => Array.from({ length: n }, (_, i) => {
+  let s = 0; for (const p of parts) { const v = p[key]?.[i]; if (v == null) return null; s += v; } return s;
+});
+const bldgQ15 = combine(BLDG_PARTS, 'q15', M.q15t.length);
+const bldgDaily = combine(BLDG_PARTS, 'daily', M.dailyT.length);
+
+// q15 series -> hourly averages on the point timeline
+function toHourly(arr) {
+  const s = new Array(HLEN).fill(0), n = new Array(HLEN).fill(0);
+  M.q15t.forEach((t, i) => { const h = Math.floor((t - HT0) / HSTEP); if (h >= 0 && h < HLEN && arr[i] != null) { s[h] += arr[i]; n[h]++; } });
+  return s.map((v, i) => n[i] ? v / n[i] : null);
+}
+function ffill(a) { let last = null; return a.map(v => (v == null ? last : (last = v))); }
+const H = {
+  elec: toHourly(bldgQ15),
+  chw: toHourly(MET.get('0802_CE_001').q15),
+  hhw: toHourly(MET.get('0802_HE_001').q15),
+  dhw: toHourly(MET.get('0802_DHW_001').q15),
+  oat: ffill(toHourly(MET.get('OAT').q15)),
+};
+const HMAX = { elec: Math.max(...bldgQ15.filter(v => v != null)), chw: Math.max(...MET.get('0802_CE_001').q15.filter(v => v != null)), hhw: Math.max(...MET.get('0802_HE_001').q15.filter(v => v != null), 1) };
+
+$('hdrUpdated').textContent = 'Data updated ' + new Date(P.generated).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+// ============================ TABS + THEME ============================
+const charts = [];
+function applyChartTheme() {
+  Chart.defaults.color = isDark() ? '#9ca3af' : '#6b7280';
+  Chart.defaults.borderColor = isDark() ? '#374151' : '#e5e7eb';
+}
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+applyChartTheme();
+const built = {};
+document.querySelectorAll('.nav-tab').forEach(tab => tab.addEventListener('click', () => {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  tab.classList.add('active');
+  $('sec-' + tab.dataset.tab).classList.add('active');
+  const k = tab.dataset.tab;
+  if (!built[k]) { built[k] = true; ({ energy: buildEnergy, meters: buildMeters, points: buildPoints, learn: buildLearn, about: buildAbout })[k]?.(); }
+  if (k === 'explore') resize();
+  if (k === 'points') drawVisibleSparks();
+}));
+$('darkToggle').addEventListener('click', () => {
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('wsuDarkMode', isDark() ? 'on' : 'off');
+  applyChartTheme(); charts.forEach(c => c.update());
+  setSceneTheme(); drawVisibleSparks(); if (built.meters) buildMeters(true);
+});
+
+// ============================ SPARKLINE ============================
+function spark(canvas, arr, color, marker) {
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const g = canvas.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, w, h);
+  const vals = (arr || []).slice(0, HLAST + 1);
+  const nn = vals.filter(v => v != null);
+  if (nn.length < 2) { g.fillStyle = cssVar('--text-light'); g.font = '11px sans-serif'; g.fillText(arr ? 'no recent data' : 'current value only', 2, h / 2 + 4); return; }
+  let lo = Math.min(...nn), hi = Math.max(...nn); if (hi === lo) { hi += 1; lo -= 1; }
+  g.strokeStyle = color; g.lineWidth = 1.4; g.beginPath(); let pen = false;
+  vals.forEach((v, i) => { if (v == null) { pen = false; return; } const x = i / (vals.length - 1) * (w - 2) + 1, y = h - 2 - (v - lo) / (hi - lo) * (h - 4); pen ? g.lineTo(x, y) : g.moveTo(x, y); pen = true; });
+  g.stroke();
+  if (marker != null) { const x = marker / (vals.length - 1) * (w - 2) + 1; g.strokeStyle = cssVar('--primary'); g.globalAlpha = 0.6; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); g.globalAlpha = 1; }
+}
+
+// ============================ COLOR MODES ============================
+const MODES = {
+  temp:    { title: 'Room temperature (°F)', stops: [[64, '#2563eb'], [68, '#06b6d4'], [71, '#10b981'], [74, '#facc15'], [78, '#ef4444']], ticks: ['64', '68', '71', '74', '78+'] },
+  comfort: { title: 'Distance from the comfort band (°F)', stops: [[-3, '#2563eb'], [-1, '#60a5fa'], [0, '#10b981'], [1, '#fb923c'], [3, '#ef4444']], ticks: ['3 cold', '', 'in band', '', '3 warm'] },
+  co2:     { title: 'CO₂ (ppm): lower means more fresh air', stops: [[400, '#10b981'], [700, '#a3e635'], [1000, '#facc15'], [1400, '#ef4444']], ticks: ['400', '700', '1,000', '1,400+'] },
+  air:     { title: 'Airflow, % of the room maximum', stops: [[0, '#cbd5e1'], [25, '#a5b4fc'], [60, '#6366f1'], [100, '#4c1d95']], ticks: ['0%', '25%', '60%', '100%'] },
+};
+let mode = 'temp';
+function colorFor(v) {
+  if (v == null || isNaN(v)) return new THREE.Color(isDark() ? '#374151' : '#cbd5e1');
+  const s = MODES[mode].stops;
+  if (v <= s[0][0]) return new THREE.Color(s[0][1]);
+  for (let i = 1; i < s.length; i++) if (v <= s[i][0]) {
+    const f = (v - s[i - 1][0]) / (s[i][0] - s[i - 1][0]);
+    return new THREE.Color(s[i - 1][1]).lerp(new THREE.Color(s[i][1]), f);
+  }
+  return new THREE.Color(s[s.length - 1][1]);
+}
+function setLegend() {
+  const m = MODES[mode];
+  $('legendTitle').textContent = m.title;
+  $('legendBar').style.background = `linear-gradient(90deg, ${m.stops.map(s => s[1]).join(',')})`;
+  $('legendTicks').innerHTML = m.ticks.map(t => `<span>${t}</span>`).join('');
+}
+
+// ============================ ZONES ============================
+const zoneEquips = P.equips.filter(e => {
+  if (!FLOORS.some(f => f.sys === e.system)) return false;
+  if (ZONE_TYPES.has(e.type)) return !!pt(e.name, 'zone temp');
+  return !!pt(e.name, 'TMP', 'ZN TMP');
+});
+function zoneVals(e, i) {
+  const g = n => { const p = pt(e.name, ...[].concat(n)); if (!p) return null; if (p.h) return p.h[i]; return i >= HLAST ? p.cur : null; };
+  const temp = g(['zone temp', 'TMP', 'ZN TMP']);
+  const hs = g('zone temp eff htg sp'), cs = g('zone temp eff clg sp');
+  const flow = g('supply air flow'), fmax = g('supply air flow clg max sp');
+  let comfort = null;
+  if (temp != null && hs != null && cs != null) comfort = temp < hs ? temp - hs : temp > cs ? temp - cs : 0;
+  return { temp, hs, cs, flow, fmax, comfort, co2: g('zone co2 concentration'), rh: g(['zone humidity', 'HUM', 'ZN HUM']),
+           damper: g('supply air damper position cmd'), hhwv: g('hhw valve position cmd'), chwv: g('chw valve position cmd'),
+           air: flow != null && fmax ? Math.min(100, flow / fmax * 100) : null };
+}
+const modeVal = (z) => ({ temp: z.temp, comfort: z.comfort, co2: z.co2, air: z.air })[mode];
+
+// ============================ THREE.JS SCENE ============================
+const host = $('scene');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+host.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
+camera.position.set(62, 48, 66);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 14, 0);
+controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.5;
+controls.minDistance = 20; controls.maxDistance = 160; controls.maxPolarAngle = Math.PI * 0.49;
+renderer.domElement.addEventListener('pointerdown', () => { controls.autoRotate = false; });
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(40, 70, 30); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60 });
+scene.add(sun);
+
+const ground = new THREE.Mesh(new THREE.CircleGeometry(120, 64), new THREE.MeshStandardMaterial({ color: 0x9aa99a, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true;
+scene.add(ground);
+
+function textSprite(text, size = 1.6, color = '#1f2937', bg = 'rgba(255,255,255,0.85)') {
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  g.font = 'bold 44px Segoe UI, sans-serif';
+  const w = Math.ceil(g.measureText(text).width) + 36;
+  c.width = w; c.height = 72;
+  g.font = 'bold 44px Segoe UI, sans-serif';
+  g.fillStyle = bg; g.beginPath(); g.roundRect(0, 0, w, 72, 18); g.fill();
+  g.fillStyle = color; g.textBaseline = 'middle'; g.fillText(text, 18, 38);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+  s.scale.set(size * w / 72, size, 1); s.renderOrder = 10;
+  return s;
+}
+
+const building = new THREE.Group(); scene.add(building);
+const slabMat = new THREE.MeshStandardMaterial({ color: 0xe7e5e4, roughness: 0.9, transparent: true, opacity: 0.88 });
+const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x9fc6e0, transparent: true, opacity: 0.12, roughness: 0.1, depthWrite: false, side: THREE.DoubleSide });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x981e32, transparent: true, opacity: 0.7 });
+const pickables = [];
+const zoneMeshes = [];
+
+FLOORS.forEach((f, fi) => {
+  const w = PLATE.w * (f.partial || 1), d = PLATE.d * (f.partial ? Math.max(f.partial, 0.6) : 1);
+  const ox = f.partial ? PLATE.w / 2 - w / 2 : 0;
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, d), slabMat);
+  slab.position.set(ox, f.y, 0); slab.receiveShadow = true; slab.castShadow = true; building.add(slab);
+  const shell = new THREE.Mesh(new THREE.BoxGeometry(w, f.h, d), glassMat);
+  shell.position.set(ox, f.y + f.h / 2 + 0.17, 0); building.add(shell);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, f.h, d)), edgeMat);
+  edges.position.copy(shell.position); building.add(edges);
+  const lab = textSprite(`${f.label} (${f.rooms})`, 2.2);
+  lab.position.set(ox - w / 2 - 1, f.y + f.h * 0.5, d / 2 + 1.5); lab.center.set(1, 0.5); building.add(lab);
+
+  // zone tiles on this floor
+  const zs = zoneEquips.filter(e => e.system === f.sys).sort((a, b) => (roomOf(a) || a.name).localeCompare(roomOf(b) || b.name, undefined, { numeric: true }));
+  const areaW = f.sys === 'Ground Floor' ? w * 0.52 : f.sys === 'Penthouse' ? w * 0.4 : w - 4, areaD = d - 4;
+  const xs = f.sys === 'Penthouse' ? w * 0.55 : 0;
+  const x0 = ox - w / 2 + 2 + xs;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(zs.length * areaW / areaD)));
+  const rows = Math.max(1, Math.ceil(zs.length / cols));
+  const cw = Math.min(areaW / cols, 7), cd = Math.min(areaD / rows, 6);
+  zs.forEach((e, i) => {
+    const c = i % cols, r = Math.floor(i / cols);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.55, emissive: 0x000000 });
+    const tile = new THREE.Mesh(new THREE.BoxGeometry(cw * 0.86, 1, cd * 0.86), mat);
+    tile.position.set(x0 + cw * (c + 0.5), f.y + 0.7, -cd * rows / 2 + cd * (r + 0.5));
+    tile.castShadow = true;
+    tile.userData = { kind: 'zone', equip: e, floor: f };
+    building.add(tile); pickables.push(tile); zoneMeshes.push(tile);
+  });
+});
+const ROOF_Y = FLOORS[4].y;
+
+// mechanical room (ground floor, east end): pumps, loops, heat exchanger
+const mechEquips = P.equips.filter(e => e.system === 'Central Water');
+const mechBase = { x: PLATE.w / 2 - 12, z: -8 };
+mechEquips.forEach((e, i) => {
+  const isPump = e.type === 'Pump';
+  const color = /hhw|HX|HW|BB|HT3/i.test(e.name + e.tags.join()) ? 0xef4444 : /chw/i.test(e.name + e.tags.join()) ? 0x06b6d4 : 0x94a3b8;
+  const geo = isPump ? new THREE.CylinderGeometry(0.7, 0.7, 1.4, 20) : new THREE.CylinderGeometry(0.45, 0.45, 2.6, 16);
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.3 }));
+  m.position.set(mechBase.x + (i % 5) * 2.3, 0.2 + (isPump ? 0.7 : 1.3), mechBase.z + Math.floor(i / 5) * 2.6);
+  m.castShadow = true; m.userData = { kind: 'equip', equip: e };
+  building.add(m); pickables.push(m);
+});
+const mechLab = textSprite('Mechanical room: pumps and water loops', 1.6);
+mechLab.position.set(mechBase.x + 4.6, 4.0, mechBase.z - 1.8); building.add(mechLab);
+
+// electrical room: one bar per electric meter, height follows kW
+const elecBars = [];
+const elecMeters = [MAIN480, MAIN208, ...C480, ...C208].filter(Boolean);
+elecMeters.forEach((m, i) => {
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1, 0.8), new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0x7c2d12, emissiveIntensity: 0.25 }));
+  bar.position.set(mechBase.x + (i % 9) * 1.25, 0.7, 5 + Math.floor(i / 9) * 1.6);
+  bar.userData = { kind: 'meter', meter: m, equip: EQ.get(m.equip) };
+  building.add(bar); pickables.push(bar); elecBars.push(bar);
+});
+const elecLab = textSprite('Electric meters (bar height = kW)', 1.6);
+elecLab.position.set(mechBase.x + 5, 4.0, 8.2); building.add(elecLab);
+
+// rooftop air handler (DOAS-01) and exhaust fan
+const doas = P.equips.find(e => e.name === 'DOAS-01');
+const ahu = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 5), new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5, metalness: 0.4 }));
+ahu.position.set(-12, ROOF_Y + 1.7, 0); ahu.castShadow = true; ahu.userData = { kind: 'equip', equip: doas };
+building.add(ahu); pickables.push(ahu);
+const fanBlades = new THREE.Group();
+for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.5), new THREE.MeshStandardMaterial({ color: 0x1f2937 })); b.rotation.y = k * Math.PI / 2; b.position.set(Math.cos(k * Math.PI / 2) * 1.1, 0, -Math.sin(k * Math.PI / 2) * 1.1); fanBlades.add(b); }
+fanBlades.position.set(-12, ahu.position.y + 1.6, 0); building.add(fanBlades);
+const ahuLab = textSprite('DOAS-01: fresh air unit', 1.8);
+ahuLab.position.set(-12, ahu.position.y + 4, 0); building.add(ahuLab);
+
+// utility risers with moving particles
+const riserX = -PLATE.w / 2 - 2, top = ROOF_Y;
+const flows = [
+  { key: 'elec', color: 0xf59e0b, z: -9, label: 'Electricity' },
+  { key: 'chw', color: 0x06b6d4, z: -7.2, label: 'Chilled water' },
+  { key: 'hhw', color: 0xef4444, z: -5.4, label: 'Heating water' },
+];
+flows.forEach(f => {
+  const pipeMat = new THREE.MeshStandardMaterial({ color: f.color, transparent: true, opacity: 0.5 });
+  const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, top + 1, 12), pipeMat);
+  riser.position.set(riserX, top / 2 - 0.5, f.z); building.add(riser);
+  const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 22, 12), pipeMat);
+  feed.rotation.z = Math.PI / 2; feed.position.set(riserX - 11, -0.5, f.z); building.add(feed);
+  const N = 60, pos = new Float32Array(N * 3), phase = new Float32Array(N);
+  for (let i = 0; i < N; i++) phase[i] = i / N;
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: f.color, size: 1.1, sizeAttenuation: true, transparent: true }));
+  building.add(pts);
+  Object.assign(f, { pts, phase, N, speed: 0.1 });
+});
+const campusLab = textSprite('Utility service entrance', 1.6);
+campusLab.position.set(riserX - 16, -2.2, -3); building.add(campusLab);
+building.position.x = 3;
+
+function setSceneTheme() {
+  scene.background = new THREE.Color(cssVar('--scene-bg') || '#e8ecf1');
+  ground.material.color.set(isDark() ? 0x1e293b : 0x9aa99a);
+  slabMat.color.set(isDark() ? 0x475569 : 0xe7e5e4);
+  scene.fog = new THREE.Fog(scene.background, 140, 260);
+  applyTime(curIdx);
+}
+
+// ============================ TIME ============================
+let curIdx = HLAST;
+const slider = $('timeSlider');
+slider.max = HLAST; slider.value = HLAST;
+function applyTime(i) {
+  curIdx = i;
+  $('timeLabel').textContent = fmtHour(hourT(i)) + (i === HLAST ? ' (latest)' : '');
+  for (const m of zoneMeshes) {
+    const z = zoneVals(m.userData.equip, i);
+    const c = colorFor(modeVal(z));
+    m.material.color.copy(c);
+    m.material.emissive.copy(c).multiplyScalar(0.18);
+    m.userData.z = z;
+  }
+  // electric bars
+  const qi = nearestQ15(hourT(i) + 1800);
+  const mx = Math.max(...elecMeters.map(m => Math.max(...(m.q15 || []).filter(v => v != null), 1)));
+  elecBars.forEach(b => { const v = b.userData.meter.q15?.[qi]; const h = Math.max(0.15, (v || 0) / mx * 5); b.scale.y = h; b.position.y = 0.2 + h / 2; });
+  // flows
+  flows.forEach(f => { const v = H[f.key][i]; f.speed = v == null ? 0 : 0.02 + 0.5 * Math.max(0, v) / (HMAX[f.key] || 1); f.pts.material.opacity = v ? 1 : 0.2; });
+  fanSpeed = (pt('DOAS-01', 'supply fan 1 vfd motor speed cmd')?.h?.[i] ?? 0) / 100;
+  renderNow(i);
+  if (selected) renderDetail(selected);
+}
+function nearestQ15(t) { let lo = 0, hi = M.q15t.length - 1; while (lo < hi) { const mid = (lo + hi) >> 1; M.q15t[mid] < t ? lo = mid + 1 : hi = mid; } return lo; }
+let fanSpeed = 0;
+slider.addEventListener('input', () => { stopPlay(); applyTime(+slider.value); });
+$('liveBtn').addEventListener('click', () => { stopPlay(); slider.value = HLAST; applyTime(HLAST); });
+let playTimer = null;
+function stopPlay() { if (playTimer) { clearInterval(playTimer); playTimer = null; $('playBtn').innerHTML = '&#9654;'; } }
+$('playBtn').addEventListener('click', () => {
+  if (playTimer) return stopPlay();
+  if (+slider.value >= HLAST) slider.value = 0;
+  $('playBtn').innerHTML = '&#10074;&#10074;';
+  playTimer = setInterval(() => { const v = +slider.value + 1; if (v > HLAST) return stopPlay(); slider.value = v; applyTime(v); }, 140);
+});
+
+function renderNow(i) {
+  const zs = zoneMeshes.map(m => m.userData.z?.temp).filter(v => v != null);
+  const co2 = zoneMeshes.map(m => m.userData.z?.co2).filter(v => v != null);
+  const rows = [
+    [COLORS.elec, 'Electricity', H.elec[i], 'kW', 0],
+    [COLORS.chw, 'Cooling', H.chw[i] != null ? H.chw[i] / 12000 : null, 'tons', 1],
+    [COLORS.hhw, 'Heating', H.hhw[i] != null ? H.hhw[i] / 1000 : null, 'kBtu/h', 0],
+    [COLORS.oat, 'Outdoor air (Pullman)', H.oat[i], '°F', 0],
+    ['#10b981', 'Average room temperature', zs.length ? sum(zs) / zs.length : null, '°F', 1],
+    ['#a3e635', 'Average room CO₂', co2.length ? sum(co2) / co2.length : null, 'ppm', 0],
+  ];
+  $('nowList').innerHTML = rows.map(([c, l, v, u, d]) => `<div class="now-item"><span><span class="dot" style="background:${c}"></span>${l}</span><span class="v">${fmt(v, d)} <small class="muted">${u}</small></span></div>`).join('');
+}
+
+// ============================ PICKING ============================
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+let hovered = null, selected = null, downAt = null;
+function pick(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  return ray.intersectObjects(pickables, false)[0]?.object || null;
+}
+function label(o) {
+  const u = o.userData;
+  if (u.kind === 'zone') return roomOf(u.equip) || u.equip.name;
+  if (u.kind === 'meter') return 'Meter ' + u.meter.key;
+  return u.equip?.name || '';
+}
+renderer.domElement.addEventListener('pointermove', ev => {
+  const o = pick(ev);
+  if (hovered && hovered !== selected) hovered.material.emissiveIntensity = 1;
+  hovered = o;
+  const tip = $('tip');
+  if (!o) { tip.style.display = 'none'; renderer.domElement.style.cursor = ''; return; }
+  renderer.domElement.style.cursor = 'pointer';
+  const u = o.userData;
+  let html = `<b>${esc(label(o))}</b><br>`;
+  if (u.kind === 'zone') {
+    const z = u.z || {};
+    html += `${esc(u.equip.type || 'Radiant zone')} &bull; ${esc(u.floor.label)}<br>Temp ${fmt(z.temp, 1)}°F`;
+    if (z.hs != null) html += ` (target ${fmt(z.hs, 0)} to ${fmt(z.cs, 0)}°F)`;
+    if (z.co2 != null) html += `<br>CO₂ ${fmt(z.co2)} ppm`;
+    if (z.flow != null) html += `<br>Airflow ${fmt(z.flow)} cfm`;
+  } else if (u.kind === 'meter') {
+    const v = u.meter.q15?.[nearestQ15(hourT(curIdx) + 1800)];
+    html += `${u.meter.voltage || ''} V electric meter<br>${fmt(v, 1)} kW`;
+  } else html += esc(u.equip?.type || 'Equipment') + '<br>Click for details';
+  tip.innerHTML = html;
+  const r = host.getBoundingClientRect();
+  tip.style.display = 'block';
+  tip.style.left = Math.min(ev.clientX - r.left + 14, r.width - 270) + 'px';
+  tip.style.top = (ev.clientY - r.top + 14) + 'px';
+});
+renderer.domElement.addEventListener('pointerleave', () => { $('tip').style.display = 'none'; });
+renderer.domElement.addEventListener('pointerdown', ev => { downAt = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5) return;
+  const o = pick(ev); if (!o) return;
+  if (selected?.userData.kind === 'zone') selected.scale.y = 1;
+  selected = o;
+  if (o.userData.kind === 'zone') o.scale.y = 1.8;
+  renderDetail(o);
+});
+
+let detailChart = null;
+function renderDetail(o) {
+  const u = o.userData, e = u.equip || EQ.get(u.meter?.equip);
+  $('detailTitle').textContent = label(o);
+  const pts = Object.values(PTS_BY_EQ.get(e?.name) || {});
+  let html = `<div class="muted" style="font-size:0.82rem">${esc(e?.name || '')} &bull; ${esc(e?.type || 'Equipment')}${u.floor ? ' &bull; ' + esc(u.floor.label) : ''}</div>`;
+  if (u.kind === 'zone') {
+    const z = zoneVals(e, curIdx);
+    const cells = [['Temperature', fmt(z.temp, 1) + ' °F'], ['Target band', z.hs != null ? `${fmt(z.hs, 0)} to ${fmt(z.cs, 0)} °F` : '--'],
+      ['Airflow', z.flow != null ? fmt(z.flow) + ' cfm' : '--'], ['CO₂', z.co2 != null ? fmt(z.co2) + ' ppm' : '--'],
+      ['Humidity', z.rh != null ? fmt(z.rh) + ' %' : '--'], ['Heating valve', z.hhwv != null ? fmt(z.hhwv) + ' %' : '--'],
+      ['Cooling valve', z.chwv != null ? fmt(z.chwv) + ' %' : '--'], ['Air damper', z.damper != null ? fmt(z.damper) + ' %' : '--']];
+    html += `<div class="detail-grid">${cells.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div><div class="chart-box" style="height:190px"><canvas id="chDetail"></canvas></div>`;
+  } else if (u.kind === 'meter') {
+    const v = u.meter.q15?.[nearestQ15(hourT(curIdx) + 1800)];
+    html += `<div class="detail-grid"><div><span>Demand</span><b>${fmt(v, 1)} kW</b></div><div><span>Voltage class</span><b>${u.meter.voltage || '--'} V</b></div><div><span>Fed from</span><b>${esc(u.meter.submeterOf || '--')}</b></div></div><div class="chart-box" style="height:190px"><canvas id="chDetail"></canvas></div>`;
+  } else {
+    html += `<p style="font-size:0.86rem;margin:0.5rem 0">${esc(describeEquip(e))}</p>`;
+  }
+  html += `<div style="margin-top:0.7rem;display:flex;gap:0.5rem;flex-wrap:wrap"><button class="btn-sm primary" id="seeAll">See all ${pts.length} points</button></div>`;
+  $('detailBody').className = ''; $('detailBody').innerHTML = html;
+  $('seeAll').onclick = () => { document.querySelector('.nav-tab[data-tab="points"]').click(); $('pointSearch').value = e.name; sysFilter = 'All'; renderChips(); renderPoints(); };
+  if (detailChart) { detailChart.destroy(); charts.splice(charts.indexOf(detailChart), 1); detailChart = null; }
+  const cv = $('chDetail'); if (!cv) return;
+  const labels = Array.from({ length: HLAST + 1 }, (_, i) => fmtHour(hourT(i)));
+  let ds;
+  if (u.kind === 'zone') {
+    const s = n => (pt(e.name, ...[].concat(n))?.h || []).slice(0, HLAST + 1);
+    ds = [{ label: 'Room temp', data: s(['zone temp', 'TMP', 'ZN TMP']), borderColor: '#10b981' },
+          { label: 'Heat below', data: s('zone temp eff htg sp'), borderColor: '#ef4444', borderDash: [4, 3] },
+          { label: 'Cool above', data: s('zone temp eff clg sp'), borderColor: '#2563eb', borderDash: [4, 3] }];
+  } else {
+    const q = u.meter.q15 || [];
+    ds = [{ label: 'kW', data: Array.from({ length: HLAST + 1 }, (_, i) => { const a = []; M.q15t.forEach((t, k) => { if (Math.floor((t - HT0) / HSTEP) === i && q[k] != null) a.push(q[k]); }); return a.length ? sum(a) / a.length : null; }), borderColor: COLORS.elec }];
+  }
+  ds.forEach(d => Object.assign(d, { pointRadius: 0, borderWidth: 1.6, spanGaps: true }));
+  detailChart = new Chart(cv, { type: 'line', data: { labels, datasets: ds },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { boxWidth: 8, font: { size: 11 } } } },
+      scales: { x: { ticks: { maxTicksLimit: 4, maxRotation: 0, callback: (v, i) => labels[i].split(',')[0] } } } },
+    plugins: [{ id: 'nowline', afterDraw(c) { const x = c.scales.x.getPixelForValue(curIdx); const g = c.ctx; g.save(); g.strokeStyle = '#981e32'; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(x, c.chartArea.top); g.lineTo(x, c.chartArea.bottom); g.stroke(); g.restore(); } }] });
+  charts.push(detailChart);
+}
+
+function describeEquip(e) {
+  if (!e) return '';
+  const t = e.type || '', n = e.name;
+  if (n === 'DOAS-01') return 'The dedicated outdoor air system brings fresh outdoor air into the building. It filters the air, recovers heat from exhaust air with a thermal wheel, and cools or preheats the air before sending it to the rooms.';
+  if (t === 'Pump') return 'A pump moves water around a loop. Most pumps here have a variable frequency drive (VFD), so they run only as fast as the building needs.';
+  if (t === 'CHW Loop') return 'A chilled water loop carries cold water to the cooling coils and back.';
+  if (t === 'HHW Loop') return 'A heating hot water loop carries warm water to the heating coils, radiant floors and radiators.';
+  if (t === 'HHW Heat Exchanger') return 'The heat exchanger passes heat between two water loops without mixing them. The data show entering and leaving temperatures on both sides.';
+  if (t === 'DHW Loop') return 'The domestic hot water loop serves sinks and restrooms.';
+  return `${t || 'Equipment'} in the ${e.system || 'building'} system.`;
+}
+
+// ============================ RENDER LOOP ============================
+function resize() {
+  const w = host.clientWidth, h = host.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+  if (!resize.fit) { resize.fit = true; if (w / h < 1.2) camera.position.multiplyScalar(1.2 / Math.max(w / h, 0.5)); }
+}
+new ResizeObserver(resize).observe(host);
+let lastT = performance.now();
+renderer.setAnimationLoop(() => {
+  if (!$('sec-explore').classList.contains('active')) return;
+  const nowT = performance.now(), dtS = Math.min((nowT - lastT) / 1000, 0.1); lastT = nowT;
+  controls.update();
+  flows.forEach(f => {
+    const a = f.pts.geometry.attributes.position;
+    for (let i = 0; i < f.N; i++) {
+      f.phase[i] = (f.phase[i] + dtS * f.speed) % 1;
+      const s = f.phase[i] * 2; // 0..1 along the feed, 1..2 up the riser
+      if (s < 1) a.setXYZ(i, riserX - 22 + s * 22, -0.5, f.z);
+      else a.setXYZ(i, riserX, -0.5 + (s - 1) * (top + 0.5), f.z);
+    }
+    a.needsUpdate = true;
+  });
+  fanBlades.rotation.y += dtS * (1 + 12 * fanSpeed);
+  renderer.render(scene, camera);
+});
+
+document.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.mode-btn').forEach(x => x.classList.remove('active'));
+  b.classList.add('active'); mode = b.dataset.mode; setLegend(); applyTime(curIdx);
+}));
+
+// ============================ ENERGY TAB ============================
+function dayIdxFrom(dateStr) { const t = new Date(dateStr + 'T00:00:00').getTime() / 1000; return M.dailyT.findIndex(x => x >= t); }
+const TODAY_IDX = M.dailyT.length - 1;  // partial day: excluded from daily totals
+const dailyKWh = bldgDaily.map((v, i) => i < TODAY_IDX && v != null ? v * 24 : null);
+const dailyChwTonHr = MET.get('0802_CE_001').daily.map((v, i) => i < TODAY_IDX && v != null ? v * 24 / 12000 : null);
+const dailyHhwKBtu = MET.get('0802_HE_001').daily.map((v, i) => i < TODAY_IDX && v != null ? v * 24 / 1000 : null);
+const dailyOat = MET.get('OAT').daily;
+
+function buildEnergy() {
+  const n = TODAY_IDX, last7 = [n - 7, n];
+  const s7 = a => sum(a.slice(last7[0], last7[1]));
+  const fy = dayIdxFrom(RATES.from);
+  const fyKWh = sum(dailyKWh.slice(fy, n)), fyTon = sum(dailyChwTonHr.slice(fy, n));
+  const allKBtu = sum(dailyKWh) * KBTU_PER_KWH + sum(dailyChwTonHr) * 12 + sum(dailyHhwKBtu);
+  const todayQ = M.q15t.map((t, i) => [t, bldgQ15[i]]).filter(([t, v]) => t >= M.dailyT[TODAY_IDX] && v != null);
+  const k = [
+    ['elec', 'Electricity, last 7 days', fmt(s7(dailyKWh)), 'kWh', `about ${fmt(s7(dailyKWh) / 7)} kWh per day`],
+    ['elec', 'Electricity today so far', fmt(sum(todayQ.map(x => x[1])) * 0.25), 'kWh', `${todayQ.length} readings since midnight`],
+    ['chw', 'Cooling, last 7 days', fmt(s7(dailyChwTonHr)), 'ton-hours', `${fmt(s7(dailyChwTonHr) * 12000 / 1e6, 1)} million BTU removed`],
+    ['hhw', 'Heating, last 7 days', fmt(s7(dailyHhwKBtu) / 1000, 1), 'MMBtu', 'million BTU of heating water'],
+    ['cost', 'Electricity + cooling cost, FY27 so far', '$' + fmt(fyKWh * RATES.elec + fyTon * RATES.chw), '', `since 07/01/2026 at WSU FY27 rates`],
+    ['', 'Energy per square foot', fmt(allKBtu / SQFT, 1), 'kBtu/sq ft', `all energy since ${fmtDate(M.dailyT[0])}, not a full year`],
+  ];
+  $('kpiEnergy').innerHTML = k.map(([c, l, v, u, s]) => `<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v} <small>${u}</small></div><div class="kpi-sub">${s}</div></div>`).join('');
+
+  // week stacked area
+  const labels = M.q15t.map(t => fmtHour(t));
+  const pal = ['#f59e0b', '#fbbf24', '#fcd34d', '#d97706', '#b45309', '#92400e', '#fde68a', '#f97316', '#fb923c', '#78350f'];
+  const ds = [MAIN208, ...C480].map((m, i) => ({ label: m === MAIN208 ? '208 V service (0802_EL_012)' : m.key, data: m.q15.map(v => v == null ? null : Math.max(0, v)), backgroundColor: pal[i % pal.length] + 'cc', borderColor: pal[i % pal.length], borderWidth: 0.6, fill: true, pointRadius: 0, stack: 'b' }));
+  charts.push(new Chart($('chWeek'), { type: 'line', data: { labels, datasets: ds },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'right', labels: { boxWidth: 8, font: { size: 11 } } }, tooltip: { callbacks: { footer: it => 'Building total: ' + fmt(sum(it.map(x => x.raw)), 1) + ' kW' } } },
+      scales: { x: { ticks: { maxTicksLimit: 8, maxRotation: 0, callback: (v, i) => labels[i].split(',').slice(0, 2).join(',') } }, y: { stacked: true, title: { display: true, text: 'kW' } } } } }));
+
+  // weekday / weekend profile
+  const wk = Array.from({ length: 24 }, () => []), we = Array.from({ length: 24 }, () => []);
+  M.q15t.forEach((t, i) => { const v = bldgQ15[i]; if (v == null) return; const d = dt(t); ((d.getDay() % 6 === 0) ? we : wk)[d.getHours()].push(v); });
+  const avg = a => a.length ? sum(a) / a.length : null;
+  charts.push(new Chart($('chProfile'), { type: 'line', data: { labels: Array.from({ length: 24 }, (_, h) => (h % 12 || 12) + (h < 12 ? ' AM' : ' PM')),
+    datasets: [{ label: 'Weekday', data: wk.map(avg), borderColor: COLORS.elec, backgroundColor: COLORS.elec + '33', fill: true, tension: 0.3 },
+               { label: 'Weekend', data: we.map(avg), borderColor: '#6b7280', borderDash: [5, 4], tension: 0.3 }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { title: { display: true, text: 'Average kW' } }, x: { ticks: { maxTicksLimit: 8 } } } } }));
+
+  // weather scatter
+  const sc = (arr, f) => arr.map((v, i) => v != null && dailyOat[i] != null ? { x: dailyOat[i], y: f(v) } : null).filter(Boolean);
+  charts.push(new Chart($('chScatter'), { type: 'scatter', data: { datasets: [
+    { label: 'Cooling (ton-hours per day)', data: sc(dailyChwTonHr, v => v), backgroundColor: COLORS.chw + 'bb' },
+    { label: 'Heating (MMBtu per day x 100)', data: sc(dailyHhwKBtu, v => v / 10), backgroundColor: COLORS.hhw + 'bb' }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Daily average outdoor temperature (°F)' } }, y: { title: { display: true, text: 'Energy per day' } } } } }));
+
+  // daily kBtu stacked bars
+  const dl = M.dailyT.slice(0, TODAY_IDX).map(fmtDate);
+  charts.push(new Chart($('chDaily'), { data: { labels: dl, datasets: [
+    { type: 'bar', label: 'Electricity', data: dailyKWh.slice(0, TODAY_IDX).map(v => v == null ? null : v * KBTU_PER_KWH), backgroundColor: COLORS.elec, stack: 'e' },
+    { type: 'bar', label: 'Cooling (chilled water)', data: dailyChwTonHr.slice(0, TODAY_IDX).map(v => v == null ? null : v * 12), backgroundColor: COLORS.chw, stack: 'e' },
+    { type: 'bar', label: 'Heating (hot water)', data: dailyHhwKBtu.slice(0, TODAY_IDX), backgroundColor: COLORS.hhw, stack: 'e' },
+    { type: 'line', label: 'Outdoor temp (°F)', data: dailyOat.slice(0, TODAY_IDX), borderColor: COLORS.oat, pointRadius: 0, borderWidth: 1.5, yAxisID: 'y2', tension: 0.3 }] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      scales: { x: { stacked: true, ticks: { maxTicksLimit: 10, maxRotation: 0 } }, y: { stacked: true, title: { display: true, text: 'kBtu per day' } },
+        y2: { position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '°F' } } } } }));
+}
+
+// ============================ METERS TAB ============================
+function buildMeters(redraw) {
+  const qi = M.q15t.length - 1;
+  const lastV = m => { for (let i = qi; i >= 0; i--) if (m.q15?.[i] != null) return m.q15[i]; return null; };
+  const bNow = (() => { for (let i = qi; i >= 0; i--) if (bldgQ15[i] != null) return bldgQ15[i]; return null; })();
+  const card = (m, role, opts = {}) => {
+    const v = lastV(m), share = opts.share ? Math.min(100, (v || 0) / bNow * 100) : null;
+    return `<div class="meter ${opts.cls || ''}"><div class="mname">${esc(m.key)}${opts.tag ? `<span class="tag">${opts.tag}</span>` : ''}</div><div class="mrole">${role}</div>
+      <div class="mval">${opts.val ?? fmt(v, opts.d ?? 1)} <small>${opts.unit || 'kW'}</small></div>
+      ${share != null ? `<div class="share"><i style="width:${share}%"></i></div><div class="mrole">${fmt(share, 0)}% of the building right now</div>` : ''}
+      <canvas data-spark="${esc(m.key)}" data-conv="${opts.conv || 1}" data-color="${opts.color || COLORS.elec}"></canvas></div>`;
+  };
+  const sumC208 = combine(C208, 'q15', M.q15t.length);
+  const avgOf = a => { const v = a.filter(x => x != null); return v.length ? sum(v) / v.length : null; };
+  const cover208 = avgOf(sumC208) / avgOf(MAIN208.q15) * 100;
+  const ce = MET.get('0802_CE_001'), he = MET.get('0802_HE_001');
+  const ceSup = pt('0802_CE_001', 'chw supply temp'), ceRet = pt('0802_CE_001', 'chw return temp');
+  const heSup = pt('0802_HE_001', 'hhw supply temp'), heRet = pt('0802_HE_001', 'hhw return temp');
+  $('meterNote').innerHTML = `The building has <b>${M.meters.filter(m => m.utility === 'elec').length - 1} electric meters</b>, a chilled water meter, a heating water meter and two domestic water meters. Electricity arrives at two voltages, 480 V and 208 V. Large motors usually run on 480 V; outlets usually run on 208 V. Right now the building draws <b>${fmt(bNow, 1)} kW</b>. Values below are the latest 15-minute readings; the small line shows the last 7 days.`;
+  $('meterTree').innerHTML = `
+    <div class="card tree-group"><h3>480 V service: 9 metered circuits</h3>
+      <p>The main 480 V meter (0802_EL_001) is not used in the totals. Its voltage reads about 124 V, a quarter of the 480 V the circuit meters read, so its power reads low. The page adds up the 9 circuit meters instead.</p>
+      <div class="meter-grid">${C480.map(m => card(m, '480 V circuit', { share: true })).join('')}${card(MAIN480, 'Main 480 V meter (reads low, not used)', { cls: 'flag', tag: 'CHECK' })}</div></div>
+    <div class="card tree-group"><h3>208 V service</h3>
+      <p>0802_EL_012 measures the whole 208 V service. Six circuit meters sit under it. Over the last 7 days they add up to ${fmt(cover208, 0)}% of the service total, so they cover nearly all of the 208 V load.</p>
+      <div class="meter-grid">${card(MAIN208, '208 V service main', { share: true })}${C208.map(m => card(m, '208 V circuit', { share: true })).join('')}</div></div>
+    <div class="card tree-group"><h3>Thermal and water meters</h3>
+      <p>Each thermal meter measures flow and the supply and return temperatures, then calculates the heat moved.</p>
+      <div class="meter-grid">
+        ${card(ce, `Chilled water: supply ${fmt(ceSup?.cur, 1)}°F, return ${fmt(ceRet?.cur, 1)}°F`, { val: fmt(lastV(ce) / 12000, 1), unit: 'tons', conv: 1 / 12000, color: COLORS.chw })}
+        ${card(he, `Heating water: supply ${fmt(heSup?.cur, 1)}°F, return ${fmt(heRet?.cur, 1)}°F`, { val: fmt(lastV(he) / 1000, 0), unit: 'kBtu/h', conv: 1 / 1000, color: COLORS.hhw })}
+        ${card(MET.get('0802_DHW_001'), 'Domestic hot water flow', { d: 2, unit: 'gal/min', color: COLORS.water })}
+        ${card(MET.get('0802_DW_001'), 'Domestic cold water flow: no flow recorded since data began', { d: 2, unit: 'gal/min', color: COLORS.water, cls: 'dead', tag: 'NO DATA' })}
+      </div></div>`;
+  document.querySelectorAll('#meterTree canvas[data-spark]').forEach(c => {
+    const m = MET.get(c.dataset.spark), k = +c.dataset.conv;
+    const hr = toHourly(m.q15 || []).map(v => v == null ? null : v * k);
+    spark(c, hr, c.dataset.color);
+  });
+}
+
+// ============================ POINTS TAB ============================
+const SYS_ORDER = ['All', 'Ground Floor', 'Floor-01', 'Mezzanine', 'Floor-02', 'Penthouse', 'Central Air', 'Central Water', 'Metering', 'Other'];
+let sysFilter = 'All', shown = 60, filtered = [];
+const sysOf = p => SYS_ORDER.includes(p.system) ? p.system : 'Other';
+const SORTED = [...P.points].sort((a, b) => (niceEquip(a.equip) + a.name).localeCompare(niceEquip(b.equip) + b.name, undefined, { numeric: true }));
+function renderChips() {
+  const cnt = {}; P.points.forEach(p => { cnt[sysOf(p)] = (cnt[sysOf(p)] || 0) + 1; });
+  $('sysChips').innerHTML = SYS_ORDER.filter(s => s === 'All' || cnt[s]).map(s => `<button class="chip ${s === sysFilter ? 'active' : ''}" data-s="${s}">${s} (${s === 'All' ? P.points.length : cnt[s]})</button>`).join('');
+  $('sysChips').querySelectorAll('.chip').forEach(c => c.onclick = () => { sysFilter = c.dataset.s; shown = 60; renderChips(); renderPoints(); });
+}
+function fmtVal(p) {
+  if (p.cur == null) return '<span class="muted">--</span>';
+  if (typeof p.cur === 'boolean') return p.cur ? 'On / true' : 'Off / false';
+  if (typeof p.cur === 'string') return esc(p.cur);
+  return fmt(p.cur, Math.abs(p.cur) < 10 ? 2 : Math.abs(p.cur) < 1000 ? 1 : 0) + ' ' + esc(p.unit || '');
+}
+function renderPoints() {
+  const q = $('pointSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  filtered = SORTED.filter(p => {
+    if (sysFilter !== 'All' && sysOf(p) !== sysFilter) return false;
+    if (!q.length) return true;
+    const e = EQ.get(p.equip);
+    const hay = [niceEquip(p.equip), p.name, p.desc, p.unit, e?.alias, e?.type, roomOf(e || { name: '' }), (p.tags || []).join(' ')].join(' ').toLowerCase();
+    return q.every(w => hay.includes(w));
+  });
+  $('pointCount').textContent = `Showing ${Math.min(shown, filtered.length).toLocaleString()} of ${filtered.length.toLocaleString()} points`;
+  $('pointRows').innerHTML = filtered.slice(0, shown).map((p, i) => {
+    const e = EQ.get(p.equip), room = e ? roomOf(e) : null;
+    return `<tr data-i="${i}"><td>${esc(niceEquip(p.equip))}${room ? `<div class="muted" style="font-size:0.75rem">${room}</div>` : ''}</td>
+      <td>${esc(p.name)}${p.desc && p.desc !== p.name ? `<div class="muted" style="font-size:0.75rem">${esc(p.desc)}</div>` : ''}</td>
+      <td class="num">${fmtVal(p)}</td><td><canvas data-pi="${i}"></canvas></td><td class="muted">${p.hisStart ? fmtDate(new Date(p.hisStart + 'T12:00:00') / 1000) : '--'}</td></tr>`;
+  }).join('');
+  $('moreBtn').style.display = shown < filtered.length ? '' : 'none';
+  $('pointRows').querySelectorAll('tr').forEach(tr => tr.onclick = () => openPoint(filtered[+tr.dataset.i]));
+  drawVisibleSparks();
+}
+function drawVisibleSparks() {
+  document.querySelectorAll('#pointRows canvas[data-pi]').forEach(c => { const p = filtered[+c.dataset.pi]; if (p) spark(c, p.h, '#981e32'); });
+}
+function buildPoints() {
+  const withHis = P.points.filter(p => p.h).length;
+  $('pointsSub').textContent = `SkySpark records ${P.points.length.toLocaleString()} data points in this building: sensors, set points, commands and meters, on ${P.equips.length} pieces of equipment. ${withHis.toLocaleString()} numeric points have a 7-day hourly trend. Click any row for a larger chart.`;
+  renderChips(); renderPoints();
+}
+$('pointSearch').addEventListener('input', () => { shown = 60; renderPoints(); });
+$('moreBtn').addEventListener('click', () => { shown += 100; renderPoints(); });
+
+let modalChart = null;
+function openPoint(p) {
+  $('modalTitle').textContent = `${niceEquip(p.equip)}: ${p.name}`;
+  $('modalSub').textContent = `${p.desc || ''}${p.unit ? ' • unit ' + p.unit : ''} • latest ${fmtVal(p).replace(/<[^>]+>/g, '')}`;
+  $('modal').classList.add('open');
+  if (modalChart) { modalChart.destroy(); charts.splice(charts.indexOf(modalChart), 1); }
+  const labels = Array.from({ length: HLAST + 1 }, (_, i) => fmtHour(hourT(i)));
+  modalChart = new Chart($('chModal'), { type: 'line', data: { labels, datasets: [{ label: p.name + (p.unit ? ` (${p.unit})` : ''), data: (p.h || []).slice(0, HLAST + 1), borderColor: '#981e32', backgroundColor: '#981e3222', fill: true, pointRadius: 0, borderWidth: 1.6, spanGaps: true }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false }, scales: { x: { ticks: { maxTicksLimit: 8, maxRotation: 0 } } },
+      plugins: { subtitle: { display: !p.h, text: 'This point has no hourly trend in this export. Only the latest value is shown above.' } } } });
+  charts.push(modalChart);
+}
+$('modalClose').onclick = () => $('modal').classList.remove('open');
+$('modal').onclick = e => { if (e.target.id === 'modal') $('modal').classList.remove('open'); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('modal').classList.remove('open'); });
+
+// ============================ LEARN TAB ============================
+function buildLearn() {
+  const n = t => P.equips.filter(e => e.type === t).length;
+  const cards = [
+    ['Fresh air: DOAS-01', 1, `A rooftop unit, the dedicated outdoor air system, supplies fresh outdoor air to the zones. A <b>thermal wheel</b> moves heat between the outgoing exhaust air and the incoming fresh air, so the building reuses heat that would otherwise leave with the exhaust air. Filters, a preheat coil and a cooling coil condition the air before it goes to the rooms.`],
+    ['Room air: fan-powered boxes', n('Supply Air Terminal Unit'), `Most rooms get their air from a <b>fan-powered box</b>. It mixes fresh air from DOAS-01 with room air, then heats it with a hot water valve or cools it with a chilled water valve. Many have CO&#8322; sensors: when people fill a room, CO&#8322; rises and the box brings in more fresh air.`],
+    ['Fan coil units and unit heaters', n('Fan Coil Unit'), `Some spaces, including the mezzanine and the penthouse, use <b>fan coil units</b> and unit heaters. A fan blows room air across a coil.`],
+    ['Radiant floors', n('Radiant Floor'), `The ground floor and Level 2 have <b>radiant floors</b>. Water pipes in the concrete slab warm or cool the floor itself. The controls watch the slab temperature and the room dew point, to keep the floor from getting cold enough to collect condensation.`],
+    ['Water loops and pumps', P.equips.filter(e => e.system === 'Central Water').length, `The mechanical room holds the <b>chilled water</b>, <b>heating hot water</b> and <b>domestic hot water</b> loops, a heat exchanger and ${n('Pump') } pumps. Variable speed drives let the pumps slow down when the building needs less.`],
+    ['Meters', P.equips.filter(e => e.tags.includes('meter')).length, `<b>Electric meters</b> record each metered circuit. <b>Thermal meters</b> measure chilled water and heating water: flow times the temperature difference gives the energy. See the Meters and Circuits tab.`],
+  ];
+  $('learnGrid').innerHTML = cards.map(([t, c, body]) => `<div class="card learn-card"><h3>${t}<span class="count">${c}</span></h3><p>${body}</p></div>`).join('') +
+    `<div class="card learn-card"><h3>Try this</h3><ul>
+      <li>Press play on the 3D view. See demand rise on weekday mornings.</li>
+      <li>Switch to <b>CO&#8322;</b> during a class hour. Which rooms fill up?</li>
+      <li>On the Energy Use tab, compare the weekday and weekend curves. What runs at 3 AM?</li>
+      <li>On Every Data Point, search your classroom number.</li></ul></div>`;
+}
+
+// ============================ ABOUT TAB ============================
+function buildAbout() {
+  $('aboutCard').innerHTML = `<h2>About the data</h2>
+    <div class="sub">Source: WSU Facilities Services SkySpark metering and analytics system, project wsumeters, site 0802.</div>
+    <ul style="padding-left:1.1rem;font-size:0.9rem;display:grid;gap:0.45rem">
+      <li><b>Last update:</b> ${new Date(P.generated).toLocaleString('en-US')}. The page shows a snapshot, not a live feed.</li>
+      <li><b>Coverage:</b> ${P.points.length.toLocaleString()} points on ${P.equips.length} pieces of equipment. Hourly averages for the last 7 days. Meter data every 15 minutes for the last 7 days, and daily averages since ${fmtDate(M.dailyT[0])}.</li>
+      <li><b>Building timeline:</b> metering began in February 2026. The building opened on 09/18/2026. Data before the opening show construction, commissioning and move-in, not normal use.</li>
+      <li><b>Electric total:</b> the 208 V service meter plus the nine 480 V circuit meters. The main 480 V meter reports about a quarter of the voltage its circuit meters read, so this page leaves it out of the total.</li>
+      <li><b>Small negative readings:</b> circuits 0802_EL_007 and 0802_EL_008 sometimes read a few kW below zero at light load. The stacked weekly chart shows those readings as zero; the totals use the recorded values.</li>
+      <li><b>Domestic cold water:</b> meter 0802_DW_001 has recorded zero flow since data began, so the page shows no cold water use.</li>
+      <li><b>Energy per day</b> = average demand for the day x 24 hours. Today is left out of daily totals because the day is not over.</li>
+      <li><b>Cost</b> uses WSU FY27 utility rates in effect 07/01/2026: electricity $${RATES.elec} per kWh and chilled water $${RATES.chw} per ton-hour. Heating water has no per-unit rate, so heating cost is not shown.</li>
+      <li><b>3D model:</b> a schematic. Floors and zones come from the building control system; tile positions are not real room locations.</li>
+    </ul>`;
+}
+
+// ============================ START ============================
+setLegend(); setSceneTheme(); resize(); applyTime(HLAST);
+$('loading').style.display = 'none';
+</script>
+</body>
+</html>
