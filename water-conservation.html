@@ -2005,17 +2005,42 @@ function parseMeterCSV(text) {
 }
 
 // Wherever byMeter rows (from the repo feed or the converter) carry real data
-// for a building-month, drop the building-total rows for that month so the
-// granular data wins and nothing double counts.
+// for a building-month, they replace the building-total row for that month,
+// but ONLY when they cover every meter the total row names. A partial set
+// (e.g. 0806 Aug 2025: byMeter has 0806_IR_003 only, total = IR_002 + IR_003)
+// would under-report, so the total wins and the byMeter rows stay out of the
+// sums (their detail is collected separately, before this step).
+function overlayMeterId(s) {
+  return String(s || '').replace(/\(.*?\)/g, '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+}
 function overlayByMeter(rows) {
-  const covered = new Set();
+  const byIds = {};
   rows.forEach(r => {
     if (r.byMeter && typeof r.usage === 'number' && isFinite(r.usage)) {
-      covered.add((r.bldgNo || '') + '|' + (r.startDate || ''));
+      const k = (r.bldgNo || '') + '|' + (r.startDate || '');
+      (byIds[k] = byIds[k] || new Set()).add(overlayMeterId(r.meters));
     }
   });
-  if (!covered.size) return rows;
-  return rows.filter(r => r.byMeter || !covered.has((r.bldgNo || '') + '|' + (r.startDate || '')));
+  if (!Object.keys(byIds).length) return rows;
+  const useByMeter = new Set();
+  Object.keys(byIds).forEach(k => {
+    const totals = rows.filter(r => !r.byMeter && ((r.bldgNo || '') + '|' + (r.startDate || '')) === k &&
+      typeof r.usage === 'number' && isFinite(r.usage));
+    // A total that names virtual points ("0099 Domestic Water", "... (Calsense)")
+    // cannot be checked meter by meter; keep the byMeter rows there as before.
+    const isMeterId = n => /^[0-9]{4}[A-Z]?_?[A-Z]{2}_?[0-9]{3}[A-Z]?$/.test(overlayMeterId(n));
+    const full = totals.every(t => {
+      const names = String(t.meters || '').split(',').map(x => x.trim()).filter(Boolean);
+      if (!names.length || !names.every(isMeterId)) return true;
+      return names.map(overlayMeterId).every(id => byIds[k].has(id));
+    });
+    if (full) useByMeter.add(k);
+  });
+  return rows.filter(r => {
+    const k = (r.bldgNo || '') + '|' + (r.startDate || '');
+    if (!(k in byIds)) return true;
+    return r.byMeter ? useByMeter.has(k) : !useByMeter.has(k);
+  });
 }
 
 // Collect per-meter series from byMeter rows into G_meterDetail without
@@ -3858,12 +3883,14 @@ function renderDataInfo(domestic, irrigation, well, totals) {
                    !domHave.has(r.bldgNo + '|' + r.startDate))
       .map(r => Object.assign({}, r, { service: 'Domestic Water' })));
     const merged = applyMeterUploads(domRepo, irrRepo, wellRepo);
+    // Per-meter detail comes from every byMeter row, including partial sets
+    // that overlayByMeter keeps out of the building totals.
+    collectByMeterDetail(merged.domestic, 'Domestic Water');
+    collectByMeterDetail(merged.irrigation, 'Irrigation Water');
+    collectByMeterDetail(merged.well, 'Well Water');
     const domestic   = dedupeAggregateRows(normalizeParallelStacks(overlayByMeter(merged.domestic)));
     const irrigation = dedupeAggregateRows(normalizeParallelStacks(overlayByMeter(merged.irrigation)));
     const well       = dedupeAggregateRows(normalizeParallelStacks(overlayByMeter(merged.well)));
-    collectByMeterDetail(domestic, 'Domestic Water');
-    collectByMeterDetail(irrigation, 'Irrigation Water');
-    collectByMeterDetail(well, 'Well Water');
     // Buildings already covered by real per-meter data (upload or byMeter rows)
     // keep it; everyone else derives meter identity from the standard feed
     const detailed = new Set(Object.keys(G_meterDetail));
