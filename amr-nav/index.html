@@ -186,6 +186,7 @@ const CFG = {
   near: {drive: 45, walk: 10},       // m: second voice prompt
   maxAcc: 60,                        // m: fixes worse than this do not trigger off-route or arrival
   rerouteGapMs: 20000,
+  rerouteTimeoutMs: 8000,            // ms: give up on a reroute request after this long
   zoom: {drive: 17, walk: 18},
   osrm: {drive: 'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
          walk: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/'},
@@ -208,6 +209,7 @@ const S = {
   rt: null, lastIdx: 0, announced: {}, arrivedLeg: -1, waiting: null,
   sim: null, wake: null,
 };
+let rerouteSeq = 0;   // numbers reroute requests; setLeg() bumps it so a late reply for an old leg is dropped
 
 /* ---------- geometry ---------- */
 const R = 6371008.8, D2R = Math.PI / 180;
@@ -281,11 +283,11 @@ function instr(s, mode) {
   const onto = nm ? ' onto ' + nm : '';
   const mod = (s.mod || '').trim();
   const side = mod.replace('slight ', '').replace('sharp ', '');
+  if (mod === 'uturn') return 'Make a U-turn' + onto;
   switch (s.type) {
     case 'depart': return (mode === 'walk' ? 'Walk ' : 'Head ') + compass(s.ba) + (nm ? ' on ' + nm : '');
     case 'offpath': return mode === 'walk' ? 'Leave the path. Walk straight to the meter' : 'Continue straight';
     case 'turn': case 'end of road':
-      if (mod === 'uturn') return 'Make a U-turn' + onto;
       if (mod === 'straight' || !mod) return 'Continue straight' + onto;
       return (s.type === 'end of road' ? 'At the end of the road, turn ' : 'Turn ') + mod + onto;
     case 'new name': return 'Continue' + (onto || ' straight');
@@ -379,13 +381,20 @@ function zoomLayers() {
   bldgGroup.eachLayer(l => l.bringToBack && l.bringToBack());
 }
 map.on('zoomend', zoomLayers);
+/* street tiles only while the saved choice is on AND the device is online; otherwise the offline base map */
+function applyTiles() {
+  const street = !!(S.tiles && navigator.onLine);
+  if (street) { tileLayer.addTo(map); map.removeLayer(baseGroup); map.removeLayer(bldgGroup); map.removeLayer(pathGroup); }
+  else { map.removeLayer(tileLayer); baseGroup.addTo(map); zoomLayers(); }
+  $('fLayer').classList.toggle('on', street);
+  $('fLayer').title = street ? 'Street map (online)' : 'Offline map';
+}
 function setTiles(on) {
   S.tiles = on; lsSet('tiles', on);
-  if (on) { tileLayer.addTo(map); map.removeLayer(baseGroup); map.removeLayer(bldgGroup); map.removeLayer(pathGroup); }
-  else { map.removeLayer(tileLayer); baseGroup.addTo(map); zoomLayers(); }
-  $('fLayer').classList.toggle('on', on);
-  $('fLayer').title = on ? 'Street map (online)' : 'Offline map';
+  applyTiles();
 }
+window.addEventListener('online', applyTiles);
+window.addEventListener('offline', applyTiles);
 
 function drawRoute() {
   routeGroup.clearLayers();
@@ -459,7 +468,7 @@ function nextDriveLegAfterStop(o) {
 function setLeg(i, why) {
   S.legIdx = Math.max(0, Math.min(S.legs.length - 1, i));
   S.override = null; S.rt = prepLeg(S.legs[S.legIdx]); S.lastIdx = 0; S.announced = {}; S.offCnt = 0; S.offRoute = false;
-  S.arrivedLeg = -1; S.waiting = null;
+  S.arrivedLeg = -1; S.waiting = null; rerouteSeq++;
   lsSet('leg', S.legIdx); lsSet('done', S.done); lsSet('skipped', S.skipped);
   drawRoute(); refreshStopIcons(); renderCard(); renderBanner();
   const leg = S.legs[S.legIdx];
@@ -513,6 +522,7 @@ function arrived() {
 function doNext() {
   const leg = S.legs[S.legIdx], st = stopOf(leg);
   if (S.waiting === 'finish') { openPanel(); return; }
+  if (leg.to.kind === 'depot') { arrived(); return; }                      // Finish button
   if (leg.to.kind === 'park') { setLeg(S.legIdx + 1); return; }            // walk in
   if (leg.to.kind === 'stop' && st) markStop(st.o, 'done');
   if (S.legIdx < S.legs.length - 1) setLeg(S.legIdx + 1);
@@ -687,7 +697,12 @@ function onGeoErr(e) {
   const g = $('gps');
   g.className = 'none';
   g.textContent = e.code === 1 ? 'GPS blocked' : 'No GPS';
-  if (e.code === 1) toast('Location is blocked. Allow location for this app in Chrome settings.', 6000);
+  if (e.code === 1) {
+    toast('Location is blocked. Allow location for this app in Chrome settings.', 6000);
+    // the browser ends the watch after a denial; free the slot so startGps() can try again
+    try { if (watchId !== null) navigator.geolocation.clearWatch(watchId); } catch (x) { /* nothing to clear */ }
+    watchId = null;
+  }
 }
 let watchId = null;
 function startGps() {
@@ -699,6 +714,14 @@ function startGps() {
     onFix({lat: c.latitude, lon: c.longitude, acc: c.accuracy, heading: (c.heading != null && !isNaN(c.heading) && (c.speed || 0) > 1) ? c.heading : null, speed: c.speed, t: p.timestamp});
   }, onGeoErr, {enableHighAccuracy: true, maximumAge: 1000, timeout: 20000});
 }
+// retry after the driver allows location in Chrome settings, then comes back to the app
+try {
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({name: 'geolocation'}).then(ps => {
+      ps.addEventListener('change', () => { if (ps.state === 'granted') startGps(); });
+    }).catch(() => { /* permission state not readable here */ });
+  }
+} catch (e) { /* no permissions API */ }
 
 /* ---------- reroute (online only) ---------- */
 function legFromOsrm(o, mode) {
@@ -715,18 +738,23 @@ function legFromOsrm(o, mode) {
 async function reroute() {
   if (!S.fix || !navigator.onLine || Date.now() - S.lastReroute < CFG.rerouteGapMs) return;
   S.lastReroute = Date.now();
-  const base = S.legs[S.legIdx], end = base.geom[base.geom.length - 1];
+  const seq = ++rerouteSeq, legAt = S.legIdx;
+  const base = S.legs[legAt], end = base.geom[base.geom.length - 1];
   const url = CFG.osrm[base.mode] + S.fix.lon.toFixed(6) + ',' + S.fix.lat.toFixed(6) + ';' + end[1].toFixed(6) + ',' + end[0].toFixed(6) + '?overview=false&steps=true&geometries=geojson';
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), CFG.rerouteTimeoutMs);
   try {
-    const r = await fetch(url, {cache: 'no-store'});
+    const r = await fetch(url, {cache: 'no-store', signal: ctl.signal});
     const j = await r.json();
+    // the driver moved on, the app is waiting at a stop, or a newer request exists: this reply is stale
+    if (seq !== rerouteSeq || S.legIdx !== legAt || S.waiting) return;
     if (j.code !== 'Ok' || !j.routes.length) throw new Error(j.code);
     const nl = legFromOsrm(j.routes[0].legs[0], base.mode);
     nl.to = base.to;
     if (nl.geom.length < 2) throw new Error('short');
     S.override = nl; S.rt = prepLeg(nl); S.lastIdx = 0; S.announced = {}; S.offCnt = 0; S.offRoute = false;
     drawCurrent(); speak('Route updated.'); toast('New route to ' + (stopOf(base) ? 'stop ' + stopOf(base).o : 'the finish'));
-  } catch (e) { /* offline or no route: keep the arrow */ }
+  } catch (e) { /* offline, timed out or no route: keep the arrow */ }
+  finally { clearTimeout(timer); }
 }
 
 /* ---------- panel ---------- */
@@ -805,9 +833,19 @@ function simTick() {
 
 /* ---------- start ---------- */
 async function wakeLock() {
-  try { if ('wakeLock' in navigator && document.visibilityState === 'visible') S.wake = await navigator.wakeLock.request('screen'); } catch (e) { /* not allowed */ }
+  try {
+    if ('wakeLock' in navigator && document.visibilityState === 'visible') {
+      S.wake = await navigator.wakeLock.request('screen');
+      // the system can drop the lock (battery saver); ask again while the app is in front
+      S.wake.addEventListener('release', () => { if (S.started && document.visibilityState === 'visible') wakeLock(); });
+    }
+  } catch (e) { /* not allowed */ }
 }
-document.addEventListener('visibilitychange', () => { if (S.started && document.visibilityState === 'visible') wakeLock(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  startGps();                       // no-op while a watch runs; retries after a location denial
+  if (S.started) wakeLock();
+});
 function begin() {
   S.started = true;
   $('start').style.display = 'none';
@@ -871,8 +909,10 @@ async function load() {
     const sig = r.built + ':' + r.legs.length;
     if (qs.has('reset') || lsGet('sig', '') !== sig) { lsSet('sig', sig); lsSet('leg', 0); lsSet('done', {}); lsSet('skipped', {}); }
     if (qs.has('reset')) { qs.delete('reset'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : '')); }
-    S.legIdx = Math.min(lsGet('leg', 0), S.legs.length - 1); S.done = lsGet('done', {}); S.skipped = lsGet('skipped', {});
-    drawBase(); if (S.tiles) setTiles(true);
+    const li = Number(lsGet('leg', 0));
+    S.legIdx = Number.isInteger(li) ? Math.max(0, Math.min(li, S.legs.length - 1)) : 0;
+    S.done = lsGet('done', {}); S.skipped = lsGet('skipped', {});
+    drawBase(); applyTiles();
     S.rt = prepLeg(S.legs[S.legIdx]);
     drawRoute(); drawStops();
     map.fitBounds(L.latLngBounds(r.stops.map(s => [s.lat, s.lon])).pad(0.05), {animate: false});
