@@ -864,6 +864,9 @@ with sync_playwright() as p:
     feed(pg, away(95), speed=1)
     feed(pg, away(95), speed=5)
     check("fast, slow, fast: the slow fix starts the count again, still waiting", state()["waiting"] == "stop", json.dumps(state()))
+    feed(pg, away(95), acc=100, speed=5)
+    feed(pg, away(95), speed=5)
+    check("fast, weak-GPS fix, fast: the weak fix starts the count again, still waiting", state()["waiting"] == "stop", json.dumps(state()))
     feed(pg, away(100), speed=5)
     r = state()
     check("two fast fixes in a row more than 80 m from stop 7: the guide goes on without a tap",
@@ -1083,12 +1086,37 @@ with sync_playwright() as p:
     ctx, pg = at_stop7_no_speed()
     feed(pg, away(95), speed=None, t=T0 + 2000)          # 2 s after the arrival fix: too short to measure a speed
     feed(pg, away(97), speed=None, t=T0 + 2500)
-    check("no speed sent, fixes less than 3 s after the reference fix give no speed: still waiting", state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
-    feed(pg, away(99), speed=None, t=T0 + 3000)          # 3 s after the arrival fix: about 100 m in 3 s
-    check("the first speed comes 3 s after the reference fix, and one fast fix is not enough", state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
-    feed(pg, away(101), speed=None, t=T0 + 4000)
+    feed(pg, away(98), speed=None, t=T0 + 9000)          # 9 s: still too short
+    check("no speed sent, fixes less than 10 s after the reference fix give no speed: still waiting", state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
+    feed(pg, away(99), speed=None, t=T0 + 10000)         # 10 s after the arrival fix: about 100 m in 10 s
+    check("the first speed comes 10 s after the reference fix, and one fast fix is not enough", state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
+    feed(pg, away(101), speed=None, t=T0 + 11000)
     check("a second fast fix in a row: the guide goes on", state_of(pg)["waiting"] is None and state_of(pg)["passed"] == ["7"], json.dumps(state_of(pg)))
     ctx.close()
+
+    # driving away with no speed sent, at 5 and 8 m/s, fixes every 1 or 2 s, from a drive stop (7) and from a parking spot (10)
+    ip10 = next(i for i, l in enumerate(legs) if l["to"].get("o") == 10 and l["to"]["kind"] == "park")
+    dep10 = next(i for i in range(ip10 + 1, len(legs)) if legs[i]["mode"] == "drive")
+    for name, o, sl, dl in (("stop 7", 7, i7, i7 + 1), ("parking spot of stop 10", 10, ip10, dep10)):
+        leg_end = legs[sl]["geom"][-1]
+        Pd = Path(legs[dl]["geom"])
+        for v_ms, dt_ms in ((5, 1000), (5, 2000), (8, 1000), (8, 2000)):
+            ctx, pg = guidance_page(br)
+            pg.evaluate("(i) => setLeg(i)", sl)
+            feed(pg, leg_end, speed=None, t=T0)
+            w0, t, resumed = state_of(pg)["waiting"], T0, None
+            step = v_ms * dt_ms / 1000.0
+            for k in range(1, int(min(400, Pd.total) / step)):
+                t += dt_ms
+                ll = Pd.ll(step * k)
+                feed(pg, ll, speed=None, t=t)
+                if state_of(pg)["waiting"] is None:
+                    resumed = hav_m(ll, leg_end)
+                    break
+            r = state_of(pg)
+            check("no speed sent, driving away from %s at %d m/s with a fix every %d s: the guide goes on, more than 80 m away, stop %d Passed" % (name, v_ms, dt_ms // 1000, o),
+                  w0 in ("stop", "park") and resumed is not None and resumed > 80 and r["passed"] == [str(o)], "waiting at start %s, resumed %s m from the stop, %s" % (w0, resumed and round(resumed), json.dumps(r)))
+            ctx.close()
 
     # walk-in stops 10 and 26: the driver parks, then walks to the meter without tapping Walk to meter. The guide must neither
     # jump to the next stop nor say Off route. A device with no speed shows a walker 1.4 m/s; one GPS fix can be 4 m off.
@@ -1096,27 +1124,35 @@ with sync_playwright() as p:
         ip = next(i for i, l in enumerate(legs) if l["to"].get("o") == o and l["to"]["kind"] == "park")
         W = Path(legs[ip + 1]["geom"])
         park = legs[ip]["geom"][-1]
-        for label, dev_speed, jump in (("device speed 1.4 m/s", 1.4, None), ("no speed", None, None), ("no speed, one fix 4 m off", None, "blip"),
-                                       ("no speed, a 4 m step that stays", None, "step")):
+        # (label, device speed, kind of GPS error, size in m). blip: one fix 4 m east. step: from the first fix more than 85 m from the
+        # parking spot on, the fixes are d m off and stay off: along the walk, sideways, or sideways with accuracy 30 m (a Wi-Fi style jump).
+        for label, dev_speed, kind, d in (("device speed 1.4 m/s", 1.4, None, 0), ("no speed", None, None, 0), ("no speed, one fix 4 m off", None, "blip", 4),
+                                          ("no speed, a 4 m step that stays", None, "east", 4), ("no speed, a 5 m step along the walk that stays", None, "along", 5),
+                                          ("no speed, a 10 m sideways step that stays", None, "side", 10),
+                                          ("no speed, a 15 m jump with accuracy 30 m that stays", None, "wifi", 15)):
             ctx, pg = guidance_page(br)
             pg.evaluate("(i) => setLeg(i)", ip)
             feed(pg, park, t=T0)
             waiting0 = state_of(pg)["waiting"]
             pg.evaluate("() => { window.__spoken = []; }")
-            t, done_jump, dx, max_d = T0, False, 0.0, 0.0
+            t, stepped, ox, oy, acc, max_d = T0, False, 0.0, 0.0, 5, 0.0
             for k in range(1, int(W.total / 1.4)):
                 t += 1000
                 s_at = 1.4 * k
-                if jump and not done_jump and hav_m(W.ll(s_at), park) > 85:
-                    done_jump, dx = True, 4.0
-                elif jump == "blip":
-                    dx = 0.0
-                ll = W.ll(s_at, dx)
+                b = math.radians(W.bearing(s_at))
+                ux, uy = math.sin(b), math.cos(b)                 # the direction of the walk (east, north)
+                if kind and not stepped and hav_m(W.ll(s_at), park) > 85:
+                    stepped = True
+                    ox, oy = {"blip": (d, 0.0), "east": (d, 0.0), "along": (d * ux, d * uy), "side": (d * uy, -d * ux), "wifi": (d * uy, -d * ux)}[kind]
+                    acc = 30 if kind == "wifi" else 5
+                elif kind == "blip" and stepped:
+                    ox = oy = 0.0
+                ll = W.ll(s_at, ox, oy)
                 max_d = max(max_d, hav_m(ll, park))
-                feed(pg, ll, speed=dev_speed, t=t)
+                feed(pg, ll, acc=acc, speed=dev_speed, t=t)
             r = pg.evaluate("() => ({waiting: S.waiting, leg: S.legIdx, passed: Object.keys(S.passed), off: S.offRoute, spoken: window.__spoken})")
-            check("walk-in stop %d, %s: the walker reaches %.0f m from the parking spot (past the 80 m limit)%s" % (o, label, max_d, ", one 4 m jump made" if jump else ""),
-                  waiting0 == "park" and max_d > 85 and (not jump or done_jump), "waiting at start: %s" % waiting0)
+            check("walk-in stop %d, %s: the walker reaches %.0f m from the parking spot (past the 80 m limit)%s" % (o, label, max_d, ", GPS error made" if kind else ""),
+                  waiting0 == "park" and max_d > 85 and (not kind or stepped), "waiting at start: %s" % waiting0)
             check("walk-in stop %d, %s: the guide does not go on to the next stop" % (o, label),
                   r["waiting"] == "park" and r["leg"] == ip and r["passed"] == [], json.dumps(r))
             check("walk-in stop %d, %s: no Off route. is spoken to the walker" % (o, label), not r["off"] and "Off route." not in r["spoken"], json.dumps(r["spoken"]))

@@ -192,7 +192,7 @@ const CFG = {
   fixStaleMs: 10000,                 // ms: no new fix for this long shows GPS lost
   headingHoldMs: 30000,              // ms: the off-route arrow keeps the last known heading this long
   lookAhead: 100,                    // m: matching first looks this far ahead of the last position on the leg
-  speedBaseMs: 3000,                 // ms: a speed worked out from two fixes is measured over at least this long
+  speedBaseMs: 10000,                // ms: a speed worked out from two fixes is measured over at least this long (a GPS step of 5 to 15 m must not read as driving)
   leaveFixes: 2,                     // consecutive fixes that must show the vehicle driving away before the guide goes on
   rerouteGapMs: 20000,
   rerouteTimeoutMs: 8000,            // ms: give up on a reroute request after this long
@@ -677,7 +677,7 @@ function heldHeading() {               // the last known heading in degrees whil
   return S.lastHeading && Date.now() - S.lastHeading.t <= CFG.headingHoldMs ? S.lastHeading.deg : null;
 }
 /* Speed in m/s: the device's own value, else worked out from the move since the newest earlier good fix that is at least
-   CFG.speedBaseMs older (a shorter baseline turns one noisy fix into a false speed; a walker looks like a car for a second). */
+   CFG.speedBaseMs older (a short baseline turns one GPS step into a false speed: a walker looks like a car for several fixes). */
 function fixSpeed(f, ll) {
   const t = f.t != null ? f.t : S.fixAt, h = S.recent;
   let v = 0;
@@ -701,7 +701,7 @@ function onFix(f, quiet) {
   else { meMarker.setLatLng(ll); meMarker.setIcon(meIcon(f.heading)); accCircle.setLatLng(ll); accCircle.setRadius(acc); }
   if (!S.started || !S.route) { if (S.follow && !quiet) followTo(ll); return; }
   // a weak fix only moves the marker: it must not move the guide along the leg, speak a prompt, or count as off route or arrival
-  if (acc > CFG.maxAcc) { $('bThen').textContent = 'Weak GPS. Waiting for a better fix.'; return; }
+  if (acc > CFG.maxAcc) { S.leaveCnt = 0; $('bThen').textContent = 'Weak GPS. Waiting for a better fix.'; return; }   // a weak fix also breaks a run of leaving fixes
   if (f.heading != null && !isNaN(f.heading)) S.lastHeading = {deg: f.heading, t: S.fixAt};
   const leg = currentLeg(), mode = leg.mode, rt = S.rt;
   const legEnd = leg.geom[leg.geom.length - 1], speed = fixSpeed(f, ll), atStop = hav(ll, legEnd) <= CFG.leaveDist;
