@@ -192,6 +192,7 @@ const CFG = {
   fixStaleMs: 10000,                 // ms: no new fix for this long shows GPS lost
   headingHoldMs: 30000,              // ms: the off-route arrow keeps the last known heading this long
   lookAhead: 100,                    // m: matching first looks this far ahead of the last position on the leg
+  speedMinDtMs: 500,                 // ms: a speed worked out from two fixes needs at least this much time between them
   rerouteGapMs: 20000,
   rerouteTimeoutMs: 8000,            // ms: give up on a reroute request after this long
   zoom: {drive: 17, walk: 18},
@@ -214,7 +215,7 @@ const S = {
   routeText: '', routeSig: '', pending: null,   // route.json text in use, its hash, and a newer route that waits for the next new drive
   legIdx: 0, done: {}, skipped: {}, passed: {}, override: null,   // passed: stops the vehicle drove away from without a tap, to check later
   follow: true, voice: lsGet('voice', true), tiles: lsGet('tiles', false),
-  started: false, fix: null, fixAt: 0, blocked: false, lastHeading: null, offCnt: 0, offRoute: false, lastReroute: 0,   // fixAt: when the newest fix arrived (ms)
+  started: false, fix: null, fixAt: 0, prevFix: null, blocked: false, lastHeading: null, offCnt: 0, offRoute: false, lastReroute: 0,   // fixAt: when the newest fix arrived (ms); prevFix: the earlier good fix a speed is measured from
   rt: null, lastAlong: 0, announced: {}, arrivedLeg: -1, waiting: null,   // lastAlong: distance along the leg at the last good match (m)
   sim: null, wake: null,
 };
@@ -248,12 +249,13 @@ function prepLeg(leg) {
   if (rt.steps.length) rt.steps[rt.steps.length - 1].along = Math.max(rt.steps[rt.steps.length - 1].along, rt.total);
   return rt;
 }
-function project(rt, p, i0, i1) {
+function project(rt, p, i0, i1, ok) {          // ok(i), when given, says whether segment i may be used
   const q = [p[1] * D2R * R * rt.k, p[0] * D2R * R], n = rt.xy.length;
   if (n === 1) return {d: Math.hypot(q[0] - rt.xy[0][0], q[1] - rt.xy[0][1]), along: 0, idx: 0};
   let best = {d: Infinity, along: 0, idx: 0};
   const a0 = Math.max(0, i0 == null ? 0 : i0), a1 = Math.min(n - 2, i1 == null ? n - 2 : i1);
   for (let i = a0; i <= a1; i++) {
+    if (ok && !ok(i)) continue;
     const A = rt.xy[i], B = rt.xy[i + 1], dx = B[0] - A[0], dy = B[1] - A[1], L2 = dx * dx + dy * dy;
     let t = L2 ? ((q[0] - A[0]) * dx + (q[1] - A[1]) * dy) / L2 : 0;
     t = Math.max(0, Math.min(1, t));
@@ -262,17 +264,27 @@ function project(rt, p, i0, i1) {
   }
   return best;
 }
-/* Match a position to the leg. A road driven twice (out, then back) must not make the guide jump to the other pass,
-   so look first at the part of the leg from 30 m behind the last good match to CFG.lookAhead m ahead of it.
-   Search the whole leg only when nothing in that part is within the off-route distance. */
-function locate(rt, p) {
+const angDiff = (a, b) => Math.abs(((a - b + 540) % 360) - 180);   // degrees between two bearings, 0 to 180
+/* Match a position to the leg. A road driven twice (out, then back) must not make the guide jump to the other pass.
+   S.lastAlong is the highest distance along the leg matched so far; it never moves back except when the whole leg is searched again.
+   1. Look first at the part of the leg from 30 m behind that point to CFG.lookAhead m ahead of it.
+   2. If nothing there is within the off-route distance (or only a point more than 30 m behind), search the whole leg.
+   With a known heading (hd, degrees), a segment that runs against it by more than 90 degrees is the other lane and is not used;
+   if that rules out every segment near the position, the heading is ignored. */
+function locate(rt, p, hd) {
   const n = rt.cum.length, lo = S.lastAlong - 30, hi = S.lastAlong + CFG.lookAhead, limit = CFG.off[rt.leg.mode];
+  const way = hd == null ? null : i => {
+    const a = rt.xy[i], b = rt.xy[i + 1], dx = b[0] - a[0], dy = b[1] - a[1];
+    return Math.hypot(dx, dy) < 0.5 || angDiff(Math.atan2(dx, dy) / D2R, hd) <= 90;
+  };
   let i0 = 0, i1;
   while (i0 < n - 2 && rt.cum[i0 + 1] < lo) i0++;        // first segment that ends at or after lo
   i1 = i0;
   while (i1 < n - 2 && rt.cum[i1 + 1] <= hi) i1++;       // last segment that starts at or before hi
-  let pr = project(rt, p, i0, i1);
-  if (pr.d > limit) pr = project(rt, p);
+  let pr = project(rt, p, i0, i1, way);
+  if (pr.d <= limit && pr.along >= lo - 0.01) { S.lastAlong = Math.max(S.lastAlong, pr.along); return pr; }
+  pr = project(rt, p, null, null, way);
+  if (pr.d > limit && way) pr = project(rt, p);
   if (pr.d <= limit) S.lastAlong = pr.along;             // a position off the route does not move the anchor
   return pr;
 }
@@ -586,7 +598,7 @@ function renderBanner() {
     const end = leg.geom[leg.geom.length - 1];
     const brg = bearing([S.fix.lat, S.fix.lon], end), d = hav([S.fix.lat, S.fix.lon], end);
     // the arrow is relative to the direction of travel; with no recent heading it points on a north-up map, marked N
-    const held = S.lastHeading && Date.now() - S.lastHeading.t <= CFG.headingHoldMs ? S.lastHeading.deg : null;
+    const held = heldHeading();
     $('bArrow').innerHTML = '<svg viewBox="0 0 48 48"><g transform="rotate(' + Math.round(held == null ? brg : brg - held) + ' 24 24)"><path fill="#fff" d="M24 3l14 38-14-8-14 8z"/></g>' +
       (held == null ? '<text x="47" y="10" text-anchor="end" font-size="11" font-weight="700" font-family="sans-serif" fill="#fff">N</text>' : '') + '</svg>';
     $('bDist').textContent = fmtDist(d);
@@ -660,6 +672,17 @@ function renderCard() {
 }
 
 /* ---------- position handling ---------- */
+function heldHeading() {               // the last known heading in degrees while it is fresh, else null
+  return S.lastHeading && Date.now() - S.lastHeading.t <= CFG.headingHoldMs ? S.lastHeading.deg : null;
+}
+/* Speed in m/s: the device's own value, else worked out from the move since an earlier good fix (many devices send none). */
+function fixSpeed(f, ll) {
+  const t = f.t != null ? f.t : S.fixAt, p = S.prevFix;
+  let v = 0;
+  if (!p || t < p.t) S.prevFix = {ll, t};
+  else if (t - p.t >= CFG.speedMinDtMs) { v = hav(p.ll, ll) / ((t - p.t) / 1000); S.prevFix = {ll, t}; }
+  return f.speed != null && !isNaN(f.speed) ? f.speed : v;
+}
 function onFix(f, quiet) {
   if (f !== S.fix) { S.fixAt = Date.now(); S.blocked = false; }   // a new fix; setLeg() replays the saved one and must not make it look new
   S.fix = f;
@@ -675,10 +698,10 @@ function onFix(f, quiet) {
   if (acc > CFG.maxAcc) { $('bThen').textContent = 'Weak GPS. Waiting for a better fix.'; return; }
   if (f.heading != null && !isNaN(f.heading)) S.lastHeading = {deg: f.heading, t: S.fixAt};
   const leg = currentLeg(), mode = leg.mode, rt = S.rt;
+  const legEnd = leg.geom[leg.geom.length - 1], speed = fixSpeed(f, ll), atStop = hav(ll, legEnd) <= CFG.leaveDist;
   // the vehicle drove away from a stop that waits for a tap: go on to the next stop
-  if ((S.waiting === 'stop' || S.waiting === 'park') && mode === 'drive' && (f.speed || 0) > CFG.leaveSpeed &&
-      hav(ll, leg.geom[leg.geom.length - 1]) > CFG.leaveDist) { leaveStop(); return; }
-  const pr = locate(rt, ll);
+  if ((S.waiting === 'stop' || S.waiting === 'park') && mode === 'drive' && speed > CFG.leaveSpeed && !atStop) { leaveStop(); return; }
+  const pr = locate(rt, ll, heldHeading());
   const along = Math.min(pr.along, rt.total);
   // next maneuver
   let k = rt.steps.findIndex(s => s.along > along + 3 && s.type !== 'depart');
@@ -688,9 +711,10 @@ function onFix(f, quiet) {
   const nxt = rt.steps[k + 1];
   if (nxt && nxt.type !== 'arrive' && nxt.along - step.along < (mode === 'walk' ? 25 : 150)) then = nxt;
   S.nav = {along, toStep, step, then, off: pr.d, idx: k};
-  // off route: farther from the line than the usual limit AND than the fix's own error. Not while the guide waits at a stop:
-  // a vehicle that leaves a waiting stop is not lost (it resumes on the next leg), so no "Off route." and no reroute request.
-  if (!S.waiting && pr.d > Math.max(CFG.off[mode], acc)) S.offCnt++; else S.offCnt = 0;
+  // off route: farther from the line than the usual limit AND than the fix's own error. Not while the vehicle is still in the area
+  // of a waiting stop (it may be leaving; auto-resume takes it from there). Once it is farther than CFG.leaveDist from the stop
+  // and the guide still waits, it gets the cue.
+  if (!(S.waiting && atStop) && pr.d > Math.max(CFG.off[mode], acc)) S.offCnt++; else S.offCnt = 0;
   const wasOff = S.offRoute;
   S.offRoute = S.offCnt >= CFG.offFixes;
   if (S.offRoute && !wasOff) { speak('Off route.', true); reroute(); }
@@ -703,7 +727,7 @@ function onFix(f, quiet) {
     else if (toStep <= CFG.far[mode] && toStep > CFG.near[mode] * 1.8 && !S.announced[key + 'f']) { S.announced[key + 'f'] = 1; speak('In ' + sayDist(toStep) + ', ' + (step.type === 'arrive' ? 'arrive at ' + txt : txt.replace(/^./, c => c.toLowerCase()))); }
   }
   // arrival
-  const end = leg.geom[leg.geom.length - 1];
+  const end = legEnd;
   const remain = rt.total - along;
   if (!S.waiting && (remain <= CFG.arrive[mode] && hav(ll, end) <= CFG.arrive[mode] * 1.6 || hav(ll, end) <= CFG.arrive[mode] * 0.6)) arrived();
   if (S.follow) followTo(ll, CFG.zoom[mode]);

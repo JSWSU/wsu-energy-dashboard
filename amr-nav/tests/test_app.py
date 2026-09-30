@@ -174,6 +174,11 @@ class Path:
     def ll(self, s):
         return self.to_ll(self.at(s))
 
+    def bearing(self, s):
+        """The direction of travel at s in degrees (0 north, 90 east)."""
+        a, b = self.at(s - 1), self.at(s + 1)
+        return (math.degrees(math.atan2(b[0] - a[0], b[1] - a[1])) + 360) % 360
+
     def nearest(self, q, s_min=0.0, s_max=None):
         """(distance, point) of the point of the path nearest to q, looking only at the part from s_min to s_max."""
         best = (1e18, None)
@@ -210,10 +215,11 @@ def toward(P, s, s_min, s_max, frac):
     return P.to_ll((q[0] + frac * (pt[0] - q[0]), q[1] + frac * (pt[1] - q[1]))), d
 
 
-def feed(pg, ll, acc=5, speed=0, heading=None):
-    """Hand one fix to the app's own onFix (the geolocation mock cannot set speed) and return S.nav.along."""
-    return pg.evaluate("""(a) => { onFix({lat: a[0], lon: a[1], acc: a[2], speed: a[3], heading: a[4], t: Date.now()});
-        return S.nav ? S.nav.along : null; }""", [ll[0], ll[1], acc, speed, heading])
+def feed(pg, ll, acc=5, speed=0, heading=None, t=None):
+    """Hand one fix to the app's own onFix (the geolocation mock cannot set speed or the time) and return S.nav.along.
+    speed None is a device that sends no speed; t is the fix time in ms (now, when not given)."""
+    return pg.evaluate("""(a) => { onFix({lat: a[0], lon: a[1], acc: a[2], speed: a[3], heading: a[4], t: a[5] == null ? Date.now() : a[5]});
+        return S.nav ? S.nav.along : null; }""", [ll[0], ll[1], acc, speed, heading, t])
 
 
 def guidance_page(br):
@@ -228,6 +234,10 @@ def guidance_page(br):
     pg.click("#startBtns button")
     pg.wait_for_timeout(800)
     return ctx, pg
+
+
+def state_of(pg):
+    return pg.evaluate("() => ({waiting: S.waiting, leg: S.legIdx, passed: Object.keys(S.passed || {}), done: Object.keys(S.done), skipped: Object.keys(S.skipped)})")
 
 
 def dom(pg, sel, what="e.textContent.trim()"):
@@ -1027,9 +1037,135 @@ with sync_playwright() as p:
     check("the heading is forgotten after 30 s: north-up with an N again",
           a_old["label"] == "N" and a_old["rot"] == round(brg), json.dumps(a_old))
     ctx.close()
+
+    # ---------- 20. a device that sends no speed: the speed is worked out from the move between fixes ----------
+    T0 = 1_700_000_000_000                               # fix times in ms; only the differences matter
+
+    def at_stop7_no_speed():
+        ctx, pg = guidance_page(br)
+        pg.evaluate("(i) => setLeg(i)", i7)
+        feed(pg, end7, speed=None, t=T0)
+        return ctx, pg
+
+    ctx, pg = at_stop7_no_speed()
+    check("no-speed test setup: arriving at stop 7 waits for a tap", state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
+    resumed_at, early = None, []
+    for k, s in enumerate(range(20, 241, 20)):           # 20 m every 4 s is 5 m/s
+        ll = P7.ll(s)
+        feed(pg, ll, speed=None, t=T0 + 4000 * (k + 1))
+        if state_of(pg)["waiting"] is None and resumed_at is None:
+            resumed_at = s
+            if hav_m(ll, end7) <= 80:
+                early.append(s)
+    r = state_of(pg)
+    check("no speed sent, driving away at 5 m/s: the guide goes on without a tap",
+          r["waiting"] is None and r["leg"] == i7 + 1 and r["passed"] == ["7"], json.dumps(r))
+    check("... and only once the vehicle is more than 80 m from stop 7", resumed_at is not None and not early,
+          "resumed at %s m along the next leg" % resumed_at)
+    check("... and says which stop comes next", "Continuing to stop 8." in pg.evaluate("() => window.__spoken"))
+    ctx.close()
+
+    ctx, pg = at_stop7_no_speed()
+    for k, s in enumerate(range(20, 201, 20)):           # 20 m every 20 s is 1 m/s
+        feed(pg, P7.ll(s), speed=None, t=T0 + 20000 * (k + 1))
+    r = state_of(pg)
+    check("no speed sent, creeping away at 1 m/s: still waiting", r["waiting"] == "stop" and r["passed"] == [], json.dumps(r))
+    ctx.close()
+
+    ctx, pg = at_stop7_no_speed()
+    feed(pg, away(95), speed=None, t=T0 + 200)           # 0.2 s after the last fix: too short to measure a speed
+    check("no speed sent, a fix 0.2 s after the last one gives no speed: still waiting", state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
+    feed(pg, away(100), speed=None, t=T0 + 4000)         # 4 s after the last fix that counted, about 100 m
+    check("the next fix measures from the last fix that counted, not from the 0.2 s one",
+          state_of(pg)["waiting"] is None and state_of(pg)["passed"] == ["7"], json.dumps(state_of(pg)))
+    ctx.close()
+
+    # ---------- 21. waiting at a stop: no Off route in the stop area, the cue once the vehicle is farther away ----------
+    P0 = Path(legs[0]["geom"])                           # leg 0 drives to the parking spot of stop 1
+    end0 = legs[0]["geom"][-1]
+    near = P0.side_point(P0.total, 60)                   # 60 m from the parking spot, and more than 45 m from the leg line
+    farp = P0.side_point(P0.total, 100)
+    ctx, pg = guidance_page(br)
+    check("park-stop test setup: side points 60 m and 100 m from the parking spot exist",
+          near is not None and farp is not None and hav_m(near, end0) <= 80 < hav_m(farp, end0), "")
+    feed(pg, end0)
+    check("arriving at the parking spot of stop 1 waits for a tap", state_of(pg)["waiting"] == "park", json.dumps(state_of(pg)))
+    cue = "() => ({off: S.offRoute, cnt: S.offCnt, waiting: S.waiting, spoken: window.__spoken.filter(x => x === 'Off route.').length})"
+    for _ in range(5):
+        feed(pg, near, speed=1)
+    r = pg.evaluate(cue)
+    check("60 m from the parking spot and still waiting: no off-route count", r["off"] is False and r["cnt"] == 0 and r["spoken"] == 0, json.dumps(r))
+    for _ in range(5):
+        feed(pg, farp, speed=1)
+    r = pg.evaluate(cue)
+    check("100 m from the parking spot at 1 m/s and still waiting: off route is counted and spoken",
+          r["off"] is True and r["waiting"] == "park" and r["spoken"] == 1, json.dumps(r))
+    ctx.close()
+
+    iw = next(i for i, l in enumerate(legs) if l["to"].get("o") == 10 and l["to"]["kind"] == "stop")
+    Pn = Path(legs[iw + 2]["geom"])                      # the drive that follows the walk-in stop 10
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => setLeg(i)", iw)
+    feed(pg, legs[iw]["geom"][-1])
+    check("walk-in test setup: stop 10 is reached on a walk leg, a drive leg follows, and arriving waits for a tap",
+          legs[iw]["mode"] == "walk" and legs[iw + 2]["mode"] == "drive" and state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
+    for s in range(0, 401, 10):
+        feed(pg, Pn.ll(s), speed=8, heading=Pn.bearing(s))
+    r = pg.evaluate(cue)
+    check("no tap at walk-in stop 10, then driving away at 8 m/s: the guide says Off route.", r["off"] is True and r["spoken"] == 1, json.dumps(r))
+    ctx.close()
+
+    # ---------- 22. a gap in the fixes across the U-turn must not send the guide back down the outbound lane ----------
+    # (last good fix before the gap, first fix after it on the return lane); the U-turn is at 446 m. The first pair is the main case.
+    gap_cases = [(int(s_turn) - 200, int(s_turn) + 150), (int(s_turn) - 300, int(s_turn) + 250), (int(s_turn) - 140, int(s_turn) + 100)]
+    for g_from, g_resume in gap_cases:
+        ctx, pg = guidance_page(br)
+        pg.evaluate("(i) => setLeg(i)", i_u)
+        top = 0.0
+        for s in range(0, g_from + 1, 20):
+            top = max(top, feed(pg, PU.ll(s), speed=10))
+        pg.evaluate("() => { window.__spoken = []; }")
+        worst_back, wrong, trace = 0.0, [], []
+        for k, s in enumerate(range(g_resume, int(PU.total) - 50, 15)):
+            a = feed(pg, PU.ll(s), speed=10)
+            top = max(top, a)
+            worst_back = max(worst_back, top - a)
+            trace.append((s, round(a)))
+            if abs(a - s) > 25:
+                wrong.append(k)
+        spoken = pg.evaluate("() => window.__spoken")
+        label = "gap from %d m to %d m" % (g_from, g_resume)
+        check("%s: no match goes back more than 30 m from the highest one so far" % label, worst_back <= 30.5,
+              "largest step back %.0f m; %s" % (worst_back, trace[:6]))
+        check("%s: back on the return lane within a few fixes (every fix from the fifth is within 25 m)" % label,
+              not [k for k in wrong if k >= 4], "wrong fixes %s" % wrong)
+        if (g_from, g_resume) == gap_cases[0]:
+            check("%s: no U-turn prompt is spoken after the U-turn point" % label, not [x for x in spoken if "U-turn" in x], json.dumps(spoken))
+        ctx.close()
+
+    for g_from, g_resume in gap_cases:                   # the same gaps when the fixes carry a heading
+        ctx, pg = guidance_page(br)
+        pg.evaluate("(i) => setLeg(i)", i_u)
+        for s in range(0, g_from + 1, 20):
+            feed(pg, PU.ll(s), speed=10, heading=PU.bearing(s))
+        pg.evaluate("() => { window.__spoken = []; }")
+        errs = [abs(feed(pg, PU.ll(s), speed=10, heading=PU.bearing(s)) - s) for s in range(g_resume, int(PU.total) - 50, 15)]
+        spoken = pg.evaluate("() => window.__spoken")
+        label = "gap from %d m to %d m with headings" % (g_from, g_resume)
+        check("%s: the first fix after the gap is already on the return lane, and so are all the rest" % label,
+              max(errs) <= 25, "largest error %.0f m, first %.0f m" % (max(errs), errs[0]))
+        check("%s: no U-turn prompt is spoken after the U-turn point" % label, not [x for x in spoken if "U-turn" in x], json.dumps(spoken))
+        ctx.close()
+
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => setLeg(i)", i_u)
+    errs = [abs(feed(pg, PU.ll(s), speed=10, heading=PU.bearing(s)) - s) for s in range(0, int(PU.total) - 60, 20)]
+    check("with headings, driving the whole out-and-back leg (through the U-turn) stays within 25 m of the true distance",
+          max(errs) <= 25, "largest error %.0f m" % max(errs))
+    ctx.close()
     br.close()
 
-errs =[e for e in errors if "favicon" not in e]
+errs = [e for e in errors if "favicon" not in e]
 check("no console errors or page errors", not errs, " || ".join(errs[:6]))
 print("SUMMARY", sum(1 for r in results if r[1]), "of", len(results), "passed")
 sys.exit(0 if all(r[1] for r in results) else 1)
