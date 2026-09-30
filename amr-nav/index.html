@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AMR Route Guide</title>
+<meta name="description" content="GPS guide for the Sensus AMR water meter read route, WSU Pullman.">
+<meta name="theme-color" content="#981e32">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<script src="vendor/leaflet/leaflet.js"></script>
+<style>
+:root{--primary:#981e32;--primary-dark:#7a1828;--accent:#c69214;--bg:#f5f5f5;--card:#fff;--text:#2d2d2d;
+--muted:#6b7280;--border:#e5e7eb;--green:#059669;--blue:#2563eb;--warn-bg:#fff3cd;--warn-text:#7a5b00;}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+ font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+button{font:inherit;cursor:pointer}
+#map{position:absolute;inset:0;background:#efe9e2}
+.leaflet-container{background:#efe9e2}
+/* maneuver banner */
+#banner{position:absolute;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;max-width:560px;z-index:900;
+ background:var(--primary);color:#fff;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.28);display:flex;align-items:center;
+ gap:12px;padding:10px 14px;min-height:76px}
+#banner.walk{background:var(--blue)}
+#banner.off{background:#b45309}
+#banner.idle{background:#374151}
+#bArrow{flex:0 0 56px;height:56px}
+#bArrow svg{width:56px;height:56px}
+#bText{flex:1;min-width:0}
+#bDist{font-size:28px;font-weight:800;line-height:1.05}
+#bInstr{font-size:19px;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+#bThen{font-size:13px;opacity:.9;margin-top:2px}
+/* stop card */
+#card{position:absolute;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));max-width:560px;z-index:900;
+ background:var(--card);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);overflow:hidden}
+#cardHead{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)}
+.stopno{background:var(--primary);color:#fff;font-weight:800;border-radius:16px;min-width:34px;height:34px;padding:0 8px;
+ display:inline-flex;align-items:center;justify-content:center;font-size:16px}
+.stopno.walk{background:var(--blue)}
+.stopno.depot{background:#374151}
+#cTitle{flex:1;min-width:0}
+#cSite{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cSub{font-size:13px;color:var(--muted)}
+#cToggle{background:none;border:none;font-size:20px;color:var(--muted);padding:4px 8px}
+#meters{max-height:32vh;overflow:auto;padding:4px 12px;display:none}
+#card.open #meters{display:block}
+.m{padding:6px 0;border-bottom:1px solid #f0edea;font-size:14px}
+.m:last-child{border-bottom:none}
+.m .mn{font-family:Consolas,Menlo,monospace;font-weight:700}
+.m .mw{color:var(--muted)}
+.m.attn{background:var(--warn-bg);margin:0 -12px;padding:6px 12px}
+.m .note{color:var(--warn-text);font-size:13px}
+.badge{display:inline-block;background:var(--accent);color:#fff;font-size:11px;font-weight:700;border-radius:8px;padding:1px 7px;margin-left:6px}
+#prompt{display:none;padding:10px 12px;background:#faf7f4;border-top:1px solid var(--border);font-size:15px}
+#prompt.show{display:block}
+#prompt b{display:block;margin-bottom:6px}
+#actions{display:flex;gap:8px;padding:10px 12px;flex-wrap:wrap}
+.btn{flex:1 1 auto;min-height:48px;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--text);
+ font-weight:700;font-size:15px;padding:8px 12px}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.blue{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.ghost{background:#fff;color:var(--primary);border-color:var(--primary)}
+.btn:disabled{opacity:.45}
+/* side controls */
+#side{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:10px}
+.fab{width:52px;height:52px;border-radius:50%;border:none;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.25);
+ display:flex;align-items:center;justify-content:center;color:var(--text)}
+.fab svg{width:26px;height:26px}
+.fab.on{color:var(--primary)}
+.fab.off{color:#9ca3af}
+#gps{background:#fff;border-radius:14px;padding:4px 6px;font-size:11.5px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2);
+ text-align:center;width:52px;line-height:1.15}
+.leaflet-bottom{bottom:var(--ctlBottom,0px)}
+#gps.good{color:var(--green)} #gps.weak{color:#b45309} #gps.none{color:#dc2626}
+#toast{position:absolute;left:50%;transform:translateX(-50%);bottom:40%;z-index:1200;background:rgba(17,24,39,.92);color:#fff;
+ padding:10px 16px;border-radius:10px;font-weight:600;max-width:90vw;text-align:center;display:none}
+/* list panel */
+#panel{position:absolute;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:1100;background:var(--card);
+ box-shadow:-4px 0 18px rgba(0,0,0,.25);display:none;flex-direction:column}
+#panel.show{display:flex}
+#pHead{background:var(--primary);color:#fff;padding:12px 14px;padding-top:calc(12px + env(safe-area-inset-top));display:flex;align-items:center;gap:10px}
+#pHead h2{margin:0;font-size:18px;flex:1}
+#pHead button{background:none;border:none;color:#fff;font-size:26px;line-height:1}
+#pBody{overflow:auto;flex:1;padding:8px 12px 24px}
+.sum{font-size:14px;color:var(--muted);margin:6px 0 10px}
+.row{display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid #f0edea;border-radius:8px}
+.row.cur{background:#fdf2f4}
+.row .stopno{min-width:30px;height:30px;font-size:14px}
+.row .rs{flex:1;min-width:0}
+.row .rs div:first-child{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .rs div:last-child{font-size:12.5px;color:var(--muted)}
+.chip{font-size:11.5px;font-weight:700;border-radius:10px;padding:2px 8px;white-space:nowrap}
+.chip.done{background:#d1fae5;color:#065f46} .chip.skip{background:#e5e7eb;color:#374151} .chip.attn{background:var(--accent);color:#fff}
+.row button{border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 10px;font-weight:700;color:var(--primary)}
+.sec{font-weight:800;color:var(--primary);margin:16px 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.04em}
+.help p{margin:6px 0;font-size:14px}
+.help li{font-size:14px;margin:4px 0}
+.pbtns{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+/* start screen */
+#start{position:absolute;inset:0;z-index:1300;background:rgba(17,24,39,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+#startCard{background:#fff;border-radius:14px;max-width:460px;width:100%;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+#startCard header{background:var(--primary);color:#fff;padding:16px 18px}
+#startCard header h1{margin:0;font-size:22px}
+#startCard header p{margin:4px 0 0;font-size:13.5px;opacity:.92}
+#startCard .body{padding:14px 18px}
+#startCard .body p{margin:6px 0;font-size:14.5px}
+#startCard .btns{display:flex;flex-direction:column;gap:10px;padding:0 18px 18px}
+/* sim */
+#sim{position:absolute;left:50%;transform:translateX(-50%);top:calc(96px + env(safe-area-inset-top));z-index:950;background:#111827;color:#fff;
+ border-radius:10px;padding:6px 10px;display:none;gap:8px;align-items:center;font-size:13px}
+#sim.show{display:flex}
+#sim button{background:#374151;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-weight:700}
+/* markers */
+.sm{background:var(--primary);color:#fff;border:2px solid #fff;border-radius:14px;font-weight:800;font-size:12px;
+ min-width:26px;height:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.4);padding:0 4px}
+.sm.done{background:var(--green)} .sm.skip{background:#9ca3af} .sm.cur{background:var(--accent);transform:scale(1.25)}
+.sm.attn{border-color:var(--accent)}
+.sm.depot{background:#374151}
+.me{width:30px;height:30px}
+@media (min-width:900px) and (orientation:landscape){
+ #banner{right:auto;width:520px}
+ #card{right:auto;width:520px}
+}
+@media (max-width:420px){
+ #bDist{font-size:24px} #bInstr{font-size:17px} #bArrow,#bArrow svg{width:46px;height:46px;flex-basis:46px}
+}
+</style>
+</head>
+<body>
+<div id="map" role="application" aria-label="Route map"></div>
+
+<div id="banner" class="idle" aria-live="polite">
+ <div id="bArrow"></div>
+ <div id="bText"><div id="bDist">&nbsp;</div><div id="bInstr">Loading the route</div><div id="bThen"></div></div>
+</div>
+<div id="side">
+ <div id="gps" class="none">GPS off</div>
+ <button class="fab on" id="fFollow" title="Follow my position" aria-label="Follow my position"></button>
+ <button class="fab on" id="fVoice" title="Voice on or off" aria-label="Voice on or off"></button>
+ <button class="fab" id="fLayer" title="Map style" aria-label="Map style"></button>
+ <button class="fab" id="fList" title="Stop list" aria-label="Stop list"></button>
+</div>
+
+<div id="card">
+ <div id="cardHead">
+  <span class="stopno" id="cNo">1</span>
+  <div id="cTitle"><div id="cSite">&nbsp;</div><div id="cSub">&nbsp;</div></div>
+  <button id="cToggle" aria-label="Show meters">&#9650;</button>
+ </div>
+ <div id="meters"></div>
+ <div id="prompt"></div>
+ <div id="actions">
+  <button class="btn primary" id="aNext">Next</button>
+  <button class="btn" id="aSkip">Skip stop</button>
+  <button class="btn ghost" id="aGmaps">Google Maps</button>
+ </div>
+</div>
+
+<div id="sim"><span>Simulate</span><button id="sPlay">Play</button><button id="sSpeed">5x</button></div>
+<div id="toast" role="status"></div>
+
+<aside id="panel" aria-label="Stop list">
+ <div id="pHead"><h2>Stops</h2><button id="pClose" aria-label="Close">&times;</button></div>
+ <div id="pBody"></div>
+</aside>
+
+<div id="start">
+ <div id="startCard">
+  <header><h1>AMR Route Guide</h1><p>Sensus AMR water meter read route, WSU Pullman</p></header>
+  <div class="body" id="startBody"><p>Loading the route&hellip;</p></div>
+  <div class="btns" id="startBtns"></div>
+ </div>
+</div>
+
+<script>
+'use strict';
+const APP_VERSION = '2026.09.30-1';
+const CFG = {
+  arrive: {drive: 45, walk: 15},     // m: arrival radius at the end of a leg
+  off: {drive: 45, walk: 25},        // m: off-route distance
+  offFixes: 3,                       // consecutive fixes before "off route"
+  far: {drive: 250, walk: 40},       // m: first voice prompt before a maneuver
+  near: {drive: 45, walk: 10},       // m: second voice prompt
+  maxAcc: 60,                        // m: fixes worse than this do not trigger off-route or arrival
+  rerouteGapMs: 20000,
+  zoom: {drive: 17, walk: 18},
+  osrm: {drive: 'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
+         walk: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/'},
+  simSpeed: {drive: 11, walk: 1.4},  // m/s at 1x
+};
+const LSK = 'amrNav.v1.';
+const qs = new URLSearchParams(location.search);
+const $ = id => document.getElementById(id);
+
+/* ---------- storage (per-device convenience only) ---------- */
+function lsGet(k, d) { try { const v = localStorage.getItem(LSK + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
+function lsSet(k, v) { try { localStorage.setItem(LSK + k, JSON.stringify(v)); } catch (e) { /* private mode */ } }
+
+/* ---------- state ---------- */
+const S = {
+  route: null, base: null, legs: [], stopBy: {},
+  legIdx: 0, done: {}, skipped: {}, override: null,
+  follow: true, voice: lsGet('voice', true), tiles: lsGet('tiles', false),
+  started: false, fix: null, offCnt: 0, offRoute: false, lastReroute: 0,
+  rt: null, lastIdx: 0, announced: {}, arrivedLeg: -1, waiting: null,
+  sim: null, wake: null,
+};
+
+/* ---------- geometry ---------- */
+const R = 6371008.8, D2R = Math.PI / 180;
+function hav(a, b) {
+  const p1 = a[0] * D2R, p2 = b[0] * D2R, dp = p2 - p1, dl = (b[1] - a[1]) * D2R;
+  const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function bearing(a, b) {
+  const p1 = a[0] * D2R, p2 = b[0] * D2R, dl = (b[1] - a[1]) * D2R;
+  const y = Math.sin(dl) * Math.cos(p2), x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+  return (Math.atan2(y, x) / D2R + 360) % 360;
+}
+function prepLeg(leg) {
+  const lat0 = leg.geom[0][0], k = Math.cos(lat0 * D2R);
+  const xy = leg.geom.map(p => [p[1] * D2R * R * k, p[0] * D2R * R]);
+  const cum = [0];
+  for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+  const rt = {leg, lat0, k, xy, cum, total: cum[cum.length - 1]};
+  let from = 0;
+  rt.steps = leg.steps.map(s => {
+    const pr = project(rt, s.loc, from, xy.length - 2);
+    from = Math.max(0, pr.idx);
+    return Object.assign({}, s, {along: pr.along});
+  });
+  for (let i = 1; i < rt.steps.length; i++) rt.steps[i].along = Math.max(rt.steps[i].along, rt.steps[i - 1].along);
+  if (rt.steps.length) rt.steps[rt.steps.length - 1].along = Math.max(rt.steps[rt.steps.length - 1].along, rt.total);
+  return rt;
+}
+function project(rt, p, i0, i1) {
+  const q = [p[1] * D2R * R * rt.k, p[0] * D2R * R], n = rt.xy.length;
+  if (n === 1) return {d: Math.hypot(q[0] - rt.xy[0][0], q[1] - rt.xy[0][1]), along: 0, idx: 0};
+  let best = {d: Infinity, along: 0, idx: 0};
+  const a0 = Math.max(0, i0 == null ? 0 : i0), a1 = Math.min(n - 2, i1 == null ? n - 2 : i1);
+  for (let i = a0; i <= a1; i++) {
+    const A = rt.xy[i], B = rt.xy[i + 1], dx = B[0] - A[0], dy = B[1] - A[1], L2 = dx * dx + dy * dy;
+    let t = L2 ? ((q[0] - A[0]) * dx + (q[1] - A[1]) * dy) / L2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(q[0] - (A[0] + t * dx), q[1] - (A[1] + t * dy));
+    if (d < best.d) best = {d, along: rt.cum[i] + t * Math.sqrt(L2), idx: i};
+  }
+  return best;
+}
+function locate(rt, p) {
+  // search near the last position first so a road used twice does not make the guide jump
+  let pr = project(rt, p, S.lastIdx - 30, S.lastIdx + 250);
+  if (pr.d > 60) pr = project(rt, p);
+  S.lastIdx = pr.idx;
+  return pr;
+}
+
+/* ---------- words and units (US) ---------- */
+const DIRS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
+const compass = b => DIRS[Math.round((((b || 0) % 360) + 360) % 360 / 45) % 8];
+const ord = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 >> 3 ^ 1 && n % 10) || 0] || 'th');
+function fmtDist(m) {
+  const ft = m * 3.28084;
+  if (ft < 1000) return Math.max(0, Math.round(ft / 10) * 10) + ' ft';
+  const mi = m / 1609.344;
+  return (mi < 10 ? mi.toFixed(1) : Math.round(mi)) + ' mi';
+}
+function sayDist(m) {
+  const ft = m * 3.28084;
+  if (ft < 1000) return (Math.round(ft / 50) * 50 || 50) + ' feet';
+  const mi = m / 1609.344;
+  return (mi < 10 ? mi.toFixed(1) : Math.round(mi)) + ' miles';
+}
+function fmtDur(s) { const m = Math.max(1, Math.round(s / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }
+function instr(s, mode) {
+  const nm = s.name || s.ref || '';
+  const onto = nm ? ' onto ' + nm : '';
+  const mod = (s.mod || '').trim();
+  const side = mod.replace('slight ', '').replace('sharp ', '');
+  switch (s.type) {
+    case 'depart': return (mode === 'walk' ? 'Walk ' : 'Head ') + compass(s.ba) + (nm ? ' on ' + nm : '');
+    case 'offpath': return mode === 'walk' ? 'Leave the path. Walk straight to the meter' : 'Continue straight';
+    case 'turn': case 'end of road':
+      if (mod === 'uturn') return 'Make a U-turn' + onto;
+      if (mod === 'straight' || !mod) return 'Continue straight' + onto;
+      return (s.type === 'end of road' ? 'At the end of the road, turn ' : 'Turn ') + mod + onto;
+    case 'new name': return 'Continue' + (onto || ' straight');
+    case 'continue': return (mod && mod !== 'straight' ? 'Keep ' + side : 'Continue') + (onto || (mod && mod !== 'straight' ? '' : ' straight'));
+    case 'merge': return 'Merge' + (side && side !== 'straight' ? ' ' + side : '') + onto;
+    case 'on ramp': return 'Take the ramp' + (side && side !== 'straight' ? ' on the ' + side : '') + onto;
+    case 'off ramp': return 'Take the exit' + (side && side !== 'straight' ? ' on the ' + side : '') + onto;
+    case 'fork': return 'Keep ' + (side || 'straight') + ' at the fork' + onto;
+    case 'roundabout': case 'rotary': return s.exit ? 'At the roundabout, take the ' + ord(s.exit) + ' exit' + onto : 'Enter the roundabout' + onto;
+    case 'roundabout turn': return 'At the roundabout, turn ' + (mod || 'straight') + onto;
+    case 'exit roundabout': case 'exit rotary': return 'Exit the roundabout' + onto;
+    default: return 'Continue' + (onto || ' straight');
+  }
+}
+function arrowAngle(s) {
+  const m = s.mod || '';
+  if (s.type === 'depart' || s.type === 'offpath') return 0;
+  return ({'straight': 0, 'slight right': 40, 'right': 90, 'sharp right': 135, 'slight left': -40, 'left': -90, 'sharp left': -135})[m] || 0;
+}
+function arrowSvg(s) {
+  if (!s || s.type === 'arrive') return '<svg viewBox="0 0 48 48"><path fill="#fff" d="M24 4a14 14 0 0 0-14 14c0 10.5 14 26 14 26s14-15.5 14-26A14 14 0 0 0 24 4zm0 19a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>';
+  if (s.mod === 'uturn') return '<svg viewBox="0 0 48 48"><path fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" d="M30 42V20a8 8 0 0 0-16 0v10"/><path fill="#fff" d="M6 28h16l-8 11z"/></svg>';
+  if (s.type === 'roundabout' || s.type === 'rotary' || s.type === 'roundabout turn') return '<svg viewBox="0 0 48 48"><circle cx="24" cy="22" r="9" fill="none" stroke="#fff" stroke-width="5"/><path fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" d="M24 31v13"/><path fill="#fff" d="M31 6l8 9-11 3z"/></svg>';
+  const a = arrowAngle(s);
+  return '<svg viewBox="0 0 48 48"><g transform="rotate(' + a + ' 24 26)"><path fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" d="M24 44V14"/><path fill="#fff" d="M11 18L24 3l13 15z"/></g></svg>';
+}
+
+/* ---------- speech ---------- */
+let voiceEn = null;
+function pickVoice() {
+  if (!('speechSynthesis' in window)) return;
+  const vs = speechSynthesis.getVoices();
+  voiceEn = vs.find(v => /en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+}
+if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text, urgent) {
+  if (!S.voice || !('speechSynthesis' in window) || !text) return;
+  try {
+    if (urgent) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    if (voiceEn) u.voice = voiceEn;
+    u.rate = 1.0;
+    speechSynthesis.speak(u);
+  } catch (e) { /* no speech on this device */ }
+}
+
+/* ---------- toast ---------- */
+let toastT = null;
+function toast(msg, ms) {
+  const t = $('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastT); toastT = setTimeout(() => { t.style.display = 'none'; }, ms || 3500);
+}
+
+/* ---------- map ---------- */
+const map = L.map('map', {zoomControl: false, preferCanvas: true, attributionControl: true}).setView([46.7298, -117.1580], 15);
+L.control.zoom({position: 'bottomright'}).addTo(map);
+const canvas = L.canvas({padding: 0.5});
+const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'});
+const baseGroup = L.layerGroup().addTo(map), bldgGroup = L.layerGroup(), pathGroup = L.layerGroup();
+const routeGroup = L.layerGroup().addTo(map), stopGroup = L.layerGroup().addTo(map);
+let curLine = null, curCase = null, meMarker = null, accCircle = null;
+const stopMarkers = {};
+
+function drawBase() {
+  const b = S.base;
+  if (!b) return;
+  const road = {
+    major: {color: '#ffffff', weight: 7}, minor: {color: '#ffffff', weight: 5}, service: {color: '#fbfaf8', weight: 3.5},
+    path: {color: '#a8826b', weight: 1.6, dashArray: '4 4'}, steps: {color: '#a8826b', weight: 2.5, dashArray: '2 3'},
+  };
+  // casings under the main roads so they read on the tan ground
+  b.roads.filter(r => r.c === 'major' || r.c === 'minor').forEach(r => {
+    L.polyline(r.p, {renderer: canvas, color: '#d8cfc4', weight: road[r.c].weight + 2.5, interactive: false}).addTo(baseGroup);
+  });
+  b.roads.forEach(r => {
+    const st = road[r.c];
+    const line = L.polyline(r.p, Object.assign({renderer: canvas, interactive: false, opacity: 1}, st));
+    (r.c === 'path' || r.c === 'steps' ? pathGroup : baseGroup).addLayer(line);
+  });
+  b.bldgs.forEach(p => {
+    bldgGroup.addLayer(L.polygon(p, {renderer: canvas, interactive: false, color: '#cfc3b6', weight: 1, fillColor: '#ddd3c8', fillOpacity: 1}));
+  });
+  map.attributionControl.addAttribution(b.attribution);
+  zoomLayers();
+}
+function zoomLayers() {
+  const z = map.getZoom();
+  if (z >= 15) { if (!map.hasLayer(bldgGroup)) bldgGroup.addTo(map); if (!map.hasLayer(pathGroup)) pathGroup.addTo(map); }
+  else { map.removeLayer(bldgGroup); map.removeLayer(pathGroup); }
+  bldgGroup.eachLayer(l => l.bringToBack && l.bringToBack());
+}
+map.on('zoomend', zoomLayers);
+function setTiles(on) {
+  S.tiles = on; lsSet('tiles', on);
+  if (on) { tileLayer.addTo(map); map.removeLayer(baseGroup); map.removeLayer(bldgGroup); map.removeLayer(pathGroup); }
+  else { map.removeLayer(tileLayer); baseGroup.addTo(map); zoomLayers(); }
+  $('fLayer').classList.toggle('on', on);
+  $('fLayer').title = on ? 'Street map (online)' : 'Offline map';
+}
+
+function drawRoute() {
+  routeGroup.clearLayers();
+  S.legs.forEach((leg, i) => {
+    const doneLeg = i < S.legIdx;
+    L.polyline(leg.geom, {renderer: canvas, interactive: false,
+      color: leg.mode === 'walk' ? '#60a5fa' : (doneLeg ? '#c4a3aa' : '#8b5e66'),
+      weight: leg.mode === 'walk' ? 3 : 3.5, opacity: doneLeg ? 0.55 : 0.8, dashArray: leg.mode === 'walk' ? '6 6' : null}).addTo(routeGroup);
+  });
+  drawCurrent();
+}
+function drawCurrent() {
+  if (curLine) { map.removeLayer(curLine); map.removeLayer(curCase); }
+  const leg = currentLeg();
+  if (!leg) return;
+  curCase = L.polyline(leg.geom, {renderer: canvas, interactive: false, color: '#fff', weight: 11, opacity: 0.95}).addTo(map);
+  curLine = L.polyline(leg.geom, {renderer: canvas, interactive: false, color: leg.mode === 'walk' ? '#2563eb' : '#981e32',
+    weight: 7, dashArray: leg.mode === 'walk' ? '10 8' : null}).addTo(map);
+}
+function stopClass(st) {
+  const cur = currentTargetStop();
+  let c = 'sm';
+  if (S.done[st.o]) c += ' done'; else if (S.skipped[st.o]) c += ' skip';
+  if (cur && cur.o === st.o) c += ' cur';
+  if (st.meters.some(m => m.attn)) c += ' attn';
+  return c;
+}
+function drawStops() {
+  stopGroup.clearLayers();
+  const d = S.route.depot;
+  L.marker([d.lat, d.lon], {icon: L.divIcon({className: '', html: '<div class="sm depot">M</div>', iconSize: [26, 26], iconAnchor: [13, 13]}),
+    title: d.name, keyboard: false}).addTo(stopGroup);
+  S.route.stops.forEach(st => {
+    const mk = L.marker([st.lat, st.lon], {icon: L.divIcon({className: '', html: '<div class="' + stopClass(st) + '">' + st.o + '</div>',
+      iconSize: [26, 26], iconAnchor: [13, 13]}), title: 'Stop ' + st.o + ': ' + st.site, keyboard: false});
+    mk.on('click', () => { openPanel(); setTimeout(() => { const el = $('row' + st.o); if (el) el.scrollIntoView({block: 'center'}); }, 250); });
+    mk.addTo(stopGroup);
+    stopMarkers[st.o] = mk;
+  });
+}
+function refreshStopIcons() {
+  S.route.stops.forEach(st => {
+    const mk = stopMarkers[st.o];
+    if (mk) mk.setIcon(L.divIcon({className: '', html: '<div class="' + stopClass(st) + '">' + st.o + '</div>', iconSize: [26, 26], iconAnchor: [13, 13]}));
+  });
+}
+function meIcon(heading) {
+  const rot = heading == null || isNaN(heading) ? '' : '<path d="M15 2l6 11H9z" fill="#2563eb" transform="rotate(' + heading + ' 15 15)"/>';
+  return L.divIcon({className: '', iconSize: [30, 30], iconAnchor: [15, 15],
+    html: '<svg class="me" viewBox="0 0 30 30">' + rot + '<circle cx="15" cy="15" r="8" fill="#2563eb" stroke="#fff" stroke-width="3"/></svg>'});
+}
+
+/* ---------- legs and stops ---------- */
+function currentLeg() { return S.override || S.legs[S.legIdx]; }
+function stopOf(leg) { return leg && leg.to && leg.to.o ? S.stopBy[leg.to.o] : null; }
+function currentTargetStop() { return stopOf(S.legs[S.legIdx]); }
+function legLabel(leg) {
+  const st = stopOf(leg);
+  if (!leg) return '';
+  if (leg.to.kind === 'depot') return 'Return to ' + S.route.depot.name;
+  if (leg.to.kind === 'park') return 'Park near stop ' + st.o;
+  if (leg.to.kind === 'car') return 'Walk back to the car';
+  return (leg.mode === 'walk' ? 'Walk to stop ' : 'Stop ') + st.o;
+}
+function firstLegOfStop(o) { return S.legs.findIndex(l => l.to && l.to.o === o); }
+function nextDriveLegAfterStop(o) {
+  let i = S.legs.length - 1;
+  for (let j = 0; j < S.legs.length; j++) if (S.legs[j].to && S.legs[j].to.o === o) i = j;
+  return Math.min(i + 1, S.legs.length - 1);
+}
+function setLeg(i, why) {
+  S.legIdx = Math.max(0, Math.min(S.legs.length - 1, i));
+  S.override = null; S.rt = prepLeg(S.legs[S.legIdx]); S.lastIdx = 0; S.announced = {}; S.offCnt = 0; S.offRoute = false;
+  S.arrivedLeg = -1; S.waiting = null;
+  lsSet('leg', S.legIdx); lsSet('done', S.done); lsSet('skipped', S.skipped);
+  drawRoute(); refreshStopIcons(); renderCard(); renderBanner();
+  const leg = S.legs[S.legIdx];
+  if (S.started && why !== 'silent') {
+    const st = stopOf(leg);
+    if (leg.to.kind === 'depot') speak('Head back to McCluskey Services. ' + sayDist(leg.dist) + '.');
+    else if (leg.to.kind === 'car') speak('Walk back to the car.');
+    else if (st) speak(legLabel(leg) + '. ' + spokenSite(st) + '. ' + sayDist(leg.dist) + '.');
+  }
+  if (S.fix) onFix(S.fix, true);
+}
+function spokenSite(st) { return st.site.replace(/\//g, ', ').replace(/\b0(\d{3})/g, '$1'); }
+function markStop(o, how) {
+  if (how === 'done') { S.done[o] = Date.now(); delete S.skipped[o]; }
+  else { S.skipped[o] = Date.now(); delete S.done[o]; }
+  lsSet('done', S.done); lsSet('skipped', S.skipped);
+}
+
+/* ---------- arrival handling ---------- */
+function arrived() {
+  const leg = S.legs[S.legIdx];
+  if (S.arrivedLeg === S.legIdx) return;
+  S.arrivedLeg = S.legIdx;
+  const st = stopOf(leg);
+  if (leg.to.kind === 'depot') {
+    S.waiting = 'finish';
+    speak('Route complete. Back at McCluskey Services.', true);
+    renderCard(); renderBanner(); return;
+  }
+  if (leg.to.kind === 'park') {
+    S.waiting = 'park';
+    const walkLeg = S.legs[S.legIdx + 1];
+    speak('Parking spot for stop ' + st.o + '. The meter is ' + sayDist(walkLeg ? walkLeg.dist : 0) + ' away. Walk in, or read from the car.', true);
+    renderCard(); renderBanner(); return;
+  }
+  if (leg.to.kind === 'car') { toast('Back at the car'); setLeg(S.legIdx + 1); return; }
+  // reached a stop
+  const attn = st.meters.filter(m => m.attn);
+  if (leg.mode === 'walk' || attn.length) {
+    S.waiting = 'stop';
+    speak('Stop ' + st.o + '. ' + spokenSite(st) + '. ' + st.meters.length + (st.meters.length === 1 ? ' meter.' : ' meters.') +
+      (attn.length ? ' Attention: ' + attn.length + (attn.length === 1 ? ' meter needs a check.' : ' meters need a check.') : ''), true);
+    $('card').classList.add('open');
+    renderCard(); renderBanner(); return;
+  }
+  markStop(st.o, 'done');
+  toast('Stop ' + st.o + ' reached. Check FieldLogic for ' + st.meters.length + (st.meters.length === 1 ? ' read.' : ' reads.'), 4000);
+  speak('Stop ' + st.o + ' reached.', true);
+  setLeg(S.legIdx + 1);
+}
+function doNext() {
+  const leg = S.legs[S.legIdx], st = stopOf(leg);
+  if (S.waiting === 'finish') { openPanel(); return; }
+  if (leg.to.kind === 'park') { setLeg(S.legIdx + 1); return; }            // walk in
+  if (leg.to.kind === 'stop' && st) markStop(st.o, 'done');
+  if (S.legIdx < S.legs.length - 1) setLeg(S.legIdx + 1);
+}
+function readFromCar() {
+  const leg = S.legs[S.legIdx], st = stopOf(leg);
+  if (st) markStop(st.o, 'done');
+  setLeg(nextDriveLegAfterStop(st.o));
+}
+function doSkip() {
+  const st = currentTargetStop();
+  if (!st) return;
+  markStop(st.o, 'skip');
+  toast('Stop ' + st.o + ' skipped');
+  setLeg(nextDriveLegAfterStop(st.o));
+}
+
+/* ---------- rendering ---------- */
+function renderBanner() {
+  const b = $('banner'), leg = currentLeg();
+  b.className = '';
+  if (!S.route) return;
+  if (!S.started) { b.className = 'idle'; $('bArrow').innerHTML = arrowSvg(null); $('bDist').textContent = 'Ready'; $('bInstr').textContent = 'Tap Start to begin guidance'; $('bThen').textContent = ''; return; }
+  if (leg.mode === 'walk') b.classList.add('walk');
+  const st = stopOf(S.legs[S.legIdx]);
+  if (S.waiting === 'park') { $('bArrow').innerHTML = arrowSvg(null); $('bDist').textContent = 'Park here'; $('bInstr').textContent = 'Stop ' + st.o + ': walk in, or read from the car'; $('bThen').textContent = ''; return; }
+  if (S.waiting === 'stop') { $('bArrow').innerHTML = arrowSvg(null); $('bDist').textContent = 'Stop ' + st.o; $('bInstr').textContent = st.site; $('bThen').textContent = 'Check FieldLogic, then tap Done'; return; }
+  if (S.waiting === 'finish') { $('bArrow').innerHTML = arrowSvg(null); $('bDist').textContent = 'Done'; $('bInstr').textContent = 'Route complete'; $('bThen').textContent = ''; return; }
+  if (!S.fix) { b.classList.add('idle'); $('bArrow').innerHTML = arrowSvg(null); $('bDist').textContent = 'No GPS yet'; $('bInstr').textContent = legLabel(S.legs[S.legIdx]) + (st ? ': ' + st.site : ''); $('bThen').textContent = 'Waiting for a GPS fix'; return; }
+  const nav = S.nav || {};
+  if (S.offRoute) {
+    b.classList.add('off');
+    const end = leg.geom[leg.geom.length - 1];
+    const brg = bearing([S.fix.lat, S.fix.lon], end), d = hav([S.fix.lat, S.fix.lon], end);
+    $('bArrow').innerHTML = '<svg viewBox="0 0 48 48"><g transform="rotate(' + Math.round(brg - (S.fix.heading || 0) * (S.fix.heading == null ? 0 : 1)) + ' 24 24)"><path fill="#fff" d="M24 3l14 38-14-8-14 8z"/></g></svg>';
+    $('bDist').textContent = fmtDist(d);
+    $('bInstr').textContent = 'Off route. Head ' + compass(brg) + ' to ' + (st ? 'stop ' + st.o : 'the finish');
+    $('bThen').textContent = navigator.onLine ? 'Rerouting when possible' : 'Offline: follow the arrow';
+    return;
+  }
+  const s = nav.step;
+  $('bArrow').innerHTML = arrowSvg(s);
+  $('bDist').textContent = s ? fmtDist(Math.max(0, nav.toStep)) : '';
+  $('bInstr').textContent = !s ? '' : (s.type === 'arrive' ? (leg.to.kind === 'park' ? 'Park for stop ' + st.o : leg.to.kind === 'car' ? 'Car' : leg.to.kind === 'depot' ? 'McCluskey Services' : 'Stop ' + st.o + ': ' + st.site) : instr(s, leg.mode));
+  $('bThen').textContent = nav.then ? 'Then ' + instr(nav.then, leg.mode).replace(/^./, c => c.toLowerCase()) : '';
+}
+function renderCard() {
+  if (!S.route) return;
+  const leg = S.legs[S.legIdx], st = stopOf(leg);
+  const no = $('cNo');
+  no.className = 'stopno' + (leg.mode === 'walk' ? ' walk' : '') + (leg.to.kind === 'depot' ? ' depot' : '');
+  no.textContent = st ? st.o : 'M';
+  const nStops = S.route.stops.length;
+  $('cSite').textContent = st ? st.site : S.route.depot.name;
+  // far from the line (just jumped, or off route): show the straight-line distance, not the distance along the line
+  const legEnd = leg.geom[leg.geom.length - 1];
+  const remain = !(S.nav && S.started && S.fix) ? leg.dist
+    : (S.offRoute || S.nav.off > CFG.off[leg.mode]) ? hav([S.fix.lat, S.fix.lon], legEnd) : Math.max(0, S.rt.total - S.nav.along);
+  const speedRatio = leg.dist > 0 ? leg.dur / leg.dist : (leg.mode === 'walk' ? 0.75 : 0.1);
+  $('cSub').textContent = legLabel(leg) + (st ? ' of ' + nStops : '') + ' · ' + fmtDist(remain) + ' · ' + fmtDur(remain * speedRatio) +
+    (st ? ' · ' + st.meters.length + (st.meters.length === 1 ? ' meter' : ' meters') : '');
+  // meter list
+  const mt = $('meters');
+  mt.innerHTML = '';
+  if (st) st.meters.forEach(m => {
+    const d = document.createElement('div');
+    d.className = 'm' + (m.attn ? ' attn' : '');
+    d.innerHTML = '<span class="mn"></span>' + (m.attn ? '<span class="badge">ATTENTION</span>' : '') +
+      ' <span class="mw"></span>' + (m.note ? '<div class="note"></div>' : '');
+    d.querySelector('.mn').textContent = m.meter;
+    d.querySelector('.mw').textContent = 'ref ' + m.ref + ' · ' + m.where;
+    if (m.note) d.querySelector('.note').textContent = m.note;
+    mt.appendChild(d);
+  });
+  // prompt and buttons
+  const pr = $('prompt'), next = $('aNext'), skip = $('aSkip');
+  pr.className = ''; pr.innerHTML = '';
+  next.className = 'btn primary'; skip.style.display = ''; skip.textContent = 'Skip stop';
+  next.onclick = doNext; skip.onclick = doSkip;
+  if (S.waiting === 'park') {
+    const w = S.legs[S.legIdx + 1];
+    pr.className = 'show';
+    pr.innerHTML = '<b>Parked near stop ' + st.o + '.</b>The meter is <span id="pd"></span> away on foot. Walk in, or read it from the car if FieldLogic already has it.';
+    $('pd').textContent = fmtDist(w ? w.dist : 0);
+    next.textContent = 'Walk to meter'; next.className = 'btn blue';
+    skip.textContent = 'Read from car'; skip.onclick = readFromCar;
+  } else if (S.waiting === 'stop') {
+    pr.className = 'show';
+    pr.innerHTML = '<b>At stop ' + st.o + '.</b>Check that FieldLogic shows ' + (st.meters.length === 1 ? 'the read' : 'all ' + st.meters.length + ' reads') + '. Log anything marked ATTENTION.';
+    next.textContent = leg.mode === 'walk' ? 'Done, walk back' : 'Done, next stop';
+  } else if (S.waiting === 'finish') {
+    const nd = Object.keys(S.done).length, ns = Object.keys(S.skipped).length;
+    pr.className = 'show';
+    pr.innerHTML = '<b>Route complete.</b>' + nd + ' stops reached, ' + ns + ' skipped. Pull the tablet in AutoRead.';
+    next.textContent = 'Review stops'; skip.style.display = 'none';
+  } else {
+    next.textContent = leg.to.kind === 'park' ? 'At parking spot' : leg.to.kind === 'car' ? 'Back at car' : leg.to.kind === 'depot' ? 'Finish' : 'Reached, next';
+    if (leg.to.kind === 'car' || leg.to.kind === 'depot') skip.style.display = 'none';
+  }
+  const tgt = leg.geom[leg.geom.length - 1];
+  $('aGmaps').onclick = () => { window.open('https://www.google.com/maps/dir/?api=1&destination=' + tgt[0] + ',' + tgt[1] + '&travelmode=' + (leg.mode === 'walk' ? 'walking' : 'driving'), '_blank'); };
+  refreshStopIcons();
+  layoutVars();
+}
+
+/* ---------- position handling ---------- */
+function onFix(f, quiet) {
+  S.fix = f;
+  const acc = f.acc || 0;
+  const g = $('gps');
+  g.className = acc <= 20 ? 'good' : acc <= CFG.maxAcc ? 'weak' : 'none';
+  g.textContent = 'GPS ±' + fmtDist(acc);
+  const ll = [f.lat, f.lon];
+  if (!meMarker) { meMarker = L.marker(ll, {icon: meIcon(f.heading), interactive: false, zIndexOffset: 1000}).addTo(map); accCircle = L.circle(ll, {radius: acc, color: '#2563eb', weight: 1, fillOpacity: 0.08, interactive: false}).addTo(map); }
+  else { meMarker.setLatLng(ll); meMarker.setIcon(meIcon(f.heading)); accCircle.setLatLng(ll); accCircle.setRadius(acc); }
+  if (!S.started || !S.route) { if (S.follow && !quiet) followTo(ll); return; }
+  const leg = currentLeg(), mode = leg.mode, rt = S.rt;
+  const pr = locate(rt, ll);
+  const along = Math.min(pr.along, rt.total);
+  // next maneuver
+  let k = rt.steps.findIndex(s => s.along > along + 3 && s.type !== 'depart');
+  if (k < 0) k = rt.steps.length - 1;
+  const step = rt.steps[k], toStep = step.along - along;
+  let then = null;
+  const nxt = rt.steps[k + 1];
+  if (nxt && nxt.type !== 'arrive' && nxt.along - step.along < (mode === 'walk' ? 25 : 150)) then = nxt;
+  S.nav = {along, toStep, step, then, off: pr.d, idx: k};
+  // off route
+  if (acc <= CFG.maxAcc && pr.d > CFG.off[mode]) S.offCnt++; else S.offCnt = 0;
+  const wasOff = S.offRoute;
+  S.offRoute = S.offCnt >= CFG.offFixes;
+  if (S.offRoute && !wasOff) { speak('Off route.', true); reroute(); }
+  else if (S.offRoute && Date.now() - S.lastReroute > CFG.rerouteGapMs) reroute();
+  // voice prompts
+  if (!S.offRoute && !S.waiting && step) {
+    const key = S.legIdx + ':' + k;
+    const txt = step.type === 'arrive' ? (leg.to.kind === 'park' ? 'the parking spot for stop ' + (stopOf(leg) || {}).o : leg.to.kind === 'car' ? 'the car' : 'stop ' + (stopOf(leg) || {}).o) : instr(step, mode);
+    if (toStep <= CFG.near[mode] && !S.announced[key + 'n']) { S.announced[key + 'n'] = S.announced[key + 'f'] = 1; speak(step.type === 'arrive' ? 'Arriving at ' + txt : txt, true); }
+    else if (toStep <= CFG.far[mode] && toStep > CFG.near[mode] * 1.8 && !S.announced[key + 'f']) { S.announced[key + 'f'] = 1; speak('In ' + sayDist(toStep) + ', ' + (step.type === 'arrive' ? 'arrive at ' + txt : txt.replace(/^./, c => c.toLowerCase()))); }
+  }
+  // arrival
+  const end = leg.geom[leg.geom.length - 1];
+  const remain = rt.total - along;
+  if (!S.waiting && acc <= CFG.maxAcc && (remain <= CFG.arrive[mode] && hav(ll, end) <= CFG.arrive[mode] * 1.6 || hav(ll, end) <= CFG.arrive[mode] * 0.6)) arrived();
+  if (S.follow) followTo(ll, CFG.zoom[mode]);
+  renderBanner(); renderCard();
+}
+/* keep my position in the part of the map that the banner and card do not cover */
+function freeOffset() {
+  const sz = map.getSize(), W = sz.x, H = sz.y;
+  const b = $('banner').getBoundingClientRect(), c = $('card').getBoundingClientRect();
+  let left = 0, top = 0, bottom = H;
+  if (c.right < W * 0.6) left = Math.max(b.right, c.right);   // wide screen: panels form a left column
+  else { top = b.bottom; bottom = Math.max(top + 60, c.top); } // narrow screen: banner on top, card below
+  return L.point((left + W) / 2 - W / 2, (top + bottom) / 2 - H / 2);
+}
+function followTo(ll, z) {
+  // Leaflet drops a new view while a zoom animation runs; wait for it to end
+  if (map._animatingZoom) { map.once('zoomend', () => followTo(ll, z)); return; }
+  const zoom = z == null ? map.getZoom() : z;
+  const center = map.unproject(map.project(ll, zoom).subtract(freeOffset()), zoom);
+  if (Math.abs(map.getZoom() - zoom) > 1) map.setView(center, zoom, {animate: false});
+  else map.panTo(center, {animate: true, duration: 0.5});
+}
+function layoutVars() {
+  const m = $('map').getBoundingClientRect(), c = $('card').getBoundingClientRect();
+  const narrow = c.right >= m.width * 0.6;   // card spans the screen, so lift the zoom buttons and credits above it
+  document.documentElement.style.setProperty('--ctlBottom', narrow ? Math.max(0, m.bottom - c.top + 4) + 'px' : '0px');
+}
+window.addEventListener('resize', layoutVars);
+function onGeoErr(e) {
+  const g = $('gps');
+  g.className = 'none';
+  g.textContent = e.code === 1 ? 'GPS blocked' : 'No GPS';
+  if (e.code === 1) toast('Location is blocked. Allow location for this app in Chrome settings.', 6000);
+}
+let watchId = null;
+function startGps() {
+  if (S.sim) return;
+  if (!('geolocation' in navigator)) { toast('This device has no location service.'); return; }
+  if (watchId !== null) return;
+  watchId = navigator.geolocation.watchPosition(p => {
+    const c = p.coords;
+    onFix({lat: c.latitude, lon: c.longitude, acc: c.accuracy, heading: (c.heading != null && !isNaN(c.heading) && (c.speed || 0) > 1) ? c.heading : null, speed: c.speed, t: p.timestamp});
+  }, onGeoErr, {enableHighAccuracy: true, maximumAge: 1000, timeout: 20000});
+}
+
+/* ---------- reroute (online only) ---------- */
+function legFromOsrm(o, mode) {
+  const geom = [], steps = [];
+  o.steps.forEach(st => {
+    let g = st.geometry.coordinates.map(c => [+c[1].toFixed(6), +c[0].toFixed(6)]);
+    if (geom.length && g.length && geom[geom.length - 1][0] === g[0][0] && geom[geom.length - 1][1] === g[0][1]) g = g.slice(1);
+    geom.push(...g);
+    const mv = st.maneuver;
+    steps.push({type: mv.type, mod: mv.modifier || '', exit: mv.exit, name: st.name || '', ref: st.ref || '', loc: [mv.location[1], mv.location[0]], ba: mv.bearing_after, dist: st.distance, dur: st.duration});
+  });
+  return {mode, dist: o.distance, dur: o.duration, geom: geom.length ? geom : [[0, 0]], steps};
+}
+async function reroute() {
+  if (!S.fix || !navigator.onLine || Date.now() - S.lastReroute < CFG.rerouteGapMs) return;
+  S.lastReroute = Date.now();
+  const base = S.legs[S.legIdx], end = base.geom[base.geom.length - 1];
+  const url = CFG.osrm[base.mode] + S.fix.lon.toFixed(6) + ',' + S.fix.lat.toFixed(6) + ';' + end[1].toFixed(6) + ',' + end[0].toFixed(6) + '?overview=false&steps=true&geometries=geojson';
+  try {
+    const r = await fetch(url, {cache: 'no-store'});
+    const j = await r.json();
+    if (j.code !== 'Ok' || !j.routes.length) throw new Error(j.code);
+    const nl = legFromOsrm(j.routes[0].legs[0], base.mode);
+    nl.to = base.to;
+    if (nl.geom.length < 2) throw new Error('short');
+    S.override = nl; S.rt = prepLeg(nl); S.lastIdx = 0; S.announced = {}; S.offCnt = 0; S.offRoute = false;
+    drawCurrent(); speak('Route updated.'); toast('New route to ' + (stopOf(base) ? 'stop ' + stopOf(base).o : 'the finish'));
+  } catch (e) { /* offline or no route: keep the arrow */ }
+}
+
+/* ---------- panel ---------- */
+function openPanel() { renderPanel(); $('panel').classList.add('show'); }
+function closePanel() { $('panel').classList.remove('show'); }
+let resetArmed = 0;
+function renderPanel() {
+  const r = S.route, body = $('pBody');
+  const nm = r.stops.reduce((a, s) => a + s.meters.length, 0);
+  const nd = Object.keys(S.done).length, ns = Object.keys(S.skipped).length;
+  const totalMi = S.legs.filter(l => l.mode === 'drive').reduce((a, l) => a + l.dist, 0);
+  body.innerHTML = '';
+  const sum = document.createElement('div');
+  sum.className = 'sum';
+  sum.textContent = r.stops.length + ' stops · ' + nm + ' meters on the map · ' + fmtDist(totalMi) + ' drive loop · ' + nd + ' reached, ' + ns + ' skipped';
+  body.appendChild(sum);
+  const cur = currentTargetStop();
+  r.stops.forEach(st => {
+    const row = document.createElement('div');
+    row.className = 'row' + (cur && cur.o === st.o ? ' cur' : '');
+    row.id = 'row' + st.o;
+    const attn = st.meters.filter(m => m.attn).length;
+    const walk = S.legs.some(l => l.to && l.to.o === st.o && l.to.kind === 'park');
+    row.innerHTML = '<span class="stopno' + (walk ? ' walk' : '') + '">' + st.o + '</span><div class="rs"><div></div><div></div></div>' +
+      (S.done[st.o] ? '<span class="chip done">Reached</span>' : S.skipped[st.o] ? '<span class="chip skip">Skipped</span>' : attn ? '<span class="chip attn">' + attn + ' ATTN</span>' : '') +
+      '<button>Go</button>';
+    row.querySelector('.rs div:first-child').textContent = st.site;
+    row.querySelector('.rs div:last-child').textContent = st.meters.length + (st.meters.length === 1 ? ' meter' : ' meters') + (walk ? ' · walk-in stop' : '') + (st.road ? ' · ' + st.road : '');
+    row.querySelector('button').onclick = () => { closePanel(); delete S.done[st.o]; delete S.skipped[st.o]; setLeg(firstLegOfStop(st.o)); };
+    body.appendChild(row);
+  });
+  if (r.unmapped && r.unmapped.length) {
+    const h = document.createElement('div'); h.className = 'sec'; h.textContent = 'On the route, no location on file'; body.appendChild(h);
+    r.unmapped.forEach(m => { const d = document.createElement('div'); d.className = 'm attn'; d.innerHTML = '<span class="mn"></span> <span class="mw"></span><div class="note"></div>'; d.querySelector('.mn').textContent = 'ref ' + m.ref; d.querySelector('.mw').textContent = m.where; d.querySelector('.note').textContent = m.note; body.appendChild(d); });
+  }
+  const h2 = document.createElement('div'); h2.className = 'sec'; h2.textContent = 'Drive'; body.appendChild(h2);
+  const pb = document.createElement('div'); pb.className = 'pbtns';
+  pb.innerHTML = '<button class="btn" id="bReset">Start a new drive</button><a class="btn ghost" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="../route.html">Printable route page</a>';
+  body.appendChild(pb);
+  $('bReset').onclick = () => {
+    if (Date.now() - resetArmed > 4000) { resetArmed = Date.now(); $('bReset').textContent = 'Tap again to clear progress'; return; }
+    S.done = {}; S.skipped = {}; resetArmed = 0; closePanel(); setLeg(0); toast('Progress cleared. Stop 1 is next.');
+  };
+  const help = document.createElement('div'); help.className = 'help';
+  help.innerHTML = '<div class="sec">How to use</div><ol>' +
+    '<li>Open FieldLogic Tools, load the route, tap Start Read, and check the blue LINK light on the Command Link.</li>' +
+    '<li>Open this guide in split screen with FieldLogic (Recent apps, tap the app icon, Open in split screen view).</li>' +
+    '<li>Drive the crimson line. Most meters read from the car. The guide moves to the next stop when you reach each one.</li>' +
+    '<li>Blue stops are walk-in stops. Park, then choose Walk to meter or Read from car.</li>' +
+    '<li>Gold-ringed stops have ATTENTION meters. The guide pauses there so you can read the note.</li>' +
+    '<li>No signal? The map, the route and the turn list work offline. Rerouting needs data.</li></ol>' +
+    '<p>Route built ' + r.built + '. ' + r.source + '</p><p>App ' + APP_VERSION + '. Map data &copy; OpenStreetMap contributors. Routing by OSRM (FOSSGIS).</p>';
+  body.appendChild(help);
+}
+
+/* ---------- simulation (?sim=1) for demos and testing ---------- */
+function simStart() {
+  S.sim = {on: false, speed: 5, legIdx: -1, dist: 0, timer: null};
+  $('sim').classList.add('show');
+  $('sPlay').onclick = () => { S.sim.on = !S.sim.on; $('sPlay').textContent = S.sim.on ? 'Pause' : 'Play'; };
+  $('sSpeed').onclick = () => { S.sim.speed = S.sim.speed === 1 ? 5 : S.sim.speed === 5 ? 20 : 1; $('sSpeed').textContent = S.sim.speed + 'x'; };
+  S.sim.timer = setInterval(simTick, 1000);
+}
+function simTick() {
+  if (!S.sim.on || !S.started || S.waiting) return;
+  const leg = currentLeg();
+  if (S.sim.legRef !== leg) { S.sim.legRef = leg; S.sim.dist = 0; S.sim.rt = prepLeg(leg); }
+  const rt = S.sim.rt;
+  S.sim.dist = Math.min(rt.total, S.sim.dist + CFG.simSpeed[leg.mode] * S.sim.speed);
+  let i = 0;
+  while (i < rt.cum.length - 2 && rt.cum[i + 1] < S.sim.dist) i++;
+  const seg = rt.cum[i + 1] - rt.cum[i] || 1, t = Math.min(1, (S.sim.dist - rt.cum[i]) / seg);
+  const a = leg.geom[i], b = leg.geom[Math.min(i + 1, leg.geom.length - 1)];
+  onFix({lat: a[0] + (b[0] - a[0]) * t, lon: a[1] + (b[1] - a[1]) * t, acc: 5, heading: bearing(a, b), speed: 10, t: Date.now()});
+}
+
+/* ---------- start ---------- */
+async function wakeLock() {
+  try { if ('wakeLock' in navigator && document.visibilityState === 'visible') S.wake = await navigator.wakeLock.request('screen'); } catch (e) { /* not allowed */ }
+}
+document.addEventListener('visibilitychange', () => { if (S.started && document.visibilityState === 'visible') wakeLock(); });
+function begin() {
+  S.started = true;
+  $('start').style.display = 'none';
+  wakeLock();
+  if ('speechSynthesis' in window) { try { speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } catch (e) { /* unlock */ } }
+  startGps();
+  setLeg(S.legIdx);
+  if (!S.sim && S.fix) followTo([S.fix.lat, S.fix.lon], CFG.zoom[currentLeg().mode]);
+}
+function renderStart() {
+  const r = S.route, nm = r.stops.reduce((a, s) => a + s.meters.length, 0);
+  const drive = S.legs.filter(l => l.mode === 'drive');
+  const miles = drive.reduce((a, l) => a + l.dist, 0), mins = drive.reduce((a, l) => a + l.dur, 0);
+  const walkStops = S.legs.filter(l => l.to && l.to.kind === 'park').length;
+  const resumeStop = currentTargetStop();
+  $('startBody').innerHTML = '<p><b>' + r.stops.length + ' stops, ' + nm + ' meters.</b> Loop from McCluskey Services, about ' + fmtDist(miles) + ' and ' + fmtDur(mins) + ' of driving, plus ' + walkStops + ' walk-in stops.</p>' +
+    '<p>Keep FieldLogic Tools running for the reads. This guide only shows the way.</p>' +
+    '<p style="color:#6b7280;font-size:13px">Route built ' + r.built + '. Works offline after the first load.</p>';
+  const btns = $('startBtns');
+  btns.innerHTML = '';
+  const go = document.createElement('button');
+  go.className = 'btn primary';
+  const resuming = S.legIdx > 0 && resumeStop;
+  go.textContent = resuming ? 'Resume at stop ' + resumeStop.o : 'Start guidance';
+  go.onclick = begin;
+  btns.appendChild(go);
+  if (resuming) {
+    const fresh = document.createElement('button');
+    fresh.className = 'btn';
+    fresh.textContent = 'Start a new drive at stop 1';
+    fresh.onclick = () => { S.done = {}; S.skipped = {}; S.legIdx = 0; begin(); };
+    btns.appendChild(fresh);
+  }
+}
+
+/* ---------- controls ---------- */
+const ICON = {
+  follow: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  voiceOn: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3z"/><path d="M16 8a5 5 0 0 1 0 8M19 5a9 9 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  voiceOff: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3z"/><path d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  layer: '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z" fill="currentColor"/><path d="M3 13l9 5 9-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="3.5" cy="6" r="1.6" fill="currentColor"/><circle cx="3.5" cy="12" r="1.6" fill="currentColor"/><circle cx="3.5" cy="18" r="1.6" fill="currentColor"/></svg>',
+};
+$('fFollow').innerHTML = ICON.follow; $('fLayer').innerHTML = ICON.layer; $('fList').innerHTML = ICON.list;
+function paintVoice() { $('fVoice').innerHTML = S.voice ? ICON.voiceOn : ICON.voiceOff; $('fVoice').className = 'fab ' + (S.voice ? 'on' : 'off'); }
+paintVoice();
+$('fVoice').onclick = () => { S.voice = !S.voice; lsSet('voice', S.voice); paintVoice(); if (!S.voice && 'speechSynthesis' in window) speechSynthesis.cancel(); };
+$('fFollow').onclick = () => { S.follow = true; $('fFollow').className = 'fab on'; if (S.fix) followTo([S.fix.lat, S.fix.lon], CFG.zoom[currentLeg() ? currentLeg().mode : 'drive']); };
+$('fLayer').onclick = () => { if (!S.tiles && !navigator.onLine) { toast('Street map needs a data connection'); return; } setTiles(!S.tiles); };
+$('fList').onclick = openPanel;
+$('pClose').onclick = closePanel;
+$('cToggle').onclick = () => { const c = $('card'); c.classList.toggle('open'); $('cToggle').innerHTML = c.classList.contains('open') ? '&#9660;' : '&#9650;'; layoutVars(); };
+map.on('dragstart', () => { S.follow = false; $('fFollow').className = 'fab off'; });
+
+/* ---------- load ---------- */
+async function load() {
+  try {
+    const [r, b] = await Promise.all([fetch('route.json').then(x => x.json()), fetch('basemap.json').then(x => x.json()).catch(() => null)]);
+    S.route = r; S.base = b; S.legs = r.legs;
+    r.stops.forEach(s => { S.stopBy[s.o] = s; });
+    const sig = r.built + ':' + r.legs.length;
+    if (qs.has('reset') || lsGet('sig', '') !== sig) { lsSet('sig', sig); lsSet('leg', 0); lsSet('done', {}); lsSet('skipped', {}); }
+    if (qs.has('reset')) { qs.delete('reset'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : '')); }
+    S.legIdx = Math.min(lsGet('leg', 0), S.legs.length - 1); S.done = lsGet('done', {}); S.skipped = lsGet('skipped', {});
+    drawBase(); if (S.tiles) setTiles(true);
+    S.rt = prepLeg(S.legs[S.legIdx]);
+    drawRoute(); drawStops();
+    map.fitBounds(L.latLngBounds(r.stops.map(s => [s.lat, s.lon])).pad(0.05), {animate: false});
+    renderCard(); renderBanner(); renderStart();
+    if (qs.has('sim')) simStart(); else startGps();
+  } catch (e) {
+    $('startBody').innerHTML = '<p>The route did not load. Connect to the internet once, then reopen the app.</p>';
+    console.error(e);
+  }
+}
+load();
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ }); });
+}
+</script>
+</body>
+</html>
