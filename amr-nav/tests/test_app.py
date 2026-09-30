@@ -171,8 +171,10 @@ class Path:
         a, b = self.xy[i], self.xy[i + 1]
         return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
 
-    def ll(self, s):
-        return self.to_ll(self.at(s))
+    def ll(self, s, dx=0.0, dy=0.0):
+        """The point at s along the path, moved dx metres east and dy metres north (to place a fix off the line)."""
+        q = self.at(s)
+        return self.to_ll((q[0] + dx, q[1] + dy))
 
     def bearing(self, s):
         """The direction of travel at s in degrees (0 north, 90 east)."""
@@ -229,6 +231,7 @@ def guidance_page(br):
     pg = ctx.new_page()
     attach(pg)
     pg.add_init_script(CAPTURE_SPEECH)
+    pg.add_init_script(RECORD_OSRM_SIGNALS)                                      # window.__osrmSignals has one entry per reroute request
     pg.goto(BASE + "?sim=1&reset=1")
     pg.wait_for_selector("#startBtns button", timeout=20000)
     pg.click("#startBtns button")
@@ -857,8 +860,13 @@ with sync_playwright() as p:
     feed(pg, away(95), acc=100, speed=5)
     check("95 m from stop 7 at 5 m/s with a weak fix (100 m): still waiting", state()["waiting"] == "stop", json.dumps(state()))
     feed(pg, away(95), speed=5)
+    check("one fast fix more than 80 m from stop 7 is not enough: still waiting", state()["waiting"] == "stop", json.dumps(state()))
+    feed(pg, away(95), speed=1)
+    feed(pg, away(95), speed=5)
+    check("fast, slow, fast: the slow fix starts the count again, still waiting", state()["waiting"] == "stop", json.dumps(state()))
+    feed(pg, away(100), speed=5)
     r = state()
-    check("fast and more than 80 m from stop 7: the guide goes on without a tap",
+    check("two fast fixes in a row more than 80 m from stop 7: the guide goes on without a tap",
           r["waiting"] is None and r["leg"] == i7 + 1, json.dumps(r))
     check("stop 7 is put in Passed, not in reached or skipped", r["passed"] == ["7"] and "7" not in r["done"] and "7" not in r["skipped"], json.dumps(r))
     check("the passed stop is saved", pg.evaluate("() => Object.keys(lsGet('passed', {}))") == ["7"])
@@ -1038,7 +1046,7 @@ with sync_playwright() as p:
           a_old["label"] == "N" and a_old["rot"] == round(brg), json.dumps(a_old))
     ctx.close()
 
-    # ---------- 20. a device that sends no speed: the speed is worked out from the move between fixes ----------
+    # ---------- 20. a device that sends no speed: a speed worked out over 3 s or more; walkers at walk-in stops ----------
     T0 = 1_700_000_000_000                               # fix times in ms; only the differences matter
 
     def at_stop7_no_speed():
@@ -1073,14 +1081,48 @@ with sync_playwright() as p:
     ctx.close()
 
     ctx, pg = at_stop7_no_speed()
-    feed(pg, away(95), speed=None, t=T0 + 200)           # 0.2 s after the last fix: too short to measure a speed
-    check("no speed sent, a fix 0.2 s after the last one gives no speed: still waiting", state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
-    feed(pg, away(100), speed=None, t=T0 + 4000)         # 4 s after the last fix that counted, about 100 m
-    check("the next fix measures from the last fix that counted, not from the 0.2 s one",
-          state_of(pg)["waiting"] is None and state_of(pg)["passed"] == ["7"], json.dumps(state_of(pg)))
+    feed(pg, away(95), speed=None, t=T0 + 2000)          # 2 s after the arrival fix: too short to measure a speed
+    feed(pg, away(97), speed=None, t=T0 + 2500)
+    check("no speed sent, fixes less than 3 s after the reference fix give no speed: still waiting", state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
+    feed(pg, away(99), speed=None, t=T0 + 3000)          # 3 s after the arrival fix: about 100 m in 3 s
+    check("the first speed comes 3 s after the reference fix, and one fast fix is not enough", state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
+    feed(pg, away(101), speed=None, t=T0 + 4000)
+    check("a second fast fix in a row: the guide goes on", state_of(pg)["waiting"] is None and state_of(pg)["passed"] == ["7"], json.dumps(state_of(pg)))
     ctx.close()
 
-    # ---------- 21. waiting at a stop: no Off route in the stop area, the cue once the vehicle is farther away ----------
+    # walk-in stops 10 and 26: the driver parks, then walks to the meter without tapping Walk to meter. The guide must neither
+    # jump to the next stop nor say Off route. A device with no speed shows a walker 1.4 m/s; one GPS fix can be 4 m off.
+    for o in (10, 26):
+        ip = next(i for i, l in enumerate(legs) if l["to"].get("o") == o and l["to"]["kind"] == "park")
+        W = Path(legs[ip + 1]["geom"])
+        park = legs[ip]["geom"][-1]
+        for label, dev_speed, jump in (("device speed 1.4 m/s", 1.4, None), ("no speed", None, None), ("no speed, one fix 4 m off", None, "blip"),
+                                       ("no speed, a 4 m step that stays", None, "step")):
+            ctx, pg = guidance_page(br)
+            pg.evaluate("(i) => setLeg(i)", ip)
+            feed(pg, park, t=T0)
+            waiting0 = state_of(pg)["waiting"]
+            pg.evaluate("() => { window.__spoken = []; }")
+            t, done_jump, dx, max_d = T0, False, 0.0, 0.0
+            for k in range(1, int(W.total / 1.4)):
+                t += 1000
+                s_at = 1.4 * k
+                if jump and not done_jump and hav_m(W.ll(s_at), park) > 85:
+                    done_jump, dx = True, 4.0
+                elif jump == "blip":
+                    dx = 0.0
+                ll = W.ll(s_at, dx)
+                max_d = max(max_d, hav_m(ll, park))
+                feed(pg, ll, speed=dev_speed, t=t)
+            r = pg.evaluate("() => ({waiting: S.waiting, leg: S.legIdx, passed: Object.keys(S.passed), off: S.offRoute, spoken: window.__spoken})")
+            check("walk-in stop %d, %s: the walker reaches %.0f m from the parking spot (past the 80 m limit)%s" % (o, label, max_d, ", one 4 m jump made" if jump else ""),
+                  waiting0 == "park" and max_d > 85 and (not jump or done_jump), "waiting at start: %s" % waiting0)
+            check("walk-in stop %d, %s: the guide does not go on to the next stop" % (o, label),
+                  r["waiting"] == "park" and r["leg"] == ip and r["passed"] == [], json.dumps(r))
+            check("walk-in stop %d, %s: no Off route. is spoken to the walker" % (o, label), not r["off"] and "Off route." not in r["spoken"], json.dumps(r["spoken"]))
+            ctx.close()
+
+    # ---------- 21. waiting at a stop: Off route only for a vehicle driving more than 80 m away ----------
     P0 = Path(legs[0]["geom"])                           # leg 0 drives to the parking spot of stop 1
     end0 = legs[0]["geom"][-1]
     near = P0.side_point(P0.total, 60)                   # 60 m from the parking spot, and more than 45 m from the leg line
@@ -1097,9 +1139,9 @@ with sync_playwright() as p:
     check("60 m from the parking spot and still waiting: no off-route count", r["off"] is False and r["cnt"] == 0 and r["spoken"] == 0, json.dumps(r))
     for _ in range(5):
         feed(pg, farp, speed=1)
-    r = pg.evaluate(cue)
-    check("100 m from the parking spot at 1 m/s and still waiting: off route is counted and spoken",
-          r["off"] is True and r["waiting"] == "park" and r["spoken"] == 1, json.dumps(r))
+    r = pg.evaluate("() => ({off: S.offRoute, cnt: S.offCnt, waiting: S.waiting, spoken: window.__spoken.filter(x => x === 'Off route.').length, calls: window.__osrmSignals.length})")
+    check("100 m from the parking spot at 1 m/s (a walker) and still waiting: no off-route count, no cue, no reroute request",
+          r["off"] is False and r["cnt"] == 0 and r["waiting"] == "park" and r["spoken"] == 0 and r["calls"] == 0, json.dumps(r))
     ctx.close()
 
     iw = next(i for i, l in enumerate(legs) if l["to"].get("o") == 10 and l["to"]["kind"] == "stop")
@@ -1115,7 +1157,24 @@ with sync_playwright() as p:
     check("no tap at walk-in stop 10, then driving away at 8 m/s: the guide says Off route.", r["off"] is True and r["spoken"] == 1, json.dumps(r))
     ctx.close()
 
-    # ---------- 22. a gap in the fixes across the U-turn must not send the guide back down the outbound lane ----------
+    # ---------- 22. after the route is complete there is no route to be off ----------
+    il = len(legs) - 1
+    end_d = legs[il]["geom"][-1]
+    Qf = Path([end_d, [end_d[0] + 0.0020, end_d[1] + 0.0020]])      # a straight line about 280 m long, away from the depot
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => setLeg(i)", il)
+    feed(pg, end_d, speed=0)
+    check("finish test setup: arriving at the depot ends the route", state_of(pg)["waiting"] == "finish" and Qf.total > 250, json.dumps(state_of(pg)))
+    pg.evaluate("() => { window.__spoken = []; }")
+    for d in range(10, int(Qf.total), 20):
+        feed(pg, Qf.ll(d), speed=8)
+    r = pg.evaluate("() => ({waiting: S.waiting, off: S.offRoute, cnt: S.offCnt, calls: window.__osrmSignals.length, spoken: window.__spoken.filter(x => x === 'Off route.').length})")
+    far_end = hav_m(Qf.ll(Qf.total - 10), end_d)
+    check("after Finish, driving %.0f m away at 8 m/s: no Off route. and no reroute request" % far_end,
+          far_end > 200 and r["waiting"] == "finish" and r["off"] is False and r["cnt"] == 0 and r["calls"] == 0 and r["spoken"] == 0, json.dumps(r))
+    ctx.close()
+
+    # ---------- 23. a gap in the fixes across the U-turn must not send the guide back down the outbound lane ----------
     # (last good fix before the gap, first fix after it on the return lane); the U-turn is at 446 m. The first pair is the main case.
     gap_cases = [(int(s_turn) - 200, int(s_turn) + 150), (int(s_turn) - 300, int(s_turn) + 250), (int(s_turn) - 140, int(s_turn) + 100)]
     for g_from, g_resume in gap_cases:
