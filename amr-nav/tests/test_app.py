@@ -137,6 +137,104 @@ def release(route, body):
     route.fulfill(status=200, content_type="application/json", headers={"access-control-allow-origin": "*"}, body=json.dumps(body))
 
 
+ROUTE = json.loads(ROUTE_TEXT)
+EARTH = 6371008.8
+# keeps what the app speaks, so a test can read it (the real speech engine is not needed)
+CAPTURE_SPEECH = """
+window.__spoken = [];
+try { speechSynthesis.speak = (u) => { window.__spoken.push(u.text); }; speechSynthesis.cancel = () => {}; } catch (e) {}
+"""
+
+
+class Path:
+    """A leg geometry in the app's local metres (flat map around its first point), to place test fixes along it."""
+
+    def __init__(self, geom):
+        self.geom = geom
+        self.k = math.cos(math.radians(geom[0][0]))
+        self.xy = [(math.radians(p[1]) * EARTH * self.k, math.radians(p[0]) * EARTH) for p in geom]
+        self.cum = [0.0]
+        for i in range(1, len(self.xy)):
+            self.cum.append(self.cum[-1] + math.hypot(self.xy[i][0] - self.xy[i - 1][0], self.xy[i][1] - self.xy[i - 1][1]))
+        self.total = self.cum[-1]
+
+    def to_ll(self, q):
+        return [math.degrees(q[1] / EARTH), math.degrees(q[0] / (EARTH * self.k))]
+
+    def at(self, s):
+        """The point (x, y) at distance s along the path."""
+        s = max(0.0, min(self.total, s))
+        i = 0
+        while i < len(self.cum) - 2 and self.cum[i + 1] < s:
+            i += 1
+        t = (s - self.cum[i]) / ((self.cum[i + 1] - self.cum[i]) or 1.0)
+        a, b = self.xy[i], self.xy[i + 1]
+        return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+    def ll(self, s):
+        return self.to_ll(self.at(s))
+
+    def nearest(self, q, s_min=0.0, s_max=None):
+        """(distance, point) of the point of the path nearest to q, looking only at the part from s_min to s_max."""
+        best = (1e18, None)
+        for i in range(len(self.xy) - 1):
+            if self.cum[i + 1] < s_min or (s_max is not None and self.cum[i] > s_max):
+                continue
+            a, b = self.xy[i], self.xy[i + 1]
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            l2 = dx * dx + dy * dy
+            t = max(0.0, min(1.0, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2)) if l2 else 0.0
+            pt = (a[0] + t * dx, a[1] + t * dy)
+            d = math.hypot(q[0] - pt[0], q[1] - pt[1])
+            if d < best[0]:
+                best = (d, pt)
+        return best
+
+    def side_point(self, s, dist):
+        """A point dist metres (plus or minus 2) to the side of the path at s, with no other part of the path nearer. None if not found."""
+        a, b, q = self.at(s - 1), self.at(s + 1), self.at(s)
+        n = math.hypot(b[0] - a[0], b[1] - a[1])
+        nx, ny = -(b[1] - a[1]) / n, (b[0] - a[0]) / n
+        for sign in (1, -1):
+            c = (q[0] + sign * dist * nx, q[1] + sign * dist * ny)
+            if abs(self.nearest(c)[0] - dist) <= 2:
+                return self.to_ll(c)
+        return None
+
+
+def toward(P, s, s_min, s_max, frac):
+    """The path point at s moved frac of the way to the nearest point of the same path between s_min and s_max
+    (the other lane of an out-and-back road). Returns (lat/lon, distance between the lanes here)."""
+    q = P.at(s)
+    d, pt = P.nearest(q, s_min, s_max)
+    return P.to_ll((q[0] + frac * (pt[0] - q[0]), q[1] + frac * (pt[1] - q[1]))), d
+
+
+def feed(pg, ll, acc=5, speed=0, heading=None):
+    """Hand one fix to the app's own onFix (the geolocation mock cannot set speed) and return S.nav.along."""
+    return pg.evaluate("""(a) => { onFix({lat: a[0], lon: a[1], acc: a[2], speed: a[3], heading: a[4], t: Date.now()});
+        return S.nav ? S.nav.along : null; }""", [ll[0], ll[1], acc, speed, heading])
+
+
+def guidance_page(br):
+    """A started app on the simulator page (?sim=1 has no GPS watch, so only the fixes a test feeds arrive)."""
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    ctx.route(OSRM_URL, lambda route: release(route, {"code": "NoRoute"}))      # a reroute must never reach the real server
+    pg = ctx.new_page()
+    attach(pg)
+    pg.add_init_script(CAPTURE_SPEECH)
+    pg.goto(BASE + "?sim=1&reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(800)
+    return ctx, pg
+
+
+def dom(pg, sel, what="e.textContent.trim()"):
+    """A value read from the first element that matches sel, or None when there is none."""
+    return pg.evaluate("(s) => { const e = document.querySelector(s); return e ? " + what + " : null; }", sel)
+
+
 def reroute_case(br, mode):
     """Drive off route on leg 0 with routing.openstreetmap.de held, then finish the scenario.
     mode 'apply': release the reply with the leg unchanged.
@@ -715,9 +813,223 @@ with sync_playwright() as p:
           any(sw and u.rstrip("?").endswith("/amr-nav/") for u, sw in net_failed), json.dumps(net_failed[:3]))
     ctx.set_offline(False)
     ctx.close()
+
+    # ---------- 14. a stop that waits for a tap is left behind when the vehicle drives away ----------
+    legs = ROUTE["legs"]
+    attn_stops = {s["o"] for s in ROUTE["stops"] if any(m.get("attn") for m in s["meters"])}
+    i7 = next(i for i, l in enumerate(legs) if l["to"].get("o") == 7 and l["to"]["kind"] == "stop")
+    nxt = legs[i7 + 1]
+    end7 = legs[i7]["geom"][-1]
+    P7 = Path(nxt["geom"])
+
+    def away(m):
+        """The first point along the next leg that is at least m metres (straight line) from stop 7."""
+        s = 0.0
+        while s < P7.total and hav_m(P7.ll(s), end7) < m:
+            s += 5
+        return P7.ll(s)
+
+    ctx, pg = guidance_page(br)
+    check("stop 7 test setup: an ATTENTION stop reached by driving, and the next leg drives on to stop 8",
+          7 in attn_stops and legs[i7]["mode"] == "drive" and nxt["mode"] == "drive" and nxt["to"].get("o") == 8 and hav_m(away(95), end7) > 80,
+          "leg %d -> leg %d" % (i7, i7 + 1))
+
+    def state():
+        return pg.evaluate("() => ({waiting: S.waiting, leg: S.legIdx, passed: Object.keys(S.passed || {}), done: Object.keys(S.done), skipped: Object.keys(S.skipped)})")
+
+    pg.evaluate("(i) => setLeg(i)", i7)
+    feed(pg, end7)
+    check("arriving at ATTENTION stop 7 waits for a tap", state()["waiting"] == "stop", json.dumps(state()))
+    feed(pg, away(40), speed=5)
+    check("moving at 5 m/s but only 40 m from stop 7: still waiting", state()["waiting"] == "stop", json.dumps(state()))
+    feed(pg, away(95), speed=1)
+    check("95 m from stop 7 but slower than 3 m/s: still waiting", state()["waiting"] == "stop", json.dumps(state()))
+    feed(pg, away(95), acc=100, speed=5)
+    check("95 m from stop 7 at 5 m/s with a weak fix (100 m): still waiting", state()["waiting"] == "stop", json.dumps(state()))
+    feed(pg, away(95), speed=5)
+    r = state()
+    check("fast and more than 80 m from stop 7: the guide goes on without a tap",
+          r["waiting"] is None and r["leg"] == i7 + 1, json.dumps(r))
+    check("stop 7 is put in Passed, not in reached or skipped", r["passed"] == ["7"] and "7" not in r["done"] and "7" not in r["skipped"], json.dumps(r))
+    check("the passed stop is saved", pg.evaluate("() => Object.keys(lsGet('passed', {}))") == ["7"])
+    spoken = pg.evaluate("() => window.__spoken")
+    check("the guide says which stop comes next", "Continuing to stop 8." in spoken, json.dumps(spoken[-3:]))
+    pg.click("#fList")
+    chip = dom(pg, "#row7 .chip", "({t: e.textContent, c: e.className, bg: getComputedStyle(e).backgroundColor, fg: getComputedStyle(e).color})")
+    check("the stop list shows a Passed chip for stop 7", bool(chip) and chip["t"] == "Passed" and "pass" in chip["c"].split(), json.dumps(chip))
+    check("the Passed chip is pale amber with brown text", bool(chip) and chip["bg"] == "rgb(254, 243, 199)" and chip["fg"] == "rgb(146, 64, 14)", json.dumps(chip))
+    summ = dom(pg, "#pBody .sum")
+    check("the list summary counts the passed stop", summ is not None and "1 passed" in summ, str(summ))
+    pg.click("#pClose")
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    check("a passed stop is still Passed after a reload", pg.evaluate("() => Object.keys(S.passed || {})") == ["7"])
+    pg.click('#startBtns button:has-text("Start a new drive at stop 1")')
+    pg.wait_for_timeout(500)
+    r = pg.evaluate("() => ({passed: Object.keys(S.passed || {}), stored: lsGet('passed', null)})")
+    check("Start a new drive at stop 1 (start screen) clears Passed", r["passed"] == [] and r["stored"] == {}, json.dumps(r))
+    pg.evaluate("() => { S.passed = S.passed || {}; S.passed[7] = 1; S.passed[9] = 1; }")
+    pg.evaluate("() => { markStop(7, 'done'); markStop(9, 'skip'); }")
+    r = pg.evaluate("() => ({passed: Object.keys(S.passed || {}), stored: lsGet('passed', null), done: Object.keys(S.done), skipped: Object.keys(S.skipped)})")
+    check("marking a passed stop done or skipped takes it out of Passed",
+          r["passed"] == [] and r["stored"] == {} and r["done"] == ["7"] and r["skipped"] == ["9"], json.dumps(r))
+    pg.evaluate("() => { S.passed = S.passed || {}; S.passed[7] = 1; lsSet('passed', S.passed); }")
+    pg.click("#fList")
+    pg.click("#bReset")
+    pg.click("#bReset")                                  # the second tap confirms
+    pg.wait_for_timeout(400)
+    r = pg.evaluate("() => ({passed: Object.keys(S.passed || {}), stored: lsGet('passed', null), leg: S.legIdx})")
+    check("Start a new drive in the stop list clears Passed", r["passed"] == [] and r["stored"] == {} and r["leg"] == 0, json.dumps(r))
+    pg.evaluate("() => { S.passed = S.passed || {}; S.passed[7] = 1; }")
+    pg.click("#fList")
+    pg.locator("#row7 button").click()                   # Go: the driver returns to stop 7
+    pg.wait_for_timeout(400)
+    r = pg.evaluate("() => ({passed: Object.keys(S.passed || {}), leg: S.legIdx})")
+    check("Go to a passed stop from the list takes it out of Passed", r["passed"] == [] and r["leg"] == i7, json.dumps(r))
+    ctx.close()
+
+    # ---------- 15. a fix with poor accuracy does not steer the guide ----------
+    i_u = next(i for i, l in enumerate(legs) if l["mode"] == "drive" and any(s.get("mod") == "uturn" for s in l["steps"]))
+    uturn = next(s for s in legs[i_u]["steps"] if s.get("mod") == "uturn")
+    nxt_step = legs[i_u]["steps"][legs[i_u]["steps"].index(uturn) + 1]
+    PU = Path(legs[i_u]["geom"])
+    turn_j = min(range(len(PU.geom)), key=lambda j: hav_m(PU.geom[j], uturn["loc"]))
+    s_turn = PU.cum[turn_j]                              # where the out-and-back turns around
+
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => setLeg(i)", i_u)
+    a0 = feed(pg, PU.ll(200))
+    keys0 = pg.evaluate("() => Object.keys(S.announced).sort()")
+    check("accuracy test setup: a good fix 200 m along leg %d matches near 200 m" % i_u, a0 is not None and abs(a0 - 200) < 10, "along=%s" % a0)
+    weak_at = nxt_step["loc"]                            # the next maneuver: a voice prompt would be spoken here
+    a1 = feed(pg, weak_at, acc=150)
+    keys1 = pg.evaluate("() => Object.keys(S.announced).sort()")
+    check("a fix with 150 m accuracy does not change S.nav.along", a1 == a0, "%s -> %s" % (a0, a1))
+    check("a fix with 150 m accuracy adds no key to S.announced", keys1 == keys0, json.dumps([keys0, keys1]))
+    r = pg.evaluate("""() => ({then: document.getElementById('bThen').textContent, chip: document.getElementById('gps').textContent,
+        cls: document.getElementById('gps').className, lat: meMarker.getLatLng().lat, rad: accCircle.getRadius()})""")
+    check("a weak fix still moves the marker and the accuracy circle, and shows the GPS chip",
+          abs(r["lat"] - weak_at[0]) < 1e-6 and r["rad"] == 150 and r["chip"].startswith("GPS ±") and r["cls"] == "none", json.dumps(r))
+    check("a weak fix says Weak GPS. Waiting for a better fix.", r["then"] == "Weak GPS. Waiting for a better fix.", r["then"])
+    a2 = feed(pg, PU.ll(220))
+    then = text(pg, "#bThen")
+    check("the next good fix is matched again and the banner recovers", a2 is not None and abs(a2 - 220) < 10 and "Weak GPS" not in then, "along=%s then=%r" % (a2, then))
+    ctx.close()
+
+    # ---------- 16. a fix with no news for 10 s shows GPS lost ----------
+    ctx, pg = guidance_page(br)
+    t0 = time.time()
+    feed(pg, [DEPOT["latitude"], DEPOT["longitude"]], acc=5)
+    check("a good fix: the GPS chip shows the accuracy", text(pg, "#gps").startswith("GPS ±"), text(pg, "#gps"))
+    pg.wait_for_timeout(8000)
+    check("8 s after the last fix the chip still shows the accuracy", text(pg, "#gps").startswith("GPS ±"), text(pg, "#gps"))
+    lost_at = None
+    while time.time() - t0 < 16:
+        pg.wait_for_timeout(250)
+        if text(pg, "#gps") == "GPS lost":
+            lost_at = time.time() - t0
+            break
+    check("with no fix for 11 s or more the GPS chip text is GPS lost (shown 10 to 13 s after the last fix)",
+          lost_at is not None and 9.9 <= lost_at <= 13, "after %s s" % (round(lost_at, 1) if lost_at else None))
+    r = pg.evaluate("() => ({then: document.getElementById('bThen').textContent, cls: document.getElementById('gps').className})")
+    check("the banner says GPS lost and how old the last fix is, and the chip is red",
+          re.fullmatch(r"GPS lost\. Last fix 1\d s ago\.", r["then"]) is not None and r["cls"] == "none", json.dumps(r))
+    feed(pg, [DEPOT["latitude"], DEPOT["longitude"]], acc=5)
+    check("a new fix takes GPS lost away", text(pg, "#gps").startswith("GPS ±") and "GPS lost" not in text(pg, "#bThen"), text(pg, "#gps") + " | " + text(pg, "#bThen"))
+    ctx.close()
+
+    # ---------- 17. an out-and-back road: the guide stays on the pass the vehicle is on ----------
+    ctx, pg = guidance_page(br)
+    gaps, errs_out, jumps_out = [], [], []
+    pg.evaluate("(i) => setLeg(i)", i_u)
+    prev = None
+    for k, s in enumerate(range(100, int(s_turn) - 70, 20)):
+        if k % 2:                                        # every second fix drifts 70% of the way to the other lane
+            ll, gap = toward(PU, s, s_turn + 15, None, 0.7)
+            gaps.append(gap)
+        else:
+            ll = PU.ll(s)
+        along = feed(pg, ll, acc=5, speed=10)
+        errs_out.append(abs(along - s))
+        if prev is not None:
+            jumps_out.append(along - prev)
+        prev = along
+    check("out-and-back setup: the return lane is 4 to 15 m from the outbound fixes", gaps and 4 <= min(gaps) and max(gaps) <= 15, "%.1f to %.1f m" % (min(gaps), max(gaps)))
+    check("outbound fixes never match the return part: no forward jump over 60 m between fixes 20 m apart",
+          max(jumps_out) <= 60, "largest forward step %.0f m" % max(jumps_out))
+    check("outbound fixes stay within 25 m of their true distance along the leg", max(errs_out) <= 25, "largest error %.0f m" % max(errs_out))
+    jumps_back, errs_back = [], []
+    pg.evaluate("(i) => setLeg(i)", i_u)
+    prev = None
+    for k, s in enumerate(range(int(s_turn) + 60, int(s_turn) + 300, 20)):
+        ll = toward(PU, s, 0.0, s_turn - 15, 0.7)[0] if k % 2 else PU.ll(s)
+        along = feed(pg, ll, acc=5, speed=10)
+        errs_back.append(abs(along - s))
+        if prev is not None:
+            jumps_back.append(prev - along)
+        prev = along
+    check("return fixes never match the outbound part: no backward jump over 60 m between fixes 20 m apart",
+          max(jumps_back) <= 60, "largest backward step %.0f m" % max(jumps_back))
+    check("return fixes stay within 25 m of their true distance along the leg", max(errs_back) <= 25, "largest error %.0f m" % max(errs_back))
+    ctx.close()
+
+    # ---------- 18. off-route distance grows with the fix's own error ----------
+    P0 = Path(legs[0]["geom"])
+    side, s_side = None, None
+    for s_try in range(150, int(P0.total) - 100, 25):
+        side = P0.side_point(s_try, 50)
+        if side:
+            s_side = s_try
+            break
+    ctx, pg = guidance_page(br)
+    check("off-route test setup: a point 48 to 52 m from leg 0 and no nearer part of it", side is not None, "at %s m" % s_side)
+    feed(pg, P0.ll(s_side))
+    for _ in range(4):
+        feed(pg, side, acc=55, speed=5)
+    r = pg.evaluate("() => ({off: S.offRoute, cnt: S.offCnt})")
+    check("50 m from the route with a 55 m fix is not off route", r["off"] is False and r["cnt"] == 0, json.dumps(r))
+    for _ in range(4):
+        feed(pg, side, acc=10, speed=5)
+    r = pg.evaluate("() => ({off: S.offRoute, cnt: S.offCnt})")
+    check("50 m from the route with a 10 m fix is off route", r["off"] is True, json.dumps(r))
+    ctx.close()
+
+    # ---------- 19. the off-route arrow keeps its frame when the heading drops out ----------
+    far = far_point(legs[0]["geom"])
+
+    def arrow(pg):
+        return pg.evaluate("""() => { const a = document.getElementById('bArrow'), g = a.querySelector('g'), t = a.querySelector('text');
+            const m = g ? /rotate\\((-?\\d+) 24 24\\)/.exec(g.getAttribute('transform')) : null;
+            return {rot: m ? Number(m[1]) : null, label: t ? t.textContent : null, off: S.offRoute}; }""")
+
+    ctx, pg = guidance_page(br)
+    pg.evaluate("() => setLeg(0)")
+    feed(pg, legs[0]["geom"][0])
+    for k in range(4):
+        feed(pg, [far[0], far[1] + 0.00001 * k], acc=5, speed=0, heading=None)
+    a_none = arrow(pg)
+    brg = pg.evaluate("() => { const l = S.legs[0], e = l.geom[l.geom.length - 1]; return bearing([S.fix.lat, S.fix.lon], e); }")
+    check("off route with no heading: the arrow points on a north-up map and carries an N",
+          a_none["off"] and a_none["label"] == "N" and a_none["rot"] == round(brg), json.dumps(a_none) + " bearing=%.1f" % brg)
+    feed(pg, [far[0], far[1] + 0.00005], acc=5, speed=8, heading=90)
+    a_head = arrow(pg)
+    brg = pg.evaluate("() => { const l = S.legs[0], e = l.geom[l.geom.length - 1]; return bearing([S.fix.lat, S.fix.lon], e); }")
+    check("off route with a heading: the arrow is relative to the direction of travel, no N",
+          a_head["label"] is None and a_head["rot"] == round(brg - 90), json.dumps(a_head) + " bearing=%.1f" % brg)
+    feed(pg, [far[0], far[1] + 0.00005], acc=5, speed=0, heading=None)
+    a_held = arrow(pg)
+    check("the heading is held when the next fix has none: same frame, no N",
+          a_held["label"] is None and a_held["rot"] == a_head["rot"], json.dumps(a_held))
+    pg.evaluate("() => { if (S.lastHeading) S.lastHeading.t -= 31000; }")      # 31 s have passed since the last heading
+    feed(pg, [far[0], far[1] + 0.00005], acc=5, speed=0, heading=None)
+    a_old = arrow(pg)
+    brg = pg.evaluate("() => { const l = S.legs[0], e = l.geom[l.geom.length - 1]; return bearing([S.fix.lat, S.fix.lon], e); }")
+    check("the heading is forgotten after 30 s: north-up with an N again",
+          a_old["label"] == "N" and a_old["rot"] == round(brg), json.dumps(a_old))
+    ctx.close()
     br.close()
 
-errs = [e for e in errors if "favicon" not in e]
+errs =[e for e in errors if "favicon" not in e]
 check("no console errors or page errors", not errs, " || ".join(errs[:6]))
 print("SUMMARY", sum(1 for r in results if r[1]), "of", len(results), "passed")
 sys.exit(0 if all(r[1] for r in results) else 1)

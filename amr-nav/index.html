@@ -94,6 +94,7 @@ button{font:inherit;cursor:pointer}
 .row .rs div:last-child{font-size:12.5px;color:var(--muted)}
 .chip{font-size:11.5px;font-weight:700;border-radius:10px;padding:2px 8px;white-space:nowrap}
 .chip.done{background:#d1fae5;color:#065f46} .chip.skip{background:#e5e7eb;color:#374151} .chip.attn{background:var(--accent);color:#fff}
+.chip.pass{background:#fef3c7;color:#92400e}
 .row button{border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 10px;font-weight:700;color:var(--primary)}
 .sec{font-weight:800;color:var(--primary);margin:16px 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.04em}
 .help p{margin:6px 0;font-size:14px}
@@ -185,7 +186,12 @@ const CFG = {
   offFixes: 3,                       // consecutive fixes before "off route"
   far: {drive: 250, walk: 40},       // m: first voice prompt before a maneuver
   near: {drive: 45, walk: 10},       // m: second voice prompt
-  maxAcc: 60,                        // m: fixes worse than this do not trigger off-route or arrival
+  maxAcc: 60,                        // m: a fix worse than this only moves the marker; it is not matched to the route
+  leaveSpeed: 3,                     // m/s: faster than this, away from a waiting stop, the drive goes on without a tap
+  leaveDist: 80,                     // m: and farther than this from the end of the leg
+  fixStaleMs: 10000,                 // ms: no new fix for this long shows GPS lost
+  headingHoldMs: 30000,              // ms: the off-route arrow keeps the last known heading this long
+  lookAhead: 100,                    // m: matching first looks this far ahead of the last position on the leg
   rerouteGapMs: 20000,
   rerouteTimeoutMs: 8000,            // ms: give up on a reroute request after this long
   zoom: {drive: 17, walk: 18},
@@ -206,10 +212,10 @@ const asObj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};  
 const S = {
   route: null, base: null, legs: [], stopBy: {},
   routeText: '', routeSig: '', pending: null,   // route.json text in use, its hash, and a newer route that waits for the next new drive
-  legIdx: 0, done: {}, skipped: {}, override: null,
+  legIdx: 0, done: {}, skipped: {}, passed: {}, override: null,   // passed: stops the vehicle drove away from without a tap, to check later
   follow: true, voice: lsGet('voice', true), tiles: lsGet('tiles', false),
-  started: false, fix: null, offCnt: 0, offRoute: false, lastReroute: 0,
-  rt: null, lastIdx: 0, announced: {}, arrivedLeg: -1, waiting: null,
+  started: false, fix: null, fixAt: 0, blocked: false, lastHeading: null, offCnt: 0, offRoute: false, lastReroute: 0,   // fixAt: when the newest fix arrived (ms)
+  rt: null, lastAlong: 0, announced: {}, arrivedLeg: -1, waiting: null,   // lastAlong: distance along the leg at the last good match (m)
   sim: null, wake: null,
 };
 let rerouteSeq = 0;   // numbers reroute requests; setLeg() bumps it so a late reply for an old leg is dropped
@@ -256,11 +262,18 @@ function project(rt, p, i0, i1) {
   }
   return best;
 }
+/* Match a position to the leg. A road driven twice (out, then back) must not make the guide jump to the other pass,
+   so look first at the part of the leg from 30 m behind the last good match to CFG.lookAhead m ahead of it.
+   Search the whole leg only when nothing in that part is within the off-route distance. */
 function locate(rt, p) {
-  // search near the last position first so a road used twice does not make the guide jump
-  let pr = project(rt, p, S.lastIdx - 30, S.lastIdx + 250);
-  if (pr.d > 60) pr = project(rt, p);
-  S.lastIdx = pr.idx;
+  const n = rt.cum.length, lo = S.lastAlong - 30, hi = S.lastAlong + CFG.lookAhead, limit = CFG.off[rt.leg.mode];
+  let i0 = 0, i1;
+  while (i0 < n - 2 && rt.cum[i0 + 1] < lo) i0++;        // first segment that ends at or after lo
+  i1 = i0;
+  while (i1 < n - 2 && rt.cum[i1 + 1] <= hi) i1++;       // last segment that starts at or before hi
+  let pr = project(rt, p, i0, i1);
+  if (pr.d > limit) pr = project(rt, p);
+  if (pr.d <= limit) S.lastAlong = pr.along;             // a position off the route does not move the anchor
   return pr;
 }
 
@@ -472,9 +485,9 @@ function nextDriveLegAfterStop(o) {
 }
 function setLeg(i, why) {
   S.legIdx = Math.max(0, Math.min(S.legs.length - 1, i));
-  S.override = null; S.rt = prepLeg(S.legs[S.legIdx]); S.lastIdx = 0; S.announced = {}; S.offCnt = 0; S.offRoute = false;
+  S.override = null; S.rt = prepLeg(S.legs[S.legIdx]); S.lastAlong = 0; S.nav = null; S.announced = {}; S.offCnt = 0; S.offRoute = false;
   S.arrivedLeg = -1; S.waiting = null; rerouteSeq++;
-  lsSet('leg', S.legIdx); lsSet('done', S.done); lsSet('skipped', S.skipped);
+  lsSet('leg', S.legIdx); lsSet('done', S.done); lsSet('skipped', S.skipped); lsSet('passed', S.passed);
   drawRoute(); refreshStopIcons(); renderCard(); renderBanner();
   const leg = S.legs[S.legIdx];
   if (S.started && why !== 'silent') {
@@ -489,7 +502,17 @@ function spokenSite(st) { return st.site.replace(/\//g, ', ').replace(/\b0(\d{3}
 function markStop(o, how) {
   if (how === 'done') { S.done[o] = Date.now(); delete S.skipped[o]; }
   else { S.skipped[o] = Date.now(); delete S.done[o]; }
-  lsSet('done', S.done); lsSet('skipped', S.skipped);
+  delete S.passed[o];                 // the driver decided; the stop is no longer waiting for a later check
+  lsSet('done', S.done); lsSet('skipped', S.skipped); lsSet('passed', S.passed);
+}
+/* The vehicle drove away from a stop that was waiting for a tap: keep guiding, and leave the stop flagged as Passed. */
+function leaveStop() {
+  const st = stopOf(S.legs[S.legIdx]);
+  const to = S.waiting === 'park' ? nextDriveLegAfterStop(st.o) : S.legIdx + 1;
+  const nx = stopOf(S.legs[to]);
+  S.passed[st.o] = Date.now();
+  speak(nx ? 'Continuing to stop ' + nx.o + '.' : 'Continuing to McCluskey Services.', true);
+  setLeg(to, 'silent');               // the line above already told the driver where the guide goes next
 }
 
 /* ---------- arrival handling ---------- */
@@ -562,7 +585,10 @@ function renderBanner() {
     b.classList.add('off');
     const end = leg.geom[leg.geom.length - 1];
     const brg = bearing([S.fix.lat, S.fix.lon], end), d = hav([S.fix.lat, S.fix.lon], end);
-    $('bArrow').innerHTML = '<svg viewBox="0 0 48 48"><g transform="rotate(' + Math.round(brg - (S.fix.heading || 0) * (S.fix.heading == null ? 0 : 1)) + ' 24 24)"><path fill="#fff" d="M24 3l14 38-14-8-14 8z"/></g></svg>';
+    // the arrow is relative to the direction of travel; with no recent heading it points on a north-up map, marked N
+    const held = S.lastHeading && Date.now() - S.lastHeading.t <= CFG.headingHoldMs ? S.lastHeading.deg : null;
+    $('bArrow').innerHTML = '<svg viewBox="0 0 48 48"><g transform="rotate(' + Math.round(held == null ? brg : brg - held) + ' 24 24)"><path fill="#fff" d="M24 3l14 38-14-8-14 8z"/></g>' +
+      (held == null ? '<text x="47" y="10" text-anchor="end" font-size="11" font-weight="700" font-family="sans-serif" fill="#fff">N</text>' : '') + '</svg>';
     $('bDist').textContent = fmtDist(d);
     $('bInstr').textContent = 'Off route. Head ' + compass(brg) + ' to ' + (st ? 'stop ' + st.o : 'the finish');
     $('bThen').textContent = navigator.onLine ? 'Rerouting when possible' : 'Offline: follow the arrow';
@@ -571,7 +597,7 @@ function renderBanner() {
   const s = nav.step;
   $('bArrow').innerHTML = arrowSvg(s);
   $('bDist').textContent = s ? fmtDist(Math.max(0, nav.toStep)) : '';
-  $('bInstr').textContent = !s ? '' : (s.type === 'arrive' ? (leg.to.kind === 'park' ? 'Park for stop ' + st.o : leg.to.kind === 'car' ? 'Car' : leg.to.kind === 'depot' ? 'McCluskey Services' : 'Stop ' + st.o + ': ' + st.site) : instr(s, leg.mode));
+  $('bInstr').textContent = !s ? legLabel(S.legs[S.legIdx]) + (st ? ': ' + st.site : '') : (s.type === 'arrive' ? (leg.to.kind === 'park' ? 'Park for stop ' + st.o : leg.to.kind === 'car' ? 'Car' : leg.to.kind === 'depot' ? 'McCluskey Services' : 'Stop ' + st.o + ': ' + st.site) : instr(s, leg.mode));
   $('bThen').textContent = nav.then ? 'Then ' + instr(nav.then, leg.mode).replace(/^./, c => c.toLowerCase()) : '';
 }
 function renderCard() {
@@ -619,9 +645,9 @@ function renderCard() {
     pr.innerHTML = '<b>At stop ' + st.o + '.</b>Check that FieldLogic shows ' + (st.meters.length === 1 ? 'the read' : 'all ' + st.meters.length + ' reads') + '. Log anything marked ATTENTION.';
     next.textContent = leg.mode === 'walk' ? 'Done, walk back' : 'Done, next stop';
   } else if (S.waiting === 'finish') {
-    const nd = Object.keys(S.done).length, ns = Object.keys(S.skipped).length;
+    const nd = Object.keys(S.done).length, ns = Object.keys(S.skipped).length, np = Object.keys(S.passed).length;
     pr.className = 'show';
-    pr.innerHTML = '<b>Route complete.</b>' + nd + ' stops reached, ' + ns + ' skipped. Pull the tablet in AutoRead.';
+    pr.innerHTML = '<b>Route complete.</b>' + nd + ' stops reached, ' + ns + ' skipped' + (np ? ', ' + np + ' passed' : '') + '. Pull the tablet in AutoRead.';
     next.textContent = 'Review stops'; skip.style.display = 'none';
   } else {
     next.textContent = leg.to.kind === 'park' ? 'At parking spot' : leg.to.kind === 'car' ? 'Back at car' : leg.to.kind === 'depot' ? 'Finish' : 'Reached, next';
@@ -635,6 +661,7 @@ function renderCard() {
 
 /* ---------- position handling ---------- */
 function onFix(f, quiet) {
+  if (f !== S.fix) { S.fixAt = Date.now(); S.blocked = false; }   // a new fix; setLeg() replays the saved one and must not make it look new
   S.fix = f;
   const acc = f.acc || 0;
   const g = $('gps');
@@ -644,7 +671,13 @@ function onFix(f, quiet) {
   if (!meMarker) { meMarker = L.marker(ll, {icon: meIcon(f.heading), interactive: false, zIndexOffset: 1000}).addTo(map); accCircle = L.circle(ll, {radius: acc, color: '#2563eb', weight: 1, fillOpacity: 0.08, interactive: false}).addTo(map); }
   else { meMarker.setLatLng(ll); meMarker.setIcon(meIcon(f.heading)); accCircle.setLatLng(ll); accCircle.setRadius(acc); }
   if (!S.started || !S.route) { if (S.follow && !quiet) followTo(ll); return; }
+  // a weak fix only moves the marker: it must not move the guide along the leg, speak a prompt, or count as off route or arrival
+  if (acc > CFG.maxAcc) { $('bThen').textContent = 'Weak GPS. Waiting for a better fix.'; return; }
+  if (f.heading != null && !isNaN(f.heading)) S.lastHeading = {deg: f.heading, t: S.fixAt};
   const leg = currentLeg(), mode = leg.mode, rt = S.rt;
+  // the vehicle drove away from a stop that waits for a tap: go on to the next stop
+  if ((S.waiting === 'stop' || S.waiting === 'park') && mode === 'drive' && (f.speed || 0) > CFG.leaveSpeed &&
+      hav(ll, leg.geom[leg.geom.length - 1]) > CFG.leaveDist) { leaveStop(); return; }
   const pr = locate(rt, ll);
   const along = Math.min(pr.along, rt.total);
   // next maneuver
@@ -655,8 +688,9 @@ function onFix(f, quiet) {
   const nxt = rt.steps[k + 1];
   if (nxt && nxt.type !== 'arrive' && nxt.along - step.along < (mode === 'walk' ? 25 : 150)) then = nxt;
   S.nav = {along, toStep, step, then, off: pr.d, idx: k};
-  // off route
-  if (acc <= CFG.maxAcc && pr.d > CFG.off[mode]) S.offCnt++; else S.offCnt = 0;
+  // off route: farther from the line than the usual limit AND than the fix's own error. Not while the guide waits at a stop:
+  // a vehicle that leaves a waiting stop is not lost (it resumes on the next leg), so no "Off route." and no reroute request.
+  if (!S.waiting && pr.d > Math.max(CFG.off[mode], acc)) S.offCnt++; else S.offCnt = 0;
   const wasOff = S.offRoute;
   S.offRoute = S.offCnt >= CFG.offFixes;
   if (S.offRoute && !wasOff) { speak('Off route.', true); reroute(); }
@@ -671,7 +705,7 @@ function onFix(f, quiet) {
   // arrival
   const end = leg.geom[leg.geom.length - 1];
   const remain = rt.total - along;
-  if (!S.waiting && acc <= CFG.maxAcc && (remain <= CFG.arrive[mode] && hav(ll, end) <= CFG.arrive[mode] * 1.6 || hav(ll, end) <= CFG.arrive[mode] * 0.6)) arrived();
+  if (!S.waiting && (remain <= CFG.arrive[mode] && hav(ll, end) <= CFG.arrive[mode] * 1.6 || hav(ll, end) <= CFG.arrive[mode] * 0.6)) arrived();
   if (S.follow) followTo(ll, CFG.zoom[mode]);
   renderBanner(); renderCard();
 }
@@ -703,6 +737,7 @@ function onGeoErr(e) {
   g.className = 'none';
   g.textContent = e.code === 1 ? 'GPS blocked' : 'No GPS';
   if (e.code === 1) {
+    S.blocked = true;                 // checkFixAge() leaves this message alone
     toast('Location is blocked. Allow location for this app in Chrome settings.', 6000);
     // the browser ends the watch after a denial; free the slot so startGps() can try again
     try { if (watchId !== null) navigator.geolocation.clearWatch(watchId); } catch (x) { /* nothing to clear */ }
@@ -727,6 +762,16 @@ try {
     }).catch(() => { /* permission state not readable here */ });
   }
 } catch (e) { /* no permissions API */ }
+/* When no new fix comes, the banner must not look live: say so once the newest fix is older than CFG.fixStaleMs. */
+function checkFixAge() {
+  if (!S.started || !S.fix || S.blocked) return;       // before Start, or before the first fix, other messages apply; GPS blocked has its own
+  const age = Date.now() - S.fixAt;
+  if (age <= CFG.fixStaleMs) return;
+  const g = $('gps');
+  g.className = 'none'; g.textContent = 'GPS lost';
+  $('bThen').textContent = 'GPS lost. Last fix ' + Math.round(age / 1000) + ' s ago.';
+}
+setInterval(checkFixAge, 2000);
 
 /* ---------- reroute (online only) ---------- */
 function legFromOsrm(o, mode) {
@@ -756,7 +801,7 @@ async function reroute() {
     const nl = legFromOsrm(j.routes[0].legs[0], base.mode);
     nl.to = base.to;
     if (nl.geom.length < 2) throw new Error('short');
-    S.override = nl; S.rt = prepLeg(nl); S.lastIdx = 0; S.announced = {}; S.offCnt = 0; S.offRoute = false;
+    S.override = nl; S.rt = prepLeg(nl); S.lastAlong = 0; S.announced = {}; S.offCnt = 0; S.offRoute = false;
     drawCurrent(); speak('Route updated.'); toast('New route to ' + (stopOf(base) ? 'stop ' + stopOf(base).o : 'the finish'));
   } catch (e) { /* offline, timed out or no route: keep the arrow */ }
   finally { clearTimeout(timer); }
@@ -769,12 +814,12 @@ let resetArmed = 0;
 function renderPanel() {
   const r = S.route, body = $('pBody');
   const nm = r.stops.reduce((a, s) => a + s.meters.length, 0);
-  const nd = Object.keys(S.done).length, ns = Object.keys(S.skipped).length;
+  const nd = Object.keys(S.done).length, ns = Object.keys(S.skipped).length, np = Object.keys(S.passed).length;
   const totalMi = S.legs.filter(l => l.mode === 'drive').reduce((a, l) => a + l.dist, 0);
   body.innerHTML = '';
   const sum = document.createElement('div');
   sum.className = 'sum';
-  sum.textContent = r.stops.length + ' stops · ' + nm + ' meters on the map · ' + fmtDist(totalMi) + ' drive loop · ' + nd + ' reached, ' + ns + ' skipped';
+  sum.textContent = r.stops.length + ' stops · ' + nm + ' meters on the map · ' + fmtDist(totalMi) + ' drive loop · ' + nd + ' reached, ' + ns + ' skipped, ' + np + ' passed';
   body.appendChild(sum);
   const cur = currentTargetStop();
   r.stops.forEach(st => {
@@ -784,11 +829,11 @@ function renderPanel() {
     const attn = st.meters.filter(m => m.attn).length;
     const walk = S.legs.some(l => l.to && l.to.o === st.o && l.to.kind === 'park');
     row.innerHTML = '<span class="stopno' + (walk ? ' walk' : '') + '">' + st.o + '</span><div class="rs"><div></div><div></div></div>' +
-      (S.done[st.o] ? '<span class="chip done">Reached</span>' : S.skipped[st.o] ? '<span class="chip skip">Skipped</span>' : attn ? '<span class="chip attn">' + attn + ' ATTN</span>' : '') +
+      (S.done[st.o] ? '<span class="chip done">Reached</span>' : S.skipped[st.o] ? '<span class="chip skip">Skipped</span>' : S.passed[st.o] ? '<span class="chip pass">Passed</span>' : attn ? '<span class="chip attn">' + attn + ' ATTN</span>' : '') +
       '<button>Go</button>';
     row.querySelector('.rs div:first-child').textContent = st.site;
     row.querySelector('.rs div:last-child').textContent = st.meters.length + (st.meters.length === 1 ? ' meter' : ' meters') + (walk ? ' · walk-in stop' : '') + (st.road ? ' · ' + st.road : '');
-    row.querySelector('button').onclick = () => { closePanel(); delete S.done[st.o]; delete S.skipped[st.o]; setLeg(firstLegOfStop(st.o)); };
+    row.querySelector('button').onclick = () => { closePanel(); delete S.done[st.o]; delete S.skipped[st.o]; delete S.passed[st.o]; setLeg(firstLegOfStop(st.o)); };
     body.appendChild(row);
   });
   if (r.unmapped && r.unmapped.length) {
@@ -802,7 +847,7 @@ function renderPanel() {
   $('bReset').onclick = () => {
     if (Date.now() - resetArmed > 4000) { resetArmed = Date.now(); $('bReset').textContent = 'Tap again to clear progress'; return; }
     const swap = !!S.pending;
-    S.done = {}; S.skipped = {}; resetArmed = 0; closePanel();
+    S.done = {}; S.skipped = {}; S.passed = {}; resetArmed = 0; closePanel();
     if (swap) adoptPending();
     setLeg(0);
     toast(swap ? 'New route loaded. Stop 1 is next.' : 'Progress cleared. Stop 1 is next.');
@@ -897,7 +942,7 @@ function renderStart() {
       fresh.onclick = () => { adoptPending(); begin(); };
     } else {
       fresh.textContent = 'Start a new drive at stop 1';
-      fresh.onclick = () => { S.done = {}; S.skipped = {}; S.legIdx = 0; begin(); };
+      fresh.onclick = () => { S.done = {}; S.skipped = {}; S.passed = {}; S.legIdx = 0; begin(); };
     }
     btns.appendChild(fresh);
   }
@@ -956,7 +1001,7 @@ function setRoute(r, text, sig) {
   S.route = r; S.routeText = text; S.routeSig = sig; S.legs = r.legs; S.stopBy = {};
   r.stops.forEach(s => { S.stopBy[s.o] = s; });
 }
-function clearProgress() { lsSet('leg', 0); lsSet('done', {}); lsSet('skipped', {}); }
+function clearProgress() { lsSet('leg', 0); lsSet('done', {}); lsSet('skipped', {}); lsSet('passed', {}); }
 /* Remember the route in use. A later deploy then cannot swap the route under a drive that has progress. */
 function pinRoute() { lsSet('activeRoute', S.routeText); lsSet('activeSig', S.routeSig); lsSet('sig', S.routeSig); }
 function showRoute() {                 // draw the route in S on the map and the cards
@@ -969,7 +1014,7 @@ function adoptPending() {              // switch to the newer route that was wai
   const p = S.pending;
   S.pending = null;
   setRoute(p.route, p.text, p.sig);
-  S.done = {}; S.skipped = {}; S.legIdx = 0; clearProgress();
+  S.done = {}; S.skipped = {}; S.passed = {}; S.legIdx = 0; clearProgress();
   pinRoute();
   showRoute();
 }
@@ -1002,7 +1047,7 @@ async function load() {
     if (qs.has('reset')) { qs.delete('reset'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : '')); }
     const li = Number(lsGet('leg', 0));
     S.legIdx = Number.isInteger(li) ? Math.max(0, Math.min(li, S.legs.length - 1)) : 0;
-    S.done = asObj(lsGet('done', {})); S.skipped = asObj(lsGet('skipped', {}));
+    S.done = asObj(lsGet('done', {})); S.skipped = asObj(lsGet('skipped', {})); S.passed = asObj(lsGet('passed', {}));
     drawBase(); applyTiles();
     showRoute(); renderStart();
     if (qs.has('sim')) simStart(); else startGps();
