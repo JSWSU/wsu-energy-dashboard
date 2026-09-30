@@ -682,6 +682,39 @@ with sync_playwright() as p:
     st = pg.evaluate("() => ({saved: S.tiles, base: map.hasLayer(baseGroup), tiles: map.hasLayer(tileLayer)})")
     check("layer button online: a second tap switches it on again", st["saved"] is True and st["tiles"] is True and st["base"] is False, json.dumps(st))
     ctx.close()
+
+    # ---------- 13. a tab opened on another file in the scope must not replace the saved app page ----------
+    # No ctx.route here, so set_offline reaches the worker's own requests.
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    check("service worker controls the page (other-file test)", sw_controls(pg))
+    check("Offline ready. shows before the other files are opened",
+          wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20))
+    for other in ("route.json", "manifest.webmanifest", "sw.js"):
+        pg.goto("about:blank")
+        try:
+            pg.goto(BASE + other)
+        except Exception:
+            pass                       # a file type the browser downloads instead of showing still went through the worker
+        pg.wait_for_timeout(300)
+    # stay on that last file (no online visit to the app page, which would save a good copy again) and read the cache from here
+    kind = pg.evaluate("""async () => { const r = await caches.match(new URL('./', location.href).href);
+        return r ? (r.headers.get('content-type') || '') : null; }""")
+    check("the saved app page is still text/html after other files were opened in the tab", bool(kind) and kind.lower().startswith("text/html"), str(kind))
+    net_failed = []
+    ctx.on("requestfailed", lambda r: net_failed.append((r.url, bool(r.service_worker))))
+    ctx.set_offline(True)
+    pg.goto("about:blank")
+    pg.goto(BASE)
+    ok = wait_for(pg, lambda: "43 stops" in (pg.locator("#startBody").inner_text() or ""), timeout=20)
+    check("offline, the app still opens and its start card shows 43 stops", ok, text(pg, "body")[:60])
+    check("that offline open failed at the network first (the worker's own request)",
+          any(sw and u.rstrip("?").endswith("/amr-nav/") for u, sw in net_failed), json.dumps(net_failed[:3]))
+    ctx.set_offline(False)
+    ctx.close()
     br.close()
 
 errs = [e for e in errors if "favicon" not in e]

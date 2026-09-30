@@ -22,12 +22,17 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
+const SCOPE_PATH = new URL('./', self.location).pathname;       // for example /amr-nav/
+const isAppPage = url => url.pathname === SCOPE_PATH || url.pathname === SCOPE_PATH + 'index.html';
+
 /* Network first: ask the server (no HTTP cache), wait at most FRESH_TIMEOUT_MS. A good reply is saved under `key`
-   and returned. Otherwise return the saved copy; with no saved copy, return the server reply or a 503. */
-async function networkFirst(e, key) {
+   and returned (when `html` is set, only a text/html reply is saved, so a stray file can never take the app page's place).
+   Otherwise return the saved copy; with no saved copy, return the server reply or a 503. */
+async function networkFirst(e, key, html) {
   const cache = await caches.open(VERSION);
   const net = fetch(e.request, {cache: 'no-cache'}).then(res => {
-    if (res.ok) cache.put(key, res.clone()).catch(() => { /* storage full: serve without saving */ });
+    const saveable = res.ok && (!html || /^text\/html/i.test(res.headers.get('content-type') || ''));
+    if (saveable) cache.put(key, res.clone()).catch(() => { /* storage full: serve without saving */ });
     return res;
   });
   let timer, res = null;
@@ -44,13 +49,14 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
-  const nav = req.mode === 'navigate';
-  if (nav || url.pathname.endsWith('route.json')) {
-    // one saved page for every address that opens the app (?reset=1, ?sim=1, index.html); route.json without its query
-    e.respondWith(networkFirst(e, nav ? './' : url.origin + url.pathname));
+  // the app page: one saved copy for every address that opens it (./, index.html, with or without ?reset=1 or ?sim=1)
+  const page = req.mode === 'navigate' && isAppPage(url);
+  if (page || url.pathname.endsWith('route.json')) {
+    e.respondWith(networkFirst(e, page ? './' : url.origin + url.pathname, page));    // route.json: saved without its query
     return;
   }
-  // everything else: saved copy first, refresh in the background (stale while revalidate), exact address only
+  // everything else, including a tab opened on another file in the scope: saved copy first, refresh in the
+  // background (stale while revalidate), exact address only
   e.respondWith(caches.open(VERSION).then(async cache => {
     const hit = await cache.match(req);
     const net = fetch(req).then(res => {
