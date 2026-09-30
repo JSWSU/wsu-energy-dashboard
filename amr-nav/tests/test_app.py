@@ -4,6 +4,9 @@ Run from the repository root while a static server serves the repository root:
     py -m http.server 41999 --bind 127.0.0.1
     py amr-nav\\tests\\test_app.py
 Only the original reroute check (section 2) calls the real OSRM server. New checks intercept it.
+Interception of route.json and the page uses ctx.route (context level), because page.route does not see the
+requests that the service worker makes. A request that a handler lets through ignores set_offline, so the
+offline steps remove the handler first.
 """
 import base64
 import json
@@ -24,6 +27,7 @@ results = []
 
 
 def check(name, ok, detail=""):
+    detail = " ".join(str(detail).split())          # one line per check
     results.append((name, bool(ok), detail))
     print(("PASS " if ok else "FAIL ") + name + (" | " + detail if detail else ""))
 
@@ -73,6 +77,8 @@ def far_point(geom, min_m=250):
 
 
 OSRM_URL = re.compile(r"https://routing\.openstreetmap\.de/")
+ROUTE_URL = re.compile(r"/amr-nav/route\.json(\?.*)?$")
+PAGE_URL = re.compile(r"/amr-nav/(index\.html)?(\?.*)?$")
 TILE_URL = re.compile(r"https://tile\.openstreetmap\.org/")
 PNG_1PX = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
 # remembers the AbortSignal of every reroute request, so a test can see whether the app ended it
@@ -81,6 +87,38 @@ window.__osrmSignals = [];
 const __f = window.fetch.bind(window);
 window.fetch = (u, o) => { if (String(u).includes('routing.openstreetmap.de')) window.__osrmSignals.push(o && o.signal); return __f(u, o); };
 """
+
+
+ROUTE_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "route.json"), "rb").read().decode("utf-8")
+ROUTE_BUILT = json.loads(ROUTE_TEXT)["built"]
+
+
+def fnv1a_py(s):
+    """32-bit FNV-1a over the UTF-16 code units of s, as 8 hex digits (the same as the page's fnv1a)."""
+    b = s.encode("utf-16-le")
+    h = 0x811C9DC5
+    for i in range(0, len(b), 2):
+        h = ((h ^ (b[i] | (b[i + 1] << 8))) * 0x01000193) & 0xFFFFFFFF
+    return "%08x" % h
+
+
+def route_editor(state):
+    """Handler for ctx.route(ROUTE_URL, ...). state['edit'] is None (pass the request on) or a function that
+    rewrites the route.json text. The rewritten text is kept in state['served']. The service worker's own
+    requests reach this handler too, because the route is set on the context."""
+    def handler(route):
+        edit = state["edit"]
+        if edit is None:
+            route.continue_()
+            return
+        body = edit(route.fetch().text())
+        state["served"] = body
+        route.fulfill(status=200, content_type="application/json", body=body)
+    return handler
+
+
+def sw_controls(pg, timeout=20):
+    return wait_for(pg, lambda: pg.evaluate("() => navigator.serviceWorker && navigator.serviceWorker.controller ? 1 : 0"), timeout=timeout)
 
 
 def osrm_reply(geom):
@@ -144,6 +182,11 @@ def reroute_case(br, mode):
         out["aborted"] = pump_until(pg, lambda: pg.evaluate("() => !!(__osrmSignals[0] && __osrmSignals[0].aborted)"), timeout=8)
     out.update(pg.evaluate("() => ({override: !!S.override, legIdx: S.legIdx, done: Object.keys(S.done), waiting: S.waiting})"))
     out["leg0_to"] = pg.evaluate("() => S.legs.slice(0, 1).filter(l => l.to.kind === 'stop').map(l => String(l.to.o))")
+    for h in held:                                     # answer every held request, so no handler is left waiting when the context closes
+        try:
+            release(h, {"code": "NoRoute"})
+        except Exception:
+            pass                                       # already answered, or the app ended the request
     ctx.close()
     return out
 
@@ -216,6 +259,8 @@ with sync_playwright() as p:
     check("resume offers the current stop", "Resume at stop 12" in text(pg, "#startBtns"), text(pg, "#startBtns"))
     sw = wait_for(pg, lambda: pg.evaluate("() => navigator.serviceWorker && navigator.serviceWorker.controller ? 1 : 0"), timeout=20)
     check("service worker controls the page", sw)
+    ready = wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
+    check("start screen says Offline ready. once the worker holds route.json and basemap.json", ready, text(pg, "#startBody")[-80:])
     ctx.set_offline(True)
     pg.reload()
     ok = wait_for(pg, lambda: "43 stops" in (pg.locator("#startBody").inner_text() or ""), timeout=20)
@@ -382,6 +427,260 @@ with sync_playwright() as p:
     pg.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
     got = pump_until(pg, lambda: pg.evaluate("() => S.fix !== null"), timeout=5)
     check("after permission is granted the app gets a fix without a reload", got, text(pg, "#gps"))
+    ctx.close()
+
+    # ---------- 8. a redeploy in the middle of a drive ----------
+    # Every request for route.json, including the service worker's own, goes through ctx.route (set on the context,
+    # so the worker's traffic is seen). The worker is on, so this also proves it asks the network first.
+    NEW_BUILT = "10/01/2026"
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    rstate = {"edit": None, "served": None}
+    ctx.route(ROUTE_URL, route_editor(rstate))
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    check("service worker controls the page (redeploy test)", sw_controls(pg))
+    vec = pg.evaluate("() => [fnv1a(''), fnv1a('a'), fnv1a('foobar')]")
+    check("fnv1a gives the published FNV-1a test values", vec == ["811c9dc5", "e40c292c", "bf9cf968"], json.dumps(vec))
+    sig0 = pg.evaluate("() => S.routeSig")
+    check("the route signature is the FNV-1a hash of route.json", sig0 == fnv1a_py(ROUTE_TEXT), sig0 + " vs " + fnv1a_py(ROUTE_TEXT))
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(1000)
+    pin = pg.evaluate("() => ({route: lsGet('activeRoute', null), sig: lsGet('activeSig', null)})")
+    check("Start pins the route text and its hash", pin["route"] == ROUTE_TEXT and pin["sig"] == sig0, str(pin["sig"]))
+    # reach two stops by GPS: legs 3 and 4 end at stops 2 and 3, which have no ATTENTION meters
+    pg.evaluate("() => setLeg(3)")
+    for _ in range(2):
+        before = pg.evaluate("() => S.legIdx")
+        end = pg.evaluate("() => { const g = S.legs[S.legIdx].geom; return g[g.length - 1]; }")
+        ctx.set_geolocation({"latitude": end[0], "longitude": end[1], "accuracy": 5})
+        pump_until(pg, lambda: pg.evaluate("() => S.legIdx") != before, timeout=8)
+    prog = pg.evaluate("() => ({leg: S.legIdx, done: Object.keys(S.done).sort(), next: currentTargetStop().o})")
+    check("redeploy test setup: two stops reached", len(prog["done"]) == 2 and prog["leg"] == 5 and prog["next"] == 4, json.dumps(prog))
+
+    def reload_with(edit):
+        rstate["edit"] = edit
+        pg.reload()
+        pg.wait_for_selector("#startBtns button", timeout=20000)
+        return pg.evaluate("""() => ({leg: S.legIdx, done: Object.keys(S.done).sort(), built: S.route.built,
+            line: document.getElementById('newRouteLine') ? document.getElementById('newRouteLine').textContent : null,
+            btns: [...document.querySelectorAll('#startBtns button')].map(b => b.textContent)})""")
+
+    # same built date, other content: the hash (not the date) decides
+    r = reload_with(lambda t: t.replace('"source":"', '"source":"Revised. ', 1))
+    check("redeploy test: the served route.json really differs", rstate["served"] != ROUTE_TEXT and ROUTE_BUILT in rstate["served"])
+    check("new content with the same built date still shows the new-route line",
+          r["line"] == "A new route is ready (built " + ROUTE_BUILT + "). It loads when you start a new drive.", str(r["line"]))
+    check("a new route keeps the saved progress", r["leg"] == prog["leg"] and r["done"] == prog["done"], json.dumps(r))
+    check("the primary button resumes at the same stop", r["btns"][0] == "Resume at stop 4", json.dumps(r["btns"]))
+    check("the second button starts a new drive with the new route", r["btns"][1:] == ["Start a new drive with the new route"], json.dumps(r["btns"]))
+    # the old route comes back: no new-route line, same progress (the worker must not serve the revised copy it saved)
+    r = reload_with(None)
+    check("route.json back to the pinned one: no new-route line, progress kept",
+          r["line"] is None and r["leg"] == prog["leg"] and r["done"] == prog["done"] and r["btns"][0] == "Resume at stop 4", json.dumps(r))
+    # the brief's case: the built date changes
+    r = reload_with(lambda t: t.replace('"built":"' + ROUTE_BUILT + '"', '"built":"' + NEW_BUILT + '"', 1))
+    check("redeploy mid-drive: the new-route line shows the new built date",
+          r["line"] == "A new route is ready (built " + NEW_BUILT + "). It loads when you start a new drive.", str(r["line"]))
+    check("redeploy mid-drive: progress is kept (same leg, same stops)", r["leg"] == prog["leg"] and r["done"] == prog["done"], json.dumps(r))
+    check("redeploy mid-drive: primary button reads Resume at stop 4 and the session runs the pinned route",
+          r["btns"][0] == "Resume at stop 4" and r["built"] == ROUTE_BUILT, json.dumps(r))
+    pg.click('#startBtns button:has-text("Start a new drive with the new route")')
+    pg.wait_for_timeout(800)
+    st = pg.evaluate("""() => ({leg: S.legIdx, done: Object.keys(S.done), skipped: Object.keys(S.skipped), built: S.route.built,
+        started: S.started, sig: lsGet('activeSig', null), saved: lsGet('leg', null), shown: getComputedStyle(document.getElementById('start')).display})""")
+    check("new drive with the new route: leg 0, nothing reached", st["leg"] == 0 and st["done"] == [] and st["skipped"] == [] and st["saved"] == 0, json.dumps(st))
+    check("new drive with the new route: the page now uses the new route", st["built"] == NEW_BUILT and st["started"] and st["shown"] == "none", json.dumps(st))
+    check("the new route is pinned", st["sig"] == fnv1a_py(rstate["served"]), json.dumps(st))
+    r = reload_with(rstate["edit"])
+    check("after the switch the new route is the pinned one: no new-route line", r["line"] is None and r["built"] == NEW_BUILT, json.dumps(r))
+    check("after the switch the start button starts at stop 1", r["btns"] == ["Start guidance"], json.dumps(r["btns"]))
+    # a panel reset with a newer route waiting also switches to it
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(500)
+    pg.evaluate("() => setLeg(3)")
+    rstate["edit"] = lambda t: t.replace('"built":"' + ROUTE_BUILT + '"', '"built":"11/01/2026"', 1)
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    check("a newer route waits while the drive has progress",
+          pg.evaluate("() => !!S.pending && S.pending.route.built === '11/01/2026' && S.route.built === '10/01/2026'"))
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(500)
+    pg.click("#fList")
+    pg.click("#bReset")
+    pg.click("#bReset")      # the second tap confirms
+    pg.wait_for_timeout(500)
+    st = pg.evaluate("() => ({leg: S.legIdx, built: S.route.built, pending: S.pending, sig: lsGet('activeSig', null)})")
+    check("Start a new drive in the stop list switches to the waiting route", st["leg"] == 0 and st["built"] == "11/01/2026" and st["pending"] is None
+          and st["sig"] == fnv1a_py(rstate["served"]), json.dumps(st))
+    ctx.close()
+
+    # ---------- 9. a query address does not pin an old page; the saved page is one entry ----------
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    pstate = {"marker": None}
+
+    def page_handler(route):
+        if not pstate["marker"]:
+            route.continue_()
+            return
+        body = route.fetch().text().replace("<head>", "<head><!-- " + pstate["marker"] + " -->", 1)
+        route.fulfill(status=200, content_type="text/html; charset=utf-8", body=body)
+
+    ctx.route(PAGE_URL, page_handler)
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE)
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    check("service worker controls the page (query test)", sw_controls(pg))
+    pg.goto(BASE + "?reset=1")                     # a query visit while the worker runs: the old worker saved a second page entry
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pstate["marker"] = "AMR-TEST-MARKER-1"
+    pg.goto("about:blank")
+    pg.goto(BASE)                                  # plain address, online, the server now sends a changed page
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    has = pg.evaluate("() => document.head.innerHTML.includes('AMR-TEST-MARKER-1')")
+    check("a plain visit after a ?reset=1 visit shows the page the server sends now", has)
+    pstate["marker"] = "AMR-TEST-MARKER-2"
+    pg.goto("about:blank")
+    pg.goto(BASE + "?sim=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    check("a ?sim=1 visit also shows the page the server sends now", pg.evaluate("() => document.head.innerHTML.includes('AMR-TEST-MARKER-2')"))
+    keys = pg.evaluate("""async () => { const out = []; for (const k of await caches.keys()) { const c = await caches.open(k);
+        (await c.keys()).forEach(r => out.push(r.url)); } return out; }""")
+    check("no saved page or file has a query string", not [u for u in keys if "?" in u], " ".join(u for u in keys if "?" in u))
+    pstate["marker"] = None
+    # A request that a ctx.route handler lets through is not stopped by set_offline, so drop the handler first:
+    # the offline steps below must reach the worker's real (failing) network request.
+    ctx.unroute(PAGE_URL, page_handler)
+    net_failed = []
+    ctx.on("requestfailed", lambda r: net_failed.append((r.url, bool(r.service_worker))))
+    ctx.set_offline(True)
+    pg.goto("about:blank")
+    pg.goto(BASE + "?sim=1")
+    ok = wait_for(pg, lambda: "43 stops" in (pg.locator("#startBody").inner_text() or ""), timeout=20)
+    check("offline, a query address opens from the one saved page", ok)
+    check("that offline open really failed at the network first (the worker's own request)",
+          any(sw and "?sim=1" in u for u, sw in net_failed), json.dumps(net_failed[:3]))
+    ctx.set_offline(False)
+    pg.goto("about:blank")
+    pg.goto(BASE)
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    ready = wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
+    check("Offline ready. shows while the worker holds route.json and basemap.json", ready, text(pg, "#startBody")[-80:])
+    txt = pg.evaluate("""async () => { for (const k of await caches.keys()) { const c = await caches.open(k); await c.delete('basemap.json'); }
+        await updateOfflineLine(); return document.getElementById('offlineLine').textContent; }""")
+    check("without basemap.json in the cache the line asks the driver to wait online",
+          txt == "Not offline ready yet. Keep this page open online for a minute.", txt)
+    ctx.close()
+
+    # a browser without service workers (insecure address, old browser): never claim offline readiness
+    ctx = br.new_context(viewport={"width": 800, "height": 1280})
+    pg = ctx.new_page()
+    attach(pg)
+    pg.add_init_script("delete Navigator.prototype.serviceWorker;")
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    ok = wait_for(pg, lambda: "Not offline ready yet. Keep this page open online for a minute." in text(pg, "#startBody"), timeout=10)
+    check("with no service worker the start screen says Not offline ready yet.", ok, text(pg, "#startBody")[-90:])
+    ctx.close()
+
+    # ---------- 10. a slow network: wait 3 s, then use the saved route; the late reply still refreshes the save ----------
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    held = []
+    hold = {"on": False}
+
+    def slow_handler(route):
+        if hold["on"]:
+            held.append(route)
+        else:
+            route.continue_()
+
+    ctx.route(ROUTE_URL, slow_handler)
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    sw_controls(pg)
+    wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
+    hold["on"] = True
+    t0 = time.time()
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    dt = time.time() - t0
+    check("route.json that never answers: the page waits about 3 s, then opens with the saved route",
+          2.5 <= dt <= 9 and len(held) >= 1 and "43 stops" in text(pg, "#startBody"), "%.1f s, held=%d" % (dt, len(held)))
+    late = json.loads(ROUTE_TEXT)
+    late["built"] = "12/31/2026"
+    for h in held:
+        h.fulfill(status=200, content_type="application/json", body=json.dumps(late, separators=(",", ":")))
+    hold["on"] = False
+    saved = wait_for(pg, lambda: '"built":"12/31/2026"' in pg.evaluate("async () => { const r = await caches.match('route.json'); return r ? await r.text() : ''; }"), timeout=8)
+    check("the late reply was saved in the worker's cache", saved)
+    ctx.close()
+
+    # ---------- 11. a failed store does not stop the drive from starting ----------
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    pg = ctx.new_page()
+    attach(pg)
+    pg.add_init_script("""
+      const __set = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) {
+        if (String(k).endsWith('.activeRoute')) throw new DOMException('full', 'QuotaExceededError');
+        return __set.call(this, k, v);
+      };
+    """)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(1000)
+    st = pg.evaluate("() => ({started: S.started, shown: getComputedStyle(document.getElementById('start')).display, pinned: localStorage.getItem('amrNav.v1.activeRoute'), leg: lsGet('leg', null)})")
+    check("Start works when the route pin cannot be stored", st["started"] and st["shown"] == "none" and st["pinned"] is None and st["leg"] == 0, json.dumps(st))
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    check("the app still opens after a failed pin", "43 stops" in text(pg, "#startBody"))
+    ctx.close()
+
+    # ---------- 12. street tiles showing: no offline buildings and paths on top; the layer button offline ----------
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    ctx.route(TILE_URL, lambda route: route.fulfill(status=200, content_type="image/png", body=PNG_1PX))
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.evaluate("() => localStorage.setItem('amrNav.v1.tiles', 'true')")
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.evaluate("() => { map.setZoom(16, {animate: false}); }")
+    pg.wait_for_timeout(500)
+    lay = "() => ({z: map.getZoom(), tiles: map.hasLayer(tileLayer), base: map.hasLayer(baseGroup), bldg: map.hasLayer(bldgGroup), path: map.hasLayer(pathGroup)})"
+    st = pg.evaluate(lay)
+    check("street tiles at zoom 16: buildings and paths of the offline map are not added",
+          st["z"] == 16 and st["tiles"] is True and st["bldg"] is False and st["path"] is False, json.dumps(st))
+    pg.evaluate("() => { map.setZoom(14, {animate: false}); map.setZoom(17, {animate: false}); }")
+    pg.wait_for_timeout(300)
+    st = pg.evaluate(lay)
+    check("street tiles after more zooming: still no offline buildings or paths",
+          st["tiles"] is True and st["bldg"] is False and st["path"] is False, json.dumps(st))
+    ctx.set_offline(True)
+    ok = pump_until(pg, lambda: pg.evaluate("() => map.hasLayer(bldgGroup) && map.hasLayer(pathGroup) && !map.hasLayer(tileLayer)"), timeout=8)
+    check("offline map showing: buildings and paths are added", ok, json.dumps(pg.evaluate(lay)))
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(800)
+    pg.click("#fLayer")
+    st = pg.evaluate("() => ({saved: S.tiles, stored: lsGet('tiles', null), base: map.hasLayer(baseGroup), tiles: map.hasLayer(tileLayer)})")
+    toast_txt = pg.locator("#toast").inner_text().strip() if pg.locator("#toast").is_visible() else ""
+    check("layer button offline with street map saved: the saved choice stays on", st["saved"] is True and st["stored"] is True, json.dumps(st))
+    check("layer button offline: the data connection toast shows and the map does not change",
+          toast_txt == "Street map needs a data connection" and st["base"] is True and st["tiles"] is False, toast_txt + " " + json.dumps(st))
+    ctx.set_offline(False)
+    pump_until(pg, lambda: pg.evaluate("() => map.hasLayer(tileLayer)"), timeout=8)
+    pg.click("#fLayer")                              # online: the button still switches the street map off
+    st = pg.evaluate("() => ({saved: S.tiles, base: map.hasLayer(baseGroup), tiles: map.hasLayer(tileLayer)})")
+    check("layer button online: a tap switches the street map off", st["saved"] is False and st["base"] is True and st["tiles"] is False, json.dumps(st))
+    pg.click("#fLayer")
+    st = pg.evaluate("() => ({saved: S.tiles, base: map.hasLayer(baseGroup), tiles: map.hasLayer(tileLayer)})")
+    check("layer button online: a second tap switches it on again", st["saved"] is True and st["tiles"] is True and st["base"] is False, json.dumps(st))
     ctx.close()
     br.close()
 
