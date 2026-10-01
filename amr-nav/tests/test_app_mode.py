@@ -10,6 +10,10 @@ from playwright.sync_api import sync_playwright
 
 import apptest as A
 
+GRAPH_URL = re.compile(r"/amr-nav/graph\.json(\?.*)?$")
+ROUTE_URL = re.compile(r"/amr-nav/route\.json(\?.*)?$")
+GRAPH_DONE = "() => !!GR && !graphLoading"           # the road map is decoded and the offline line has been brought up to date
+
 
 @A.case
 def t_browser_unchanged(br):
@@ -32,6 +36,7 @@ def t_app_detect(br):
     r = pg.evaluate("async () => ({regs: navigator.serviceWorker ? (await navigator.serviceWorker.getRegistrations()).length : 0, "
                     "ctl: !!(navigator.serviceWorker && navigator.serviceWorker.controller)})")
     A.check("app: no service worker is registered", r == {"regs": 0, "ctl": False}, json.dumps(r))
+    A.pump_until(pg, lambda: pg.evaluate(GRAPH_DONE), timeout=20)
     line = A.text(pg, "#offlineLine")
     A.check("app: the offline line names the app's built-in copy", line == "Offline ready. Web copy 2026.10.01-1, built into the app.", line)
     v = pg.evaluate("() => APP_VERSION")
@@ -39,6 +44,7 @@ def t_app_detect(br):
     ctx.close()
     ctx, pg = A.open_app(br, mode="app", start=False, query="?reset=1", init=A.QUIET_GPS,
                          native_cfg={"app": "1.0", "web": "2026.10.02-1", "source": "downloaded", "pending": "2026.10.03-1", "check": "staged 2026.10.03-1"})
+    A.pump_until(pg, lambda: pg.evaluate(GRAPH_DONE), timeout=20)
     line = A.text(pg, "#offlineLine")
     A.check("app: a downloaded copy, and a newer one that waits for the next start",
             line == "Offline ready. Web copy 2026.10.02-1, downloaded. Version 2026.10.03-1 loads at the next start.", line)
@@ -51,10 +57,51 @@ def t_app_detect(br):
 
 
 @A.case
+def t_app_road_map(br):
+    """In the app, Offline ready. waits for the road map (graph.json), as in a browser: while it loads, and when it does
+    not decode, the line says Loading the road map.; once it is decoded, the stops it does not reach are named."""
+    ctx = A.new_context(br)
+    graph = {"hold": True, "held": []}
+
+    def graph_gate(route):                              # holds the page's graph.json request until the test answers it
+        if graph["hold"]:
+            graph["held"].append(route)
+        else:
+            route.continue_()
+
+    def far_stop_33(route):                             # the end of leg 40 (stop 33) 5.5 km south, outside the road map's box
+        r = json.loads(route.fetch().text())
+        g = r["legs"][40]["geom"]
+        g[-1] = [round(g[-1][0] - 0.05, 6), g[-1][1]]
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(r, separators=(",", ":")))
+
+    ctx.route(GRAPH_URL, graph_gate)
+    ctx.route(ROUTE_URL, far_stop_33)
+    ctx, pg = A.open_app(br, mode="app", start=False, query="?reset=1", init=A.QUIET_GPS, ctx=ctx, native_cfg={"web": "2026.10.01-1"})
+    A.pump_until(pg, lambda: graph["held"], timeout=20)
+    line = A.text(pg, "#offlineLine")
+    A.check("app: while the road map loads, the line says so, not Offline ready.",
+            line == "Loading the road map. Web copy 2026.10.01-1, built into the app.", line)
+    graph["hold"] = False
+    graph["held"].pop(0).fulfill(status=200, content_type="application/json", body='{"damaged')
+    A.pump_until(pg, lambda: pg.evaluate("() => !graphLoading && !!graphErr"), timeout=20)
+    r = pg.evaluate("() => ({graph: !!GR, err: graphErr, line: document.getElementById('offlineLine').textContent})")
+    A.check("app: a road map that does not decode: no road map, and never Offline ready.",
+            not r["graph"] and r["err"] and r["line"] == "Loading the road map. Web copy 2026.10.01-1, built into the app.", json.dumps(r))
+    pg.evaluate("() => { startGraphLoad(); return true; }")   # the next try (a reroute or the device back online)
+    A.pump_until(pg, lambda: pg.evaluate(GRAPH_DONE), timeout=20)
+    line = A.text(pg, "#offlineLine")
+    A.check("app: the road map decoded: Offline ready., the stop it does not reach (as in a browser), then the web copy",
+            line == "Offline ready. The road map does not reach 1 stop: no new route to it. Web copy 2026.10.01-1, built into the app.", line)
+    ctx.close()
+
+
+@A.case
 def t_app_old_calls_safe(br):
     """A bridge that throws, or lacks a call, never stops the page."""
     broken = "window.AMRNative = {bridgeVersion() { return '1'; }, info() { throw new Error('boom'); }};"
     ctx, pg = A.open_app(br, mode="browser", start=False, query="?reset=1", init=[A.QUIET_GPS, broken])
+    A.pump_until(pg, lambda: pg.evaluate(GRAPH_DONE), timeout=20)
     A.check("a broken bridge: the route still loads and the offline line still shows",
             "Offline ready." in A.text(pg, "#offlineLine") and pg.evaluate("() => nativeCall('nope') === '' && JSON.stringify(nativeInfo()) === '{}'"))
     ctx.close()

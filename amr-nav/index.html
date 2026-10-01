@@ -1626,11 +1626,19 @@ function renderStart() {
   updateOfflineLine();
 }
 /* "Offline ready." once a service worker controls this page, its cache holds the route, the offline map and the road map for
-   rerouting, and this page has read that road map. A road map older than the route (built for fewer stops) is named too. */
+   rerouting, and this page has read that road map. A road map older than the route (built for fewer stops) is named too.
+   In the app, which holds every file itself, "Offline ready." waits only for this page to read the road map. */
 async function updateOfflineLine() {
   const el = $('offlineLine');
   if (!el) return;
-  if (NATIVE) { el.textContent = 'Offline ready. ' + appCopyText(); return; }   // the app holds every file itself
+  // the stops (and the depot) the road map does not reach, as a sentence ('' when it reaches all, or has not loaded)
+  const offMap = () => { const miss = stopsOffMap();
+    return miss ? 'The road map does not reach ' + miss + (miss === 1 ? ' stop: no new route to it.' : ' stops: no new route to them.') : ''; };
+  if (NATIVE) {
+    const off = offMap();
+    el.textContent = (GR ? 'Offline ready. ' : 'Loading the road map. ') + (off ? off + ' ' : '') + appCopyText();
+    return;
+  }
   let ready = false;
   try {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller && 'caches' in window) {
@@ -1638,9 +1646,8 @@ async function updateOfflineLine() {
       ready = got.every(Boolean) && !!GR;
     }
   } catch (e) { ready = false; }
-  const miss = stopsOffMap();
-  el.textContent = (ready ? 'Offline ready.' : 'Not offline ready yet. Keep this page open online for a minute.') +
-    (miss ? ' The road map does not reach ' + miss + (miss === 1 ? ' stop: no new route to it.' : ' stops: no new route to them.') : '');
+  const off = offMap();
+  el.textContent = (ready ? 'Offline ready.' : 'Not offline ready yet. Keep this page open online for a minute.') + (off ? ' ' + off : '');
 }
 
 /* ---------- controls ---------- */
