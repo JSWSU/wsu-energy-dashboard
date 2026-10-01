@@ -4,7 +4,9 @@ Run from the repository root while a static server serves the repository root:
     py -m http.server 41999 --bind 127.0.0.1
     py amr-nav\\tests\\test_app.py
 No check calls a server other than 127.0.0.1: rerouting runs on the page, on graph.json (the road map). Section 26
-drives offline with every other host blocked and recorded, and checks the router and its speed.
+drives offline with every other host blocked and recorded, and checks the router, its words and its speed. It also runs
+the reference router, Graph.route() in build_graph.py of the sensus-amr-read-cycle skill (folder scripts/route-guide, or
+the folder in the environment variable AMR_ROUTE_GUIDE), and the app's router must give the same costs.
 Interception of route.json, graph.json and the page uses ctx.route (context level), because page.route does not see
 the requests that the service worker makes. A request that a handler lets through ignores set_offline, so the
 offline steps remove the handler first, or route only the hosts they block.
@@ -22,6 +24,8 @@ from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 
 BASE = "http://127.0.0.1:41999/amr-nav/"
+RG_DIR = os.environ.get("AMR_ROUTE_GUIDE") or os.path.join(os.path.expanduser("~"), ".claude", "skills", "sensus-amr-read-cycle",
+                                                           "scripts", "route-guide")
 SHOTS = os.path.join(os.environ.get("TEMP", "."), "amr-cycle", "app-test-shots")
 os.makedirs(SHOTS, exist_ok=True)
 DEPOT = {"latitude": 46.728993, "longitude": -117.144701, "accuracy": 6}
@@ -1700,7 +1704,7 @@ with sync_playwright() as p:
           json.dumps([r0, r]))
     ctx.close()
 
-    # f. the app page opens at once from the saved copy (stale while revalidate); version 2026.10.01-1; every save inside e.waitUntil
+    # f. the app page opens at once from the saved copy (stale while revalidate); version 2026.10.01-2; every save inside e.waitUntil
     SW_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sw.js"), encoding="utf-8").read()
     puts = [ln.strip() for ln in SW_TEXT.splitlines() if "cache.put(" in ln]
     check("sw.js: every cache.put runs inside e.waitUntil", bool(puts) and all("e.waitUntil(" in ln for ln in puts), " | ".join(puts))
@@ -1714,7 +1718,7 @@ with sync_playwright() as p:
     sw_controls(pg)
     wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
     v = pg.evaluate("async () => ({app: APP_VERSION, caches: (await caches.keys()).filter(k => k.startsWith('amr-nav-'))})")
-    check("app version 2026.10.01-1 and one worker cache, amr-nav-2026.10.01-1", v["app"] == "2026.10.01-1" and v["caches"] == ["amr-nav-2026.10.01-1"], json.dumps(v))
+    check("app version 2026.10.01-2 and one worker cache, amr-nav-2026.10.01-2", v["app"] == "2026.10.01-2" and v["caches"] == ["amr-nav-2026.10.01-2"], json.dumps(v))
     hold["on"] = True
     pg.goto("about:blank")
     t0 = time.time()
@@ -1935,26 +1939,28 @@ with sync_playwright() as p:
     # ---------- 26. rerouting with no network at all: a drive on the installed app, the router, and its speed ----------
     GRAPH_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "graph.json"), encoding="utf-8").read()
     GRAPH_HEAD = json.loads(GRAPH_TEXT)
-    STEP_TYPES = {"depart", "turn", "new name", "continue", "end of road", "offpath", "arrive"}
+    STEP_TYPES = {"depart", "turn", "new name", "continue", "end of road", "offpath", "arrive", "roundabout", "exit roundabout"}
     STEP_MODS = {"", "straight", "slight left", "slight right", "left", "right", "sharp left", "sharp right", "uturn"}
     legs = ROUTE["legs"]
 
     def off_route_point(i, lo, hi, end_min, modes):
         """A vertex of another leg of the given modes (so it lies on a road or path), lo to hi m from leg i and end_min m or
-        more from the end of leg i: the one nearest the middle of that band. Returns (point, distance) or (None, None)."""
+        more from the end of leg i: the one nearest the middle of that band. Returns (point, distance, the direction of travel
+        of that other leg there) or (None, None, None)."""
         P = Path(legs[i]["geom"])
         end = legs[i]["geom"][-1]
         best = None
         for j, l in enumerate(legs):
             if j == i or l["mode"] not in modes:
                 continue
-            for q in l["geom"]:
+            for k, q in enumerate(l["geom"]):
                 d = P.nearest(P.xy_of(q))[0]
-                if lo <= d <= hi and hav_m(q, end) >= end_min:
+                if lo <= d <= hi and hav_m(q, end) >= end_min and 0 < k < len(l["geom"]) - 1:
                     key = (abs(d - (lo + hi) / 2), j, q[0], q[1])
                     if best is None or key < best[0]:
-                        best = (key, q, d)
-        return (best[1], best[2]) if best else (None, None)
+                        Q = Path(l["geom"])
+                        best = (key, q, d, Q.bearing(Q.cum[k]))
+        return (best[1], best[2], best[3]) if best else (None, None, None)
 
     def fix_state(pg, ll, speed, heading=None):
         """Hand one good fix to onFix and return what the guide made of it."""
@@ -1991,7 +1997,7 @@ with sync_playwright() as p:
     for i, mode in ((0, "drive"), (21, "drive"), (12, "walk")):
         leg = legs[i]
         lo, hi, end_min, v, step, modes = (80, 250, 200, 10, 25, ("drive",)) if mode == "drive" else (40, 120, 80, 1.4, 5, ("drive", "walk"))
-        off, d_off = off_route_point(i, lo, hi, end_min, modes)
+        off, d_off, hd_off = off_route_point(i, lo, hi, end_min, modes)
         check("offline drive, leg %d: a %s leg (to %s %s), and an off-route point on another leg's road %d to %d m from it" % (i, mode, leg["to"]["kind"], leg["to"].get("o", ""), lo, hi),
               leg["mode"] == mode and off is not None, "point %s, %s m from the leg" % (off, d_off and round(d_off)))
         if off is None:
@@ -2001,13 +2007,13 @@ with sync_playwright() as p:
         pg.evaluate("(i) => { S.fix = null; setLeg(i); S.lastReroute = 0; window.__spoken = []; }", i)
         s0 = min(30.0, P.total / 3)
         fix_state(pg, P.ll(s0), v, P.bearing(s0))
-        for k in range(4):                               # CFG.offFixes (3) fixes off the leg make it off route
-            fix_state(pg, [off[0], off[1] + 0.000004 * k], v)
+        for k in range(4):                               # CFG.offFixes (3) fixes off the leg make it off route; a car on the other
+            fix_state(pg, [off[0], off[1] + 0.000004 * k], v, hd_off if mode == "drive" else None)   # road drives along it
         r = pg.evaluate("""(i) => { const o = S.override, base = S.legs[i];
             if (!o) return {override: false, note: S.rerouteNote, off: S.offRoute};
             const rt = prepLeg(o);
             return {override: true, geom: o.geom, baseEnd: base.geom[base.geom.length - 1], sameTo: o.to === base.to, mode: o.mode, dist: o.dist,
-              types: o.steps.map(s => s.type), mods: o.steps.map(s => s.mod), words: o.steps.map(s => s.type === 'arrive' ? 'arrive' : instr(s, o.mode)),
+              types: o.steps.map(s => s.type), mods: o.steps.map(s => s.mod), words: o.steps.map(s => s.type === 'arrive' ? 'arrive' : instr(s, o.mode)), atStart: o.steps.map(s => !!s.atStart),
               along: rt.steps.map(s => s.along), onLine: Math.max(...rt.steps.map(s => project(rt, s.loc).d)), offRoute: S.offRoute,
               cls: document.getElementById('banner').className, instr: document.getElementById('bInstr').textContent, spoken: window.__spoken}; }""", i)
         if not r["override"]:
@@ -2018,12 +2024,13 @@ with sync_playwright() as p:
         check("offline drive, leg %d: off route %.0f m from the leg, the device plans a new %s leg that ends at the leg's own end" % (i, d_off, mode),
               end_ok and r["sameTo"] and r["mode"] == mode and r["dist"] >= straight - 1,
               "%d points, %.0f m (straight line %.0f m), %d steps" % (len(r["geom"]), r["dist"], straight, len(r["types"])))
-        moves = [a for t, a in zip(r["types"], r["along"]) if t not in ("depart", "arrive", "offpath")]
-        gaps = [b - a for a, b in zip(moves, moves[1:])]
+        moves = [(a, m, t) for t, a, m, st in zip(r["types"], r["along"], r["mods"], r["atStart"]) if t not in ("depart", "arrive", "offpath") and not st]
+        close = [(x, y) for x, y in zip(moves, moves[1:]) if y[0] - x[0] < 14.9]      # kept apart only when both turn (a jog)
+        sided = lambda m: "left" in m or "right" in m or m == "uturn"
         bad_words = [w for w in r["words"] if not w or "undefined" in w or "null" in w or "  " in w]
-        check("offline drive, leg %d: sensible steps: depart first, arrive last, known types and turns, plain words, maneuvers 15 m or more apart, every step on the line" % i,
+        check("offline drive, leg %d: sensible steps: depart first, arrive last, known types and turns, plain words, maneuvers under 15 m apart only when both are turns, every step on the line" % i,
               r["types"][0] == "depart" and r["types"][-1] == "arrive" and r["types"].count("arrive") == 1 and set(r["types"]) <= STEP_TYPES
-              and set(r["mods"]) <= STEP_MODS and not bad_words and (not gaps or min(gaps) >= 14.9) and r["onLine"] <= 1.0,
+              and set(r["mods"]) <= STEP_MODS and not bad_words and all(sided(x[1]) and sided(y[1]) for x, y in close) and r["onLine"] <= 1.0,
               " | ".join(r["words"]))
         pg.wait_for_timeout(700)                         # the map pans to the position in 0.5 s
         pg.screenshot(path=os.path.join(SHOTS, "26-offline-reroute-leg%02d.png" % i))
@@ -2055,11 +2062,15 @@ with sync_playwright() as p:
         pairs.append([PP[k][1], PP[k + 1][1], li_])
     res = pg.evaluate("""(pairs) => pairs.map(([a, b, i]) => { const r = routeG(GR, a, b, 'car');
         if (r.fail) return {i, fail: r.fail};
-        const wrong = r.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & (y > x ? F_FWD : F_BWD))).length;
+        const wrong = r.pieces.filter(([e, x, y]) => Math.abs(y - x) > 1e-6 && !(GR.fl[e] & (y > x ? F_FWD : F_BWD))).length;
         return {i, length: r.length, wrong}; })""", pairs)
-    EXPLAINED = {38: "leg 38: the stop 31 park point is on a footpath (highway=path, access=permissive) that OSRM drove; "
-                     "the car route ends on Southeast Forest Way 45.8 m away (offline-graph-validation.txt)"}
+    # keyed by (leg index, stop): after a route rebuild that moves this leg, the key no longer matches and the check fails
+    EXPLAINED = {(38, 31): "leg 38: the stop 31 park point is on a footpath (highway=path, access=permissive) that OSRM drove; "
+                           "the car route ends on Southeast Forest Way 45.8 m away (offline-graph-validation.txt)"}
     bad, ratios = [], []
+    for (ei, eo), why in EXPLAINED.items():
+        if not (ei < len(legs) and legs[ei]["mode"] == "drive" and legs[ei]["to"].get("o") == eo):
+            bad.append("EXPLAINED (%d, %d) no longer matches route.json: review the note" % (ei, eo))
     for x in res:
         dist = legs[x["i"]]["dist"]
         if "fail" in x or x["wrong"]:
@@ -2068,20 +2079,21 @@ with sync_playwright() as p:
         if dist >= 1:
             ratio = x["length"] / dist
             ratios.append(ratio)
-            if ratio > 1.35 or (ratio < 0.75 and x["i"] not in EXPLAINED):
+            if ratio > 1.35 or (ratio < 0.75 and (x["i"], legs[x["i"]]["to"].get("o")) not in EXPLAINED):
                 bad.append("leg %d ratio %.2f" % (x["i"], ratio))
         elif x["length"] > 10:
             bad.append("leg %d: %.1f m for a 0 m leg" % (x["i"], x["length"]))
     check("router: a car route joins every pair of consecutive park points (depot, stops 1 to 43, depot), never drives an edge against its one-way flag, "
           "and is at most 1.35 times the route.json leg (and 0.75 or more, except the leg the validation report explains)",
-          len(res) == 44 and not bad, "%d routes, ratio %.2f to %.2f; %s; explained: %s" % (len(res), min(ratios), max(ratios), "; ".join(bad[:4]) or "none bad",
-                                                                                             "; ".join("%s (%.2f)" % (EXPLAINED[x["i"]], x["length"] / legs[x["i"]]["dist"]) for x in res if x["i"] in EXPLAINED and "length" in x)))
+          len(res) == 44 and not bad, "%d routes, ratio %.2f to %.2f; %s; explained: %s" % (len(res), min(ratios or [0]), max(ratios or [0]), "; ".join(bad[:4]) or "none bad",
+                                                                                             "; ".join("%s (%.2f)" % (EXPLAINED[(x["i"], legs[x["i"]]["to"].get("o"))], x["length"] / legs[x["i"]]["dist"])
+                                                                                                       for x in res if (x["i"], legs[x["i"]]["to"].get("o")) in EXPLAINED and "length" in x)))
     one = pg.evaluate("""() => {
         const cand = [];
         for (let e = 0; e < GR.m; e++) { const f = GR.fl[e]; if (((f & 3) === F_FWD || (f & 3) === F_BWD) && !(f & (F_RESTRICT | F_NOSNAP)) && GR.names[GR.en[e]] && GR.el[e] >= 80) cand.push(e); }
         cand.sort((a, b) => GR.el[b] - GR.el[a] || a - b);
         const at = (e, frac) => { const p = piecePts(GR, e, 0, GR.el[e] * frac).pop(); return [+(p[0] * 1e-6).toFixed(6), +(p[1] * 1e-6).toFixed(6)]; };
-        const wrong = r => r.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & (y > x ? F_FWD : F_BWD))).length;
+        const wrong = r => r.pieces.filter(([e, x, y]) => Math.abs(y - x) > 1e-6 && !(GR.fl[e] & (y > x ? F_FWD : F_BWD))).length;
         for (const e of cand) {
           const a = at(e, 0.2), b = at(e, 0.8), fwd = (GR.fl[e] & 3) === F_FWD;
           const w = fwd ? routeG(GR, a, b, 'car') : routeG(GR, b, a, 'car'), x = fwd ? routeG(GR, b, a, 'car') : routeG(GR, a, b, 'car');
@@ -2097,11 +2109,11 @@ with sync_playwright() as p:
     foot = pg.evaluate("""(idx) => idx.map(i => { const l = S.legs[i], a = l.geom[0], b = l.geom[l.geom.length - 1];
         const f = routeG(GR, a, b, 'foot'), c = routeG(GR, a, b, 'car');
         if (f.fail) return {i, fail: f.fail};
-        const only = f.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & 3));
+        const only = f.pieces.filter(([e, x, y]) => Math.abs(y - x) > 1e-6 && !(GR.fl[e] & 3));
         return {i, to: l.to.o, foot: f.length, car: c.fail ? null : c.length, onlyM: only.reduce((s, [e, x, y]) => s + Math.abs(y - x), 0),
                 kinds: [...new Set(only.map(([e]) => GR.cl[e]))],
-                footBad: f.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & F_FOOT)).length,
-                carBad: c.fail ? 0 : c.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & 3)).length}; })""", walk_legs)
+                footBad: f.pieces.filter(([e, x, y]) => Math.abs(y - x) > 1e-6 && !(GR.fl[e] & F_FOOT)).length,
+                carBad: c.fail ? 0 : c.pieces.filter(([e, x, y]) => Math.abs(y - x) > 1e-6 && !(GR.fl[e] & 3)).length}; })""", walk_legs)
     classes = GRAPH_HEAD["classes"]
     uses = [x for x in foot if "fail" not in x and x["onlyM"] >= 20 and (x["car"] is None or x["car"] > 1.1 * x["foot"])]
     check("router: every walk leg routes on foot over walkable edges only, and no car route uses an edge that cars may not use",
@@ -2110,7 +2122,245 @@ with sync_playwright() as p:
           bool(uses), "; ".join("walk leg %d to stop %s: %.0f m of %s, foot %.0f m, car %s m" % (x["i"], x["to"], x["onlyM"], "/".join(classes[k] for k in x["kinds"]), x["foot"],
                                                                                                  "none" if x["car"] is None else "%.0f" % x["car"]) for x in uses))
 
-    # c. speed: 50 reroutes from random points within 300 m of random legs; the graph decode
+    # d. the router against its reference, Graph.route() in build_graph.py (the rules in its docstring): the same cost, the same
+    #    snapped edges and the same start direction for the 44 park-point pairs, every leg in its own profile, and 360 seeded
+    #    random trips (car with and without a heading, car snapped to the main network only, foot). Every routed trip is legal.
+    snap_max = pg.evaluate("() => CFG.snapMax")
+    try:
+        if RG_DIR not in sys.path:
+            sys.path.insert(0, RG_DIR)
+        import build_graph as BG
+        REF, ref_err = BG.Graph(json.loads(GRAPH_TEXT)), ""
+    except Exception as ex:                              # a missing reference is a failed check, never a skipped one
+        REF, ref_err = None, "%s: %s. Set AMR_ROUTE_GUIDE to the scripts\\route-guide folder of the sensus-amr-read-cycle skill." % (RG_DIR, ex)
+    check("parity setup: the reference router (build_graph.py) loads and reads graph.json", REF is not None, ref_err)
+    # problems(r, car): what makes a routed trip illegal (an edge against its flags, pieces that do not meet, a barrier passed,
+    # a banned turn), from the decoded graph
+    PROBLEMS = """(r, car) => { const out = [], P = r.pieces;
+        P.forEach(([e, x, y]) => { if (Math.abs(y - x) > 1e-6 && !(GR.fl[e] & (car ? (y > x ? F_FWD : F_BWD) : F_FOOT))) out.push('edge ' + e + ' against its flags'); });
+        for (let k = 0; k + 1 < P.length; k++) {
+          const e = P[k][0], v = P[k][2] === 0 ? GR.ea[e] : GR.eb[e], e2 = P[k + 1][0];
+          if ((P[k + 1][1] === 0 ? GR.ea[e2] : GR.eb[e2]) !== v) out.push('pieces ' + k + ' and ' + (k + 1) + ' do not meet');
+          if (!car) continue;
+          if (GR.blk[v]) out.push('through barrier node ' + v);
+          const rule = GR.xbase[v] >= 0 ? GR.xto[GR.slotOf(v, e)] : null;
+          if (rule && (rule.only ? !rule.to.includes(e2) : rule.to.includes(e2))) out.push('banned turn ' + e + ' -> ' + e2 + ' at node ' + v);
+        }
+        return out; }"""
+    prng = random.Random(20261002)
+
+    def near_route(rng, spread):
+        """a random point within spread m of a random point of a random leg"""
+        i = rng.choice([j for j, l in enumerate(legs) if l["dist"] > 0])
+        Pn = Path(legs[i]["geom"])
+        ang, dd = rng.random() * 2 * math.pi, rng.random() * spread
+        return Pn.ll(rng.random() * Pn.total, dd * math.sin(ang), dd * math.cos(ang))
+
+    cases = [[a, b, "car", None, False] for a, b, _ in pairs]
+    cases += [[l["geom"][0], l["geom"][-1], "car" if l["mode"] == "drive" else "foot", None, False] for l in legs if l["dist"] > 0]
+    for k in range(360):
+        mode = "foot" if k % 4 == 0 else "car"
+        cases.append([near_route(prng, 200), near_route(prng, 200), mode, prng.random() * 360 if k % 4 in (1, 2) else None, k % 8 == 3])
+    js = pg.evaluate("""(cs) => { const problems = """ + PROBLEMS + """;
+        return cs.map(([a, b, m, h, mo]) => { const r = routeG(GR, a, b, m, h, mo);
+          return r.fail ? {fail: r.fail} : {cost: r.cost, s: r.s.e, t: r.t.e, sg: r.s.gap, tg: r.t.gap, against: r.against, bad: problems(r, m === 'car')}; }); }""", cases)
+    mism, bad_routes, n_ok, n_hd, n_against = [], [], 0, 0, 0
+    for (a, b, m, h, mo), j in zip(cases, js):
+        py = REF.route(a, b, m, heading=h, max_m=snap_max, main_only=mo) if REF else None
+        if "fail" in j or py is None:
+            if not ("fail" in j and py is None):
+                mism.append("%s %s %s h=%s: app %s, reference %s" % (a, b, m, h, j.get("fail") or round(j["cost"], 3), py and round(py["cost"], 3)))
+            continue
+        n_ok += 1
+        n_hd += h is not None
+        n_against += bool(j["against"])
+        if j["bad"]:
+            bad_routes.append("%s -> %s %s: %s" % (a, b, m, "; ".join(j["bad"][:2])))
+        same_s = py["start_edge"] == j["s"] or abs(py["gap_start"] - j["sg"]) < 1e-9      # an exact tie in distance may go either way
+        same_t = py["end_edge"] == j["t"] or abs(py["gap_end"] - j["tg"]) < 1e-9
+        if abs(py["cost"] - j["cost"]) > 1e-6 * max(1.0, py["cost"]) or not same_s or not same_t or py["start_against"] != j["against"]:
+            mism.append("%s %s %s h=%s: app %.6f e%d->e%d %s, reference %.6f e%d->e%d %s" % (a, b, m, h, j["cost"], j["s"], j["t"], j["against"],
+                                                                                         py["cost"], py["start_edge"], py["end_edge"], py["start_against"]))
+    check("router parity with build_graph.py Graph.route(): %d trips (44 park-point pairs, every leg, 360 random: car with and without a heading, car on the main network only, foot), "
+          "the same cost (1e-6), snapped edges and start direction" % len(cases),
+          REF is not None and n_ok >= 300 and n_hd >= 100 and n_against >= 5 and not mism,
+          "%d routed (%d with a heading, %d planned against it), %d differ: %s" % (n_ok, n_hd, n_against, len(mism), " || ".join(mism[:3])))
+    check("every routed trip is legal: no edge against its one-way or mode flag, pieces that meet, no pass through a barrier node, no banned turn",
+          n_ok >= 300 and not bad_routes, "%d routed; %s" % (n_ok, " || ".join(bad_routes[:3])))
+    rules_js = pg.evaluate("""() => { const out = []; GR.xto.forEach((r, sl) => { if (r) out.push([GR.xnode[sl], GR.xedge[sl], r.only ? 'only' : 'no', [...r.to].sort((a, b) => a - b)]); });
+        return out; }""")
+    rules_py = sorted([v, f, k, sorted(t)] for (v, f), (k, t) in REF.rule.items()) if REF else None
+    check("the app reads the same turn restrictions as the reference (via node, from edge, only or no, to edges)",
+          REF is not None and sorted(rules_js) == rules_py, "%d rules in the app, %s in the reference" % (len(rules_js), rules_py and len(rules_py)))
+
+    # e. barriers and turn restrictions on their own: from the middle of one car edge at a barrier node to the middle of another,
+    #    and over every banned turn; the route never takes them. A route that must go around (or finds none) shows the rule acts.
+    br_r = pg.evaluate("""() => { const out = {blk: [], turns: []};
+        const mid = e => { const p = piecePts(GR, e, 0, GR.el[e] / 2).pop(); return [p[0] * 1e-6, p[1] * 1e-6]; };
+        const carAt = v => { const o = []; for (let j = GR.ao[v]; j < GR.ao[v + 1]; j++) { const e = GR.adj[j]; if ((GR.fl[e] & 3) && !(GR.fl[e] & F_NOSNAP) && GR.el[e] >= 4) o.push(e); } return o; };
+        const arrives = (e, v) => (GR.eb[e] === v && (GR.fl[e] & F_FWD)) || (GR.ea[e] === v && (GR.fl[e] & F_BWD));
+        const leaves = (e, v) => (GR.ea[e] === v && (GR.fl[e] & F_FWD)) || (GR.eb[e] === v && (GR.fl[e] & F_BWD));
+        const direct = (e1, e2) => GR.cpm[GR.cl[e1]] * GR.el[e1] / 2 + GR.cpm[GR.cl[e2]] * GR.el[e2] / 2;
+        const passed = r => r.pieces.slice(0, -1).map(pc => pc[2] === 0 ? GR.ea[pc[0]] : GR.eb[pc[0]]);
+        const turned = (r, v, e1, e2) => r.pieces.some((pc, k) => k + 1 < r.pieces.length && pc[0] === e1 && r.pieces[k + 1][0] === e2 && passed(r)[k] === v);
+        const run = (e1, e2) => { const r = routeG(GR, mid(e1), mid(e2), 'car', null, false);
+          return !r.s || !r.t || r.s.e !== e1 || r.t.e !== e2 ? null : r; };     // null: the test points did not snap to these edges
+        for (let v = 0; v < GR.n; v++) if (GR.blk[v]) {
+          const es = carAt(v);
+          es.forEach(e1 => es.forEach(e2 => { if (e1 === e2 || !arrives(e1, v) || !leaves(e2, v)) return;
+            const r = run(e1, e2); if (!r) return;
+            out.blk.push({v, e1, e2, through: !r.fail && passed(r).includes(v), around: !!r.fail || r.cost > direct(e1, e2) + 1e-6}); })); }
+        GR.xto.forEach((rule, sl) => { if (!rule) return; const v = GR.xnode[sl], f = GR.xedge[sl];
+          const tos = rule.only ? carAt(v).filter(e => e !== f && leaves(e, v) && !rule.to.includes(e)) : rule.to.filter(e => leaves(e, v));
+          tos.forEach(t => { const r = run(f, t); if (!r) return;
+            out.turns.push({v, f, t, only: rule.only, banned: !r.fail && turned(r, v, f, t), around: !!r.fail || r.cost > direct(f, t) + 1e-6}); }); });
+        const problems = """ + PROBLEMS + """;
+        out.leg40 = [[46.7268228, -117.1658191], [46.7266166, -117.1672591], [46.7261526, -117.1671955]].map(p => {
+          const r = routeG(GR, p, S.legs[40].geom[S.legs[40].geom.length - 1], 'car', null, false); return r.fail ? ['no route: ' + r.fail] : problems(r, true); });
+        return out; }""")
+    check("barriers: a car route between two roads that meet at a barrier node never passes it (%d trips; the ones that must go around show it acts)" % len(br_r["blk"]),
+          br_r["blk"] and not [x for x in br_r["blk"] if x["through"]] and any(x["around"] for x in br_r["blk"]),
+          "%d trips, %d through, %d go around" % (len(br_r["blk"]), sum(x["through"] for x in br_r["blk"]), sum(x["around"] for x in br_r["blk"])))
+    check("turn restrictions: a car route over a banned turn never takes it (%d trips: no_* turns and the turns an only_* rule leaves out)" % len(br_r["turns"]),
+          br_r["turns"] and not [x for x in br_r["turns"] if x["banned"]] and any(x["around"] for x in br_r["turns"]),
+          "%d trips, %d banned turns taken, %d go around" % (len(br_r["turns"]), sum(x["banned"] for x in br_r["turns"]), sum(x["around"] for x in br_r["turns"])))
+    check("the three review probe starts near the end of leg 40 route without the bollard on Southeast Nevada Street or a banned turn at Stadium Way and Main Street",
+          all(x == [] for x in br_r["leg40"]), json.dumps(br_r["leg40"]))
+
+    # f. the heading: on a divided road the new route starts on the carriageway the car drives; a missed turn gives a U-turn or a
+    #    way ahead; the U-turn is said at once
+    hdr = pg.evaluate("""(p) => { const out = {};
+        [[41, 58], [24, 58], [41, 238], [24, 238]].forEach(([i, h]) => { const pl = planLeg(p, S.legs[i], h);
+          if (!pl.leg) { out[i + '/' + h] = {fail: pl.fail}; return; }
+          const g = pl.leg.geom, q = g.find(z => hav(z, g[0]) >= 10) || g[g.length - 1];
+          pl.leg.to = S.legs[i].to;
+          out[i + '/' + h] = {brg: Math.round(bearing(g[0], q)), uturn: !!pl.leg.steps[1] && !!pl.leg.steps[1].atStart,
+            words: prepLeg(pl.leg).steps.slice(0, 3).map(s => s.type === 'depart' ? 'depart' : s.type === 'arrive' ? 'arrive' : instr(s, 'drive'))}; });
+        const s0 = snapG(GR, micro(p[0]), micro(p[1]), 'car', CFG.snapMax, null, false);
+        out.plainFits58 = s0 ? fitsHeading(GR.fl[s0.e], s0.brg, 58) : null;
+        return out; }""", [46.7278038, -117.1637859])
+    ang_deg = lambda a, b: abs(((a - b + 540) % 360) - 180)       # degrees between two bearings
+    check("divided road (Northeast Stadium Way): from one point, heading 58 starts on the northeast carriageway and heading 238 on the southwest one, with no U-turn, to legs 24 and 41",
+          hdr["plainFits58"] is False and all("fail" not in hdr[k] and ang_deg(hdr[k]["brg"], int(k.split("/")[1])) <= 45 and not hdr[k]["uturn"] for k in ("41/58", "24/58", "41/238", "24/238")),
+          json.dumps(hdr))
+    snaps = pg.evaluate("""(seed) => { let x = seed; const rnd = () => { x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648; };
+        const cand = []; for (let e = 0; e < GR.m; e++) { const f = GR.fl[e]; if (((f & 3) === F_FWD || (f & 3) === F_BWD) && !(f & F_NOSNAP) && GR.el[e] > 20) cand.push(e); }
+        let n = 0, against = 0, plain = 0;
+        for (let k = 0; k < 600; k++) {
+          const e = cand[Math.floor(rnd() * cand.length)], pts = piecePts(GR, e, 0, GR.el[e] * (0.1 + 0.8 * rnd())), p = pts[pts.length - 1], q = pts[pts.length - 2];
+          const b = segBearing((p[1] - q[1]) * Math.cos(p[0] * 1e-6 * D2R), p[0] - q[0]), hd = (GR.fl[e] & 3) === F_FWD ? b : (b + 180) % 360;
+          const r = 8 * rnd(), a = rnd() * 2 * Math.PI, lat = Math.round(p[0] + r * Math.cos(a) / (1e-6 * KM)), lon = Math.round(p[1] + r * Math.sin(a) / (1e-6 * KM * Math.cos(p[0] * 1e-6 * D2R)));
+          const s = snapG(GR, lat, lon, 'car', CFG.snapMax, hd, false), s0 = snapG(GR, lat, lon, 'car', CFG.snapMax, null, false);
+          if (!s) continue; n++;
+          if (!fitsHeading(GR.fl[s.e], s.brg, hd)) against++;
+          if (!fitsHeading(GR.fl[s0.e], s0.brg, hd)) plain++; }
+        return {n, against, plain}; }""", 20261001)
+    check("one-way roads: of 600 positions with up to 8 m GPS error and the legal heading, none snaps to a road it cannot drive that way (without the heading some do)",
+          snaps["n"] >= 590 and snaps["against"] == 0 and snaps["plain"] > 0, json.dumps(snaps))
+    missed = pg.evaluate("""() => { const side = m => /left/.test(m || '') ? 'L' : /right/.test(m || '') ? 'R' : '';
+        let n = 0, uturn = 0, ahead = 0, words = ''; const bad = [];
+        S.legs.forEach((leg, i) => { if (leg.mode !== 'drive') return; const rt = prepLeg(leg), xy = rt.xy, k0 = Math.cos(rt.lat0 * D2R);
+          const at = d => { let j = 0; while (j < rt.cum.length - 2 && rt.cum[j + 1] < d) j++; const t = Math.max(0, Math.min(1, (d - rt.cum[j]) / ((rt.cum[j + 1] - rt.cum[j]) || 1)));
+            return [xy[j][0] + t * (xy[j + 1][0] - xy[j][0]), xy[j][1] + t * (xy[j + 1][1] - xy[j][1])]; };
+          rt.steps.forEach(s => { if (!side(s.mod) || /slight/.test(s.mod) || s.type === 'depart' || s.type === 'arrive' || s.along < 20) return;
+            const p1 = at(s.along - 15), p2 = at(s.along), hd = (Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) / D2R + 360) % 360;
+            const X = [p2[0] + 70 * Math.sin(hd * D2R), p2[1] + 70 * Math.cos(hd * D2R)], ll = [X[1] / (D2R * R), X[0] / (D2R * R * k0)];
+            const sn = snapG(GR, micro(ll[0]), micro(ll[1]), 'car', CFG.snapMax, null, false); if (!sn || sn.gap > 10) return;   // the road goes on straight
+            const pl = planLeg(ll, leg, hd); if (!pl.leg) return; n++;
+            const st = pl.leg.steps[1];
+            if (st && st.atStart) { uturn++; words = words || instr(st, 'drive'); return; }
+            const g = pl.leg.geom, q = g.find(z => hav(z, g[0]) >= 4) || g[g.length - 1];
+            if (angDiff(bearing(g[0], q), hd) <= 90) ahead++; else bad.push([i, s.mod, Math.round(s.along)]); }); });
+        return {n, uturn, ahead, bad, words}; }""")
+    check("missed turns: on every drive leg the car misses each left or right turn and goes straight on 70 m; the new route starts with Make a U-turn or goes ahead, never back without a word",
+          missed["n"] >= 20 and not missed["bad"] and missed["uturn"] >= 1 and missed["ahead"] >= 1 and missed["words"].startswith("Make a U-turn"), json.dumps(missed))
+
+    # g. words against OSRM: every leg over 50 m planned offline from its first point
+    W = pg.evaluate("""() => { const side = m => /left/.test(m || '') ? 'L' : /right/.test(m || '') ? 'R' : '';
+        const say = (s, mode) => s.type === 'arrive' ? 'arrive' : s.type === 'depart' ? 'depart' : instr(s, mode);
+        const res = {agree: 0, sideBad: [], realBad: [], keepExtra: [], turnsOn: {}, words: {}};
+        S.legs.forEach((leg, i) => { if (!(leg.dist > 50)) return;
+          const p = planLeg(leg.geom[0], leg, null); if (!p.leg) { res.sideBad.push([i, p.fail]); return; }
+          p.leg.to = leg.to;
+          const mv = a => a.filter(s => s.type !== 'depart' && s.type !== 'arrive'), off = mv(prepLeg(p.leg).steps), osrm = mv(prepLeg(leg).steps);
+          res.words[i] = prepLeg(p.leg).steps.map(s => say(s, leg.mode));
+          res.turnsOn[i] = off.filter(s => side(s.mod) && s.mod !== 'uturn').length;
+          off.forEach(s => { const sd = side(s.mod); if (!sd || s.mod === 'uturn') return;          // 1. left and right as OSRM has them
+            let o = null, od = 20; osrm.forEach(t => { if (!side(t.mod) || t.mod === 'uturn') return; const d = hav(t.loc, s.loc); if (d <= od) { od = d; o = t; } });
+            if (!o) return; if (side(o.mod) === sd) res.agree++; else res.sideBad.push([i, say(s, leg.mode), say(o, leg.mode), +od.toFixed(1)]); });
+          if (leg.mode !== 'drive') return;
+          osrm.forEach(t => { if (!/^(sharp )?(left|right)$/.test(t.mod || '') || /roundabout|rotary/.test(t.type)) return;   // 2. a real turn is never Continue or Keep
+            const near = off.filter(s => hav(s.loc, t.loc) <= 20); if (!near.length) return;
+            if (!near.some(s => side(s.mod) === side(t.mod) && ['turn', 'end of road', 'roundabout'].includes(s.type))) res.realBad.push([i, say(t, 'drive'), near.map(s => say(s, 'drive'))]); });
+          off.forEach(s => { if (s.type === 'continue' && side(s.mod) && !osrm.some(t => hav(t.loc, s.loc) <= 30)) res.keepExtra.push([i, say(s, 'drive'), Math.round(s.along)]); });   // 3. no extra Keep
+        });
+        return res; }""")
+    words_of = lambda i: W["words"].get(str(i), [])
+    check("offline turns keep their side: every left or right step of every leg over 50 m planned offline has the side of the nearest OSRM maneuver within 20 m",
+          W["agree"] >= 80 and not W["sideBad"], "%d agree; %s" % (W["agree"], json.dumps(W["sideBad"][:4])))
+    check("legs 0 and 21 planned offline have left or right turn steps, and leg 0 reads as OSRM: end of the road, left onto East Grimes Way; left onto Southeast Dairy Road",
+          W["turnsOn"].get("0", 0) >= 1 and W["turnsOn"].get("21", 0) >= 1 and words_of(0)[1:3] == ["At the end of the road, turn left onto East Grimes Way", "Turn left onto Southeast Dairy Road"],
+          json.dumps([W["turnsOn"].get("0"), W["turnsOn"].get("21"), words_of(0)]))
+    check("a real left or right turn (OSRM) is never said as Continue or Keep; the right-then-left jogs of legs 48 and 49 give both turns",
+          not W["realBad"] and words_of(48).count("Turn right") >= 1 and "Turn left" in words_of(48)
+          and "At the end of the road, turn right" in words_of(49) and "At the end of the road, turn left onto Northeast TerreView Drive" in words_of(49),
+          json.dumps([W["realBad"][:3], words_of(48), words_of(49)]))
+    check("no Keep left or Keep right on a drive leg where OSRM has no maneuver within 30 m (a driveway or parking aisle beside the road is no fork)",
+          not W["keepExtra"], json.dumps(W["keepExtra"][:6]))
+    check("street names: a turn names the road it leads to, not a short stub (leg 21: Thatuna Street, then Colorado Street), and a change of quadrant word is not a new road (leg 43)",
+          "Turn right onto Northeast Thatuna Street" in words_of(21) and "At the end of the road, turn left onto Northeast Colorado Street" in words_of(21)
+          and not [w for w in words_of(21) if "Campus Street" in w or "Cougar Way" in w] and not [w for w in words_of(43) if w.startswith("Continue onto")],
+          json.dumps([words_of(21), words_of(43)]))
+    check("U-turns: the U-turn where the two halves of Northeast Stadium Way meet reads Make a U-turn (leg 34); a sharp bend of the two-way Antelope Trail does not (leg 45)",
+          "Make a U-turn onto Northeast Stadium Way" in words_of(34) and not [w for w in words_of(45) if "U-turn" in w], json.dumps([words_of(34), words_of(45)]))
+    ra = pg.evaluate("""() => { const out = [];
+        S.legs.forEach((leg, i) => { if (leg.mode !== 'drive') return; const rt = prepLeg(leg);
+          rt.steps.forEach((s, k) => { if (s.type !== 'roundabout' || !s.exit) return;
+            const ex = rt.steps.slice(k + 1).find(t => t.type === 'exit roundabout'), a0 = s.along - 60, a1 = (ex ? ex.along : s.along) + 60;
+            if (a0 < 0 || a1 > rt.total) return;
+            const at = d => { let j = 0; while (j < rt.cum.length - 2 && rt.cum[j + 1] < d) j++; const t = (d - rt.cum[j]) / ((rt.cum[j + 1] - rt.cum[j]) || 1);
+              const A = leg.geom[j], B = leg.geom[j + 1]; return [A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])]; };
+            const p = at(a0), q = at(a1), pl = planLeg(p, {mode: 'drive', geom: [p, q], to: leg.to, dist: 0}, null);
+            out.push({i, want: instr(s, 'drive'), words: pl.leg ? prepLeg(Object.assign(pl.leg, {to: leg.to})).steps.map(t => t.type === 'arrive' ? 'arrive' : t.type === 'depart' ? 'depart' : instr(t, 'drive')) : [pl.fail]}); }); });
+        return out; }""")
+    check("roundabouts: through every roundabout of a drive leg, from 60 m before it to 60 m after, the one step is OSRM's At the roundabout, take the Nth exit onto ... (the 3rd exit on leg 27)",
+          len(ra) >= 3 and all(x["words"][1:-1] == [x["want"]] for x in ra) and any("3rd exit" in x["want"] for x in ra), json.dumps(ra))
+
+    # h. a start on a small piece of road with no way into the main car network: the route snaps again to the main network
+    isl = pg.evaluate("""(i) => { const leg = S.legs[i], end = leg.geom[leg.geom.length - 1], out = {tested: 0, planned: 0, bad: []};
+        for (let e = 0; e < GR.m; e++) { if (!GR.isl[e] || !(GR.fl[e] & 3) || (GR.fl[e] & F_NOSNAP)) continue;
+          const p = piecePts(GR, e, 0, GR.el[e] / 2).pop(), ll = [p[0] * 1e-6, p[1] * 1e-6];
+          const s0 = snapG(GR, p[0], p[1], 'car', CFG.snapMax, null, false); if (!s0 || s0.e !== e) continue;
+          if (routeG(GR, ll, end, 'car', null, false).fail !== 'route' || !snapG(GR, p[0], p[1], 'car', CFG.snapMax, null, true)) continue;
+          out.tested++; const pl = planLeg(ll, leg, null); if (pl.leg) out.planned++; else out.bad.push([e, pl.fail]); }
+        return out; }""", 31)
+    check("car islands: from every off-network piece of road (car_island) with the main network within 490 ft, the plain route to the end of leg 31 fails, and planLeg snaps again and plans one",
+          isl["tested"] >= 5 and isl["planned"] == isl["tested"], json.dumps(isl))
+
+    # i. the straight line from the position to the road: a drive fix 40 to 100 m from any road
+    lead = pg.evaluate("""() => { const d = S.route.depot, k = Math.cos(d.lat * D2R);
+        for (let r = 60; r <= 2500; r += 20) for (let a = 0; a < 360; a += 10) {
+          const lat = d.lat + r * Math.cos(a * D2R) / (D2R * R), lon = d.lon + r * Math.sin(a * D2R) / (D2R * R * k), p = [+lat.toFixed(6), +lon.toFixed(6)];
+          const s = snapG(GR, micro(p[0]), micro(p[1]), 'car', CFG.snapMax, null, false);
+          if (!s || s.gap < 40 || s.gap > 100) continue;
+          const pl = planLeg(p, S.legs[0], null); if (!pl.leg) continue;
+          pl.leg.to = S.legs[0].to;
+          return {p, gap: pl.route.gapStart, first: pl.leg.geom[0], toRoad: hav(pl.leg.geom[0], pl.leg.geom[1]),
+            words: prepLeg(pl.leg).steps.slice(0, 2).map(t => t.type === 'depart' ? 'depart' : instr(t, 'drive'))}; }
+        return null; }""")
+    check("off the road map (a fix 40 to 100 m from any road): the new route starts with a straight line to the road, and its first words name the road",
+          lead is not None and lead["first"] == lead["p"] and 40 <= lead["gap"] <= 100 and abs(lead["toRoad"] - lead["gap"]) < 2
+          and re.match(r"^(Continue|Turn|At the end of the road, turn|Keep|Make a U-turn) ", lead["words"][1] or "") and "undefined" not in lead["words"][1],
+          json.dumps(lead))
+
+    # c. speed: 50 reroutes from random points within 300 m of random legs; the graph decode. Measured with the CPU slowed 4 times
+    #    (CDP), a stand-in for the Galaxy Tab A9+ (an estimate, not a measurement on the tablet); the page is opened again so the
+    #    decode at app start runs slowed too.
+    cdp = ctx.new_cdp_session(pg)
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=30000)
+    pump_until(pg, lambda: pg.evaluate("() => (!!GR && GR.gridMs !== null) || graphErr !== ''"), timeout=20)
     rng = random.Random(20261001)
     trips = []
     for _ in range(50):
@@ -2124,15 +2374,18 @@ with sync_playwright() as p:
     ms = sorted(x["ms"] for x in perf)
     p95 = ms[math.ceil(0.95 * len(ms)) - 1]
     n_ok = sum(1 for x in perf if x["ok"])
-    check("speed: 50 reroutes (snap, A*, steps, prepLeg) from random points within 300 m of random legs, p95 under 150 ms",
-          len(ms) == 50 and p95 < 150, "p95 %.1f ms, median %.1f ms, max %.1f ms; %d planned, %d not (%s)" % (
+    check("speed, CPU slowed 4 times: 50 reroutes (snap, A*, steps, prepLeg) from random points within 300 m of random legs, 40 or more planned, p95 under 150 ms",
+          len(ms) == 50 and n_ok >= 40 and p95 < 150, "p95 %.1f ms, median %.1f ms, max %.1f ms; %d planned, %d not (%s)" % (
               p95, ms[len(ms) // 2], ms[-1], n_ok, 50 - n_ok, "; ".join(sorted({x["fail"] for x in perf if not x["ok"]}))))
     dec = pg.evaluate("""async () => { const txt = await (await caches.match('graph.json')).text(), out = [];
-        for (let k = 0; k < 5; k++) { const t0 = performance.now(); decodeGraph(JSON.parse(txt)); out.push(performance.now() - t0); }
-        return {load: GR.ms, again: out}; }""")
-    check("speed: graph.json parse and decode under 150 ms (at app start, and 5 more times)", dec["load"] < 150 and max(dec["again"]) < 150,
-          "at start %.1f ms, again %s ms" % (dec["load"], ", ".join("%.1f" % x for x in dec["again"])))
-    PERF = {"p95": p95, "decode": dec["load"]}
+        for (let k = 0; k < 5; k++) { const t0 = performance.now(); ensureGrid(decodeGraph(JSON.parse(txt))); out.push(performance.now() - t0); }
+        return {load: GR.ms, grid: GR.gridMs, again: out}; }""")
+    check("speed, CPU slowed 4 times: at app start graph.json parse and decode, and then the segment grid (a task of its own), each under 150 ms; "
+          "all three together 5 more times, each under 150 ms",
+          dec["load"] < 150 and dec["grid"] is not None and dec["grid"] < 150 and max(dec["again"]) < 150,
+          "at start %.1f ms, then the grid %s ms; again %s ms" % (dec["load"], dec["grid"] is not None and round(dec["grid"], 1), ", ".join("%.1f" % x for x in dec["again"])))
+    PERF = {"p95": p95, "decode": dec["load"], "grid": dec["grid"]}
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 1})
     ctx.set_offline(False)
     ctx.close()
 
@@ -2179,10 +2432,308 @@ with sync_playwright() as p:
     far = far_point(legs[0]["geom"])
     for k in range(3):
         feed(pg, [far[0], far[1] + 0.00001 * k], speed=8)
+    pump_until(pg, lambda: pg.evaluate("() => !graphLoading"), timeout=8)    # a road map asked for again has failed again by now
     b = pg.evaluate("() => ({cls: document.getElementById('banner').className, then: document.getElementById('bThen').textContent, override: !!S.override, calls: window.__reroutes})")
     check("off route with no road map: the reroute is tried, no new leg, the arrow stays, and the banner says The road map did not load. Follow the arrow.",
           b["calls"] >= 1 and "off" in b["cls"].split() and b["then"] == "The road map did not load. Follow the arrow." and b["override"] is False, json.dumps(b))
     ctx.close()
+    # b. a graph.json that is whole JSON but does not decode (one interior point pair short; a turn row whose node is not on its
+    #    edges): never saved, a good saved copy is neither replaced nor passed over, and with no good copy no Offline ready.
+    good_graph = json.loads(GRAPH_TEXT)
+    short = dict(good_graph, ec=good_graph["ec"][:-2])
+    badturn = dict(good_graph, turns=good_graph["turns"] + [[0, good_graph["n"] - 1, 1, 0]])
+    CACHED_GRAPH = """async () => { const c = await caches.match('graph.json');
+        return {cached: c ? (await c.text()).length : 0, graph: !!GR, err: graphErr, line: document.getElementById('offlineLine').textContent}; }"""
+    for label, doc in (("one interior point pair short", short), ("a turn row whose node is not on its edges", badturn)):
+        ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+        block_external(ctx)
+        gs = {"bad": False, "seen": 0}
+
+        def bad_graph_handler(gs, body):
+            def handler(route):
+                if not gs["bad"]:
+                    route.continue_()
+                    return
+                gs["seen"] += 1
+                route.fulfill(status=200, content_type="application/json", body=body)
+            return handler
+
+        ctx.route(GRAPH_URL, bad_graph_handler(gs, json.dumps(doc, separators=(",", ":"))))
+        pg = ctx.new_page()
+        attach(pg)
+        pg.add_init_script(QUIET_GPS)
+        pg.goto(BASE + "?reset=1")
+        pg.wait_for_selector("#startBtns button", timeout=20000)
+        sw_controls(pg)
+        wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
+        gs["bad"] = True
+        pg.reload()
+        pg.wait_for_selector("#startBtns button", timeout=20000)
+        pump_until(pg, lambda: gs["seen"] > 0 and pg.evaluate("() => !graphLoading"), timeout=10)
+        pump_until(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=8)
+        pg.wait_for_timeout(1000)                        # time for a wrongly saved copy to land
+        r = pg.evaluate(CACHED_GRAPH)
+        check("graph.json with %s (whole JSON): the worker keeps the good saved copy and serves it, the page decodes it, and the start screen says Offline ready." % label,
+              gs["seen"] > 0 and r["cached"] == len(GRAPH_TEXT) and r["graph"] and r["line"].startswith("Offline ready."), json.dumps(r))
+        pg.evaluate("async () => { for (const k of await caches.keys()) { const c = await caches.open(k); await c.delete('graph.json'); } }")
+        pg.reload()
+        pg.wait_for_selector("#startBtns button", timeout=20000)
+        pump_until(pg, lambda: pg.evaluate("() => !graphLoading && graphErr !== ''"), timeout=10)
+        pump_until(pg, lambda: "Not offline ready" in text(pg, "#startBody"), timeout=8)
+        pg.wait_for_timeout(1000)
+        r = pg.evaluate(CACHED_GRAPH)
+        check("... and with no saved copy: it is not saved, the page has no road map, and the start screen is not Offline ready.",
+              r["cached"] == 0 and not r["graph"] and r["err"] != "" and r["line"].startswith("Not offline ready yet."), json.dumps(r))
+        ctx.close()
+
+    # ---------- 28. graph.json from the network first and asked for again, a road map older than the route, the reroute timing and
+    #            banner notes, the U-turn said at once, arrival at a stop off the road, the walker's last stretch, car islands ----------
+    # a. the first open after a deploy reads the new graph.json at once (route.json and graph.json both come network first)
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    block_external(ctx)
+    gst = {"edit": None}
+
+    def graph_edit(route):
+        if gst["edit"] is None:
+            route.continue_()
+            return
+        route.fulfill(status=200, content_type="application/json", body=gst["edit"](route.fetch().text()))
+
+    ctx.route(GRAPH_URL, graph_edit)
+    pg = ctx.new_page()
+    attach(pg)
+    pg.add_init_script(QUIET_GPS)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    sw_controls(pg)
+    wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
+    gst["edit"] = lambda t: t.replace('"built":"' + GRAPH_HEAD["built"] + '"', '"built":"12/31/2026"', 1)
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pump_until(pg, lambda: pg.evaluate("() => !graphLoading && !!GR"), timeout=10)
+    pg.wait_for_timeout(500)
+    r = pg.evaluate("""async () => { const c = await caches.match('graph.json');
+        return {built: GR && GR.built, cached: c ? JSON.parse(await c.text()).built : null}; }""")
+    check("first open after a deploy: the page reads the new graph.json at once (network first, not the copy saved before), and the worker saves the new one",
+          r["built"] == "12/31/2026" and r["cached"] == "12/31/2026", json.dumps(r))
+
+    # b. a road map that did not load is asked for again: by the next reroute, and when the device comes back online
+    gst["edit"] = None
+    ctx.unroute(GRAPH_URL, graph_edit)
+    aborting = {"on": True}                              # on: the server sends a damaged graph.json (it does not load); off: the real one
+    ctx.route(GRAPH_URL, lambda route: route.fulfill(status=200, content_type="application/json", body=GRAPH_TEXT[:20000])
+              if aborting["on"] else route.continue_())
+    DROP_GRAPH = "async () => { for (const k of await caches.keys()) { const c = await caches.open(k); await c.delete('graph.json'); } }"
+    pg.evaluate(DROP_GRAPH)
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pump_until(pg, lambda: pg.evaluate("() => !graphLoading && graphErr !== ''"), timeout=10)
+    r0 = pg.evaluate("() => ({graph: !!GR, err: graphErr})")
+    aborting["on"] = False
+    pg.evaluate(COUNT_REROUTES)
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(500)
+    pg.evaluate("() => { graphTriedAt = Date.now() - CFG.graphRetryMs - 1; }")     # the last try was CFG.graphRetryMs ago
+    off0, _, hd0 = off_route_point(0, 80, 250, 200, ("drive",))
+    feed(pg, legs[0]["geom"][0], speed=8)
+    for k in range(4):
+        feed(pg, [off0[0], off0[1] + 0.000004 * k], speed=8, heading=hd0)
+    got = pump_until(pg, lambda: pg.evaluate("() => !!GR && !!S.override"), timeout=10)
+    check("a road map that did not load (graph.json damaged, none saved) is asked for again by the next reroute, which then plans the new route",
+          r0["graph"] is False and r0["err"] != "" and got, json.dumps([r0, pg.evaluate("() => ({graph: !!GR, err: graphErr, note: S.rerouteNote, override: !!S.override})")]))
+    aborting["on"] = True
+    pg.evaluate(DROP_GRAPH)
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pump_until(pg, lambda: pg.evaluate("() => !graphLoading && graphErr !== ''"), timeout=10)
+    r0 = pg.evaluate("() => ({graph: !!GR, line: document.getElementById('offlineLine').textContent})")
+    aborting["on"] = False
+    pg.evaluate("() => window.dispatchEvent(new Event('online'))")
+    got = pump_until(pg, lambda: pg.evaluate("() => !!GR"), timeout=10)
+    ready = wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=10)
+    check("... and when the device comes back online; the start screen then changes from Not offline ready yet. to Offline ready.",
+          r0["graph"] is False and r0["line"].startswith("Not offline ready yet.") and got and ready, json.dumps([r0, text(pg, "#startBody")[-80:]]))
+    ctx.close()
+
+    # c. a road map older than the route: graph.json carries the signature of its route.json, and the page knows its box
+    check("graph.json was built for this route.json (its route_sig is the FNV-1a hash of route.json); if not, run build_graph.py (route-guide README step 5)",
+          GRAPH_HEAD.get("route_sig") == fnv1a_py(ROUTE_TEXT), "graph %s, route.json %s" % (GRAPH_HEAD.get("route_sig"), fnv1a_py(ROUTE_TEXT)))
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    block_external(ctx)
+    rstate = {"edit": None, "served": None}
+    ctx.route(ROUTE_URL, route_editor(rstate))
+
+    def move_stop_33(t):                                 # the end of leg 40 (stop 33) 5.5 km south, outside the road map's box
+        r = json.loads(t)
+        g = r["legs"][40]["geom"]
+        g[-1] = [round(g[-1][0] - 0.05, 6), g[-1][1]]
+        return json.dumps(r, separators=(",", ":"))
+
+    rstate["edit"] = move_stop_33
+    pg = ctx.new_page()
+    attach(pg)
+    pg.add_init_script(QUIET_GPS)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pump_until(pg, lambda: pg.evaluate("() => !!GR") and "does not reach" in text(pg, "#startBody"), timeout=10)
+    r = pg.evaluate("""() => ({line: document.getElementById('offlineLine').textContent, to: S.legs[40].to,
+        fail: planLeg(S.legs[39].geom[0], S.legs[40], null).fail || '', ok41: !!planLeg(S.legs[40].geom[0], S.legs[41], null).leg, sameSig: GR.routeSig === S.routeSig})""")
+    check("a stop outside the road map's box (graph.json older than route.json): the start screen says so, a reroute to it says why, and reroutes to other stops still work",
+          "The road map does not reach 1 stop: no new route to it." in r["line"] and r["to"]["kind"] == "stop"
+          and r["fail"] == "The road map does not reach the stop. Follow the arrow." and r["ok41"] and r["sameSig"] is False, json.dumps(r))
+    ctx.close()
+
+    # d. a missed turn on leg 9 (Northeast Ellis Way): the new route says Make a U-turn at once, or turns ahead; the car keeps going
+    #    straight and leaves that route too: a new plan comes within a few fixes (no 20 s wait), Route updated. is said once, and the
+    #    banner never claims a plan runs when none does
+    def along_of(P, ll):
+        q = P.xy_of(ll)
+        best = (1e18, 0.0)
+        for k in range(len(P.xy) - 1):
+            a, b = P.xy[k], P.xy[k + 1]
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            l2 = dx * dx + dy * dy
+            t = max(0.0, min(1.0, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2)) if l2 else 0.0
+            d = math.hypot(q[0] - (a[0] + t * dx), q[1] - (a[1] + t * dy))
+            if d < best[0]:
+                best = (d, P.cum[k] + t * math.sqrt(l2))
+        return best[1]
+
+    i9 = 9
+    turn9 = next((s for s in legs[i9]["steps"] if s.get("name") == "Northeast Ellis Way" and "right" in (s.get("mod") or "")), None)
+    check("missed-turn test setup: leg 9 turns right onto Northeast Ellis Way", turn9 is not None and legs[i9]["mode"] == "drive")
+    P9 = Path(legs[i9]["geom"])
+    s9 = along_of(P9, turn9["loc"])
+    h9 = P9.bearing(s9 - 8)
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => setLeg(i)", i9)
+    for s in range(max(0, int(s9) - 100), int(s9), 10):
+        feed(pg, P9.ll(s), speed=11, heading=P9.bearing(s))
+    pg.evaluate("() => { window.__spoken = []; }")
+    base_xy = P9.at(s9)
+    ahead = lambda m: P9.to_ll((base_xy[0] + m * math.sin(math.radians(h9)), base_xy[1] + m * math.cos(math.radians(h9))))
+    first, k = None, 0
+    while k < 14 and not first:
+        k += 1
+        feed(pg, ahead(11 * k), speed=11, heading=h9)
+        first = pg.evaluate("""() => S.override ? {steps: S.override.steps.slice(0, 2), dist: document.getElementById('bDist').textContent,
+            instr: document.getElementById('bInstr').textContent, spoken: window.__spoken.slice(), calls: window.__reroutes,
+            next: S.nav && S.nav.step ? S.nav.step.loc : null, fix: [S.fix.lat, S.fix.lon]} : null""")
+    ok_first = False
+    if first:
+        if first["steps"][1].get("atStart"):
+            ok_first = first["instr"].startswith("Make a U-turn") and first["dist"] == "Now" and any(x.startswith("Make a U-turn") for x in first["spoken"])
+        elif first["next"]:
+            fq, nq = P9.xy_of(first["fix"]), P9.xy_of(first["next"])
+            ok_first = ang_deg((math.degrees(math.atan2(nq[0] - fq[0], nq[1] - fq[1])) + 360) % 360, h9) <= 90
+    check("missed turn onto Northeast Ellis Way (leg 9), the car goes straight on: the new route's first words are Make a U-turn (now, and spoken) or a maneuver ahead of the car",
+          ok_first, json.dumps(first)[:500])
+    plans, then_off = [], []
+    o1 = pg.evaluate("() => { window.__o1 = S.override; return window.__reroutes; }")
+    for k2 in range(k + 1, k + 13):
+        feed(pg, ahead(11 * k2), speed=11, heading=h9)
+        st = pg.evaluate("() => ({calls: window.__reroutes, changed: S.override !== window.__o1, cls: document.getElementById('banner').className, then: document.getElementById('bThen').textContent})")
+        if "off" in st["cls"].split():
+            then_off.append(st["then"])
+        if st["changed"]:
+            plans.append(k2)
+            break
+    said = pg.evaluate("() => window.__spoken.filter(x => x === 'Route updated.').length")
+    check("... the car keeps going straight and leaves the new route too: a second plan comes within 12 fixes (11 m apart), with no 20 s wait",
+          bool(first) and bool(plans), "second plan at fix %s; banner notes while off: %s" % (plans, json.dumps(then_off)))
+    check("... Route updated. is said once for the two plans, and the banner never says Finding a new route while no plan runs",
+          said == 1 and "Finding a new route" not in then_off, "said %d times; notes %s" % (said, json.dumps(then_off)))
+    ctx.close()
+
+    # e. banner notes: a failed plan says why; back on the line the note is cleared; a one-fix GPS jump later shows the arrow only
+    ctx, pg = guidance_page(br)
+    far = pg.evaluate(NO_ROAD_POINT)
+    pg.evaluate("() => setLeg(0)")
+    P0 = Path(legs[0]["geom"])
+    feed(pg, P0.ll(10), speed=8)
+    for k in range(4):
+        feed(pg, [far[0], far[1] + 0.00001 * k], speed=8)
+    t1 = text(pg, "#bThen")
+    feed(pg, P0.ll(20), speed=8)
+    note = pg.evaluate("() => S.rerouteNote")
+    feed(pg, far, speed=8)
+    r = pg.evaluate("() => ({then: document.getElementById('bThen').textContent, cls: document.getElementById('banner').className, off: S.offRoute})")
+    check("banner notes: no road near says why; back on the route the note is cleared; one fix far off again shows Follow the arrow, not the old note or Finding a new route",
+          t1 == "No road within 490 ft. Follow the arrow." and note == "" and r["then"] == "Follow the arrow" and "off" in r["cls"].split() and r["off"] is False,
+          json.dumps([t1, note, r]))
+    ctx.close()
+
+    # f. a drive leg whose end lies 45.8 m off the car network (leg 38, stop 31): after a reroute the car arrives at the end of the road
+    i38 = next(i for i, l in enumerate(legs) if l["mode"] == "drive" and l["to"].get("o") == 31 and l["to"]["kind"] == "stop")
+    P38 = Path(legs[i38]["geom"])
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => setLeg(i)", i38)
+    feed(pg, P38.ll(0))
+    east = P38.ll(0, 120, 0)
+    for k in range(4):
+        feed(pg, [east[0], east[1] + 0.000004 * k])
+    o = pg.evaluate("() => S.override ? {geom: S.override.geom, tail: S.override.tail} : null")
+    check("off-road stop test setup: the new leg to stop 31 ends with a straight line over 45 m (no car drives it) at the stop",
+          o is not None and (o["tail"] or 0) > 45 and o["geom"][-1] == legs[i38]["geom"][-1], json.dumps(o and {"tail": o["tail"], "end": o["geom"][-1]}))
+    arrived_at, before = None, pg.evaluate("() => [S.legIdx, S.waiting]")
+    if o and o["tail"]:
+        Q = Path(o["geom"])
+        road_end = Q.total - o["tail"]
+        for s in [float(x) for x in range(0, int(road_end), 10)] + [road_end]:
+            feed(pg, Q.ll(s), speed=5, heading=Q.bearing(s))
+            if pg.evaluate("() => [S.legIdx, S.waiting]") != before:
+                arrived_at = s
+                break
+    check("... the car that drives the new leg arrives at stop 31 by the end of the road, without driving the straight line", arrived_at is not None,
+          "arrived %s m along the new leg (the road ends at %s m)" % (arrived_at, o and round(Path(o["geom"]).total - (o["tail"] or 0))))
+    ctx.close()
+
+    # g. the walker's last stretch: off walk leg 1, the new leg leaves the path straight to the meter, and the walker arrives there
+    i1 = 1
+    W1 = Path(legs[i1]["geom"])
+    side60 = None
+    for s_try in range(5, int(W1.total) - 5, 5):
+        side60 = W1.side_point(s_try, 60)
+        if side60:
+            break
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => { S.fix = null; setLeg(i); }", i1)
+    feed(pg, W1.ll(0), speed=1.4)
+    for k in range(4):
+        feed(pg, [side60[0], side60[1] + 0.000004 * k], speed=1.4)
+    o = pg.evaluate("() => S.override ? {geom: S.override.geom, words: S.override.steps.map(s => s.type === 'arrive' ? 'arrive' : instr(s, 'walk'))} : null")
+    arrived = False
+    if o:
+        Q = Path(o["geom"])
+        s = 0.0
+        while s <= Q.total + 3 and not arrived:
+            feed(pg, Q.ll(min(s, Q.total)), speed=1.4)
+            arrived = pg.evaluate("() => S.waiting === 'stop'")
+            s += 3
+    check("off walk leg 1 (60 m away): the new leg ends with Leave the path. Walk straight to the meter, and the walker who follows it arrives at the meter",
+          side60 is not None and o is not None and "Leave the path. Walk straight to the meter" in o["words"] and o["geom"][-1] == legs[i1]["geom"][-1] and arrived,
+          json.dumps(o and o["words"]))
+    ctx.close()
+
+    # h. a car island next to leg 31: the fixes snap to a piece of road with no way into the main network; the reroute still plans
+    ctx, pg = guidance_page(br)
+    pt = pg.evaluate("""(i) => { const leg = S.legs[i], rt = prepLeg(leg), end = leg.geom[leg.geom.length - 1];
+        for (let e = 0; e < GR.m; e++) { if (!GR.isl[e] || !(GR.fl[e] & 3) || (GR.fl[e] & F_NOSNAP)) continue;
+          const p = piecePts(GR, e, 0, GR.el[e] / 2).pop(), ll = [+(p[0] * 1e-6).toFixed(6), +(p[1] * 1e-6).toFixed(6)];
+          const s0 = snapG(GR, micro(ll[0]), micro(ll[1]), 'car', CFG.snapMax, null, false); if (!s0 || s0.e !== e) continue;
+          if (project(rt, ll).d < 70 || routeG(GR, ll, end, 'car', null, false).fail !== 'route') continue;
+          if (!snapG(GR, micro(ll[0]), micro(ll[1]), 'car', CFG.snapMax, null, true)) continue;
+          return ll; }
+        return null; }""", 31)
+    pg.evaluate("(i) => setLeg(i)", 31)
+    feed(pg, legs[31]["geom"][0])
+    for k in range(4 if pt else 0):                      # no such point: the check below fails
+        feed(pg, pt)
+    r = pg.evaluate("() => ({override: !!S.override, then: document.getElementById('bThen').textContent, instr: document.getElementById('bInstr').textContent})")
+    check("leg 31, the car on a piece of road with no way into the main network (a car island): the reroute snaps to the main network and plans a new leg",
+          pt is not None and r["override"] and "No route found" not in r["then"], json.dumps([pt, r]))
+    ctx.close()
+
     check("no guidance page asked a host other than 127.0.0.1", not EXTERNAL, " ".join(EXTERNAL[:5]))
     br.close()
 
