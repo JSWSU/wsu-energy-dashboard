@@ -224,19 +224,52 @@ def feed(pg, ll, acc=5, speed=0, heading=None, t=None):
         return S.nav ? S.nav.along : null; }""", [ll[0], ll[1], acc, speed, heading, t])
 
 
-def guidance_page(br):
-    """A started app on the simulator page (?sim=1 has no GPS watch, so only the fixes a test feeds arrive)."""
+# a GPS that never sends a fix: the app's own GPS code runs (no simulator), and only the fixes a test feeds arrive
+QUIET_GPS = "Geolocation.prototype.watchPosition = function () { return 1; }; Geolocation.prototype.clearWatch = function () {};"
+
+
+def guidance_page(br, sim=True, init=None):
+    """A started app. sim: the simulator page (?sim=1 has no GPS watch). Otherwise the app's real GPS code runs with a GPS that
+    never sends a fix. Either way only the fixes a test feeds arrive. init: one more script that runs before the page."""
     ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
     ctx.route(OSRM_URL, lambda route: release(route, {"code": "NoRoute"}))      # a reroute must never reach the real server
     pg = ctx.new_page()
     attach(pg)
     pg.add_init_script(CAPTURE_SPEECH)
     pg.add_init_script(RECORD_OSRM_SIGNALS)                                      # window.__osrmSignals has one entry per reroute request
-    pg.goto(BASE + "?sim=1&reset=1")
+    if not sim:
+        pg.add_init_script(QUIET_GPS)
+    if init:
+        pg.add_init_script(init)
+    pg.goto(BASE + ("?sim=1&reset=1" if sim else "?reset=1"))
     pg.wait_for_selector("#startBtns button", timeout=20000)
     pg.click("#startBtns button")
     pg.wait_for_timeout(800)
     return ctx, pg
+
+
+def tap(pg, sel):
+    """Click the first visible element that matches sel. Returns False at once when there is none, so a check fails
+    instead of the run stopping on a wait."""
+    loc = pg.locator(sel)
+    for i in range(loc.count()):
+        if loc.nth(i).is_visible():
+            loc.nth(i).click()
+            return True
+    return False
+
+
+def start_btns(pg):
+    return pg.evaluate("() => [...document.querySelectorAll('#startBtns button')].map(b => b.textContent)")
+
+
+def opened(pg, timeout=12000):
+    """True when the start screen buttons appear (the route loaded), False when they do not."""
+    try:
+        pg.wait_for_selector("#startBtns button", timeout=timeout)
+        return True
+    except Exception:
+        return False
 
 
 def state_of(pg):
@@ -598,6 +631,12 @@ with sync_playwright() as p:
     check("redeploy mid-drive: primary button reads Resume at stop 4 and the session runs the pinned route",
           r["btns"][0] == "Resume at stop 4" and r["built"] == ROUTE_BUILT, json.dumps(r))
     pg.click('#startBtns button:has-text("Start a new drive with the new route")')
+    one = pg.evaluate("() => ({leg: S.legIdx, done: Object.keys(S.done).sort(), built: S.route.built, started: S.started})")
+    one["btns"] = start_btns(pg)
+    check("one tap on Start a new drive with the new route clears nothing and asks for a second tap",
+          one["leg"] == prog["leg"] and one["done"] == prog["done"] and one["built"] == ROUTE_BUILT and not one["started"]
+          and one["btns"][1:] == ["Tap again to clear progress"], json.dumps(one))
+    tap(pg, '#startBtns button:has-text("Tap again to clear progress")')      # the second tap confirms
     pg.wait_for_timeout(800)
     st = pg.evaluate("""() => ({leg: S.legIdx, done: Object.keys(S.done), skipped: Object.keys(S.skipped), built: S.route.built,
         started: S.started, sig: lsGet('activeSig', null), saved: lsGet('leg', null), shown: getComputedStyle(document.getElementById('start')).display})""")
@@ -628,6 +667,7 @@ with sync_playwright() as p:
     ctx.close()
 
     # ---------- 9. a query address does not pin an old page; the saved page is one entry ----------
+    # The app page is stale while revalidate: a visit opens the saved page at once and saves the server's page for the next open.
     ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
     pstate = {"marker": None}
 
@@ -646,17 +686,20 @@ with sync_playwright() as p:
     check("service worker controls the page (query test)", sw_controls(pg))
     pg.goto(BASE + "?reset=1")                     # a query visit while the worker runs: the old worker saved a second page entry
     pg.wait_for_selector("#startBtns button", timeout=20000)
+    saved_page = "async () => { const r = await caches.match(new URL('./', location.href).href); return r ? await r.text() : ''; }"
     pstate["marker"] = "AMR-TEST-MARKER-1"
     pg.goto("about:blank")
     pg.goto(BASE)                                  # plain address, online, the server now sends a changed page
     pg.wait_for_selector("#startBtns button", timeout=20000)
     has = pg.evaluate("() => document.head.innerHTML.includes('AMR-TEST-MARKER-1')")
-    check("a plain visit after a ?reset=1 visit shows the page the server sends now", has)
-    pstate["marker"] = "AMR-TEST-MARKER-2"
+    saved = pump_until(pg, lambda: "AMR-TEST-MARKER-1" in pg.evaluate(saved_page), timeout=8)
+    check("a plain visit after a ?reset=1 visit opens the saved page at once and saves the page the server sends now",
+          not has and saved, "shown now: %s, saved: %s" % (has, saved))
     pg.goto("about:blank")
     pg.goto(BASE + "?sim=1")
     pg.wait_for_selector("#startBtns button", timeout=20000)
-    check("a ?sim=1 visit also shows the page the server sends now", pg.evaluate("() => document.head.innerHTML.includes('AMR-TEST-MARKER-2')"))
+    check("the next visit, on ?sim=1, opens that one saved page, now the server's new page",
+          pg.evaluate("() => document.head.innerHTML.includes('AMR-TEST-MARKER-1')"))
     keys = pg.evaluate("""async () => { const out = []; for (const k of await caches.keys()) { const c = await caches.open(k);
         (await c.keys()).forEach(r => out.push(r.url)); } return out; }""")
     check("no saved page or file has a query string", not [u for u in keys if "?" in u], " ".join(u for u in keys if "?" in u))
@@ -671,7 +714,7 @@ with sync_playwright() as p:
     pg.goto(BASE + "?sim=1")
     ok = wait_for(pg, lambda: "43 stops" in (pg.locator("#startBody").inner_text() or ""), timeout=20)
     check("offline, a query address opens from the one saved page", ok)
-    check("that offline open really failed at the network first (the worker's own request)",
+    check("that offline open still asked the network for the page, and the worker's own request failed",
           any(sw and "?sim=1" in u for u, sw in net_failed), json.dumps(net_failed[:3]))
     ctx.set_offline(False)
     pg.goto("about:blank")
@@ -822,7 +865,7 @@ with sync_playwright() as p:
     pg.goto(BASE)
     ok = wait_for(pg, lambda: "43 stops" in (pg.locator("#startBody").inner_text() or ""), timeout=20)
     check("offline, the app still opens and its start card shows 43 stops", ok, text(pg, "body")[:60])
-    check("that offline open failed at the network first (the worker's own request)",
+    check("that offline open still asked the network for the page, and the worker's own request failed (other-file test)",
           any(sw and u.rstrip("?").endswith("/amr-nav/") for u, sw in net_failed), json.dumps(net_failed[:3]))
     ctx.set_offline(False)
     ctx.close()
@@ -875,6 +918,10 @@ with sync_playwright() as p:
     check("the passed stop is saved", pg.evaluate("() => Object.keys(lsGet('passed', {}))") == ["7"])
     spoken = pg.evaluate("() => window.__spoken")
     check("the guide says which stop comes next", "Continuing to stop 8." in spoken, json.dumps(spoken[-3:]))
+    mk = pg.evaluate("""() => { const m = stopMarkers[7], e = m && m.getElement() ? m.getElement().querySelector('.sm') : null;
+        return e ? {c: e.className, bg: getComputedStyle(e).backgroundColor, fg: getComputedStyle(e).color} : null; }""")
+    check("the map marker of stop 7 shows it as Passed: amber (#f59e0b) with white text",
+          bool(mk) and "pass" in mk["c"].split() and mk["bg"] == "rgb(245, 158, 11)" and mk["fg"] == "rgb(255, 255, 255)", json.dumps(mk))
     pg.click("#fList")
     chip = dom(pg, "#row7 .chip", "({t: e.textContent, c: e.className, bg: getComputedStyle(e).backgroundColor, fg: getComputedStyle(e).color})")
     check("the stop list shows a Passed chip for stop 7", bool(chip) and chip["t"] == "Passed" and "pass" in chip["c"].split(), json.dumps(chip))
@@ -886,6 +933,7 @@ with sync_playwright() as p:
     pg.wait_for_selector("#startBtns button", timeout=20000)
     check("a passed stop is still Passed after a reload", pg.evaluate("() => Object.keys(S.passed || {})") == ["7"])
     pg.click('#startBtns button:has-text("Start a new drive at stop 1")')
+    tap(pg, '#startBtns button:has-text("Tap again to clear progress")')      # the second tap confirms
     pg.wait_for_timeout(500)
     r = pg.evaluate("() => ({passed: Object.keys(S.passed || {}), stored: lsGet('passed', null)})")
     check("Start a new drive at stop 1 (start screen) clears Passed", r["passed"] == [] and r["stored"] == {}, json.dumps(r))
@@ -937,8 +985,8 @@ with sync_playwright() as p:
     check("the next good fix is matched again and the banner recovers", a2 is not None and abs(a2 - 220) < 10 and "Weak GPS" not in then, "along=%s then=%r" % (a2, then))
     ctx.close()
 
-    # ---------- 16. a fix with no news for 10 s shows GPS lost ----------
-    ctx, pg = guidance_page(br)
+    # ---------- 16. a fix with no news for 10 s shows GPS lost (real GPS code: the simulator has no GPS-lost check) ----------
+    ctx, pg = guidance_page(br, sim=False)
     t0 = time.time()
     feed(pg, [DEPOT["latitude"], DEPOT["longitude"]], acc=5)
     check("a good fix: the GPS chip shows the accuracy", text(pg, "#gps").startswith("GPS ±"), text(pg, "#gps"))
@@ -1180,18 +1228,45 @@ with sync_playwright() as p:
           r["off"] is False and r["cnt"] == 0 and r["waiting"] == "park" and r["spoken"] == 0 and r["calls"] == 0, json.dumps(r))
     ctx.close()
 
-    iw = next(i for i, l in enumerate(legs) if l["to"].get("o") == 10 and l["to"]["kind"] == "stop")
-    Pn = Path(legs[iw + 2]["geom"])                      # the drive that follows the walk-in stop 10
-    ctx, pg = guidance_page(br)
-    pg.evaluate("(i) => setLeg(i)", iw)
-    feed(pg, legs[iw]["geom"][-1])
-    check("walk-in test setup: stop 10 is reached on a walk leg, a drive leg follows, and arriving waits for a tap",
-          legs[iw]["mode"] == "walk" and legs[iw + 2]["mode"] == "drive" and state_of(pg)["waiting"] == "stop", json.dumps(state_of(pg)))
-    for s in range(0, 401, 10):
-        feed(pg, Pn.ll(s), speed=8, heading=Pn.bearing(s))
-    r = pg.evaluate(cue)
-    check("no tap at walk-in stop 10, then driving away at 8 m/s: the guide says Off route.", r["off"] is True and r["spoken"] == 1, json.dumps(r))
-    ctx.close()
+    # walk-in stops 1 and 10: the reader reaches the meter, does not tap Done, walks back to the car and drives away. The meter
+    # wait ends like a drive stop (2 fixes, over 3 m/s, over 80 m from the meter): Passed, past the walk back, to the next drive.
+    for o in (1, 10):
+        iw = next(i for i, l in enumerate(legs) if l["to"].get("o") == o and l["to"]["kind"] == "stop")
+        idr = next(i for i in range(iw + 2, len(legs)) if legs[i]["mode"] == "drive")
+        meter, nxt_o = legs[iw]["geom"][-1], legs[idr]["to"]["o"]
+        Pc, Pn = Path(legs[iw + 1]["geom"]), Path(legs[idr]["geom"])    # the walk back to the car, the drive after it
+        ctx, pg = guidance_page(br)
+        pg.evaluate("(i) => { S.fix = null; setLeg(i); }", iw)
+        feed(pg, meter)
+        w0 = state_of(pg)
+        pg.evaluate("() => { window.__spoken = []; }")
+        s = 0.0
+        while s < Pc.total:
+            feed(pg, Pc.ll(s), speed=1.4)
+            s += 5
+        feed(pg, Pc.ll(Pc.total), speed=0)
+        r_walk = pg.evaluate("() => ({waiting: S.waiting, leg: S.legIdx, off: S.offRoute})")
+        resumed, s = None, 0.0
+        while s <= Pn.total:
+            ll = Pn.ll(s)
+            feed(pg, ll, speed=8, heading=Pn.bearing(s))
+            if state_of(pg)["waiting"] is None:
+                resumed = hav_m(ll, meter)
+                break
+            s += 8
+        r = pg.evaluate("() => ({waiting: S.waiting, leg: S.legIdx, passed: Object.keys(S.passed), off: S.offRoute, spoken: window.__spoken, calls: window.__osrmSignals.length})")
+        check("walk-in stop %d test setup: the meter is reached on a walk leg and waits for Done; the car leg, then the drive to stop %d follow" % (o, nxt_o),
+              legs[iw]["mode"] == "walk" and legs[iw + 1]["to"]["kind"] == "car" and w0["waiting"] == "stop" and w0["leg"] == iw, json.dumps(w0))
+        check("walk-in stop %d: walking back to the car at 1.4 m/s without Done keeps the wait at the meter" % o,
+              r_walk["waiting"] == "stop" and r_walk["leg"] == iw and r_walk["off"] is False, json.dumps(r_walk))
+        check("walk-in stop %d: driving away at 8 m/s, the guide goes on without Done, more than 80 m from the meter, past the walk back to the drive to stop %d" % (o, nxt_o),
+              r["waiting"] is None and r["leg"] == idr and resumed is not None and resumed > 80,
+              "resumed %s m from the meter, leg %s, waiting %s" % (resumed and round(resumed), r["leg"], r["waiting"]))
+        check("walk-in stop %d: the stop is Passed and the guide says Continuing to stop %d." % (o, nxt_o),
+              r["passed"] == [str(o)] and ("Continuing to stop %d." % nxt_o) in r["spoken"], json.dumps(r))
+        check("walk-in stop %d: no Off route. and no reroute request before or during this" % o,
+              "Off route." not in r["spoken"] and r["calls"] == 0 and r["off"] is False, json.dumps(r))
+        ctx.close()
 
     # ---------- 22. after the route is complete there is no route to be off ----------
     il = len(legs) - 1
@@ -1400,15 +1475,15 @@ with sync_playwright() as p:
     n_legs = pg.evaluate("() => S.legs.length")
 
     def end_screen(edit=None):
-        """The drive is over (last leg saved, some stops marked); open the app again. Returns the start screen buttons."""
-        pg.evaluate("(n) => { markStop(1, 'done'); markStop(2, 'skip'); setLeg(n - 1); }", n_legs)
+        """The drive is over (last leg, finished at the depot, some stops marked); open the app again. Returns the start screen buttons."""
+        pg.evaluate("(n) => { markStop(1, 'done'); markStop(2, 'skip'); setLeg(n - 1); arrived(); }", n_legs)
         rstate["edit"] = edit
         pg.reload()
         pg.wait_for_selector("#startBtns button", timeout=20000)
         return pg.evaluate("() => [...document.querySelectorAll('#startBtns button')].map(b => b.textContent)")
 
     btns = end_screen()
-    check("with the last leg saved, the start screen offers Start a new drive at stop 1 first, then Review the last drive",
+    check("with the drive finished, the start screen offers Start a new drive at stop 1 first, then Review the last drive",
           btns == ["Start a new drive at stop 1", "Review the last drive"], json.dumps(btns))
     check("... and not Start guidance or Resume", pg.evaluate("() => S.legIdx") == n_legs - 1 and "Resume" not in " ".join(btns), json.dumps(btns))
     pg.click('#startBtns button:has-text("Review the last drive")')
@@ -1426,20 +1501,388 @@ with sync_playwright() as p:
           btns2[0] == "Resume at stop 12" and pg.evaluate("() => S.started") is False, json.dumps(btns2))
     btns = end_screen()
     pg.click('#startBtns button:has-text("Start a new drive at stop 1")')
+    tap(pg, '#startBtns button:has-text("Tap again to clear progress")')      # the second tap confirms
     pg.wait_for_timeout(500)
     r = pg.evaluate("() => ({leg: S.legIdx, done: Object.keys(S.done), skipped: Object.keys(S.skipped), started: S.started, built: S.route.built})")
-    check("Start a new drive at stop 1 after the last leg: leg 0, nothing reached, drive started",
+    check("Start a new drive at stop 1 after the finished drive (two taps): leg 0, nothing reached, drive started",
           r["leg"] == 0 and r["done"] == [] and r["skipped"] == [] and r["started"] and r["built"] == ROUTE_BUILT, json.dumps(r))
     # a newer route waits too: the same two buttons, and the new drive uses the new route
     btns = end_screen(lambda t: t.replace('"built":"' + ROUTE_BUILT + '"', '"built":"' + NEW_BUILT_24 + '"', 1))
     line = pg.evaluate("() => document.getElementById('newRouteLine') ? document.getElementById('newRouteLine').textContent : null")
-    check("last leg saved and a new route waiting: the same two buttons, and the new-route line shows",
+    check("drive finished and a new route waiting: the same two buttons, and the new-route line shows",
           btns == ["Start a new drive at stop 1", "Review the last drive"] and line is not None and NEW_BUILT_24 in line, json.dumps([btns, line]))
     pg.click('#startBtns button:has-text("Start a new drive at stop 1")')
+    tap(pg, '#startBtns button:has-text("Tap again to clear progress")')      # the second tap confirms
     pg.wait_for_timeout(500)
     r = pg.evaluate("() => ({leg: S.legIdx, done: Object.keys(S.done), built: S.route.built, pending: S.pending, started: S.started, sig: lsGet('activeSig', null)})")
     check("Start a new drive at stop 1 with a new route waiting uses the new route",
           r["leg"] == 0 and r["done"] == [] and r["built"] == NEW_BUILT_24 and r["pending"] is None and r["started"] and r["sig"] == fnv1a_py(rstate["served"]), json.dumps(r))
+    ctx.close()
+
+    # ---------- 25. final review fixes ----------
+    def snap(pg):
+        """Drive state and start screen buttons."""
+        r = pg.evaluate("""() => ({leg: S.legIdx, done: Object.keys(S.done).map(Number), started: S.started, finished: S.finished,
+            stored: lsGet('finished', null), shown: getComputedStyle(document.getElementById('start')).display !== 'none'})""")
+        r["btns"] = start_btns(pg)
+        return r
+
+    # a. voice prompts only on the leg: Go to stop 30, then a fix 1 km from its leg, past its end
+    i30 = li(30, "stop")
+    P30 = Path(legs[i30]["geom"])
+    qa, qb = P30.at(P30.total - 20), P30.at(P30.total)
+    qn = math.hypot(qb[0] - qa[0], qb[1] - qa[1])
+    far_xy = (qb[0] + (qb[0] - qa[0]) / qn * 1000, qb[1] + (qb[1] - qa[1]) / qn * 1000)
+    far30, d30 = P30.to_ll(far_xy), P30.nearest(far_xy)[0]
+    ctx, pg = guidance_page(br)
+    pg.click("#fList")
+    pg.locator("#row30 button").click()
+    pg.wait_for_timeout(300)
+    pg.evaluate("() => { window.__spoken = []; }")
+    feed(pg, far30, speed=10)
+    r = pg.evaluate("""() => ({leg: S.legIdx, off: S.nav ? S.nav.off : null, offRoute: S.offRoute, spoken: window.__spoken,
+        cls: document.getElementById('banner').className, instr: document.getElementById('bInstr').textContent})""")
+    check("prompt test setup: Go to stop 30 (leg %d), then a fix %.0f m from its leg, past its end" % (i30, d30),
+          r["leg"] == i30 and d30 >= 900 and r["off"] is not None and r["off"] >= 900, json.dumps(r))
+    check("a fix 1 km from the leg speaks no maneuver or arrival prompt", r["spoken"] == [], json.dumps(r["spoken"]))
+    check("... and the banner shows the direct arrow to the stop (the off-route display)",
+          "off" in r["cls"].split() and r["instr"].startswith("Off route. Head ") and r["instr"].endswith(" to stop 30"), json.dumps(r))
+    feed(pg, P30.ll(P30.total - 30), speed=10)
+    sp = pg.evaluate("() => window.__spoken")
+    check("on the leg, 30 m before its end, the arrival prompt is spoken", "Arriving at stop 30" in sp, json.dumps(sp))
+    ctx.close()
+
+    # b. two taps for every button that clears progress, with the Skip time (CFG.skipConfirmMs)
+    ctx, pg = guidance_page(br)
+    pg.evaluate("() => { markStop(2, 'done'); S.fix = null; setLeg(5); }")
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.evaluate("() => { CFG.skipConfirmMs = 1500; }")
+    b0 = start_btns(pg)
+    tap(pg, '#startBtns button:has-text("Start a new drive at stop 1")')
+    r1 = snap(pg)
+    check("start screen: one tap on Start a new drive at stop 1 clears nothing and reads Tap again to clear progress",
+          b0 == ["Resume at stop 4", "Start a new drive at stop 1"] and r1["leg"] == 5 and r1["done"] == [2] and r1["shown"]
+          and not r1["started"] and r1["btns"] == ["Resume at stop 4", "Tap again to clear progress"], json.dumps([b0, r1]))
+    pg.wait_for_timeout(1800)
+    r2 = snap(pg)
+    check("... after CFG.skipConfirmMs (here 1.5 s) the text goes back and nothing is cleared",
+          r2["btns"] == b0 and r2["leg"] == 5 and r2["done"] == [2], json.dumps(r2))
+    tap(pg, '#startBtns button:has-text("Start a new drive at stop 1")')
+    pg.wait_for_timeout(1800)
+    tap(pg, '#startBtns button:has-text("Start a new drive at stop 1")')
+    r3 = snap(pg)
+    check("a tap after that time only arms the button again: nothing cleared", r3["leg"] == 5 and r3["done"] == [2] and not r3["started"], json.dumps(r3))
+    tap(pg, '#startBtns button:has-text("Tap again to clear progress")')
+    r4 = snap(pg)
+    check("a second tap within the time starts a new drive: leg 0, nothing reached", r4["leg"] == 0 and r4["done"] == [] and r4["started"], json.dumps(r4))
+    pg.evaluate("() => { markStop(3, 'done'); }")
+    pg.click("#fList")
+    pg.click("#bReset")
+    t1, d1 = text(pg, "#bReset"), pg.evaluate("() => Object.keys(S.done)")
+    pg.wait_for_timeout(1800)
+    t2 = text(pg, "#bReset")
+    check("stop list: one tap on Start a new drive clears nothing, reads Tap again to clear progress, and goes back after CFG.skipConfirmMs",
+          t1 == "Tap again to clear progress" and d1 == ["3"] and t2 == "Start a new drive", json.dumps([t1, d1, t2]))
+    pg.click("#pClose")
+
+    # c. newDrive() is the one way to a new drive
+    r = pg.evaluate("""() => { if (typeof newDrive !== 'function') return null;
+        S.done = {1: 1}; S.skipped = {2: 1}; S.passed = {7: 1}; S.finished = true; S.legIdx = 9;
+        lsSet('leg', 9); lsSet('done', S.done); lsSet('skipped', S.skipped); lsSet('passed', S.passed); lsSet('finished', true);
+        const swap = newDrive({adopt: true});
+        return {swap, leg: S.legIdx, done: S.done, skipped: S.skipped, passed: S.passed, finished: S.finished,
+                stored: ['leg', 'done', 'skipped', 'passed', 'finished'].map(k => lsGet(k, null))}; }""")
+    check("newDrive clears leg, done, skipped, passed and finished, in memory and in storage (no route waiting: no switch)",
+          r is not None and r["swap"] is False and r["leg"] == 0 and r["done"] == {} and r["skipped"] == {} and r["passed"] == {}
+          and r["finished"] is False and r["stored"] == [0, {}, {}, {}, False], json.dumps(r))
+    ctx.close()
+
+    # d. the finished flag: driving back to the depot resumes in one tap; only a finished drive offers a new one first
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(n) => { markStop(1, 'done'); S.fix = null; setLeg(n - 1); }", len(legs))
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    r = snap(pg)
+    check("driving back to the depot (last leg, not finished): the start screen offers Resume: return to McCluskey Services first",
+          r["btns"] == ["Resume: return to McCluskey Services", "Start a new drive at stop 1"] and r["stored"] is not True, json.dumps(r))
+    tap(pg, '#startBtns button:has-text("Resume: return to McCluskey Services")')
+    pg.wait_for_timeout(300)
+    r = snap(pg)
+    check("one tap on Resume: return to McCluskey Services resumes the last leg with the progress kept",
+          r["started"] and r["leg"] == len(legs) - 1 and r["done"] == [1], json.dumps(r))
+    pg.evaluate("() => arrived()")                      # Finish at the depot
+    fin = pg.evaluate("() => lsGet('finished', null)")
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    r = snap(pg)
+    check("finished at the depot: the flag is saved, and the start screen offers Start a new drive at stop 1, then Review the last drive",
+          fin is True and r["btns"] == ["Start a new drive at stop 1", "Review the last drive"], json.dumps([fin, r]))
+    tap(pg, '#startBtns button:has-text("Start a new drive at stop 1")')
+    r = snap(pg)
+    check("after a finished drive one tap on Start a new drive at stop 1 clears nothing yet",
+          r["leg"] == len(legs) - 1 and r["done"] == [1] and not r["started"] and r["btns"][0] == "Tap again to clear progress", json.dumps(r))
+    tap(pg, '#startBtns button:has-text("Tap again to clear progress")')
+    pg.wait_for_timeout(300)
+    r = snap(pg)
+    check("the second tap starts a new drive and clears the finished flag",
+          r["started"] and r["leg"] == 0 and r["done"] == [] and r["finished"] is False and r["stored"] is False, json.dumps(r))
+    ctx.close()
+
+    # e. a drive with only a passed stop keeps its pinned route when a new route arrives
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    rstate = {"edit": None, "served": None}
+    ctx.route(ROUTE_URL, route_editor(rstate))
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.click("#startBtns button")                        # Start pins the route
+    pg.wait_for_timeout(600)
+    pg.evaluate("() => { S.passed[7] = Date.now(); lsSet('passed', S.passed); }")
+    r0 = pg.evaluate("() => ({leg: lsGet('leg', null), done: lsGet('done', null), skipped: lsGet('skipped', null)})")
+    rstate["edit"] = lambda t: t.replace('"built":"' + ROUTE_BUILT + '"', '"built":"10/15/2026"', 1)
+    pg.reload()
+    ok = opened(pg)
+    r = pg.evaluate("() => ({passed: Object.keys(S.passed), built: S.route && S.route.built, pending: S.pending ? S.pending.route.built : null})")
+    check("a drive with only a passed stop (leg 0, nothing reached or skipped) keeps the pinned route and the passed stop when a new route arrives",
+          ok and r0 == {"leg": 0, "done": {}, "skipped": {}} and r["passed"] == ["7"] and r["built"] == ROUTE_BUILT and r["pending"] == "10/15/2026",
+          json.dumps([r0, r]))
+    ctx.close()
+
+    # f. the app page opens at once from the saved copy (stale while revalidate); version -3; every save inside e.waitUntil
+    SW_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sw.js"), encoding="utf-8").read()
+    puts = [ln.strip() for ln in SW_TEXT.splitlines() if "cache.put(" in ln]
+    check("sw.js: every cache.put runs inside e.waitUntil", bool(puts) and all("e.waitUntil(" in ln for ln in puts), " | ".join(puts))
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    hold, held = {"on": False}, []
+    ctx.route(PAGE_URL, lambda route: held.append(route) if hold["on"] else route.continue_())
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    sw_controls(pg)
+    wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
+    v = pg.evaluate("async () => ({app: APP_VERSION, caches: (await caches.keys()).filter(k => k.startsWith('amr-nav-'))})")
+    check("app version 2026.09.30-3 and one worker cache, amr-nav-2026.09.30-3", v["app"] == "2026.09.30-3" and v["caches"] == ["amr-nav-2026.09.30-3"], json.dumps(v))
+    hold["on"] = True
+    pg.goto("about:blank")
+    t0 = time.time()
+    pg.goto(BASE)
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    dt = time.time() - t0
+    check("the server holds the app page: the saved page opens at once (under 2 s, no 3 s wait)", dt < 2.0 and len(held) >= 1, "%.1f s, held=%d" % (dt, len(held)))
+    hold["on"] = False
+    for h in held:
+        h.fulfill(status=200, content_type="text/html; charset=utf-8", body=h.fetch().text().replace("<head>", "<head><!-- AMR-SWR-MARK -->", 1))
+    held.clear()
+    saved = pump_until(pg, lambda: "AMR-SWR-MARK" in pg.evaluate(saved_page), timeout=8)
+    check("the page that arrives late is saved for the next open", saved)
+    pg.goto("about:blank")
+    pg.goto(BASE)
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    check("the next open shows that refreshed page", pg.evaluate("() => document.head.innerHTML.includes('AMR-SWR-MARK')"))
+    ctx.close()
+
+    # g. a damaged route.json: never saved by the worker; the app runs on the pin, else on the saved copy, else the load error
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    rstate = {"edit": None, "served": None}
+    ctx.route(ROUTE_URL, route_editor(rstate))
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    sw_controls(pg)
+    wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
+    damaged = lambda t: t[:5000]
+    rstate["edit"] = damaged
+    pg.reload()
+    ok = opened(pg)
+    good = pg.evaluate("""async () => { const r = await caches.match('route.json'); if (!r) return null;
+        try { const j = JSON.parse(await r.text()); return Array.isArray(j.legs) ? j.legs.length : -1; } catch (e) { return -2; } }""")
+    check("damaged route.json test setup: the reply is 5000 bytes of %d" % len(ROUTE_TEXT), rstate["served"] is not None and len(rstate["served"]) == 5000)
+    check("a damaged route.json reply is not saved: the worker keeps the good copy", good == len(legs), str(good))
+    check("damaged reply and no pinned route: the app opens on the copy the worker saved", ok and "43 stops" in text(pg, "#startBody"), text(pg, "#startBody")[:80])
+    rstate["edit"] = None
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    tap(pg, "#startBtns button")                         # Start pins the route
+    pg.wait_for_timeout(500)
+    pg.evaluate("() => { markStop(2, 'done'); S.fix = null; setLeg(5); }")
+    rstate["edit"] = damaged
+    pg.reload()
+    ok = opened(pg)
+    r = pg.evaluate("() => ({leg: S.legIdx, done: Object.keys(S.done), built: S.route && S.route.built, pending: S.pending})")
+    r["btns"] = start_btns(pg)
+    check("damaged reply with a pinned drive: the app runs on the pinned route, progress kept",
+          ok and r["leg"] == 5 and r["done"] == ["2"] and r["built"] == ROUTE_BUILT and r["pending"] is None and r["btns"][:1] == ["Resume at stop 4"], json.dumps(r))
+    pg.evaluate("""async () => { localStorage.removeItem('amrNav.v1.activeRoute');
+        for (const k of await caches.keys()) { const c = await caches.open(k); await c.delete('route.json'); } }""")
+    n_err = len(errors)
+    pg.reload()
+    msg = wait_for(pg, lambda: (lambda m: m if ("did not load" in m or "43 stops" in m) else None)(text(pg, "#startBody")), timeout=10) or ""
+    new_errs = errors[n_err:]
+    del errors[n_err:]                                   # the one expected console error of this step
+    check("damaged reply, no pin and no saved copy: the app shows the load error",
+          "The route did not load." in msg and len(new_errs) == 1 and "route.json is missing or damaged" in new_errs[0], msg + " | " + " || ".join(new_errs))
+    ctx.close()
+
+    # h. GPS lost: nothing in the simulator; while the guide waits, only the chip changes
+    ctx, pg = guidance_page(br)
+    feed(pg, [DEPOT["latitude"], DEPOT["longitude"]])
+    r = pg.evaluate("""() => { S.fixAt = Date.now() - 11000; checkFixAge();
+        return {chip: document.getElementById('gps').textContent, then: document.getElementById('bThen').textContent}; }""")
+    check("simulator (?sim=1): the GPS-lost check does nothing", r["chip"].startswith("GPS ±") and "GPS lost" not in r["then"], json.dumps(r))
+    ctx.close()
+    ctx, pg = guidance_page(br, sim=False)
+    ip10 = li(10, "park")
+    for label, li_, pt, want in (("stop 7 (waiting for Done)", i7, end7, "stop"), ("the parking spot of stop 10", ip10, legs[ip10]["geom"][-1], "park"),
+                                 ("the finish", len(legs) - 1, legs[-1]["geom"][-1], "finish")):
+        pg.evaluate("(i) => { S.fix = null; setLeg(i); }", li_)
+        feed(pg, pt)
+        before = pg.evaluate("() => ({waiting: S.waiting, then: document.getElementById('bThen').textContent})")
+        r = pg.evaluate("""() => { S.fixAt = Date.now() - 11000; checkFixAge();
+            return {chip: document.getElementById('gps').textContent, then: document.getElementById('bThen').textContent}; }""")
+        check("waiting at %s: GPS lost changes the chip, and the banner keeps its line %r" % (label, before["then"]),
+              before["waiting"] == want and r["chip"] == "GPS lost" and r["then"] == before["then"], json.dumps([before, r]))
+    ctx.close()
+
+    # i. a return to the app (visibilitychange) starts the GPS only after the route has loaded, and never in the simulator
+    for sim in (True, False):
+        ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+        hold, held = {"on": True}, []
+        ctx.route(ROUTE_URL, lambda route: held.append(route) if hold["on"] else route.continue_())
+        pg = ctx.new_page()
+        attach(pg)
+        pg.goto(BASE + ("?sim=1&reset=1" if sim else "?reset=1"))
+        pump_until(pg, lambda: len(held) > 0, timeout=10)
+        pg.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
+        w1 = pg.evaluate("() => watchId")
+        hold["on"] = False
+        for h in held:
+            h.continue_()
+        held.clear()
+        pg.wait_for_selector("#startBtns button", timeout=20000)
+        pg.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
+        w2 = pg.evaluate("() => watchId")
+        if sim:
+            check("simulator: a return to the app while the route is still loading does not start the GPS, nor after it loaded",
+                  w1 is None and w2 is None, json.dumps([w1, w2]))
+        else:
+            check("a return to the app while the route is still loading does not start the GPS; the finished load starts it",
+                  w1 is None and w2 is not None, json.dumps([w1, w2]))
+        ctx.close()
+
+    # j. the screen lock: one at a time; after the system drops it, ask again at most once per CFG.wakeRetryMs
+    WAKE_MOCK = """
+    window.__wake = {requests: 0, sentinels: []};
+    Object.defineProperty(Navigator.prototype, 'wakeLock', {configurable: true, get() { return {request: async () => {
+      window.__wake.requests++;
+      const s = new EventTarget(); s.released = false;
+      s.release = async () => { if (!s.released) { s.released = true; s.dispatchEvent(new Event('release')); } };
+      window.__wake.sentinels.push(s); return s; }}; }});
+    """
+    live = "() => ({requests: __wake.requests, live: __wake.sentinels.filter(s => !s.released).length})"
+    ctx, pg = guidance_page(br, init=WAKE_MOCK)
+    r0 = pg.evaluate(live)
+    for _ in range(3):
+        pg.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
+    pg.wait_for_timeout(200)
+    r1 = pg.evaluate(live)
+    check("screen lock: Start asks once, and returns to the app while it is held ask no more (one lock)",
+          r0 == {"requests": 1, "live": 1} and r1 == {"requests": 1, "live": 1}, json.dumps([r0, r1]))
+    pg.evaluate("() => { CFG.wakeRetryMs = 1500; }")
+    pg.wait_for_timeout(1600)                            # the last request is now older than CFG.wakeRetryMs
+    pg.evaluate("() => __wake.sentinels[0].release()")
+    pg.wait_for_timeout(200)
+    r2 = pg.evaluate(live)
+    check("the system drops the lock: the app asks again at once", r2 == {"requests": 2, "live": 1}, json.dumps(r2))
+    pg.evaluate("() => __wake.sentinels[1] && __wake.sentinels[1].release()")
+    pg.wait_for_timeout(200)
+    r3 = pg.evaluate(live)
+    check("dropped again within CFG.wakeRetryMs: no request at once (no loop)", r3 == {"requests": 2, "live": 0}, json.dumps(r3))
+    pg.wait_for_timeout(1600)
+    r4 = pg.evaluate(live)
+    check("... one request when that time is over, and one lock again", r4 == {"requests": 3, "live": 1}, json.dumps(r4))
+    ctx.close()
+
+    # k. streetShown() decides the street map for applyTiles, zoomLayers and the layer button
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    ctx.route(TILE_URL, lambda route: route.fulfill(status=200, content_type="image/png", body=PNG_1PX))
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(500)
+    pg.evaluate("() => { map.setZoom(16, {animate: false}); }")
+    r = pg.evaluate("""() => { const out = {}; window.__realStreet = window.streetShown;
+        const lay = () => ({tiles: map.hasLayer(tileLayer), base: map.hasLayer(baseGroup), bldg: map.hasLayer(bldgGroup)});
+        S.tiles = false; window.streetShown = () => true; applyTiles(); zoomLayers(); out.on = lay();
+        S.tiles = true; window.streetShown = () => false; applyTiles(); zoomLayers(); out.off = lay();
+        return out; }""")
+    check("applyTiles and zoomLayers follow streetShown(): shown, street tiles only; not shown, the offline map with buildings",
+          r["on"] == {"tiles": True, "base": False, "bldg": False} and r["off"] == {"tiles": False, "base": True, "bldg": True}, json.dumps(r))
+    pg.click("#fLayer")                                  # streetShown() says not shown (saved choice on): the button turns the street map on
+    r = pg.evaluate("() => { const t = S.tiles; window.streetShown = window.__realStreet; applyTiles(); return t; }")
+    check("the layer button follows streetShown() too", r is True, str(r))
+    ctx.close()
+
+    # l. a reroute reply that comes after the driver is back on the route is dropped
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    held = []
+    ctx.route(OSRM_URL, lambda route: held.append(route))
+    pg = ctx.new_page()
+    attach(pg)
+    pg.add_init_script(CAPTURE_SPEECH)
+    pg.goto(BASE + "?sim=1&reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(800)
+    P0 = Path(legs[0]["geom"])
+    far0 = far_point(legs[0]["geom"])
+    feed(pg, P0.ll(0))
+    for k in range(3):
+        feed(pg, [far0[0], far0[1] + 0.00001 * k], speed=8)
+    asked = pump_until(pg, lambda: len(held) > 0, timeout=8)
+    was_off = pg.evaluate("() => S.offRoute")
+    feed(pg, P0.ll(100), speed=8)                        # back on the route before the reply comes
+    back = pg.evaluate("() => !S.offRoute")
+    pg.evaluate("() => { window.__spoken = []; }")
+    if held:
+        release(held[0], osrm_reply(legs[0]["geom"]))
+    pg.wait_for_timeout(1000)
+    r = pg.evaluate("() => ({override: !!S.override, spoken: window.__spoken})")
+    check("a reroute reply that comes after the driver is back on the route is dropped: no new leg, no Route updated.",
+          asked and was_off and back and r["override"] is False and "Route updated." not in r["spoken"], json.dumps([asked, was_off, back, r]))
+    for h in held[1:]:
+        try:
+            release(h, {"code": "NoRoute"})
+        except Exception:
+            pass
+    ctx.close()
+
+    # m. a speed worked out from two fixes counts only when both fixes are 20 m or better
+    ctx, pg = at_stop7_no_speed()                        # the arrival fix has accuracy 5 m
+    for k, s in enumerate(range(20, 301, 20)):           # 20 m every 2 s is 10 m/s, every fix with accuracy 25 m
+        feed(pg, P7.ll(s), acc=25, speed=None, t=T0 + 2000 * (k + 1))
+    r = state_of(pg)
+    check("no speed sent, driving away at 10 m/s with every fix at accuracy 25 m (over 20 m): no speed, still waiting",
+          r["waiting"] == "stop" and r["passed"] == [], json.dumps(r))
+    ctx.close()
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => setLeg(i)", i7)
+    feed(pg, end7, acc=30, speed=None, t=T0)             # the arrival fix, later the reference for a speed, has accuracy 30 m
+    w0 = state_of(pg)["waiting"]
+    feed(pg, away(95), acc=5, speed=None, t=T0 + 10000)
+    feed(pg, away(101), acc=5, speed=None, t=T0 + 11000)
+    r1 = state_of(pg)
+    check("good fixes measured from a reference fix at accuracy 30 m give no speed either: still waiting",
+          w0 == "stop" and r1["waiting"] == "stop", json.dumps([w0, r1]))
+    feed(pg, away(200), acc=5, speed=None, t=T0 + 21000)
+    feed(pg, away(210), acc=5, speed=None, t=T0 + 22000)
+    r2 = state_of(pg)
+    check("... and two fast fixes measured from good fixes: the guide goes on", r2["waiting"] is None and r2["passed"] == ["7"], json.dumps(r2))
     ctx.close()
     br.close()
 

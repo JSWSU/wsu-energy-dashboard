@@ -119,7 +119,7 @@ button{font:inherit;cursor:pointer}
 /* markers */
 .sm{background:var(--primary);color:#fff;border:2px solid #fff;border-radius:14px;font-weight:800;font-size:12px;
  min-width:26px;height:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.4);padding:0 4px}
-.sm.done{background:var(--green)} .sm.skip{background:#9ca3af} .sm.cur{background:var(--accent);transform:scale(1.25)}
+.sm.done{background:var(--green)} .sm.skip{background:#9ca3af} .sm.pass{background:#f59e0b;color:#fff} .sm.cur{background:var(--accent);transform:scale(1.25)}
 .sm.attn{border-color:var(--accent)}
 .sm.depot{background:#374151}
 .me{width:30px;height:30px}
@@ -180,7 +180,7 @@ button{font:inherit;cursor:pointer}
 
 <script>
 'use strict';
-const APP_VERSION = '2026.09.30-2';
+const APP_VERSION = '2026.09.30-3';
 const CFG = {
   arrive: {drive: 45, walk: 15},     // m: arrival radius at the end of a leg
   off: {drive: 45, walk: 25},        // m: off-route distance
@@ -194,10 +194,12 @@ const CFG = {
   headingHoldMs: 30000,              // ms: the off-route arrow keeps the last known heading this long
   lookAhead: 100,                    // m: matching first looks this far ahead of the last position on the leg
   speedBaseMs: 10000,                // ms: a speed worked out from two fixes is measured over at least this long (a GPS step of 5 to 15 m must not read as driving)
+  derivedSpeedMaxAcc: 20,            // m: a speed worked out from two fixes counts only when both fixes are this good or better
   leaveFixes: 2,                     // consecutive fixes that must show the vehicle driving away before the guide goes on
   rerouteGapMs: 20000,
   rerouteTimeoutMs: 8000,            // ms: give up on a reroute request after this long
-  skipConfirmMs: 4000,               // ms: the second tap on Skip must come within this time of the first
+  skipConfirmMs: 4000,               // ms: the second tap on Skip, or on a button that clears progress, must come within this time of the first
+  wakeRetryMs: 10000,                // ms: after the system drops the screen lock, ask again at most once in this time
   zoom: {drive: 17, walk: 18},
   osrm: {drive: 'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
          walk: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/'},
@@ -205,6 +207,7 @@ const CFG = {
 };
 const LSK = 'amrNav.v1.';
 const qs = new URLSearchParams(location.search);
+const SIM = qs.has('sim');           // simulator (?sim=1): no GPS, the simulator makes the fixes
 const $ = id => document.getElementById(id);
 
 /* ---------- storage (per-device convenience only) ---------- */
@@ -217,13 +220,38 @@ const S = {
   route: null, base: null, legs: [], stopBy: {},
   routeText: '', routeSig: '', pending: null,   // route.json text in use, its hash, and a newer route that waits for the next new drive
   legIdx: 0, done: {}, skipped: {}, passed: {}, override: null,   // passed: stops the vehicle drove away from without a tap, to check later
+  finished: false,                              // the drive ended at the depot (saved): the start screen then offers a new drive
   follow: true, voice: lsGet('voice', true), tiles: lsGet('tiles', false),
   started: false, fix: null, fixAt: 0, recent: [], leaveCnt: 0, blocked: false, lastHeading: null, offCnt: 0, offRoute: false, lastReroute: 0,   // fixAt: when the newest fix arrived (ms); recent: earlier good fixes a speed is measured from; leaveCnt: fixes in a row that show the vehicle leaving a waiting stop
   rt: null, lastAlong: 0, announced: {}, arrivedLeg: -1, waiting: null,   // lastAlong: distance along the leg at the last good match (m)
   sim: null, wake: null,
 };
 let rerouteSeq = 0;   // numbers reroute requests; setLeg() bumps it so a late reply for an old leg is dropped
-let skipArmed = 0, skipT = null;   // when the first tap on Skip came (ms), and the timer that ends the wait for a second tap
+
+/* ---------- two taps for an action that cannot be undone (Skip, and every button that clears progress) ---------- */
+/* armTap(key, ms): the first tap arms `key` and returns false; a second tap within `ms` returns true. A button that uses it
+   carries data-arm (its key), data-text (its usual text) and data-armed (its text while armed); paintArmed() keeps that text
+   right, also when the time runs out. */
+const armedUntil = {}, armTimers = {};
+const isArmed = key => (armedUntil[key] || 0) >= Date.now();
+function disarm(key) { delete armedUntil[key]; clearTimeout(armTimers[key]); }
+function armTap(key, ms) {
+  const confirmed = isArmed(key);
+  disarm(key);
+  if (!confirmed) {
+    armedUntil[key] = Date.now() + ms;
+    armTimers[key] = setTimeout(() => { delete armedUntil[key]; paintArmed(); }, ms + 20);
+  }
+  paintArmed();
+  return confirmed;
+}
+function armButton(btn, key, text, armedText) {
+  btn.dataset.arm = key; btn.dataset.text = text; btn.dataset.armed = armedText;
+  btn.textContent = isArmed(key) ? armedText : text;
+}
+function paintArmed() {
+  document.querySelectorAll('[data-arm]').forEach(b => { b.textContent = isArmed(b.dataset.arm) ? b.dataset.armed : b.dataset.text; });
+}
 
 /* ---------- geometry ---------- */
 const R = 6371008.8, D2R = Math.PI / 180;
@@ -406,17 +434,18 @@ function drawBase() {
   map.attributionControl.addAttribution(b.attribution);
   zoomLayers();
 }
+/* street tiles show only while the saved choice is on AND the device is online; otherwise the offline base map */
+function streetShown() { return !!(S.tiles && navigator.onLine); }
 function zoomLayers() {
   const z = map.getZoom();
-  const street = !!(S.tiles && navigator.onLine);   // street tiles already draw buildings and paths; only the offline map needs these groups
+  const street = streetShown();   // street tiles already draw buildings and paths; only the offline map needs these groups
   if (z >= 15 && !street) { if (!map.hasLayer(bldgGroup)) bldgGroup.addTo(map); if (!map.hasLayer(pathGroup)) pathGroup.addTo(map); }
   else { map.removeLayer(bldgGroup); map.removeLayer(pathGroup); }
   bldgGroup.eachLayer(l => l.bringToBack && l.bringToBack());
 }
 map.on('zoomend', zoomLayers);
-/* street tiles only while the saved choice is on AND the device is online; otherwise the offline base map */
 function applyTiles() {
-  const street = !!(S.tiles && navigator.onLine);
+  const street = streetShown();
   if (street) { tileLayer.addTo(map); map.removeLayer(baseGroup); map.removeLayer(bldgGroup); map.removeLayer(pathGroup); }
   else { map.removeLayer(tileLayer); baseGroup.addTo(map); zoomLayers(); }
   $('fLayer').classList.toggle('on', street);
@@ -450,7 +479,7 @@ function drawCurrent() {
 function stopClass(st) {
   const cur = currentTargetStop();
   let c = 'sm';
-  if (S.done[st.o]) c += ' done'; else if (S.skipped[st.o]) c += ' skip';
+  if (S.done[st.o]) c += ' done'; else if (S.skipped[st.o]) c += ' skip'; else if (S.passed[st.o]) c += ' pass';   // pass: driven past, check later
   if (cur && cur.o === st.o) c += ' cur';
   if (st.meters.some(m => m.attn)) c += ' attn';
   return c;
@@ -514,7 +543,8 @@ function nextOpenLegAfterStop(o) { return nextOpenLeg(lastLegOfStop(o)); }   // 
 function setLeg(i, why) {
   S.legIdx = Math.max(0, Math.min(S.legs.length - 1, i));
   S.override = null; S.rt = prepLeg(S.legs[S.legIdx]); S.lastAlong = 0; S.nav = null; S.announced = {}; S.offCnt = 0; S.offRoute = false;
-  S.arrivedLeg = -1; S.waiting = null; S.leaveCnt = 0; rerouteSeq++; skipArmed = 0;
+  S.arrivedLeg = -1; S.waiting = null; S.leaveCnt = 0; rerouteSeq++; disarm('skip');
+  if (S.finished) { S.finished = false; lsSet('finished', false); }   // a finished drive goes on (Go from the list): it is no longer finished
   lsSet('leg', S.legIdx); lsSet('done', S.done); lsSet('skipped', S.skipped); lsSet('passed', S.passed);
   drawRoute(); refreshStopIcons(); renderCard(); renderBanner();
   const leg = S.legs[S.legIdx];
@@ -533,10 +563,12 @@ function markStop(o, how) {
   delete S.passed[o];                 // the driver decided; the stop is no longer waiting for a later check
   lsSet('done', S.done); lsSet('skipped', S.skipped); lsSet('passed', S.passed);
 }
-/* The vehicle drove away from a stop that was waiting for a tap: keep guiding, and leave the stop flagged as Passed. */
+/* The vehicle drove away from a stop that was waiting for a tap: keep guiding, and leave the stop flagged as Passed.
+   From a parking spot, or from the meter of a walk-in stop, the guide goes past the stop's walk legs to the next drive. */
 function leaveStop() {
   const st = stopOf(S.legs[S.legIdx]);
-  const to = S.waiting === 'park' ? nextOpenLegAfterStop(st.o) : nextOpenLeg(S.legIdx);
+  const onFoot = S.legs[S.legIdx].mode === 'walk';
+  const to = S.waiting === 'park' || onFoot ? nextOpenLegAfterStop(st.o) : nextOpenLeg(S.legIdx);
   const nx = stopOf(S.legs[to]);
   S.passed[st.o] = Date.now();
   speak(nx ? 'Continuing to stop ' + nx.o + '.' : 'Continuing to McCluskey Services.', true);
@@ -551,6 +583,7 @@ function arrived() {
   const st = stopOf(leg);
   if (leg.to.kind === 'depot') {
     S.waiting = 'finish';
+    S.finished = true; lsSet('finished', true);   // the next open offers a new drive, not a resume
     speak('Route complete. Back at McCluskey Services.', true);
     renderCard(); renderBanner(); return;
   }
@@ -588,21 +621,12 @@ function readFromCar() {
   if (st) markStop(st.o, 'done');
   setLeg(nextOpenLegAfterStop(st.o));
 }
-const skipIsArmed = () => skipArmed > 0 && Date.now() - skipArmed <= CFG.skipConfirmMs;
 /* Skip needs two taps within CFG.skipConfirmMs: a mis-tap in a moving vehicle must not drop a stop. On foot at a stop, the next
    leg is the walk back to the car; the drive goes on from there. */
 function doSkip() {
   const st = currentTargetStop();
-  if (!st) return;
-  if (!skipIsArmed()) {
-    skipArmed = Date.now();
-    clearTimeout(skipT);
-    skipT = setTimeout(() => { skipArmed = 0; renderCard(); }, CFG.skipConfirmMs + 20);   // the button text goes back by itself
-    renderCard();
-    return;
-  }
+  if (!st || !armTap('skip', CFG.skipConfirmMs)) return;
   const onFoot = S.legs[S.legIdx].mode === 'walk';
-  skipArmed = 0; clearTimeout(skipT);
   markStop(st.o, 'skip');
   toast('Stop ' + st.o + ' skipped');
   setLeg(onFoot ? nextOpenLeg(S.legIdx) : nextOpenLegAfterStop(st.o));
@@ -621,7 +645,9 @@ function renderBanner() {
   if (S.waiting === 'finish') { $('bArrow').innerHTML = arrowSvg(null); $('bDist').textContent = 'Done'; $('bInstr').textContent = 'Route complete'; $('bThen').textContent = ''; return; }
   if (!S.fix) { b.classList.add('idle'); $('bArrow').innerHTML = arrowSvg(null); $('bDist').textContent = 'No GPS yet'; $('bInstr').textContent = legLabel(S.legs[S.legIdx]) + (st ? ': ' + st.site : ''); $('bThen').textContent = 'Waiting for a GPS fix'; return; }
   const nav = S.nav || {};
-  if (S.offRoute) {
+  // off route, or this fix is farther from the leg than the off-route distance (a jump, or the first fixes off it): a maneuver
+  // from the line would be wrong here, so point straight at the end of the leg
+  if (S.offRoute || nav.off > CFG.off[leg.mode]) {
     b.classList.add('off');
     const end = leg.geom[leg.geom.length - 1];
     const brg = bearing([S.fix.lat, S.fix.lon], end), d = hav([S.fix.lat, S.fix.lon], end);
@@ -671,7 +697,7 @@ function renderCard() {
   // prompt and buttons
   const pr = $('prompt'), next = $('aNext'), skip = $('aSkip');
   pr.className = ''; pr.innerHTML = '';
-  next.className = 'btn primary'; skip.style.display = ''; skip.textContent = skipIsArmed() ? 'Tap again to skip' : 'Skip stop';
+  next.className = 'btn primary'; skip.style.display = ''; armButton(skip, 'skip', 'Skip stop', 'Tap again to skip');
   next.onclick = doNext; skip.onclick = doSkip;
   if (S.waiting === 'park') {
     const w = S.legs[S.legIdx + 1];
@@ -679,7 +705,7 @@ function renderCard() {
     pr.innerHTML = '<b>Parked near stop ' + st.o + '.</b>The meter is <span id="pd"></span> away on foot. Walk in, or read it from the car if FieldLogic already has it.';
     $('pd').textContent = fmtDist(w ? w.dist : 0);
     next.textContent = 'Walk to meter'; next.className = 'btn blue';
-    skip.textContent = 'Read from car'; skip.onclick = readFromCar;
+    skip.removeAttribute('data-arm'); skip.textContent = 'Read from car'; skip.onclick = readFromCar;
   } else if (S.waiting === 'stop') {
     pr.className = 'show';
     pr.innerHTML = '<b>At stop ' + st.o + '.</b>Check that FieldLogic shows ' + (st.meters.length === 1 ? 'the read' : 'all ' + st.meters.length + ' reads') + '. Log anything marked ATTENTION.';
@@ -704,15 +730,19 @@ function heldHeading() {               // the last known heading in degrees whil
   return S.lastHeading && Date.now() - S.lastHeading.t <= CFG.headingHoldMs ? S.lastHeading.deg : null;
 }
 /* Speed in m/s: the device's own value, else worked out from the move since the newest earlier good fix that is at least
-   CFG.speedBaseMs older (a short baseline turns one GPS step into a false speed: a walker looks like a car for several fixes). */
+   CFG.speedBaseMs older (a short baseline turns one GPS step into a false speed: a walker looks like a car for several fixes).
+   A worked-out speed counts as 0 when either fix is worse than CFG.derivedSpeedMaxAcc: their error alone can look like driving. */
 function fixSpeed(f, ll) {
-  const t = f.t != null ? f.t : S.fixAt, h = S.recent;
+  const t = f.t != null ? f.t : S.fixAt, h = S.recent, acc = f.acc || 0;
   let v = 0;
   if (h.length && t < h[h.length - 1].t) h.length = 0;                   // the clock went back: start again
   for (let i = h.length - 1; i >= 0; i--) {
-    if (t - h[i].t >= CFG.speedBaseMs) { v = hav(h[i].ll, ll) / ((t - h[i].t) / 1000); break; }
+    if (t - h[i].t >= CFG.speedBaseMs) {
+      v = acc > CFG.derivedSpeedMaxAcc || h[i].acc > CFG.derivedSpeedMaxAcc ? 0 : hav(h[i].ll, ll) / ((t - h[i].t) / 1000);
+      break;
+    }
   }
-  if (!h.length || t > h[h.length - 1].t) h.push({ll, t});
+  if (!h.length || t > h[h.length - 1].t) h.push({ll, t, acc});
   while (h.length > 2 && t - h[1].t >= CFG.speedBaseMs) h.shift();       // h[1] is newer and old enough, so h[0] is never needed
   return f.speed != null && !isNaN(f.speed) ? f.speed : v;
 }
@@ -732,9 +762,10 @@ function onFix(f, quiet) {
   if (f.heading != null && !isNaN(f.heading)) S.lastHeading = {deg: f.heading, t: S.fixAt};
   const leg = currentLeg(), mode = leg.mode, rt = S.rt;
   const legEnd = leg.geom[leg.geom.length - 1], speed = fixSpeed(f, ll), atStop = hav(ll, legEnd) <= CFG.leaveDist;
-  // the vehicle drove away from a stop that waits for a tap: go on to the next stop. One fast fix is not enough (a walker at a
-  // walk-in stop can look fast for a moment); CFG.leaveFixes in a row must show it.
-  const leaving = (S.waiting === 'stop' || S.waiting === 'park') && mode === 'drive' && speed > CFG.leaveSpeed && !atStop;
+  // the vehicle drove away from a stop that waits for a tap (a drive stop, a parking spot, or the meter of a walk-in stop that the
+  // reader left without Done): go on to the next stop. One fast fix is not enough (a walker at a walk-in stop can look fast for a
+  // moment); CFG.leaveFixes in a row must show it.
+  const leaving = (S.waiting === 'stop' || S.waiting === 'park') && speed > CFG.leaveSpeed && !atStop;
   S.leaveCnt = leaving ? S.leaveCnt + 1 : 0;
   if (S.leaveCnt >= CFG.leaveFixes) { leaveStop(); return; }
   const pr = locate(rt, ll, heldHeading());
@@ -747,18 +778,17 @@ function onFix(f, quiet) {
   const nxt = rt.steps[k + 1];
   if (nxt && nxt.type !== 'arrive' && nxt.along - step.along < (mode === 'walk' ? 25 : 150)) then = nxt;
   S.nav = {along, toStep, step, then, off: pr.d, idx: k};
-  // off route: farther from the line than the usual limit AND than the fix's own error. While the guide waits at a stop, only a
-  // vehicle that is driving (faster than CFG.leaveSpeed) and farther than CFG.leaveDist from the stop is counted: near the stop it
-  // may be leaving (auto-resume takes it from there), and a reader walking to a meter is not lost. After the route is complete
-  // there is no route to be off.
-  const still = S.waiting === 'finish' || (S.waiting && (atStop || speed <= CFG.leaveSpeed));
-  if (!still && pr.d > Math.max(CFG.off[mode], acc)) S.offCnt++; else S.offCnt = 0;
+  // off route: farther from the line than the usual limit AND than the fix's own error. While the guide waits (at a stop, a
+  // parking spot or the finish) nothing counts: a vehicle that drives away is taken on by auto-resume above, a reader walking to
+  // a meter is not lost, and after the route is complete there is no route to be off.
+  if (!S.waiting && pr.d > Math.max(CFG.off[mode], acc)) S.offCnt++; else S.offCnt = 0;
   const wasOff = S.offRoute;
   S.offRoute = S.offCnt >= CFG.offFixes;
   if (S.offRoute && !wasOff) { speak('Off route.', true); reroute(); }
   else if (S.offRoute && Date.now() - S.lastReroute > CFG.rerouteGapMs) reroute();
-  // voice prompts
-  if (!S.offRoute && !S.waiting && step) {
+  // voice prompts, only while this fix is on the leg: from far away (after a jump, or before the off-route count is reached)
+  // the next maneuver of the line is not the driver's next maneuver
+  if (!S.offRoute && !S.waiting && step && pr.d <= CFG.off[mode]) {
     const key = S.legIdx + ':' + k;
     const txt = step.type === 'arrive' ? (leg.to.kind === 'park' ? 'the parking spot for stop ' + (stopOf(leg) || {}).o : leg.to.kind === 'car' ? 'the car' : 'stop ' + (stopOf(leg) || {}).o) : instr(step, mode);
     if (toStep <= CFG.near[mode] && !S.announced[key + 'n']) { S.announced[key + 'n'] = S.announced[key + 'f'] = 1; speak(step.type === 'arrive' ? 'Arriving at ' + txt : txt, true); }
@@ -808,7 +838,7 @@ function onGeoErr(e) {
 }
 let watchId = null;
 function startGps() {
-  if (S.sim) return;
+  if (SIM) return;                    // the URL flag, so it holds before load() has started the simulator
   if (!('geolocation' in navigator)) { toast('This device has no location service.'); return; }
   if (watchId !== null) return;
   watchId = navigator.geolocation.watchPosition(p => {
@@ -824,14 +854,15 @@ try {
     }).catch(() => { /* permission state not readable here */ });
   }
 } catch (e) { /* no permissions API */ }
-/* When no new fix comes, the banner must not look live: say so once the newest fix is older than CFG.fixStaleMs. */
+/* When no new fix comes, the banner must not look live: say so once the newest fix is older than CFG.fixStaleMs. While the guide
+   waits (at a stop, a parking spot or the finish) only the GPS chip says so: the banner keeps what to do there. */
 function checkFixAge() {
-  if (!S.started || !S.fix || S.blocked) return;       // before Start, or before the first fix, other messages apply; GPS blocked has its own
+  if (SIM || !S.started || !S.fix || S.blocked) return;   // the simulator makes its own fixes; before Start, or before the first fix, other messages apply; GPS blocked has its own
   const age = Date.now() - S.fixAt;
   if (age <= CFG.fixStaleMs) return;
   const g = $('gps');
   g.className = 'none'; g.textContent = 'GPS lost';
-  $('bThen').textContent = 'GPS lost. Last fix ' + Math.round(age / 1000) + ' s ago.';
+  if (!S.waiting) $('bThen').textContent = 'GPS lost. Last fix ' + Math.round(age / 1000) + ' s ago.';
 }
 setInterval(checkFixAge, 2000);
 
@@ -857,8 +888,8 @@ async function reroute() {
   try {
     const r = await fetch(url, {cache: 'no-store', signal: ctl.signal});
     const j = await r.json();
-    // the driver moved on, the app is waiting at a stop, or a newer request exists: this reply is stale
-    if (seq !== rerouteSeq || S.legIdx !== legAt || S.waiting) return;
+    // the driver moved on, is back on the route, the app is waiting at a stop, or a newer request exists: this reply is stale
+    if (seq !== rerouteSeq || S.legIdx !== legAt || S.waiting || !S.offRoute) return;
     if (j.code !== 'Ok' || !j.routes.length) throw new Error(j.code);
     const nl = legFromOsrm(j.routes[0].legs[0], base.mode);
     nl.to = base.to;
@@ -872,7 +903,6 @@ async function reroute() {
 /* ---------- panel ---------- */
 function openPanel() { renderPanel(); $('panel').classList.toggle('over', $('start').style.display !== 'none'); $('panel').classList.add('show'); }
 function closePanel() { $('panel').classList.remove('show'); }
-let resetArmed = 0;
 function renderPanel() {
   const r = S.route, body = $('pBody');
   const nm = r.stops.reduce((a, s) => a + s.meters.length, 0);
@@ -909,11 +939,11 @@ function renderPanel() {
   const pb = document.createElement('div'); pb.className = 'pbtns';
   pb.innerHTML = '<button class="btn" id="bReset">Start a new drive</button><a class="btn ghost" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="../route.html">Printable route page</a>';
   body.appendChild(pb);
+  armButton($('bReset'), 'reset', 'Start a new drive', 'Tap again to clear progress');
   $('bReset').onclick = () => {
-    if (Date.now() - resetArmed > 4000) { resetArmed = Date.now(); $('bReset').textContent = 'Tap again to clear progress'; return; }
-    const swap = !!S.pending;
-    S.done = {}; S.skipped = {}; S.passed = {}; resetArmed = 0; closePanel();
-    if (swap) adoptPending();
+    if (!armTap('reset', CFG.skipConfirmMs)) return;
+    const swap = newDrive({adopt: true});
+    closePanel();
     setLeg(0);
     if (!S.started) renderStart();
     toast(swap ? 'New route loaded. Stop 1 is next.' : 'Progress cleared. Stop 1 is next.');
@@ -952,18 +982,26 @@ function simTick() {
 }
 
 /* ---------- start ---------- */
-async function wakeLock() {
+/* Keep the screen on while guiding, with one lock at a time: no request while a lock is held (not released) or being asked for.
+   The system can drop the lock (battery saver); then ask again while the app is in front, but at most once per CFG.wakeRetryMs,
+   so a lock that is dropped at once cannot start a loop of requests. */
+let wakeBusy = false, wakeAskedAt = 0, wakeRetryT = null;
+async function wakeLock(afterRelease) {
+  if (!('wakeLock' in navigator) || document.visibilityState !== 'visible' || wakeBusy || (S.wake && !S.wake.released)) return;
+  const wait = afterRelease ? wakeAskedAt + CFG.wakeRetryMs - Date.now() : 0;
+  if (wait > 0) { clearTimeout(wakeRetryT); wakeRetryT = setTimeout(() => { if (S.started) wakeLock(true); }, wait); return; }
+  wakeBusy = true; wakeAskedAt = Date.now();
   try {
-    if ('wakeLock' in navigator && document.visibilityState === 'visible') {
-      S.wake = await navigator.wakeLock.request('screen');
-      // the system can drop the lock (battery saver); ask again while the app is in front
-      S.wake.addEventListener('release', () => { if (S.started && document.visibilityState === 'visible') wakeLock(); });
-    }
+    const w = await navigator.wakeLock.request('screen');
+    S.wake = w;
+    w.addEventListener('release', () => { if (S.started && document.visibilityState === 'visible') wakeLock(true); });
   } catch (e) { /* not allowed */ }
+  wakeBusy = false;
 }
+let loaded = false;                   // load() has finished: the route is on screen
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
-  startGps();                       // no-op while a watch runs; retries after a location denial
+  if (loaded) startGps();           // no-op in the simulator or while a watch runs; retries after a location denial
   if (S.started) wakeLock();
 });
 function begin() {
@@ -977,8 +1015,7 @@ function begin() {
   if (!S.sim && S.fix) followTo([S.fix.lat, S.fix.lon], CFG.zoom[currentLeg().mode]);
 }
 function startNewDrive() {             // stop 1 next, nothing reached; a newer route that waits is loaded first
-  if (S.pending) adoptPending();
-  else { S.done = {}; S.skipped = {}; S.passed = {}; S.legIdx = 0; }
+  newDrive({adopt: true});
   begin();
 }
 function renderStart() {
@@ -1001,10 +1038,16 @@ function renderStart() {
   btns.innerHTML = '';
   const go = document.createElement('button');
   go.className = 'btn primary';
-  const atEnd = S.legs.length > 1 && S.legIdx === S.legs.length - 1;   // the saved drive stopped on the last leg: the route is finished
-  const resuming = !atEnd && (!!S.pending || !!(S.legIdx > 0 && resumeStop));   // with a new route waiting, this session always runs the saved route
-  go.textContent = atEnd ? 'Start a new drive at stop 1' : resuming ? (resumeStop ? 'Resume at stop ' + resumeStop.o : 'Resume the drive') : 'Start guidance';
-  go.onclick = atEnd ? startNewDrive : begin;
+  // a button that clears progress needs a second tap
+  const clears = (btn, text) => { armButton(btn, 'newDrive', text, 'Tap again to clear progress'); btn.onclick = () => { if (armTap('newDrive', CFG.skipConfirmMs)) startNewDrive(); }; };
+  const atEnd = S.finished;                                   // the drive ended at the depot
+  const resuming = !atEnd && (!!S.pending || S.legIdx > 0);   // with a new route waiting, this session always runs the saved route
+  if (atEnd) clears(go, 'Start a new drive at stop 1');
+  else {
+    // on the last leg (driving back, not finished) there is no stop to name
+    go.textContent = resuming ? (resumeStop ? 'Resume at stop ' + resumeStop.o : 'Resume: return to McCluskey Services') : 'Start guidance';
+    go.onclick = begin;
+  }
   btns.appendChild(go);
   if (atEnd || resuming) {
     const second = document.createElement('button');
@@ -1012,10 +1055,7 @@ function renderStart() {
     if (atEnd) {
       second.textContent = 'Review the last drive';
       second.onclick = openPanel;                       // the stop list opens in front of this screen
-    } else {
-      second.textContent = S.pending ? 'Start a new drive with the new route' : 'Start a new drive at stop 1';
-      second.onclick = startNewDrive;
-    }
+    } else clears(second, S.pending ? 'Start a new drive with the new route' : 'Start a new drive at stop 1');
     btns.appendChild(second);
   }
   updateOfflineLine();
@@ -1048,7 +1088,7 @@ paintVoice();
 $('fVoice').onclick = () => { S.voice = !S.voice; lsSet('voice', S.voice); paintVoice(); if (!S.voice && 'speechSynthesis' in window) speechSynthesis.cancel(); };
 $('fFollow').onclick = () => { S.follow = true; $('fFollow').className = 'fab on'; if (S.fix) followTo([S.fix.lat, S.fix.lon], CFG.zoom[currentLeg() ? currentLeg().mode : 'drive']); };
 $('fLayer').onclick = () => {
-  const showing = !!(S.tiles && navigator.onLine);       // what is on screen now, not only the saved choice
+  const showing = streetShown();                        // what is on screen now, not only the saved choice
   if (!showing && !navigator.onLine) { toast('Street map needs a data connection'); return; }
   setTiles(!showing);
 };
@@ -1073,7 +1113,7 @@ function setRoute(r, text, sig) {
   S.route = r; S.routeText = text; S.routeSig = sig; S.legs = r.legs; S.stopBy = {};
   r.stops.forEach(s => { S.stopBy[s.o] = s; });
 }
-function clearProgress() { lsSet('leg', 0); lsSet('done', {}); lsSet('skipped', {}); lsSet('passed', {}); }
+function clearProgress() { lsSet('leg', 0); lsSet('done', {}); lsSet('skipped', {}); lsSet('passed', {}); lsSet('finished', false); }
 /* Remember the route in use. A later deploy then cannot swap the route under a drive that has progress. */
 function pinRoute() { lsSet('activeRoute', S.routeText); lsSet('activeSig', S.routeSig); lsSet('sig', S.routeSig); }
 function showRoute() {                 // draw the route in S on the map and the cards
@@ -1082,47 +1122,71 @@ function showRoute() {                 // draw the route in S on the map and the
   map.fitBounds(L.latLngBounds(S.route.stops.map(s => [s.lat, s.lon])).pad(0.05), {animate: false});
   renderCard(); renderBanner();
 }
-function adoptPending() {              // switch to the newer route that was waiting; progress starts at stop 1
-  const p = S.pending;
-  S.pending = null;
-  setRoute(p.route, p.text, p.sig);
-  S.done = {}; S.skipped = {}; S.passed = {}; S.legIdx = 0; clearProgress();
-  pinRoute();
-  showRoute();
+/* The one way to start a new drive: stop 1 next, nothing reached, skipped or passed, not finished, saved at once. With adopt,
+   a newer route that waits (S.pending) becomes the route in use first, and is pinned. The caller then moves to leg 0 with
+   setLeg (directly, or through begin). Returns true when the newer route was loaded. */
+function newDrive({adopt} = {}) {
+  const swap = !!(adopt && S.pending);
+  if (swap) {
+    const p = S.pending;
+    S.pending = null;
+    setRoute(p.route, p.text, p.sig);
+    pinRoute();
+  }
+  S.done = {}; S.skipped = {}; S.passed = {}; S.finished = false; S.legIdx = 0; S.override = null;
+  clearProgress();
+  if (swap) showRoute();
+  return swap;
 }
 
 /* ---------- load ---------- */
+async function cachedRouteText() {     // route.json as the service worker saved it last ('' when there is none)
+  try {
+    const r = 'caches' in window ? await caches.match('route.json') : null;
+    return r ? await r.text() : '';
+  } catch (e) { return ''; }
+}
 async function load() {
   try {
-    const [rText, b] = await Promise.all([fetch('route.json', {cache: 'no-cache'}).then(x => x.text()), fetch('basemap.json').then(x => x.json()).catch(() => null)]);
-    const fetched = parseRoute(rText);
-    if (!fetched) throw new Error('route.json is missing or damaged');
-    const fSig = fnv1a(rText), reset = qs.has('reset');
+    const [netText, b] = await Promise.all([fetch('route.json', {cache: 'no-cache'}).then(x => x.text()).catch(() => ''), fetch('basemap.json').then(x => x.json()).catch(() => null)]);
+    const reset = qs.has('reset');
     if (reset) clearProgress();
     const savedLeg = Number(lsGet('leg', 0));
-    const progress = (Number.isInteger(savedLeg) && savedLeg > 0) || Object.keys(asObj(lsGet('done', {}))).length > 0 || Object.keys(asObj(lsGet('skipped', {}))).length > 0;
+    const progress = (Number.isInteger(savedLeg) && savedLeg > 0) || ['done', 'skipped', 'passed'].some(k => Object.keys(asObj(lsGet(k, {}))).length > 0);
     const pinText = lsGet('activeRoute', null), pinSig = lsGet('activeSig', '');
-    // a drive has progress and a newer route arrived: keep driving the pinned route, offer the new one at the next new drive
-    const pinned = progress && pinSig && pinSig !== fSig && typeof pinText === 'string' && fnv1a(pinText) === pinSig ? parseRoute(pinText) : null;
-    if (pinned) {
-      setRoute(pinned, pinText, pinSig);
-      S.pending = {route: fetched, text: rText, sig: fSig};
-    } else {
-      setRoute(fetched, rText, fSig);
+    const pin = pinSig && typeof pinText === 'string' && fnv1a(pinText) === pinSig ? parseRoute(pinText) : null;   // the route the drive started on, stored intact
+    // a reply that is missing or damaged: run on the pinned route; with no pin, on the copy the service worker saved last
+    let rText = netText, fetched = parseRoute(rText);
+    if (!fetched && !pin) { rText = await cachedRouteText(); fetched = parseRoute(rText); }
+    if (!fetched && !pin) throw new Error('route.json is missing or damaged');
+    if (!fetched) {
+      setRoute(pin, pinText, pinSig);
       S.pending = null;
-      // progress saved for a different route, with no pinned copy to keep it on: start clean (old app versions saved built:legs)
-      const was = lsGet('sig', '');
-      if (was !== fSig && was !== fetched.built + ':' + fetched.legs.length) clearProgress();
-      lsSet('sig', fSig);
+    } else {
+      const fSig = fnv1a(rText);
+      if (progress && pin && pinSig !== fSig) {
+        // a drive has progress and a newer route arrived: keep driving the pinned route, offer the new one at the next new drive
+        setRoute(pin, pinText, pinSig);
+        S.pending = {route: fetched, text: rText, sig: fSig};
+      } else {
+        setRoute(fetched, rText, fSig);
+        S.pending = null;
+        // progress saved for a different route, with no pinned copy to keep it on: start clean (old app versions saved built:legs)
+        const was = lsGet('sig', '');
+        if (was !== fSig && was !== fetched.built + ':' + fetched.legs.length) clearProgress();
+        lsSet('sig', fSig);
+      }
     }
     S.base = b;
     if (qs.has('reset')) { qs.delete('reset'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : '')); }
     const li = Number(lsGet('leg', 0));
     S.legIdx = Number.isInteger(li) ? Math.max(0, Math.min(li, S.legs.length - 1)) : 0;
     S.done = asObj(lsGet('done', {})); S.skipped = asObj(lsGet('skipped', {})); S.passed = asObj(lsGet('passed', {}));
+    S.finished = lsGet('finished', false) === true;
     drawBase(); applyTiles();
     showRoute(); renderStart();
-    if (qs.has('sim')) simStart(); else startGps();
+    if (SIM) simStart(); else startGps();
+    loaded = true;
   } catch (e) {
     $('startBody').innerHTML = '<p>The route did not load. Connect to the internet once, then reopen the app.</p>';
     console.error(e);
