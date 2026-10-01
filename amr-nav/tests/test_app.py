@@ -1,7 +1,7 @@
 """Browser test for the AMR Route Guide (Playwright, headless Chromium).
 
 Run from the repository root while a static server serves the repository root:
-    py -m http.server 41999 --bind 127.0.0.1
+    py -m http.server 41999 --bind 127.0.0.1   (another port: set AMR_TEST_PORT to it)
     py amr-nav\\tests\\test_app.py
 No check calls a server other than 127.0.0.1: rerouting runs on the page, on graph.json (the road map). Section 26
 drives offline with every other host blocked and recorded, and checks the router, its words and its speed. It also runs
@@ -10,7 +10,9 @@ the folder in the environment variable AMR_ROUTE_GUIDE): the app's router must g
 sections 4 and 26 put in place must be the reference route from the same fix, drawn on the road map (leg_problems()).
 Interception of route.json, graph.json and the page uses ctx.route (context level), because page.route does not see
 the requests that the service worker makes. A request that a handler lets through ignores set_offline, so the
-offline steps remove the handler first, or route only the hosts they block.
+offline steps remove the handler first, or route only the hosts they block. An offline step that reloads or opens a page
+also aborts every request to 127.0.0.1 (Offline below): Playwright 1.58 lets the service worker reach the server after an
+offline reload, so set_offline alone does not prove that the page came from the worker's cache.
 """
 import base64
 import json
@@ -39,7 +41,8 @@ def _silent_context(self, *a, **k):
 
 Browser.new_context = _silent_context
 
-BASE = "http://127.0.0.1:41999/amr-nav/"
+PORT = int(os.environ.get("AMR_TEST_PORT", "41999"))     # the port of the static server (8765 is blocked on this PC)
+BASE = f"http://127.0.0.1:{PORT}/amr-nav/"
 RG_DIR = os.environ.get("AMR_ROUTE_GUIDE") or os.path.join(os.path.expanduser("~"), ".claude", "skills", "sensus-amr-read-cycle",
                                                            "scripts", "route-guide")
 SHOTS = os.path.join(os.environ.get("TEMP", "."), "amr-cycle", "app-test-shots")
@@ -142,6 +145,30 @@ def block_external(ctx, log=None):
         log.append(route.request.url)
         route.abort()
     ctx.route(lambda url: not is_local(url), handler)
+
+
+class Offline:
+    """No network for ctx: set_offline(True), and every request to the test server (127.0.0.1) aborted as well. Playwright
+    1.58 lets the service worker reach the server after an offline reload, so set_offline alone cannot prove that a page
+    came from the worker's cache. aborted lists the local requests stopped; back_online() removes the route, then sets the
+    context online."""
+
+    def __init__(self, ctx):
+        self.ctx, self.aborted = ctx, []
+        ctx.route(self.local, self.abort)
+        ctx.set_offline(True)
+
+    @staticmethod
+    def local(url):
+        return urlparse(url).hostname == "127.0.0.1"
+
+    def abort(self, route):
+        self.aborted.append(route.request.url)
+        route.abort("internetdisconnected")
+
+    def back_online(self):
+        self.ctx.unroute(self.local, self.abort)
+        self.ctx.set_offline(False)
 
 
 ROUTE_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "route.json"), "rb").read().decode("utf-8")
@@ -565,12 +592,13 @@ with sync_playwright() as p:
     check("service worker controls the page", sw)
     ready = wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
     check("start screen says Offline ready. once the worker holds route.json and basemap.json", ready, text(pg, "#startBody")[-80:])
-    ctx.set_offline(True)
+    net_off = Offline(ctx)
     pg.reload()
     ok = wait_for(pg, lambda: "43 stops" in (pg.locator("#startBody").inner_text() or ""), timeout=20)
-    check("app loads offline from cache", ok)
+    check("app loads offline from cache (every request to the server aborted)", ok and net_off.aborted,
+          "%d local requests aborted: %s" % (len(net_off.aborted), " ".join(net_off.aborted[:3])))
     pg.screenshot(path=os.path.join(SHOTS, "07-offline-reload.png"))
-    ctx.set_offline(False)
+    net_off.back_online()
     ctx.close()
 
     # ---------- 2. real geolocation feed (no sim): progress + off route, rerouted on the device ----------
@@ -715,13 +743,13 @@ with sync_playwright() as p:
     sw = wait_for(pg, lambda: pg.evaluate("() => navigator.serviceWorker && navigator.serviceWorker.controller ? 1 : 0"), timeout=20)
     check("service worker controls the page (map test)", sw)
     pg.evaluate("() => localStorage.setItem('amrNav.v1.tiles', 'true')")
-    ctx.set_offline(True)
+    net_off = Offline(ctx)
     pg.reload()
     pg.wait_for_selector("#startBtns button", timeout=20000)
     st = pg.evaluate("() => ({base: map.hasLayer(baseGroup), tiles: map.hasLayer(tileLayer), saved: S.tiles, online: navigator.onLine})")
     check("offline with the street map saved: offline base map shows, street tiles do not",
           st["base"] is True and st["tiles"] is False and st["saved"] is True and st["online"] is False, json.dumps(st))
-    ctx.set_offline(False)
+    net_off.back_online()
     ok = pump_until(pg, lambda: pg.evaluate("() => map.hasLayer(tileLayer) && !map.hasLayer(baseGroup)"), timeout=8)
     check("back online: street tiles replace the offline map", ok,
           json.dumps(pg.evaluate("() => ({base: map.hasLayer(baseGroup), tiles: map.hasLayer(tileLayer)})")))
@@ -885,14 +913,14 @@ with sync_playwright() as p:
     ctx.unroute(PAGE_URL, page_handler)
     net_failed = []
     ctx.on("requestfailed", lambda r: net_failed.append((r.url, bool(r.service_worker))))
-    ctx.set_offline(True)
+    net_off = Offline(ctx)
     pg.goto("about:blank")
     pg.goto(BASE + "?sim=1")
     ok = wait_for(pg, lambda: "43 stops" in (pg.locator("#startBody").inner_text() or ""), timeout=20)
     check("offline, a query address opens from the one saved page", ok)
     check("that offline open still asked the network for the page, and the worker's own request failed",
           any(sw and "?sim=1" in u for u, sw in net_failed), json.dumps(net_failed[:3]))
-    ctx.set_offline(False)
+    net_off.back_online()
     pg.goto("about:blank")
     pg.goto(BASE)
     pg.wait_for_selector("#startBtns button", timeout=20000)
@@ -1014,7 +1042,7 @@ with sync_playwright() as p:
     ctx.close()
 
     # ---------- 13. a tab opened on another file in the scope must not replace the saved app page ----------
-    # No ctx.route here, so set_offline reaches the worker's own requests.
+    # No ctx.route that lets requests through here; offline, Offline aborts the worker's own requests to the server.
     ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
     pg = ctx.new_page()
     attach(pg)
@@ -1036,14 +1064,14 @@ with sync_playwright() as p:
     check("the saved app page is still text/html after other files were opened in the tab", bool(kind) and kind.lower().startswith("text/html"), str(kind))
     net_failed = []
     ctx.on("requestfailed", lambda r: net_failed.append((r.url, bool(r.service_worker))))
-    ctx.set_offline(True)
+    net_off = Offline(ctx)
     pg.goto("about:blank")
     pg.goto(BASE)
     ok = wait_for(pg, lambda: "43 stops" in (pg.locator("#startBody").inner_text() or ""), timeout=20)
     check("offline, the app still opens and its start card shows 43 stops", ok, text(pg, "body")[:60])
     check("that offline open still asked the network for the page, and the worker's own request failed (other-file test)",
           any(sw and u.rstrip("?").endswith("/amr-nav/") for u, sw in net_failed), json.dumps(net_failed[:3]))
-    ctx.set_offline(False)
+    net_off.back_online()
     ctx.close()
 
     # ---------- 14. a stop that waits for a tap is left behind when the vehicle drives away ----------
@@ -2105,13 +2133,14 @@ with sync_playwright() as p:
     ext = []                                             # every request to a host other than 127.0.0.1 from here on
     ctx.on("request", lambda req: ext.append(req.url) if not is_local(req.url) else None)
     block_external(ctx, ext)
-    ctx.set_offline(True)                                # and no network at all for the test server either
+    net_off = Offline(ctx)                               # and no network at all for the test server either
     pg.reload()
     pg.wait_for_selector("#startBtns button", timeout=20000)
     got = pump_until(pg, lambda: pg.evaluate("() => !!GR || graphErr !== ''"), timeout=10)
     st = pg.evaluate("() => ({online: navigator.onLine, n: GR && GR.n, m: GR && GR.m, ms: GR && GR.ms, err: graphErr, start: document.getElementById('startBody').textContent})")
-    check("offline: the app opens from the worker's cache and decodes the road map with no network",
-          got and st["online"] is False and st["n"] == GRAPH_HEAD["n"] and st["m"] == GRAPH_HEAD["m"] and "43 stops" in st["start"], json.dumps(st)[:300])
+    check("offline: the app opens from the worker's cache and decodes the road map with no network (every request to the server aborted)",
+          got and st["online"] is False and st["n"] == GRAPH_HEAD["n"] and st["m"] == GRAPH_HEAD["m"] and "43 stops" in st["start"] and net_off.aborted,
+          json.dumps(st)[:300] + " | %d local requests aborted" % len(net_off.aborted))
     pg.evaluate(COUNT_REROUTES)
     pg.evaluate(RECORD_PLANS)
     pg.click("#startBtns button")
@@ -2508,7 +2537,7 @@ with sync_playwright() as p:
           "at start %.1f ms, then the grid %s ms; again %s ms" % (dec["load"], dec["grid"] is not None and round(dec["grid"], 1), ", ".join("%.1f" % x for x in dec["again"])))
     PERF = {"p95": p95, "decode": dec["load"], "grid": dec["grid"]}
     cdp.send("Emulation.setCPUThrottlingRate", {"rate": 1})
-    ctx.set_offline(False)
+    net_off.back_online()
     ctx.close()
 
     # ---------- 27. a damaged graph.json is never saved; with no road map the banner says rerouting cannot run ----------

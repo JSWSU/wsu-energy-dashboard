@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://tile.openstreetmap.org; frame-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AMR Route Guide</title>
 <meta name="description" content="GPS guide for the Sensus AMR water meter read route, WSU Pullman.">
@@ -215,6 +216,24 @@ const LSK = 'amrNav.v1.';
 const qs = new URLSearchParams(location.search);
 const SIM = qs.has('sim');           // simulator (?sim=1): no GPS, the simulator makes the fixes
 const $ = id => document.getElementById(id);
+
+/* ---------- the installed app (Android) ---------- */
+/* In the AMR Route Guide app this page runs in a WebView and the app adds window.AMRNative: voice, links that leave the
+   app, the app's version and its update state go through it. In a browser it is not there and nothing changes. */
+const NATIVE = (() => { try { return window.AMRNative && typeof window.AMRNative.bridgeVersion === 'function' ? window.AMRNative : null; } catch (e) { return null; } })();
+const MIN_BRIDGE = 1;                // the oldest app bridge this page works with; make_app_manifest.py copies it into app-manifest.json
+const LIVE = 'https://jswsu.github.io/wsu-energy-dashboard/';   // the public site, for links that leave the app
+/* One bridge call that can never stop the page: '' when the app lacks the call or the call failed. */
+function nativeCall(name, ...args) {
+  try { return NATIVE && typeof NATIVE[name] === 'function' ? String(NATIVE[name](...args)) : ''; } catch (e) { return ''; }
+}
+function nativeInfo() { try { return JSON.parse(nativeCall('info') || '{}'); } catch (e) { return {}; } }
+/* The web copy the app runs, and a newer one that waits (app only). */
+function appCopyText() {
+  const i = nativeInfo();
+  return 'Web copy ' + (i.web || APP_VERSION) + (i.source === 'downloaded' ? ', downloaded.' : ', built into the app.') +
+    (i.pending ? ' Version ' + i.pending + ' loads at the next start.' : '');
+}
 
 /* ---------- storage (per-device convenience only) ---------- */
 function lsGet(k, d) { try { const v = localStorage.getItem(LSK + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -1497,9 +1516,13 @@ function renderPanel() {
     '<li>Blue stops are walk-in stops. Park, then choose Walk to meter or Read from car.</li>' +
     '<li>Gold-ringed stops have ATTENTION meters. The guide pauses there so you can read the note.</li>' +
     '<li>No signal? The map, the route, the turns and rerouting all work offline. Off the route, the guide plans a new way on this tablet.</li></ol>' +
-    '<p>Route built ' + r.built + '. ' + r.source + '</p><p>App ' + APP_VERSION + '. Map data &copy; OpenStreetMap contributors. Route lines by OSRM (FOSSGIS). Rerouting runs on this device' +
+    '<p>Route built ' + r.built + '. ' + r.source + '</p>' + (NATIVE ? '<p id="appLine"></p>' : '') + '<p>App ' + APP_VERSION + '. Map data &copy; OpenStreetMap contributors. Route lines by OSRM (FOSSGIS). Rerouting runs on this device' +
     (GR && GR.built ? ', road map built ' + GR.built : '') + '.</p>';
   body.appendChild(help);
+  if (NATIVE) {
+    const i = nativeInfo();
+    $('appLine').textContent = 'Installed app ' + (i.app || '?') + '. ' + appCopyText() + (i.check && i.check !== 'never' ? ' Last update check: ' + i.check + '.' : '');
+  }
 }
 
 /* ---------- simulation (?sim=1) for demos and testing ---------- */
@@ -1607,6 +1630,7 @@ function renderStart() {
 async function updateOfflineLine() {
   const el = $('offlineLine');
   if (!el) return;
+  if (NATIVE) { el.textContent = 'Offline ready. ' + appCopyText(); return; }   // the app holds every file itself
   let ready = false;
   try {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller && 'caches' in window) {
@@ -1732,6 +1756,7 @@ async function load() {
     showRoute(); renderStart();
     if (SIM) simStart(); else startGps();
     loaded = true;
+    if (NATIVE) nativeCall('ready', APP_VERSION);    // this web copy works: the app keeps it
   } catch (e) {
     $('startBody').innerHTML = '<p>The route did not load. Connect to the internet once, then reopen the app.</p>';
     console.error(e);
@@ -1739,7 +1764,7 @@ async function load() {
 }
 load();
 startGraphLoad();                     // the road map for rerouting loads beside the route; the route never waits for it
-if ('serviceWorker' in navigator) {
+if (!NATIVE && 'serviceWorker' in navigator) {    // the app keeps its own files and runs no service worker
   navigator.serviceWorker.addEventListener('controllerchange', updateOfflineLine);   // the first install takes control a moment after load
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ }); });
 }
