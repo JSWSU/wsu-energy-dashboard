@@ -23,6 +23,21 @@ import time
 from urllib.parse import urlparse
 
 from playwright.sync_api import sync_playwright
+from playwright.sync_api._generated import Browser
+
+# Every context records speech instead of playing it: headless Chromium sends speechSynthesis to the Windows voice,
+# which plays on the laptop speakers. Pages that read the words still add CAPTURE_SPEECH (it keeps this list).
+SILENCE = "window.__spoken=window.__spoken||[];try{speechSynthesis.speak=u=>window.__spoken.push(u.text);speechSynthesis.cancel=()=>{}}catch(e){}"
+_new_context = Browser.new_context
+
+
+def _silent_context(self, *a, **k):
+    ctx = _new_context(self, *a, **k)
+    ctx.add_init_script(SILENCE)
+    return ctx
+
+
+Browser.new_context = _silent_context
 
 BASE = "http://127.0.0.1:41999/amr-nav/"
 RG_DIR = os.environ.get("AMR_ROUTE_GUIDE") or os.path.join(os.path.expanduser("~"), ".claude", "skills", "sensus-amr-read-cycle",
