@@ -20,6 +20,7 @@ import math
 import os
 import random
 import re
+import subprocess
 import sys
 import time
 from urllib.parse import urlparse
@@ -1857,7 +1858,7 @@ with sync_playwright() as p:
           json.dumps([r0, r]))
     ctx.close()
 
-    # f. the app page opens at once from the saved copy (stale while revalidate); version 2026.10.01-2; every save inside e.waitUntil
+    # f. the app page opens at once from the saved copy (stale while revalidate); version 2026.10.01-3; every save inside e.waitUntil
     SW_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sw.js"), encoding="utf-8").read()
     puts = [ln.strip() for ln in SW_TEXT.splitlines() if "cache.put(" in ln]
     check("sw.js: every cache.put runs inside e.waitUntil", bool(puts) and all("e.waitUntil(" in ln for ln in puts), " | ".join(puts))
@@ -1871,7 +1872,7 @@ with sync_playwright() as p:
     sw_controls(pg)
     wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
     v = pg.evaluate("async () => ({app: APP_VERSION, caches: (await caches.keys()).filter(k => k.startsWith('amr-nav-'))})")
-    check("app version 2026.10.01-2 and one worker cache, amr-nav-2026.10.01-2", v["app"] == "2026.10.01-2" and v["caches"] == ["amr-nav-2026.10.01-2"], json.dumps(v))
+    check("app version 2026.10.01-3 and one worker cache, amr-nav-2026.10.01-3", v["app"] == "2026.10.01-3" and v["caches"] == ["amr-nav-2026.10.01-3"], json.dumps(v))
     hold["on"] = True
     pg.goto("about:blank")
     t0 = time.time()
@@ -2888,6 +2889,11 @@ with sync_playwright() as p:
     check("no guidance page asked a host other than 127.0.0.1", not EXTERNAL, " ".join(EXTERNAL[:5]))
     br.close()
 
+# the file list the Android app updates from must match amr-nav (tests/make_app_manifest.py after every change)
+mf = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_app_manifest.py")],
+                    capture_output=True, text=True, encoding="utf-8", errors="replace")
+check("app-manifest.json is current (tests/test_app_manifest.py; fix: py amr-nav\\tests\\make_app_manifest.py)", mf.returncode == 0,
+      " ".join(ln for ln in mf.stdout.splitlines() if ln.startswith("FAIL"))[:300])
 errs = [e for e in errors if "favicon" not in e]
 check("no console errors or page errors", not errs, " || ".join(errs[:6]))
 print("SUMMARY", sum(1 for r in results if r[1]), "of", len(results), "passed")
