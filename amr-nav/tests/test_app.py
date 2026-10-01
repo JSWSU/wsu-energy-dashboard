@@ -6,7 +6,8 @@ Run from the repository root while a static server serves the repository root:
 No check calls a server other than 127.0.0.1: rerouting runs on the page, on graph.json (the road map). Section 26
 drives offline with every other host blocked and recorded, and checks the router, its words and its speed. It also runs
 the reference router, Graph.route() in build_graph.py of the sensus-amr-read-cycle skill (folder scripts/route-guide, or
-the folder in the environment variable AMR_ROUTE_GUIDE), and the app's router must give the same costs.
+the folder in the environment variable AMR_ROUTE_GUIDE): the app's router must give the same costs, and each new leg that
+sections 4 and 26 put in place must be the reference route from the same fix, drawn on the road map (leg_problems()).
 Interception of route.json, graph.json and the page uses ctx.route (context level), because page.route does not see
 the requests that the service worker makes. A request that a handler lets through ignores set_offline, so the
 offline steps remove the handler first, or route only the hosts they block.
@@ -93,6 +94,19 @@ PNG_1PX = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlE
 COUNT_REROUTES = """() => { window.__reroutes = 0; window.__rerouteOff = [];
     const f = window.reroute;
     window.reroute = function () { window.__reroutes++; window.__rerouteOff.push(S.offRoute); return f.apply(this, arguments); }; }"""
+# keeps every planLeg() call: its from point, the end of the leg, the heading, the mode, what routeG() gave (window.__plans), and
+# the new leg (window.__planLegs, to find the plan behind S.override). Run it after the page has loaded, like COUNT_REROUTES.
+RECORD_PLANS = """() => { window.__plans = []; window.__planLegs = [];
+    const f = window.planLeg;
+    window.planLeg = function (from, base, hd) { const out = f.apply(this, arguments), r = out.route;
+      window.__plans.push({from: [from[0], from[1]], end: base.geom[base.geom.length - 1], hd: hd == null ? null : hd, mode: base.mode,
+        lead: CFG.lead[base.mode], snapMax: CFG.snapMax,
+        route: r ? {cost: r.cost, net: r.net, gapStart: r.gapStart, gapEnd: r.gapEnd, s: r.s.e, t: r.t.e, against: r.against} : null});
+      window.__planLegs.push(out.leg || null);
+      return out; }; }"""
+# the plan behind the new leg in place (S.override), with that leg's points and length; null when there is none
+APPLIED_PLAN = """() => { const k = S.override && window.__planLegs ? window.__planLegs.indexOf(S.override) : -1;
+    return k < 0 ? null : Object.assign({geom: S.override.geom, dist: S.override.dist}, window.__plans[k]); }"""
 
 
 def is_local(url):
@@ -117,6 +131,94 @@ def block_external(ctx, log=None):
 
 ROUTE_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "route.json"), "rb").read().decode("utf-8")
 ROUTE_BUILT = json.loads(ROUTE_TEXT)["built"]
+GRAPH_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "graph.json"), encoding="utf-8").read()
+GRAPH_HEAD = json.loads(GRAPH_TEXT)
+
+
+def load_reference():
+    """The reference router, Graph in build_graph.py, on graph.json: (the graph, '') or (None, why it did not load)."""
+    try:
+        if RG_DIR not in sys.path:
+            sys.path.insert(0, RG_DIR)
+        import build_graph as BG
+        return BG.Graph(json.loads(GRAPH_TEXT)), ""
+    except Exception as ex:                              # a missing reference is a failed check, never a skipped one
+        return None, "%s: %s. Set AMR_ROUTE_GUIDE to the scripts\\route-guide folder of the sensus-amr-read-cycle skill." % (RG_DIR, ex)
+
+
+REF, REF_ERR = load_reference()
+
+
+def micro(x):
+    """degrees -> integer micro-degrees, half away from zero (build_graph.micro and the app's micro)"""
+    v = x * 1e6
+    return int(math.floor(v + 0.5)) if v >= 0 else -int(math.floor(-v + 0.5))
+
+
+def leg_problems(plan):
+    """What makes a new leg the app planned (APPLIED_PLAN) differ from the reference road route: Graph.route() in build_graph.py
+    from the same point to the same end, with the same heading. The leg must be that route's pieces on the road map, with a
+    straight lead line from the position when the road is more than CFG.lead m away, and a straight tail line to the end when the
+    end is 0.5 m or more off the road. Checked: the cost and both snap gaps of the app's route (1e-6), the leg's length (1 m), where
+    the lead and tail lines start and end (1 m), and every point of the road part (each vertex, and points at most 5 m apart
+    between them) within 1 m of an edge the mode may use. Returns (problems, a short summary); no problems: the same route."""
+    if plan is None:
+        return ["no new leg in place, or no plan recorded for it"], ""
+    if REF is None:
+        return ["no reference router: " + REF_ERR], ""
+    mode = "car" if plan["mode"] == "drive" else "foot"
+    hd = plan["hd"] if mode == "car" else None
+    ref, main_only = None, False
+    for main_only in ((False, True) if mode == "car" else (False,)):   # planLeg snaps again to the main car network when it must
+        ref = REF.route(plan["from"], plan["end"], mode, heading=hd, max_m=plan["snapMax"], main_only=main_only)
+        if ref is not None:
+            break
+    if ref is None or plan["route"] is None:
+        return ["the reference finds no route" if ref is None else "the app's plan has no route"], ""
+    out, r, geom = [], plan["route"], plan["geom"]
+    for k, rk in (("cost", "cost"), ("gapStart", "gap_start"), ("gapEnd", "gap_end")):
+        if abs(r[k] - ref[rk]) > 1e-6 * max(1.0, abs(ref[rk])):
+            out.append("route %s %.6f, reference %.6f" % (k, r[k], ref[rk]))
+    lead, tail = ref["gap_start"] > plan["lead"], ref["gap_end"] >= 0.5
+    # the reference route drawn as the app draws a leg, and measured as the app measures one (the el sum runs long: each edge's
+    # el is rounded up to the next 0.1 m)
+    want_geom = [[q[0] * 1e-6, q[1] * 1e-6] for q in REF.path_points(ref)]
+    if lead:
+        want_geom.insert(0, list(plan["from"]))
+    if tail:
+        want_geom.append(list(plan["end"]))
+    elif want_geom:
+        want_geom[-1] = list(plan["end"])
+    want = Path(want_geom).total if len(want_geom) >= 2 else 0.0
+    if abs(plan["dist"] - want) > 1.0:
+        out.append("the leg is %.1f m, the reference route %.1f m" % (plan["dist"], want))
+    sp = REF.snap(micro(plan["from"][0]), micro(plan["from"][1]), mode, hd=hd, max_m=plan["snapMax"], main_only=main_only)[3]
+    tp = REF.snap(micro(plan["end"][0]), micro(plan["end"][1]), mode, max_m=plan["snapMax"], main_only=main_only)[3]
+    sp, tp = [sp[0] * 1e-6, sp[1] * 1e-6], [tp[0] * 1e-6, tp[1] * 1e-6]
+    if len(geom) < 2 or geom[-1] != plan["end"]:
+        out.append("the leg does not end at the end of the leg it replaces")
+    else:
+        if lead and (geom[0] != plan["from"] or hav_m(geom[1], sp) > 1.0):
+            out.append("no straight line from the position %s to the road at %s: the leg starts %s, %s" % (plan["from"], sp, geom[0], geom[1]))
+        if not lead and hav_m(geom[0], sp) > 1.0:
+            out.append("the leg starts at %s, %.1f m from the road at %s" % (geom[0], hav_m(geom[0], sp), sp))
+        if tail and hav_m(geom[-2], tp) > 1.0:
+            out.append("no straight line from the road at %s to the end: it starts at %s" % (tp, geom[-2]))
+    road = geom[1 if lead else 0:len(geom) - 1 if tail else len(geom)]
+    ok = lambda e: REF.allowed(e, mode)
+    off, n = [], 0
+    for a, b in zip(road, road[1:]):
+        parts = max(1, math.ceil(hav_m(a, b) / 5.0))
+        for j in range(parts + 1):
+            q = (a[0] + (b[0] - a[0]) * j / parts, a[1] + (b[1] - a[1]) * j / parts)
+            n += 1
+            if REF.grid.nearest(micro(q[0]), micro(q[1]), ok=ok, start_m=1.0, max_m=1.0) is None:
+                off.append([round(q[0], 6), round(q[1], 6)])
+    if off:
+        out.append("%d of %d points on the road part are more than 1 m from any %s edge, first %s" % (len(off), n, mode, off[0]))
+    summary = "%d points, %.1f m; the reference route %.1f m (road el sum %.1f, lead line %.1f, tail line %.1f), cost %.1f; %d road points checked" % (
+        len(geom), plan["dist"], want, ref["net_m"], ref["gap_start"] if lead else 0.0, ref["gap_end"] if tail else 0.0, ref["cost"], n)
+    return out, summary
 
 
 def fnv1a_py(s):
@@ -333,6 +435,7 @@ def reroute_case(br, mode):
     if mode != "stale":
         pump_until(pg, lambda: pg.evaluate("() => !!GR"), timeout=10)
     pg.evaluate(COUNT_REROUTES)
+    pg.evaluate(RECORD_PLANS)
     pg.click("#startBtns button")
     pg.wait_for_timeout(1500)
     out = {"cfg": pg.evaluate("() => ({osrm: 'osrm' in CFG, timeout: 'rerouteTimeoutMs' in CFG, snapMax: CFG.snapMax})")}
@@ -357,6 +460,7 @@ def reroute_case(br, mode):
     if mode == "apply":
         pump_until(pg, lambda: pg.evaluate("() => !!S.override"), timeout=5)
         out["ends"] = pg.evaluate("() => !!S.override && JSON.stringify(S.override.geom[S.override.geom.length - 1]) === JSON.stringify(S.legs[0].geom[S.legs[0].geom.length - 1])")
+        out["plan"] = pg.evaluate(APPLIED_PLAN)          # the plan behind the new leg, for leg_problems()
     elif mode == "stale":
         out["waits"] = pg.evaluate("() => GR === null && document.getElementById('bThen').textContent")
         pg.evaluate("() => setLeg(1)")
@@ -519,11 +623,17 @@ with sync_playwright() as p:
     # ---------- 4. reroute guards (the plan is made on the device; graph.json is held to make a plan wait) ----------
     APP_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "index.html"), encoding="utf-8").read()
     r = reroute_case(br, "apply")
+    plan = r.pop("plan", None)
     check("reroute test setup: off-route point is 250 m+ from leg 0, app plans a new route while off route",
           r.get("asked") and r.get("off") and r.get("min_m", 0) >= 250, json.dumps(r))
     check("the app names no routing server and has no request timeout (CFG.osrm and CFG.rerouteTimeoutMs are gone)",
           r["cfg"]["osrm"] is False and r["cfg"]["timeout"] is False and "routing.openstreetmap.de" not in APP_TEXT, json.dumps(r["cfg"]))
     check("an offline reroute for the current leg is applied, and the new leg ends where leg 0 ends", r.get("override") and r.get("ends"), json.dumps(r))
+    probs, summ = leg_problems(plan)
+    check("... the new leg is the reference road route from the off-route fix (build_graph.py Graph.route(): the same cost and snap gaps, the length "
+          "within 1 m, the lead and tail lines in place, every road point within 1 m of a car edge)",
+          plan is not None and r.get("far") and abs(plan["from"][0] - r["far"][0]) < 1e-9 and abs(plan["from"][1] - r["far"][1]) < 0.0001 and not probs,
+          "%s; %s" % (summ, "; ".join(probs[:3]) or "the same route"))
     r = reroute_case(br, "stale")
     check("a reroute that waited for graph.json is dropped when the leg changed meanwhile",
           r.get("asked") and r.get("graph") and r.get("waits") == "Loading the road map" and r.get("override") is False, json.dumps(r))
@@ -1937,8 +2047,6 @@ with sync_playwright() as p:
     ctx.close()
 
     # ---------- 26. rerouting with no network at all: a drive on the installed app, the router, and its speed ----------
-    GRAPH_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "graph.json"), encoding="utf-8").read()
-    GRAPH_HEAD = json.loads(GRAPH_TEXT)
     STEP_TYPES = {"depart", "turn", "new name", "continue", "end of road", "offpath", "arrive", "roundabout", "exit roundabout"}
     STEP_MODS = {"", "straight", "slight left", "slight right", "left", "right", "sharp left", "sharp right", "uturn"}
     legs = ROUTE["legs"]
@@ -1990,6 +2098,7 @@ with sync_playwright() as p:
     check("offline: the app opens from the worker's cache and decodes the road map with no network",
           got and st["online"] is False and st["n"] == GRAPH_HEAD["n"] and st["m"] == GRAPH_HEAD["m"] and "43 stops" in st["start"], json.dumps(st)[:300])
     pg.evaluate(COUNT_REROUTES)
+    pg.evaluate(RECORD_PLANS)
     pg.click("#startBtns button")
     pg.wait_for_timeout(500)
 
@@ -2020,10 +2129,15 @@ with sync_playwright() as p:
             check("offline drive, leg %d: off route, a new leg is planned on the device" % i, False, json.dumps(r))
             continue
         end_ok = r["geom"][-1] == r["baseEnd"] == leg["geom"][-1]
-        straight = hav_m(off, leg["geom"][-1])
         check("offline drive, leg %d: off route %.0f m from the leg, the device plans a new %s leg that ends at the leg's own end" % (i, d_off, mode),
-              end_ok and r["sameTo"] and r["mode"] == mode and r["dist"] >= straight - 1,
-              "%d points, %.0f m (straight line %.0f m), %d steps" % (len(r["geom"]), r["dist"], straight, len(r["types"])))
+              end_ok and r["sameTo"] and r["mode"] == mode, "%d points, %.0f m, %d steps" % (len(r["geom"]), r["dist"], len(r["types"])))
+        plan = pg.evaluate(APPLIED_PLAN)
+        fed = [[off[0], off[1] + 0.000004 * k] for k in range(4)]
+        probs, summ = leg_problems(plan)
+        check("offline drive, leg %d: the new leg is the reference %s route from the off-route fix (build_graph.py Graph.route(): the same cost and "
+              "snap gaps, the length within 1 m, the lead and tail lines in place, every road point within 1 m of a %s edge)"
+              % (i, "road" if mode == "drive" else "path", "car" if mode == "drive" else "foot"),
+              plan is not None and plan["from"] in fed and not probs, "%s; %s" % (summ, "; ".join(probs[:3]) or "the same route"))
         moves = [(a, m, t) for t, a, m, st in zip(r["types"], r["along"], r["mods"], r["atStart"]) if t not in ("depart", "arrive", "offpath") and not st]
         close = [(x, y) for x, y in zip(moves, moves[1:]) if y[0] - x[0] < 14.9]      # kept apart only when both turn (a jog)
         sided = lambda m: "left" in m or "right" in m or m == "uturn"
@@ -2126,14 +2240,7 @@ with sync_playwright() as p:
     #    snapped edges and the same start direction for the 44 park-point pairs, every leg in its own profile, and 360 seeded
     #    random trips (car with and without a heading, car snapped to the main network only, foot). Every routed trip is legal.
     snap_max = pg.evaluate("() => CFG.snapMax")
-    try:
-        if RG_DIR not in sys.path:
-            sys.path.insert(0, RG_DIR)
-        import build_graph as BG
-        REF, ref_err = BG.Graph(json.loads(GRAPH_TEXT)), ""
-    except Exception as ex:                              # a missing reference is a failed check, never a skipped one
-        REF, ref_err = None, "%s: %s. Set AMR_ROUTE_GUIDE to the scripts\\route-guide folder of the sensus-amr-read-cycle skill." % (RG_DIR, ex)
-    check("parity setup: the reference router (build_graph.py) loads and reads graph.json", REF is not None, ref_err)
+    check("parity setup: the reference router (build_graph.py) loads and reads graph.json", REF is not None, REF_ERR)
     # problems(r, car): what makes a routed trip illegal (an edge against its flags, pieces that do not meet, a barrier passed,
     # a banned turn), from the decoded graph
     PROBLEMS = """(r, car) => { const out = [], P = r.pieces;
