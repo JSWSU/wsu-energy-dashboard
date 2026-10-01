@@ -142,6 +142,76 @@ def t_public_files(br):
     A.check("no em dash in the app's files or tests", not dashes, ", ".join(dashes))
 
 
+@A.case
+def t_app_speech(br):
+    ctx, pg = A.open_app(br, mode="app")
+    spoken = A.native(pg)["spoken"]
+    A.check("app: the first prompt goes to the app's voice, not speechSynthesis",
+            len(spoken) >= 1 and pg.evaluate("() => window.__spoken.length") == 0, json.dumps(spoken[:3]))
+    pg.click("#fVoice")
+    n = len(A.native(pg)["spoken"])
+    pg.evaluate("() => setLeg(2)")
+    calls = [c[0] for c in A.native(pg)["calls"]]
+    A.check("app: Voice off stops the app's voice and later prompts are not sent",
+            "stopSpeech" in calls and len(A.native(pg)["spoken"]) == n, json.dumps(calls[-5:]))
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="browser")
+    A.check("browser: the prompts still use speechSynthesis", pg.evaluate("() => window.__spoken.length") >= 1)
+    ctx.close()
+
+
+@A.case
+def t_app_links(br):
+    ctx, pg = A.open_app(br, mode="app", init=A.RECORD_OPEN)
+    pg.click("#aGmaps")
+    opened = A.native(pg)["opened"]
+    A.check("app: Google Maps goes through the app (an https maps link), never window.open",
+            len(opened) == 1 and opened[0].startswith("https://www.google.com/maps/dir/?api=1&destination=")
+            and pg.evaluate("() => window.__opened.length") == 0, json.dumps(opened))
+    pg.click("#fList")
+    href0 = pg.evaluate("() => location.href")
+    pg.click("#bRoutePage")
+    pg.wait_for_timeout(300)
+    A.check("app: the printable route page opens through the app at the live site, and the guide stays",
+            A.native(pg)["opened"][-1] == "https://jswsu.github.io/wsu-energy-dashboard/route.html" and pg.evaluate("() => location.href") == href0,
+            json.dumps(A.native(pg)["opened"]))
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="app", native_cfg={"open": "no app"})
+    pg.click("#aGmaps")
+    A.check("app: when no app can open the link, a toast says so", A.dom(pg, "#toast") == "No app on this tablet can open that link.", A.dom(pg, "#toast"))
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="browser", init=A.RECORD_OPEN)
+    pg.click("#aGmaps")
+    A.check("browser: Google Maps still opens with window.open", pg.evaluate("() => window.__opened.length") == 1)
+    ctx.close()
+
+
+@A.case
+def t_app_drive_flag(br):
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    A.check("app: at load with no progress the drive is not active", A.native(pg)["drive"][-1:] == [False], json.dumps(A.native(pg)["drive"]))
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(400)
+    pg.evaluate("() => { markStop(S.legs[0].to.o, 'done'); setLeg(nextOpenLeg(0)); }")
+    A.check("app: after a stop is reached the drive is active", A.native(pg)["drive"][-1] is True, json.dumps(A.native(pg)["drive"]))
+    pg.evaluate("() => { newDrive({adopt: true}); setLeg(0); }")
+    A.check("app: a new drive is not active", A.native(pg)["drive"][-1] is False, json.dumps(A.native(pg)["drive"]))
+    pg.evaluate("() => { setLeg(S.legs.length - 1); S.arrivedLeg = -1; arrived(); }")
+    A.check("app: a finished drive is not active", A.native(pg)["drive"][-1] is False and pg.evaluate("() => S.finished"), json.dumps(A.native(pg)["drive"]))
+    ctx.close()
+
+
+@A.case
+def t_location_text(br):
+    for mode, want in (("app", "Location is blocked. Allow location for AMR Route Guide in Settings, Apps."),
+                       ("browser", "Location is blocked. Allow location for this site in the browser settings.")):
+        ctx = A.new_context(br, geolocation=False)
+        ctx, pg = A.open_app(br, mode=mode, ctx=ctx, query="?reset=1")
+        got = A.pump_until(pg, lambda: A.dom(pg, "#toast") == want, timeout=6)
+        A.check(mode + ": location blocked names where to allow it", got, A.dom(pg, "#toast"))
+        ctx.close()
+
+
 with sync_playwright() as p:
     br = p.chromium.launch()
     A.run_cases(br)

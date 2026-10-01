@@ -228,6 +228,15 @@ function nativeCall(name, ...args) {
   try { return NATIVE && typeof NATIVE[name] === 'function' ? String(NATIVE[name](...args)) : ''; } catch (e) { return ''; }
 }
 function nativeInfo() { try { return JSON.parse(nativeCall('info') || '{}'); } catch (e) { return {}; } }
+/* A link that leaves the app: the app hands it to Android (Google Maps, or the browser); a browser opens a new tab. */
+function openOutside(url) {
+  if (NATIVE) { if (nativeCall('openExternal', url) !== 'ok') toast('No app on this tablet can open that link.'); return; }
+  window.open(url, '_blank');
+}
+/* A drive is in progress: a stop past the first is saved and the drive is not finished. While one is, the app keeps
+   its web copy; a newer downloaded copy waits for a start with no drive in progress. */
+function driveActive() { return !S.finished && (S.legIdx > 0 || ['done', 'skipped', 'passed'].some(k => Object.keys(S[k]).length > 0)); }
+function nativeDrive() { if (NATIVE) nativeCall('setDriveActive', driveActive()); }
 /* The web copy the app runs, and a newer one that waits (app only). */
 function appCopyText() {
   const i = nativeInfo();
@@ -411,7 +420,9 @@ function pickVoice() {
 }
 if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 function speak(text, urgent) {
-  if (!S.voice || !('speechSynthesis' in window) || !text) return;
+  if (!S.voice || !text) return;
+  if (NATIVE) { nativeCall('speak', text, !!urgent); return; }   // the WebView has no speechSynthesis; the app speaks, also offline
+  if (!('speechSynthesis' in window)) return;
   try {
     if (urgent) speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
@@ -573,7 +584,7 @@ function setLeg(i, why) {
   S.lastReroute = 0; S.routeSaidAt = 0;   // a new leg: its first reroute plans at once and says Route updated.
   S.arrivedLeg = -1; S.waiting = null; S.leaveCnt = 0; rerouteSeq++; disarm('skip');
   if (S.finished) { S.finished = false; lsSet('finished', false); }   // a finished drive goes on (Go from the list): it is no longer finished
-  lsSet('leg', S.legIdx); lsSet('done', S.done); lsSet('skipped', S.skipped); lsSet('passed', S.passed);
+  lsSet('leg', S.legIdx); lsSet('done', S.done); lsSet('skipped', S.skipped); lsSet('passed', S.passed); nativeDrive();
   drawRoute(); refreshStopIcons(); renderCard(); renderBanner();
   const leg = S.legs[S.legIdx];
   if (S.started && why !== 'silent') {
@@ -611,7 +622,7 @@ function arrived() {
   const st = stopOf(leg);
   if (leg.to.kind === 'depot') {
     S.waiting = 'finish';
-    S.finished = true; lsSet('finished', true);   // the next open offers a new drive, not a resume
+    S.finished = true; lsSet('finished', true); nativeDrive();   // the next open offers a new drive, not a resume
     speak('Route complete. Back at McCluskey Services.', true);
     renderCard(); renderBanner(); return;
   }
@@ -751,7 +762,7 @@ function renderCard() {
     if (leg.to.kind === 'car' || leg.to.kind === 'depot') skip.style.display = 'none';
   }
   const tgt = leg.geom[leg.geom.length - 1];
-  $('aGmaps').onclick = () => { window.open('https://www.google.com/maps/dir/?api=1&destination=' + tgt[0] + ',' + tgt[1] + '&travelmode=' + (leg.mode === 'walk' ? 'walking' : 'driving'), '_blank'); };
+  $('aGmaps').onclick = () => { openOutside('https://www.google.com/maps/dir/?api=1&destination=' + tgt[0] + ',' + tgt[1] + '&travelmode=' + (leg.mode === 'walk' ? 'walking' : 'driving')); };
   refreshStopIcons();
   layoutVars();
 }
@@ -867,7 +878,7 @@ function onGeoErr(e) {
   g.textContent = e.code === 1 ? 'GPS blocked' : 'No GPS';
   if (e.code === 1) {
     S.blocked = true;                 // checkFixAge() leaves this message alone
-    toast('Location is blocked. Allow location for this app in Chrome settings.', 6000);
+    toast(NATIVE ? 'Location is blocked. Allow location for AMR Route Guide in Settings, Apps.' : 'Location is blocked. Allow location for this site in the browser settings.', 6000);
     // the browser ends the watch after a denial; free the slot so startGps() can try again
     try { if (watchId !== null) navigator.geolocation.clearWatch(watchId); } catch (x) { /* nothing to clear */ }
     watchId = null;
@@ -883,7 +894,7 @@ function startGps() {
     onFix({lat: c.latitude, lon: c.longitude, acc: c.accuracy, heading: (c.heading != null && !isNaN(c.heading) && (c.speed || 0) > 1) ? c.heading : null, speed: c.speed, t: p.timestamp});
   }, onGeoErr, {enableHighAccuracy: true, maximumAge: 1000, timeout: 20000});
 }
-// retry after the driver allows location in Chrome settings, then comes back to the app
+// retry after the driver allows location in the settings, then comes back to the app
 try {
   if (navigator.permissions && navigator.permissions.query) {
     navigator.permissions.query({name: 'geolocation'}).then(ps => {
@@ -1497,8 +1508,9 @@ function renderPanel() {
   }
   const h2 = document.createElement('div'); h2.className = 'sec'; h2.textContent = 'Drive'; body.appendChild(h2);
   const pb = document.createElement('div'); pb.className = 'pbtns';
-  pb.innerHTML = '<button class="btn" id="bReset">Start a new drive</button><a class="btn ghost" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="../route.html">Printable route page</a>';
+  pb.innerHTML = '<button class="btn" id="bReset">Start a new drive</button><a class="btn ghost" id="bRoutePage" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="../route.html">Printable route page</a>';
   body.appendChild(pb);
+  if (NATIVE) $('bRoutePage').onclick = ev => { ev.preventDefault(); openOutside(LIVE + 'route.html'); };   // in the app it opens in the browser
   armButton($('bReset'), 'reset', 'Start a new drive', 'Tap again to clear progress');
   $('bReset').onclick = () => {
     if (!armTap('reset', CFG.skipConfirmMs)) return;
@@ -1574,7 +1586,7 @@ function begin() {
   $('start').style.display = 'none';
   pinRoute();                       // a failed store must not stop the drive, so nothing below depends on it
   wakeLock();
-  if ('speechSynthesis' in window) { try { speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } catch (e) { /* unlock */ } }
+  if (!NATIVE && 'speechSynthesis' in window) { try { speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } catch (e) { /* unlock */ } }
   startGps();
   setLeg(S.legIdx);
   if (!S.sim && S.fix) followTo([S.fix.lat, S.fix.lon], CFG.zoom[currentLeg().mode]);
@@ -1661,7 +1673,10 @@ const ICON = {
 $('fFollow').innerHTML = ICON.follow; $('fLayer').innerHTML = ICON.layer; $('fList').innerHTML = ICON.list;
 function paintVoice() { $('fVoice').innerHTML = S.voice ? ICON.voiceOn : ICON.voiceOff; $('fVoice').className = 'fab ' + (S.voice ? 'on' : 'off'); }
 paintVoice();
-$('fVoice').onclick = () => { S.voice = !S.voice; lsSet('voice', S.voice); paintVoice(); if (!S.voice && 'speechSynthesis' in window) speechSynthesis.cancel(); };
+$('fVoice').onclick = () => {
+  S.voice = !S.voice; lsSet('voice', S.voice); paintVoice();
+  if (!S.voice) { if (NATIVE) nativeCall('stopSpeech'); else if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+};
 $('fFollow').onclick = () => { S.follow = true; $('fFollow').className = 'fab on'; if (S.fix) followTo([S.fix.lat, S.fix.lon], CFG.zoom[currentLeg() ? currentLeg().mode : 'drive']); };
 $('fLayer').onclick = () => {
   const showing = streetShown();                        // what is on screen now, not only the saved choice
@@ -1710,7 +1725,7 @@ function newDrive({adopt} = {}) {
     pinRoute();
   }
   S.done = {}; S.skipped = {}; S.passed = {}; S.finished = false; S.legIdx = 0; S.override = null;
-  clearProgress();
+  clearProgress(); nativeDrive();
   if (swap) showRoute();
   return swap;
 }
@@ -1763,7 +1778,7 @@ async function load() {
     showRoute(); renderStart();
     if (SIM) simStart(); else startGps();
     loaded = true;
-    if (NATIVE) nativeCall('ready', APP_VERSION);    // this web copy works: the app keeps it
+    if (NATIVE) { nativeCall('ready', APP_VERSION); nativeDrive(); }   // this web copy works: the app keeps it
   } catch (e) {
     $('startBody').innerHTML = '<p>The route did not load. Connect to the internet once, then reopen the app.</p>';
     console.error(e);
