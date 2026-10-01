@@ -2,11 +2,12 @@
    The app page opens at once from the saved copy and is refreshed in the background (a new app version shows on the next open;
    a drive in progress is safe, because the page keeps the route it started on). route.json comes from the network first (so a
    new route always shows up) and falls back to the saved copy when the network is down or slow; a damaged route.json is never
-   saved. Map tiles and rerouting go straight to the network and are never cached. */
-const VERSION = 'amr-nav-2026.09.30-3';
+   saved. graph.json, the road map that the page plans new routes on when the driver leaves the route, is saved like the app
+   files, and only a reply that is a whole graph is saved. Map tiles go straight to the network and are never cached. */
+const VERSION = 'amr-nav-2026.10.01-1';
 const FRESH_TIMEOUT_MS = 3000;     // route.json: give up on the network after this long and use the saved copy
 const CORE = [
-  './', './index.html', './manifest.webmanifest', './route.json', './basemap.json',
+  './', './index.html', './manifest.webmanifest', './route.json', './graph.json', './basemap.json',
   './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css',
   './vendor/leaflet/images/layers.png', './vendor/leaflet/images/layers-2x.png',
   './vendor/leaflet/images/marker-icon.png', './vendor/leaflet/images/marker-icon-2x.png', './vendor/leaflet/images/marker-shadow.png',
@@ -14,13 +15,18 @@ const CORE = [
 ];
 const OFFLINE = () => new Response('Offline and not cached yet.', {status: 503, headers: {'Content-Type': 'text/plain'}});
 
-/* A route.json reply worth saving: JSON with a non-empty legs array. Reads a copy, so the reply itself can still be used. */
-async function goodRoute(res) {
-  try {
-    const r = await res.clone().json();
-    return !!r && Array.isArray(r.legs) && r.legs.length > 0;
-  } catch (err) { return false; }
-}
+/* A reply worth saving: JSON that passes `test`. Reads a copy, so the reply itself can still be used. */
+const goodJson = test => async res => {
+  try { return !!test(await res.clone().json()); } catch (err) { return false; }
+};
+/* route.json: a non-empty legs array */
+const goodRoute = goodJson(r => r && Array.isArray(r.legs) && r.legs.length > 0);
+/* graph.json: format amr-graph-1 with every list the page decodes, each as long as n or m says */
+const goodGraph = goodJson(g => g && g.format === 'amr-graph-1' && g.n > 0 && g.m > 0 &&
+  ['nlat', 'nlon'].every(k => Array.isArray(g[k]) && g[k].length === g.n) &&
+  ['ea', 'eb', 'ef', 'en', 'el', 'ek'].every(k => Array.isArray(g[k]) && g[k].length === g.m) &&
+  Array.isArray(g.ec) && Array.isArray(g.names) && Array.isArray(g.car_kmh) && g.h_car_kmh > 0);
+const CHECKED = {'./route.json': goodRoute, './graph.json': goodGraph};   // CORE files saved only when they pass their test
 /* Save a copy of a reply in the background; e.waitUntil keeps the worker alive until it is stored. With `check` (an async test
    of the reply), only a reply that passes it is saved. The reply itself is not read, so it can go to the page at once. */
 function save(e, cache, key, res, check) {
@@ -31,12 +37,14 @@ function save(e, cache, key, res, check) {
 
 self.addEventListener('install', e => {
   // 'reload' skips the browser HTTP cache, so a deploy that is under 10 minutes old is not stored as an old copy.
-  // route.json is saved only when it is a good route; otherwise the copy an older version saved is kept.
+  // route.json and graph.json are saved only when they pass their test; otherwise the copy an older version saved is kept.
   e.waitUntil(caches.open(VERSION).then(async c => {
-    await c.addAll(CORE.filter(u => u !== './route.json').map(u => new Request(u, {cache: 'reload'})));
-    const r = await fetch(new Request('./route.json', {cache: 'reload'}));
-    const keep = r.ok && await goodRoute(r) ? r : await caches.match('./route.json');
-    if (keep) await c.put('./route.json', keep);
+    await c.addAll(CORE.filter(u => !CHECKED[u]).map(u => new Request(u, {cache: 'reload'})));
+    for (const u of Object.keys(CHECKED)) {
+      const r = await fetch(new Request(u, {cache: 'reload'}));
+      const keep = r.ok && await CHECKED[u](r) ? r : await caches.match(u);
+      if (keep) await c.put(u, keep);
+    }
   }).then(() => self.skipWaiting()));
 });
 
@@ -82,12 +90,12 @@ async function networkFirst(e, key) {
 }
 
 /* Everything else, including a tab opened on another file in the scope: saved copy first, refreshed in the background
-   (stale while revalidate), exact address only. */
-async function savedFirst(e) {
+   (stale while revalidate), exact address only. With `check`, only a reply that passes it is saved. */
+async function savedFirst(e, check) {
   const cache = await caches.open(VERSION);
   const hit = await cache.match(e.request);
   const net = fetch(e.request).then(res => {
-    if (res && res.ok) save(e, cache, e.request, res);
+    if (res && res.ok) save(e, cache, e.request, res, check);
     return res;
   }).catch(() => null);
   if (hit) { e.waitUntil(net); return hit; }
@@ -100,5 +108,6 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
   if (req.mode === 'navigate' && isAppPage(url)) e.respondWith(appPage(e));
   else if (url.pathname.endsWith('route.json')) e.respondWith(networkFirst(e, url.origin + url.pathname));   // saved without its query
+  else if (url.pathname.endsWith('graph.json')) e.respondWith(savedFirst(e, goodGraph));
   else e.respondWith(savedFirst(e));
 });

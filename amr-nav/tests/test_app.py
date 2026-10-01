@@ -3,18 +3,21 @@
 Run from the repository root while a static server serves the repository root:
     py -m http.server 41999 --bind 127.0.0.1
     py amr-nav\\tests\\test_app.py
-Only the original reroute check (section 2) calls the real OSRM server. New checks intercept it.
-Interception of route.json and the page uses ctx.route (context level), because page.route does not see the
-requests that the service worker makes. A request that a handler lets through ignores set_offline, so the
-offline steps remove the handler first.
+No check calls a server other than 127.0.0.1: rerouting runs on the page, on graph.json (the road map). Section 26
+drives offline with every other host blocked and recorded, and checks the router and its speed.
+Interception of route.json, graph.json and the page uses ctx.route (context level), because page.route does not see
+the requests that the service worker makes. A request that a handler lets through ignores set_offline, so the
+offline steps remove the handler first, or route only the hosts they block.
 """
 import base64
 import json
 import math
 import os
+import random
 import re
 import sys
 import time
+from urllib.parse import urlparse
 
 from playwright.sync_api import sync_playwright
 
@@ -76,17 +79,36 @@ def far_point(geom, min_m=250):
     return far
 
 
-OSRM_URL = re.compile(r"https://routing\.openstreetmap\.de/")
 ROUTE_URL = re.compile(r"/amr-nav/route\.json(\?.*)?$")
+GRAPH_URL = re.compile(r"/amr-nav/graph\.json(\?.*)?$")
 PAGE_URL = re.compile(r"/amr-nav/(index\.html)?(\?.*)?$")
 TILE_URL = re.compile(r"https://tile\.openstreetmap\.org/")
 PNG_1PX = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
-# remembers the AbortSignal of every reroute request, so a test can see whether the app ended it
-RECORD_OSRM_SIGNALS = """
-window.__osrmSignals = [];
-const __f = window.fetch.bind(window);
-window.fetch = (u, o) => { if (String(u).includes('routing.openstreetmap.de')) window.__osrmSignals.push(o && o.signal); return __f(u, o); };
-"""
+# counts the app's reroute() calls (window.__reroutes) and keeps whether the guide was off route at each one. Run it after
+# the page has loaded: onFix calls reroute() through the global object, so the wrapper sees every call.
+COUNT_REROUTES = """() => { window.__reroutes = 0; window.__rerouteOff = [];
+    const f = window.reroute;
+    window.reroute = function () { window.__reroutes++; window.__rerouteOff.push(S.offRoute); return f.apply(this, arguments); }; }"""
+
+
+def is_local(url):
+    """A request to the test server, or no network request at all (data:, blob:, about:)."""
+    u = urlparse(url)
+    return u.scheme not in ("http", "https", "ws", "wss") or u.hostname == "127.0.0.1"
+
+
+EXTERNAL = []        # every request to another host, from the pages that block them (guidance_page and section 26)
+
+
+def block_external(ctx, log=None):
+    """Abort and record every request whose host is not 127.0.0.1. Local requests are not routed, so set_offline still
+    applies to them."""
+    log = EXTERNAL if log is None else log
+
+    def handler(route):
+        log.append(route.request.url)
+        route.abort()
+    ctx.route(lambda url: not is_local(url), handler)
 
 
 ROUTE_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "route.json"), "rb").read().decode("utf-8")
@@ -121,20 +143,14 @@ def sw_controls(pg, timeout=20):
     return wait_for(pg, lambda: pg.evaluate("() => navigator.serviceWorker && navigator.serviceWorker.controller ? 1 : 0"), timeout=timeout)
 
 
-def osrm_reply(geom):
-    """A valid OSRM route reply that follows geom (lat, lon pairs)."""
-    coords = [[p[1], p[0]] for p in geom]
-    steps = [
-        {"geometry": {"coordinates": coords}, "maneuver": {"type": "depart", "modifier": "", "location": coords[0], "bearing_after": 0},
-         "name": "Test Road", "ref": "", "distance": 100, "duration": 20},
-        {"geometry": {"coordinates": [coords[-1]]}, "maneuver": {"type": "arrive", "modifier": "", "location": coords[-1], "bearing_after": 0},
-         "name": "", "ref": "", "distance": 0, "duration": 0},
-    ]
-    return {"code": "Ok", "routes": [{"legs": [{"distance": 100, "duration": 20, "steps": steps}]}]}
-
-
-def release(route, body):
-    route.fulfill(status=200, content_type="application/json", headers={"access-control-allow-origin": "*"}, body=json.dumps(body))
+def release_all(held):
+    """Let every held request go on to the server, so no handler is left waiting when the context closes."""
+    for h in held:
+        try:
+            h.continue_()
+        except Exception:
+            pass                                       # already answered, or the page went away
+    held.clear()
 
 
 ROUTE = json.loads(ROUTE_TEXT)
@@ -170,6 +186,10 @@ class Path:
         t = (s - self.cum[i]) / ((self.cum[i + 1] - self.cum[i]) or 1.0)
         a, b = self.xy[i], self.xy[i + 1]
         return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+    def xy_of(self, ll):
+        """A (lat, lon) point in this path's local metres."""
+        return (math.radians(ll[1]) * EARTH * self.k, math.radians(ll[0]) * EARTH)
 
     def ll(self, s, dx=0.0, dy=0.0):
         """The point at s along the path, moved dx metres east and dy metres north (to place a fix off the line)."""
@@ -232,17 +252,18 @@ def guidance_page(br, sim=True, init=None):
     """A started app. sim: the simulator page (?sim=1 has no GPS watch). Otherwise the app's real GPS code runs with a GPS that
     never sends a fix. Either way only the fixes a test feeds arrive. init: one more script that runs before the page."""
     ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
-    ctx.route(OSRM_URL, lambda route: release(route, {"code": "NoRoute"}))      # a reroute must never reach the real server
+    block_external(ctx)                                                          # no other host may be asked; EXTERNAL is checked at the end
     pg = ctx.new_page()
     attach(pg)
     pg.add_init_script(CAPTURE_SPEECH)
-    pg.add_init_script(RECORD_OSRM_SIGNALS)                                      # window.__osrmSignals has one entry per reroute request
     if not sim:
         pg.add_init_script(QUIET_GPS)
     if init:
         pg.add_init_script(init)
     pg.goto(BASE + ("?sim=1&reset=1" if sim else "?reset=1"))
     pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.evaluate(COUNT_REROUTES)                                                  # window.__reroutes counts reroute() calls
+    pump_until(pg, lambda: pg.evaluate("() => !!GR || graphErr !== ''"), timeout=10)   # the road map is ready before any fix
     pg.click("#startBtns button")
     pg.wait_for_timeout(800)
     return ctx, pg
@@ -281,56 +302,72 @@ def dom(pg, sel, what="e.textContent.trim()"):
     return pg.evaluate("(s) => { const e = document.querySelector(s); return e ? " + what + " : null; }", sel)
 
 
+NO_ROAD_POINT = """() => {   // the first point on rings around the depot (300 m to 3 km out) with no car road within CFG.snapMax
+    const d = S.route.depot, k = Math.cos(d.lat * D2R);
+    for (let r = 300; r <= 3000; r += 100) for (let a = 0; a < 360; a += 15) {
+      const lat = d.lat + r * Math.cos(a * D2R) / (D2R * R), lon = d.lon + r * Math.sin(a * D2R) / (D2R * R * k);
+      if (!snapG(GR, micro(lat), micro(lon), 'car', CFG.snapMax)) return [+lat.toFixed(6), +lon.toFixed(6)];
+    }
+    return null; }"""
+
+
 def reroute_case(br, mode):
-    """Drive off route on leg 0 with routing.openstreetmap.de held, then finish the scenario.
-    mode 'apply': release the reply with the leg unchanged.
-    mode 'stale': move to leg 1 with the app's own setLeg, release the reply, feed a fix at the start of leg 1.
-    mode 'timeout': shorten the timeout, never reply, see whether the app ends the request."""
+    """Drive off route on leg 0 (real geolocation feed); the app plans a new leg on the device, from graph.json.
+    mode 'apply': the new leg is put in place at once.
+    mode 'stale': graph.json is held, so the plan waits for it; the app moves to leg 1 (its own setLeg), then graph.json is
+    let through and the waiting plan must be dropped; then a fix at the start of leg 1.
+    mode 'nosnap': the off-route point has no road within CFG.snapMax: nothing changes and the banner says why."""
     ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    block_external(ctx)
     held = []
-    ctx.route(OSRM_URL, lambda route: held.append(route))
+    if mode == "stale":
+        ctx.route(GRAPH_URL, lambda route: held.append(route))
     pg = ctx.new_page()
     attach(pg)
-    pg.add_init_script(RECORD_OSRM_SIGNALS)
     pg.goto(BASE + "?reset=1")
     pg.wait_for_selector("#startBtns button", timeout=20000)
+    if mode != "stale":
+        pump_until(pg, lambda: pg.evaluate("() => !!GR"), timeout=10)
+    pg.evaluate(COUNT_REROUTES)
     pg.click("#startBtns button")
     pg.wait_for_timeout(1500)
-    out = {"timeout_cfg": pg.evaluate("() => CFG.rerouteTimeoutMs")}
-    if mode == "timeout":
-        pg.evaluate("() => { CFG.rerouteTimeoutMs = 1500; }")
+    out = {"cfg": pg.evaluate("() => ({osrm: 'osrm' in CFG, timeout: 'rerouteTimeoutMs' in CFG, snapMax: CFG.snapMax})")}
     geom0 = pg.evaluate("() => S.legs[0].geom")
-    far = far_point(geom0)
+    far = pg.evaluate(NO_ROAD_POINT) if mode == "nosnap" else far_point(geom0)
+    out["far"] = far
+    if far is None:
+        ctx.close()
+        return out
     out["min_m"] = round(min(hav_m(far, q) for q in geom0))
     fix = {"latitude": far[0], "longitude": far[1], "accuracy": 5}
     for k in range(4):
         fix["longitude"] += 0.00001
         ctx.set_geolocation(fix)
         pg.wait_for_timeout(450)
-    out["asked"] = pump_until(pg, lambda: len(held) > 0, timeout=10)
-    out["off"] = pg.evaluate("() => S.offRoute")
+    out["asked"] = pump_until(pg, lambda: pg.evaluate("() => window.__reroutes > 0"), timeout=10)
+    out["off"] = pg.evaluate("() => window.__rerouteOff.length > 0 && window.__rerouteOff.every(Boolean)")   # off route at every call
     if not out["asked"]:
+        release_all(held)
         ctx.close()
         return out
     if mode == "apply":
-        release(held[0], osrm_reply(geom0))
         pump_until(pg, lambda: pg.evaluate("() => !!S.override"), timeout=5)
+        out["ends"] = pg.evaluate("() => !!S.override && JSON.stringify(S.override.geom[S.override.geom.length - 1]) === JSON.stringify(S.legs[0].geom[S.legs[0].geom.length - 1])")
     elif mode == "stale":
+        out["waits"] = pg.evaluate("() => GR === null && document.getElementById('bThen').textContent")
         pg.evaluate("() => setLeg(1)")
-        release(held[0], osrm_reply(geom0))
-        pg.wait_for_timeout(1500)                      # time for a wrongly accepted reply to land
+        release_all(held)                              # graph.json goes through now: the plan that waited for it runs
+        out["graph"] = pump_until(pg, lambda: pg.evaluate("() => !!GR"), timeout=10)
+        pg.wait_for_timeout(1000)                      # time for a wrongly accepted plan to land
         leg1 = pg.evaluate("() => S.legs[1].geom[0]")
         ctx.set_geolocation({"latitude": leg1[0], "longitude": leg1[1], "accuracy": 5})
         pg.wait_for_timeout(1500)
     else:
-        out["aborted"] = pump_until(pg, lambda: pg.evaluate("() => !!(__osrmSignals[0] && __osrmSignals[0].aborted)"), timeout=8)
+        out["banner"] = pg.evaluate("() => ({cls: document.getElementById('banner').className, instr: document.getElementById('bInstr').textContent, then: document.getElementById('bThen').textContent})")
+        out["snapped"] = pg.evaluate("(p) => !!snapG(GR, micro(p[0]), micro(p[1]), 'car', CFG.snapMax)", far)
     out.update(pg.evaluate("() => ({override: !!S.override, legIdx: S.legIdx, done: Object.keys(S.done), waiting: S.waiting})"))
     out["leg0_to"] = pg.evaluate("() => S.legs.slice(0, 1).filter(l => l.to.kind === 'stop').map(l => String(l.to.o))")
-    for h in held:                                     # answer every held request, so no handler is left waiting when the context closes
-        try:
-            release(h, {"code": "NoRoute"})
-        except Exception:
-            pass                                       # already answered, or the app ended the request
+    release_all(held)
     ctx.close()
     return out
 
@@ -413,8 +450,9 @@ with sync_playwright() as p:
     ctx.set_offline(False)
     ctx.close()
 
-    # ---------- 2. real geolocation feed (no sim): progress + off route ----------
+    # ---------- 2. real geolocation feed (no sim): progress + off route, rerouted on the device ----------
     ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    block_external(ctx)
     pg = ctx.new_page()
     attach(pg)
     pg.goto(BASE + "?reset=1")
@@ -448,7 +486,8 @@ with sync_playwright() as p:
     t_off = text(pg, "#banner")
     check("off route is detected", "Off route" in t_off or pg.evaluate("() => !!S.override"), t_off.replace("\n", " | "))
     rer = wait_for(pg, lambda: pg.evaluate("() => !!S.override"), timeout=25)
-    check("online reroute builds a new leg", rer)
+    check("reroute builds a new leg on the device (graph.json, no routing server)", rer,
+          json.dumps(pg.evaluate("() => ({graph: !!GR, note: S.rerouteNote, steps: S.override ? S.override.steps.length : 0})")))
     pg.screenshot(path=os.path.join(SHOTS, "09-off-route.png"))
     ctx.close()
 
@@ -473,19 +512,27 @@ with sync_playwright() as p:
     check("zoom buttons sit above the card on a phone", lift)
     ctx.close()
 
-    # ---------- 4. reroute guard (routing.openstreetmap.de is intercepted, never called) ----------
+    # ---------- 4. reroute guards (the plan is made on the device; graph.json is held to make a plan wait) ----------
+    APP_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "index.html"), encoding="utf-8").read()
     r = reroute_case(br, "apply")
-    check("reroute test setup: off-route point is 250 m+ from leg 0, app asks for a new route",
-          r["asked"] and r["off"] and r["min_m"] >= 250, json.dumps(r))
-    check("reroute timeout is 8000 ms", r["timeout_cfg"] == 8000, str(r["timeout_cfg"]))
-    check("a reroute reply for the current leg is applied", r.get("override"), json.dumps(r))
+    check("reroute test setup: off-route point is 250 m+ from leg 0, app plans a new route while off route",
+          r.get("asked") and r.get("off") and r.get("min_m", 0) >= 250, json.dumps(r))
+    check("the app names no routing server and has no request timeout (CFG.osrm and CFG.rerouteTimeoutMs are gone)",
+          r["cfg"]["osrm"] is False and r["cfg"]["timeout"] is False and "routing.openstreetmap.de" not in APP_TEXT, json.dumps(r["cfg"]))
+    check("an offline reroute for the current leg is applied, and the new leg ends where leg 0 ends", r.get("override") and r.get("ends"), json.dumps(r))
     r = reroute_case(br, "stale")
-    check("a late reroute reply is dropped after the leg changed", r["asked"] and r["override"] is False, json.dumps(r))
-    check("late reply leaves the new leg in place", r["legIdx"] == 1 and r["waiting"] is None, json.dumps(r))
-    check("late reply marks no stop reached", set(r["done"]) <= set(r["leg0_to"]), json.dumps(r))
-    r = reroute_case(br, "timeout")
-    check("a reroute request that gets no reply is aborted by the app", r["asked"] and r.get("aborted"), json.dumps(r))
-    check("an aborted reroute changes nothing", r["override"] is False and r["legIdx"] == 0, json.dumps(r))
+    check("a reroute that waited for graph.json is dropped when the leg changed meanwhile",
+          r.get("asked") and r.get("graph") and r.get("waits") == "Loading the road map" and r.get("override") is False, json.dumps(r))
+    check("the dropped plan leaves the new leg in place", r.get("legIdx") == 1 and r.get("waiting") is None, json.dumps(r))
+    check("the dropped plan marks no stop reached", set(r.get("done", ["?"])) <= set(r.get("leg0_to", [])), json.dumps(r))
+    r = reroute_case(br, "nosnap")
+    check("nosnap test setup: a point 300 m+ from the depot with no car road within CFG.snapMax (150 m)",
+          r.get("far") is not None and r.get("snapped") is False and r["cfg"]["snapMax"] == 150, json.dumps(r))
+    check("off route with no road within 490 ft: the reroute is tried, no new leg, leg 0 stays",
+          r.get("asked") and r.get("off") and r.get("override") is False and r.get("legIdx") == 0, json.dumps(r))
+    check("... the arrow stays and the banner says why in plain words",
+          "off" in r.get("banner", {}).get("cls", "").split() and r["banner"]["then"] == "No road within 490 ft. Follow the arrow."
+          and r["banner"]["instr"].startswith("Off route. Head "), json.dumps(r.get("banner")))
 
     # ---------- 5. U-turn words, Finish button, damaged saved leg ----------
     ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
@@ -1059,12 +1106,14 @@ with sync_playwright() as p:
     check("50 m from the route with a 55 m fix is not off route", r["off"] is False and r["cnt"] == 0, json.dumps(r))
     for _ in range(4):
         feed(pg, side, acc=10, speed=5)
-    r = pg.evaluate("() => ({off: S.offRoute, cnt: S.offCnt})")
-    check("50 m from the route with a 10 m fix is off route", r["off"] is True, json.dumps(r))
+    # off route sets S.offRoute and calls reroute(); where a road is near, the new leg is in place at once and S.offRoute is
+    # false again, so "was off route" is S.offRoute or a reroute() call made while off route
+    r = pg.evaluate("() => ({off: S.offRoute, cnt: S.offCnt, rerouted: window.__rerouteOff.some(Boolean), override: !!S.override})")
+    check("50 m from the route with a 10 m fix is off route", r["off"] is True or (r["rerouted"] and r["override"]), json.dumps(r))
     ctx.close()
 
     # ---------- 19. the off-route arrow keeps its frame when the heading drops out ----------
-    far = far_point(legs[0]["geom"])
+    # The fixes are where no road is within CFG.snapMax: the reroute finds none, so the off-route arrow stays.
 
     def arrow(pg):
         return pg.evaluate("""() => { const a = document.getElementById('bArrow'), g = a.querySelector('g'), t = a.querySelector('text');
@@ -1072,6 +1121,7 @@ with sync_playwright() as p:
             return {rot: m ? Number(m[1]) : null, label: t ? t.textContent : null, off: S.offRoute}; }""")
 
     ctx, pg = guidance_page(br)
+    far = pg.evaluate(NO_ROAD_POINT)
     pg.evaluate("() => setLeg(0)")
     feed(pg, legs[0]["geom"][0])
     for k in range(4):
@@ -1223,7 +1273,7 @@ with sync_playwright() as p:
     check("60 m from the parking spot and still waiting: no off-route count", r["off"] is False and r["cnt"] == 0 and r["spoken"] == 0, json.dumps(r))
     for _ in range(5):
         feed(pg, farp, speed=1)
-    r = pg.evaluate("() => ({off: S.offRoute, cnt: S.offCnt, waiting: S.waiting, spoken: window.__spoken.filter(x => x === 'Off route.').length, calls: window.__osrmSignals.length})")
+    r = pg.evaluate("() => ({off: S.offRoute, cnt: S.offCnt, waiting: S.waiting, spoken: window.__spoken.filter(x => x === 'Off route.').length, calls: window.__reroutes})")
     check("100 m from the parking spot at 1 m/s (a walker) and still waiting: no off-route count, no cue, no reroute request",
           r["off"] is False and r["cnt"] == 0 and r["waiting"] == "park" and r["spoken"] == 0 and r["calls"] == 0, json.dumps(r))
     ctx.close()
@@ -1254,7 +1304,7 @@ with sync_playwright() as p:
                 resumed = hav_m(ll, meter)
                 break
             s += 8
-        r = pg.evaluate("() => ({waiting: S.waiting, leg: S.legIdx, passed: Object.keys(S.passed), off: S.offRoute, spoken: window.__spoken, calls: window.__osrmSignals.length})")
+        r = pg.evaluate("() => ({waiting: S.waiting, leg: S.legIdx, passed: Object.keys(S.passed), off: S.offRoute, spoken: window.__spoken, calls: window.__reroutes})")
         check("walk-in stop %d test setup: the meter is reached on a walk leg and waits for Done; the car leg, then the drive to stop %d follow" % (o, nxt_o),
               legs[iw]["mode"] == "walk" and legs[iw + 1]["to"]["kind"] == "car" and w0["waiting"] == "stop" and w0["leg"] == iw, json.dumps(w0))
         check("walk-in stop %d: walking back to the car at 1.4 m/s without Done keeps the wait at the meter" % o,
@@ -1279,7 +1329,7 @@ with sync_playwright() as p:
     pg.evaluate("() => { window.__spoken = []; }")
     for d in range(10, int(Qf.total), 20):
         feed(pg, Qf.ll(d), speed=8)
-    r = pg.evaluate("() => ({waiting: S.waiting, off: S.offRoute, cnt: S.offCnt, calls: window.__osrmSignals.length, spoken: window.__spoken.filter(x => x === 'Off route.').length})")
+    r = pg.evaluate("() => ({waiting: S.waiting, off: S.offRoute, cnt: S.offCnt, calls: window.__reroutes, spoken: window.__spoken.filter(x => x === 'Off route.').length})")
     far_end = hav_m(Qf.ll(Qf.total - 10), end_d)
     check("after Finish, driving %.0f m away at 8 m/s: no Off route. and no reroute request" % far_end,
           far_end > 200 and r["waiting"] == "finish" and r["off"] is False and r["cnt"] == 0 and r["calls"] == 0 and r["spoken"] == 0, json.dumps(r))
@@ -1650,7 +1700,7 @@ with sync_playwright() as p:
           json.dumps([r0, r]))
     ctx.close()
 
-    # f. the app page opens at once from the saved copy (stale while revalidate); version -3; every save inside e.waitUntil
+    # f. the app page opens at once from the saved copy (stale while revalidate); version 2026.10.01-1; every save inside e.waitUntil
     SW_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sw.js"), encoding="utf-8").read()
     puts = [ln.strip() for ln in SW_TEXT.splitlines() if "cache.put(" in ln]
     check("sw.js: every cache.put runs inside e.waitUntil", bool(puts) and all("e.waitUntil(" in ln for ln in puts), " | ".join(puts))
@@ -1664,7 +1714,7 @@ with sync_playwright() as p:
     sw_controls(pg)
     wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
     v = pg.evaluate("async () => ({app: APP_VERSION, caches: (await caches.keys()).filter(k => k.startsWith('amr-nav-'))})")
-    check("app version 2026.09.30-3 and one worker cache, amr-nav-2026.09.30-3", v["app"] == "2026.09.30-3" and v["caches"] == ["amr-nav-2026.09.30-3"], json.dumps(v))
+    check("app version 2026.10.01-1 and one worker cache, amr-nav-2026.10.01-1", v["app"] == "2026.10.01-1" and v["caches"] == ["amr-nav-2026.10.01-1"], json.dumps(v))
     hold["on"] = True
     pg.goto("about:blank")
     t0 = time.time()
@@ -1828,15 +1878,17 @@ with sync_playwright() as p:
     check("the layer button follows streetShown() too", r is True, str(r))
     ctx.close()
 
-    # l. a reroute reply that comes after the driver is back on the route is dropped
+    # l. a reroute that waited for the road map (graph.json held) is dropped when the driver is back on the route by then
     ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    block_external(ctx)
     held = []
-    ctx.route(OSRM_URL, lambda route: held.append(route))
+    ctx.route(GRAPH_URL, lambda route: held.append(route))
     pg = ctx.new_page()
     attach(pg)
     pg.add_init_script(CAPTURE_SPEECH)
     pg.goto(BASE + "?sim=1&reset=1")
     pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.evaluate(COUNT_REROUTES)
     pg.click("#startBtns button")
     pg.wait_for_timeout(800)
     P0 = Path(legs[0]["geom"])
@@ -1844,22 +1896,17 @@ with sync_playwright() as p:
     feed(pg, P0.ll(0))
     for k in range(3):
         feed(pg, [far0[0], far0[1] + 0.00001 * k], speed=8)
-    asked = pump_until(pg, lambda: len(held) > 0, timeout=8)
+    asked = pg.evaluate("() => window.__reroutes > 0 && GR === null && S.rerouteNote === 'Loading the road map'")
     was_off = pg.evaluate("() => S.offRoute")
-    feed(pg, P0.ll(100), speed=8)                        # back on the route before the reply comes
+    feed(pg, P0.ll(100), speed=8)                        # back on the route before the road map is ready
     back = pg.evaluate("() => !S.offRoute")
     pg.evaluate("() => { window.__spoken = []; }")
-    if held:
-        release(held[0], osrm_reply(legs[0]["geom"]))
+    release_all(held)
+    loaded = pump_until(pg, lambda: pg.evaluate("() => !!GR"), timeout=10)
     pg.wait_for_timeout(1000)
     r = pg.evaluate("() => ({override: !!S.override, spoken: window.__spoken})")
-    check("a reroute reply that comes after the driver is back on the route is dropped: no new leg, no Route updated.",
-          asked and was_off and back and r["override"] is False and "Route updated." not in r["spoken"], json.dumps([asked, was_off, back, r]))
-    for h in held[1:]:
-        try:
-            release(h, {"code": "NoRoute"})
-        except Exception:
-            pass
+    check("a reroute that waited for the road map is dropped when the driver is back on the route by then: no new leg, no Route updated.",
+          asked and was_off and back and loaded and r["override"] is False and "Route updated." not in r["spoken"], json.dumps([asked, was_off, back, loaded, r]))
     ctx.close()
 
     # m. a speed worked out from two fixes counts only when both fixes are 20 m or better
@@ -1884,6 +1931,259 @@ with sync_playwright() as p:
     r2 = state_of(pg)
     check("... and two fast fixes measured from good fixes: the guide goes on", r2["waiting"] is None and r2["passed"] == ["7"], json.dumps(r2))
     ctx.close()
+
+    # ---------- 26. rerouting with no network at all: a drive on the installed app, the router, and its speed ----------
+    GRAPH_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "graph.json"), encoding="utf-8").read()
+    GRAPH_HEAD = json.loads(GRAPH_TEXT)
+    STEP_TYPES = {"depart", "turn", "new name", "continue", "end of road", "offpath", "arrive"}
+    STEP_MODS = {"", "straight", "slight left", "slight right", "left", "right", "sharp left", "sharp right", "uturn"}
+    legs = ROUTE["legs"]
+
+    def off_route_point(i, lo, hi, end_min, modes):
+        """A vertex of another leg of the given modes (so it lies on a road or path), lo to hi m from leg i and end_min m or
+        more from the end of leg i: the one nearest the middle of that band. Returns (point, distance) or (None, None)."""
+        P = Path(legs[i]["geom"])
+        end = legs[i]["geom"][-1]
+        best = None
+        for j, l in enumerate(legs):
+            if j == i or l["mode"] not in modes:
+                continue
+            for q in l["geom"]:
+                d = P.nearest(P.xy_of(q))[0]
+                if lo <= d <= hi and hav_m(q, end) >= end_min:
+                    key = (abs(d - (lo + hi) / 2), j, q[0], q[1])
+                    if best is None or key < best[0]:
+                        best = (key, q, d)
+        return (best[1], best[2]) if best else (None, None)
+
+    def fix_state(pg, ll, speed, heading=None):
+        """Hand one good fix to onFix and return what the guide made of it."""
+        return pg.evaluate("""(a) => { onFix({lat: a[0], lon: a[1], acc: 5, speed: a[2], heading: a[3], t: Date.now()});
+            return {off: S.offRoute, d: S.nav ? S.nav.off : null, leg: S.legIdx, waiting: S.waiting}; }""", [ll[0], ll[1], speed, heading])
+
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    pg = ctx.new_page()
+    attach(pg)
+    pg.add_init_script(CAPTURE_SPEECH)
+    pg.add_init_script(QUIET_GPS)
+    pg.goto(BASE + "?reset=1")                           # online once: the worker installs and saves the app, the route and graph.json
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    sw = sw_controls(pg)
+    ready = wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
+    cached = pg.evaluate("async () => { const r = await caches.match('graph.json'); return r ? (await r.text()).length : 0; }")
+    check("offline drive setup: the worker controls the page, the start screen says Offline ready., and the worker holds all of graph.json",
+          sw and ready and cached == len(GRAPH_TEXT), "saved %s of %d characters" % (cached, len(GRAPH_TEXT)))
+    ext = []                                             # every request to a host other than 127.0.0.1 from here on
+    ctx.on("request", lambda req: ext.append(req.url) if not is_local(req.url) else None)
+    block_external(ctx, ext)
+    ctx.set_offline(True)                                # and no network at all for the test server either
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    got = pump_until(pg, lambda: pg.evaluate("() => !!GR || graphErr !== ''"), timeout=10)
+    st = pg.evaluate("() => ({online: navigator.onLine, n: GR && GR.n, m: GR && GR.m, ms: GR && GR.ms, err: graphErr, start: document.getElementById('startBody').textContent})")
+    check("offline: the app opens from the worker's cache and decodes the road map with no network",
+          got and st["online"] is False and st["n"] == GRAPH_HEAD["n"] and st["m"] == GRAPH_HEAD["m"] and "43 stops" in st["start"], json.dumps(st)[:300])
+    pg.evaluate(COUNT_REROUTES)
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(500)
+
+    # a. off route on two drive legs and one walk leg; each time a new leg to the same end, then drive or walk it to the end
+    for i, mode in ((0, "drive"), (21, "drive"), (12, "walk")):
+        leg = legs[i]
+        lo, hi, end_min, v, step, modes = (80, 250, 200, 10, 25, ("drive",)) if mode == "drive" else (40, 120, 80, 1.4, 5, ("drive", "walk"))
+        off, d_off = off_route_point(i, lo, hi, end_min, modes)
+        check("offline drive, leg %d: a %s leg (to %s %s), and an off-route point on another leg's road %d to %d m from it" % (i, mode, leg["to"]["kind"], leg["to"].get("o", ""), lo, hi),
+              leg["mode"] == mode and off is not None, "point %s, %s m from the leg" % (off, d_off and round(d_off)))
+        if off is None:
+            continue
+        P = Path(leg["geom"])
+        # S.lastReroute = 0: more than CFG.rerouteGapMs (20 s) has passed since the reroute on the leg before
+        pg.evaluate("(i) => { S.fix = null; setLeg(i); S.lastReroute = 0; window.__spoken = []; }", i)
+        s0 = min(30.0, P.total / 3)
+        fix_state(pg, P.ll(s0), v, P.bearing(s0))
+        for k in range(4):                               # CFG.offFixes (3) fixes off the leg make it off route
+            fix_state(pg, [off[0], off[1] + 0.000004 * k], v)
+        r = pg.evaluate("""(i) => { const o = S.override, base = S.legs[i];
+            if (!o) return {override: false, note: S.rerouteNote, off: S.offRoute};
+            const rt = prepLeg(o);
+            return {override: true, geom: o.geom, baseEnd: base.geom[base.geom.length - 1], sameTo: o.to === base.to, mode: o.mode, dist: o.dist,
+              types: o.steps.map(s => s.type), mods: o.steps.map(s => s.mod), words: o.steps.map(s => s.type === 'arrive' ? 'arrive' : instr(s, o.mode)),
+              along: rt.steps.map(s => s.along), onLine: Math.max(...rt.steps.map(s => project(rt, s.loc).d)), offRoute: S.offRoute,
+              cls: document.getElementById('banner').className, instr: document.getElementById('bInstr').textContent, spoken: window.__spoken}; }""", i)
+        if not r["override"]:
+            check("offline drive, leg %d: off route, a new leg is planned on the device" % i, False, json.dumps(r))
+            continue
+        end_ok = r["geom"][-1] == r["baseEnd"] == leg["geom"][-1]
+        straight = hav_m(off, leg["geom"][-1])
+        check("offline drive, leg %d: off route %.0f m from the leg, the device plans a new %s leg that ends at the leg's own end" % (i, d_off, mode),
+              end_ok and r["sameTo"] and r["mode"] == mode and r["dist"] >= straight - 1,
+              "%d points, %.0f m (straight line %.0f m), %d steps" % (len(r["geom"]), r["dist"], straight, len(r["types"])))
+        moves = [a for t, a in zip(r["types"], r["along"]) if t not in ("depart", "arrive", "offpath")]
+        gaps = [b - a for a, b in zip(moves, moves[1:])]
+        bad_words = [w for w in r["words"] if not w or "undefined" in w or "null" in w or "  " in w]
+        check("offline drive, leg %d: sensible steps: depart first, arrive last, known types and turns, plain words, maneuvers 15 m or more apart, every step on the line" % i,
+              r["types"][0] == "depart" and r["types"][-1] == "arrive" and r["types"].count("arrive") == 1 and set(r["types"]) <= STEP_TYPES
+              and set(r["mods"]) <= STEP_MODS and not bad_words and (not gaps or min(gaps) >= 14.9) and r["onLine"] <= 1.0,
+              " | ".join(r["words"]))
+        pg.wait_for_timeout(700)                         # the map pans to the position in 0.5 s
+        pg.screenshot(path=os.path.join(SHOTS, "26-offline-reroute-leg%02d.png" % i))
+        check("offline drive, leg %d: the banner leaves the off-route display and the guide says Route updated." % i,
+              not r["offRoute"] and "off" not in r["cls"].split() and "Off route" not in r["instr"] and "Route updated." in r["spoken"],
+              "%s | %s" % (r["instr"], json.dumps(r["spoken"][-3:])))
+        Q = Path(r["geom"])
+        s, worst, offs, last = 0.0, 0.0, 0, None
+        while s <= Q.total + step:
+            last = fix_state(pg, Q.ll(min(s, Q.total)), v, Q.bearing(min(s, Q.total)))
+            if last["leg"] != i or last["waiting"]:
+                break
+            worst = max(worst, last["d"] or 0)
+            offs += 1 if last["off"] else 0
+            s += step
+        check("offline drive, leg %d: following the new leg stays on it (never off route) and arrives at its end" % i,
+              offs == 0 and worst <= 5 and last is not None and (last["leg"] != i or last["waiting"] is not None),
+              "largest distance from the line %.1f m, end state %s" % (worst, json.dumps(last)))
+    check("offline drive: no request to any host but 127.0.0.1, and the browser was offline", not ext and pg.evaluate("() => !navigator.onLine"),
+          " ".join(ext[:5]))
+
+    # b. the router on its own: every pair of consecutive park points, a one-way street, a footway
+    PP = [("depot", [ROUTE["depot"]["lat"], ROUTE["depot"]["lon"]])] + [(s["o"], s.get("park") or [s["lat"], s["lon"]]) for s in ROUTE["stops"]]
+    PP.append(PP[0])
+    pairs = []
+    for k in range(len(PP) - 1):
+        o = PP[k + 1][0]
+        li_ = len(legs) - 1 if o == "depot" else next(j for j, l in enumerate(legs) if l["mode"] == "drive" and l["to"].get("o") == o)
+        pairs.append([PP[k][1], PP[k + 1][1], li_])
+    res = pg.evaluate("""(pairs) => pairs.map(([a, b, i]) => { const r = routeG(GR, a, b, 'car');
+        if (r.fail) return {i, fail: r.fail};
+        const wrong = r.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & (y > x ? F_FWD : F_BWD))).length;
+        return {i, length: r.length, wrong}; })""", pairs)
+    EXPLAINED = {38: "leg 38: the stop 31 park point is on a footpath (highway=path, access=permissive) that OSRM drove; "
+                     "the car route ends on Southeast Forest Way 45.8 m away (offline-graph-validation.txt)"}
+    bad, ratios = [], []
+    for x in res:
+        dist = legs[x["i"]]["dist"]
+        if "fail" in x or x["wrong"]:
+            bad.append(json.dumps(x))
+            continue
+        if dist >= 1:
+            ratio = x["length"] / dist
+            ratios.append(ratio)
+            if ratio > 1.35 or (ratio < 0.75 and x["i"] not in EXPLAINED):
+                bad.append("leg %d ratio %.2f" % (x["i"], ratio))
+        elif x["length"] > 10:
+            bad.append("leg %d: %.1f m for a 0 m leg" % (x["i"], x["length"]))
+    check("router: a car route joins every pair of consecutive park points (depot, stops 1 to 43, depot), never drives an edge against its one-way flag, "
+          "and is at most 1.35 times the route.json leg (and 0.75 or more, except the leg the validation report explains)",
+          len(res) == 44 and not bad, "%d routes, ratio %.2f to %.2f; %s; explained: %s" % (len(res), min(ratios), max(ratios), "; ".join(bad[:4]) or "none bad",
+                                                                                             "; ".join("%s (%.2f)" % (EXPLAINED[x["i"]], x["length"] / legs[x["i"]]["dist"]) for x in res if x["i"] in EXPLAINED and "length" in x)))
+    one = pg.evaluate("""() => {
+        const cand = [];
+        for (let e = 0; e < GR.m; e++) { const f = GR.fl[e]; if (((f & 3) === F_FWD || (f & 3) === F_BWD) && !(f & (F_RESTRICT | F_NOSNAP)) && GR.names[GR.en[e]] && GR.el[e] >= 80) cand.push(e); }
+        cand.sort((a, b) => GR.el[b] - GR.el[a] || a - b);
+        const at = (e, frac) => { const p = piecePts(GR, e, 0, GR.el[e] * frac).pop(); return [+(p[0] * 1e-6).toFixed(6), +(p[1] * 1e-6).toFixed(6)]; };
+        const wrong = r => r.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & (y > x ? F_FWD : F_BWD))).length;
+        for (const e of cand) {
+          const a = at(e, 0.2), b = at(e, 0.8), fwd = (GR.fl[e] & 3) === F_FWD;
+          const w = fwd ? routeG(GR, a, b, 'car') : routeG(GR, b, a, 'car'), x = fwd ? routeG(GR, b, a, 'car') : routeG(GR, a, b, 'car');
+          if (w.fail || x.fail) continue;
+          return {e, name: GR.names[GR.en[e]], el: GR.el[e], withPieces: w.pieces.length, withEdge: w.pieces[0][0], withLen: w.length,
+                  againstLen: x.length, againstOnIt: x.pieces.filter(([i, p, q]) => i === e && (fwd ? q < p : q > p)).length, wrongAgainst: wrong(x), wrongWith: wrong(w)};
+        }
+        return null; }""")
+    check("router: a one-way street (the longest named one-way edge in graph.json) is driven with its flow and never against it",
+          one is not None and one["withPieces"] == 1 and one["withEdge"] == one["e"] and one["againstOnIt"] == 0 and one["wrongAgainst"] == 0
+          and one["wrongWith"] == 0 and one["againstLen"] > one["withLen"] + 50, json.dumps(one))
+    walk_legs = [i for i, l in enumerate(legs) if l["mode"] == "walk" and l["dist"] > 50]
+    foot = pg.evaluate("""(idx) => idx.map(i => { const l = S.legs[i], a = l.geom[0], b = l.geom[l.geom.length - 1];
+        const f = routeG(GR, a, b, 'foot'), c = routeG(GR, a, b, 'car');
+        if (f.fail) return {i, fail: f.fail};
+        const only = f.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & 3));
+        return {i, to: l.to.o, foot: f.length, car: c.fail ? null : c.length, onlyM: only.reduce((s, [e, x, y]) => s + Math.abs(y - x), 0),
+                kinds: [...new Set(only.map(([e]) => GR.cl[e]))],
+                footBad: f.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & F_FOOT)).length,
+                carBad: c.fail ? 0 : c.pieces.filter(([e, x, y]) => y !== x && !(GR.fl[e] & 3)).length}; })""", walk_legs)
+    classes = GRAPH_HEAD["classes"]
+    uses = [x for x in foot if "fail" not in x and x["onlyM"] >= 20 and (x["car"] is None or x["car"] > 1.1 * x["foot"])]
+    check("router: every walk leg routes on foot over walkable edges only, and no car route uses an edge that cars may not use",
+          all("fail" not in x and x["footBad"] == 0 and x["carBad"] == 0 for x in foot), json.dumps(foot)[:400])
+    check("router: on foot the route takes footways where a car cannot go (the car has no route between the same points, or one over 1.1 times longer)",
+          bool(uses), "; ".join("walk leg %d to stop %s: %.0f m of %s, foot %.0f m, car %s m" % (x["i"], x["to"], x["onlyM"], "/".join(classes[k] for k in x["kinds"]), x["foot"],
+                                                                                                 "none" if x["car"] is None else "%.0f" % x["car"]) for x in uses))
+
+    # c. speed: 50 reroutes from random points within 300 m of random legs; the graph decode
+    rng = random.Random(20261001)
+    trips = []
+    for _ in range(50):
+        i = rng.choice([j for j, l in enumerate(legs) if l["dist"] > 0])
+        Pr = Path(legs[i]["geom"])
+        ang, dd = rng.random() * 2 * math.pi, rng.random() * 300
+        trips.append([i, Pr.ll(rng.random() * Pr.total, dd * math.sin(ang), dd * math.cos(ang))])
+    perf = pg.evaluate("""(trips) => trips.map(([i, p]) => { const t0 = performance.now(), r = planLeg(p, S.legs[i]);
+        if (r.leg) prepLeg(r.leg);
+        return {ms: performance.now() - t0, ok: !!r.leg, fail: r.fail || ''}; })""", trips)
+    ms = sorted(x["ms"] for x in perf)
+    p95 = ms[math.ceil(0.95 * len(ms)) - 1]
+    n_ok = sum(1 for x in perf if x["ok"])
+    check("speed: 50 reroutes (snap, A*, steps, prepLeg) from random points within 300 m of random legs, p95 under 150 ms",
+          len(ms) == 50 and p95 < 150, "p95 %.1f ms, median %.1f ms, max %.1f ms; %d planned, %d not (%s)" % (
+              p95, ms[len(ms) // 2], ms[-1], n_ok, 50 - n_ok, "; ".join(sorted({x["fail"] for x in perf if not x["ok"]}))))
+    dec = pg.evaluate("""async () => { const txt = await (await caches.match('graph.json')).text(), out = [];
+        for (let k = 0; k < 5; k++) { const t0 = performance.now(); decodeGraph(JSON.parse(txt)); out.push(performance.now() - t0); }
+        return {load: GR.ms, again: out}; }""")
+    check("speed: graph.json parse and decode under 150 ms (at app start, and 5 more times)", dec["load"] < 150 and max(dec["again"]) < 150,
+          "at start %.1f ms, again %s ms" % (dec["load"], ", ".join("%.1f" % x for x in dec["again"])))
+    PERF = {"p95": p95, "decode": dec["load"]}
+    ctx.set_offline(False)
+    ctx.close()
+
+    # ---------- 27. a damaged graph.json is never saved; with no road map the banner says rerouting cannot run ----------
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    block_external(ctx)
+    gstate = {"cut": False, "seen": 0}
+
+    def graph_handler(route):
+        if not gstate["cut"]:
+            route.continue_()
+            return
+        gstate["seen"] += 1
+        route.fulfill(status=200, content_type="application/json", body=route.fetch().text()[:20000])
+
+    ctx.route(GRAPH_URL, graph_handler)
+    pg = ctx.new_page()
+    attach(pg)
+    pg.add_init_script(QUIET_GPS)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    sw_controls(pg)
+    wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
+    gstate["cut"] = True                                 # from now on the server sends the first 20000 characters of graph.json
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pump_until(pg, lambda: gstate["seen"] > 0, timeout=8)
+    pg.wait_for_timeout(1000)                            # time for a wrongly saved copy to land
+    r = pg.evaluate("async () => { const c = await caches.match('graph.json'); return {cached: c ? (await c.text()).length : 0, graph: !!GR}; }")
+    check("a damaged graph.json reply is not saved: the worker keeps the whole graph, and the page runs on it",
+          gstate["seen"] > 0 and r["cached"] == len(GRAPH_TEXT) and r["graph"], json.dumps(r))
+    pg.evaluate("async () => { for (const k of await caches.keys()) { const c = await caches.open(k); await c.delete('graph.json'); } }")
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pump_until(pg, lambda: pg.evaluate("() => graphErr !== ''"), timeout=8)
+    pump_until(pg, lambda: "Not offline ready" in text(pg, "#startBody"), timeout=8)
+    st = pg.evaluate("async () => ({graph: !!GR, err: graphErr, cached: !!(await caches.match('graph.json')), line: document.getElementById('offlineLine').textContent})")
+    check("no saved graph and a damaged reply: no road map on the page, nothing saved, and the start screen is not Offline ready.",
+          st["graph"] is False and st["err"] != "" and st["cached"] is False and st["line"] == "Not offline ready yet. Keep this page open online for a minute.", json.dumps(st))
+    pg.evaluate(COUNT_REROUTES)
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(500)
+    feed(pg, legs[0]["geom"][0])
+    far = far_point(legs[0]["geom"])
+    for k in range(3):
+        feed(pg, [far[0], far[1] + 0.00001 * k], speed=8)
+    b = pg.evaluate("() => ({cls: document.getElementById('banner').className, then: document.getElementById('bThen').textContent, override: !!S.override, calls: window.__reroutes})")
+    check("off route with no road map: the reroute is tried, no new leg, the arrow stays, and the banner says The road map did not load. Follow the arrow.",
+          b["calls"] >= 1 and "off" in b["cls"].split() and b["then"] == "The road map did not load. Follow the arrow." and b["override"] is False, json.dumps(b))
+    ctx.close()
+    check("no guidance page asked a host other than 127.0.0.1", not EXTERNAL, " ".join(EXTERNAL[:5]))
     br.close()
 
 errs = [e for e in errors if "favicon" not in e]

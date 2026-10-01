@@ -180,7 +180,7 @@ button{font:inherit;cursor:pointer}
 
 <script>
 'use strict';
-const APP_VERSION = '2026.09.30-3';
+const APP_VERSION = '2026.10.01-1';
 const CFG = {
   arrive: {drive: 45, walk: 15},     // m: arrival radius at the end of a leg
   off: {drive: 45, walk: 25},        // m: off-route distance
@@ -196,13 +196,16 @@ const CFG = {
   speedBaseMs: 10000,                // ms: a speed worked out from two fixes is measured over at least this long (a GPS step of 5 to 15 m must not read as driving)
   derivedSpeedMaxAcc: 20,            // m: a speed worked out from two fixes counts only when both fixes are this good or better
   leaveFixes: 2,                     // consecutive fixes that must show the vehicle driving away before the guide goes on
-  rerouteGapMs: 20000,
-  rerouteTimeoutMs: 8000,            // ms: give up on a reroute request after this long
+  rerouteGapMs: 20000,               // ms: while off route, plan a new route at most once in this time
+  snapMax: 150,                      // m: a new route starts and ends on the nearest road (or path) within this distance
+  lead: {drive: 20, walk: 10},       // m: farther than this from the road, the new route starts with a straight line from the position to it
+  mergeM: 15,                        // m: two maneuvers closer than this along the new route become one
+  turnDeg: 30,                       // degrees: at a junction, a bend larger than this is a turn
+  walkSpm: 0.8,                      // s per m on foot (about 2.8 mph), for the time on the card
+  gapSpm: 0.36,                      // s per m by car off the road map (6 mph)
   skipConfirmMs: 4000,               // ms: the second tap on Skip, or on a button that clears progress, must come within this time of the first
   wakeRetryMs: 10000,                // ms: after the system drops the screen lock, ask again at most once in this time
   zoom: {drive: 17, walk: 18},
-  osrm: {drive: 'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
-         walk: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/'},
   simSpeed: {drive: 11, walk: 1.4},  // m/s at 1x
 };
 const LSK = 'amrNav.v1.';
@@ -224,6 +227,7 @@ const S = {
   follow: true, voice: lsGet('voice', true), tiles: lsGet('tiles', false),
   started: false, fix: null, fixAt: 0, recent: [], leaveCnt: 0, blocked: false, lastHeading: null, offCnt: 0, offRoute: false, lastReroute: 0,   // fixAt: when the newest fix arrived (ms); recent: earlier good fixes a speed is measured from; leaveCnt: fixes in a row that show the vehicle leaving a waiting stop
   rt: null, lastAlong: 0, announced: {}, arrivedLeg: -1, waiting: null,   // lastAlong: distance along the leg at the last good match (m)
+  rerouteNote: '',                              // off route: what the banner says about the new route ('' = one is being found)
   sim: null, wake: null,
 };
 let rerouteSeq = 0;   // numbers reroute requests; setLeg() bumps it so a late reply for an old leg is dropped
@@ -542,7 +546,7 @@ function nextOpenLeg(i) {
 function nextOpenLegAfterStop(o) { return nextOpenLeg(lastLegOfStop(o)); }   // past the stop's walk legs, to the next drive
 function setLeg(i, why) {
   S.legIdx = Math.max(0, Math.min(S.legs.length - 1, i));
-  S.override = null; S.rt = prepLeg(S.legs[S.legIdx]); S.lastAlong = 0; S.nav = null; S.announced = {}; S.offCnt = 0; S.offRoute = false;
+  S.override = null; S.rt = prepLeg(S.legs[S.legIdx]); S.lastAlong = 0; S.nav = null; S.announced = {}; S.offCnt = 0; S.offRoute = false; S.rerouteNote = '';
   S.arrivedLeg = -1; S.waiting = null; S.leaveCnt = 0; rerouteSeq++; disarm('skip');
   if (S.finished) { S.finished = false; lsSet('finished', false); }   // a finished drive goes on (Go from the list): it is no longer finished
   lsSet('leg', S.legIdx); lsSet('done', S.done); lsSet('skipped', S.skipped); lsSet('passed', S.passed);
@@ -657,7 +661,7 @@ function renderBanner() {
       (held == null ? '<text x="47" y="10" text-anchor="end" font-size="11" font-weight="700" font-family="sans-serif" fill="#fff">N</text>' : '') + '</svg>';
     $('bDist').textContent = fmtDist(d);
     $('bInstr').textContent = 'Off route. Head ' + compass(brg) + ' to ' + (st ? 'stop ' + st.o : 'the finish');
-    $('bThen').textContent = navigator.onLine ? 'Rerouting when possible' : 'Offline: follow the arrow';
+    $('bThen').textContent = S.rerouteNote || 'Finding a new route';
     return;
   }
   const s = nav.step;
@@ -784,8 +788,10 @@ function onFix(f, quiet) {
   if (!S.waiting && pr.d > Math.max(CFG.off[mode], acc)) S.offCnt++; else S.offCnt = 0;
   const wasOff = S.offRoute;
   S.offRoute = S.offCnt >= CFG.offFixes;
-  if (S.offRoute && !wasOff) { speak('Off route.', true); reroute(); }
-  else if (S.offRoute && Date.now() - S.lastReroute > CFG.rerouteGapMs) reroute();
+  if (S.offRoute && !wasOff) { S.rerouteNote = ''; speak('Off route.', true); }
+  // reroute() plans on this device and at most once per CFG.rerouteGapMs; when it puts a new leg in place it has already run
+  // this fix again on that leg (and drawn the banner), so nothing below may use the old leg
+  if (S.offRoute && reroute()) return;
   // voice prompts, only while this fix is on the leg: from far away (after a jump, or before the off-route count is reached)
   // the next maneuver of the line is not the driver's next maneuver
   if (!S.offRoute && !S.waiting && step && pr.d <= CFG.off[mode]) {
@@ -866,38 +872,409 @@ function checkFixAge() {
 }
 setInterval(checkFixAge, 2000);
 
-/* ---------- reroute (online only) ---------- */
-function legFromOsrm(o, mode) {
-  const geom = [], steps = [];
-  o.steps.forEach(st => {
-    let g = st.geometry.coordinates.map(c => [+c[1].toFixed(6), +c[0].toFixed(6)]);
-    if (geom.length && g.length && geom[geom.length - 1][0] === g[0][0] && geom[geom.length - 1][1] === g[0][1]) g = g.slice(1);
-    geom.push(...g);
-    const mv = st.maneuver;
-    steps.push({type: mv.type, mod: mv.modifier || '', exit: mv.exit, name: st.name || '', ref: st.ref || '', loc: [mv.location[1], mv.location[0]], ba: mv.bearing_after, dist: st.distance, dur: st.duration});
-  });
-  return {mode, dist: o.distance, dur: o.duration, geom: geom.length ? geom : [[0, 0]], steps};
+/* ---------- offline road map (graph.json) ---------- */
+/* graph.json ("amr-graph-1") is built by build_graph.py in the sensus-amr-read-cycle skill (scripts/route-guide). Its docstring is
+   the file format and the router rules, and its Graph.route() is the reference that snapG() and routeG() follow step for step.
+   Coordinates are integer micro-degrees (degrees x 1e6). Edge flags: 1 a car may drive start->end, 2 end->start, 4 a walker may
+   use it, 8 restricted for cars (private and similar), 16 a car route may not start or end on it. */
+const GRAPH_FORMAT = 'amr-graph-1';
+const KM = 6371008.8 * Math.PI / 180;                 // meters per degree on the mean sphere
+const F_FWD = 1, F_BWD = 2, F_FOOT = 4, F_RESTRICT = 8, F_NOSNAP = 16;
+const GCELL = 500;                                    // grid cell, micro-degrees (about 55 m north-south, 38 m east-west here)
+let GR = null, graphErr = '', graphReady = null;      // the decoded graph (null while it loads, or when it is missing or damaged), why it is not there, its load
+let rerouteErr = '';                                  // the last fault inside the planner, if any (kept for a look in the browser console)
+function micro(x) { const v = x * 1e6; return v >= 0 ? Math.floor(v + 0.5) : -Math.floor(-v + 0.5); }   // degrees -> micro-degrees, half away from zero
+/* graph.json -> typed arrays, the edges of every node, and a grid of polyline segments. Throws on a file that does not fit. */
+function decodeGraph(g) {
+  const fits = (a, k) => Array.isArray(a) && a.length === k;
+  if (!g || g.format !== GRAPH_FORMAT) throw new Error('graph.json is not ' + GRAPH_FORMAT);
+  const n = g.n, m = g.m;
+  if (!(n > 0 && m > 0 && fits(g.nlat, n) && fits(g.nlon, n) && ['ea', 'eb', 'ef', 'en', 'el', 'ek'].every(k => fits(g[k], m)) &&
+        Array.isArray(g.ec) && Array.isArray(g.names) && Array.isArray(g.car_kmh) && g.h_car_kmh > 0)) throw new Error('graph.json lists do not match n and m');
+  const lat = new Int32Array(n), lon = new Int32Array(n);
+  for (let i = 0, y = 0, x = 0; i < n; i++) { y += g.nlat[i]; x += g.nlon[i]; lat[i] = y; lon[i] = x; }
+  const ea = new Int32Array(m), eb = new Int32Array(m), fl = new Uint8Array(m), cl = new Uint8Array(m), en = new Int32Array(m);
+  const el = new Float64Array(m), po = new Int32Array(m + 1);
+  for (let i = 0, a = 0; i < m; i++) {
+    a += g.ea[i]; ea[i] = a; eb[i] = a + g.eb[i];
+    if (!(a >= 0 && a < n && eb[i] >= 0 && eb[i] < n && g.ek[i] >= 0)) throw new Error('graph.json edge ' + i + ' does not fit');
+    fl[i] = g.ef[i] % 32; cl[i] = Math.floor(g.ef[i] / 32); en[i] = g.en[i]; el[i] = g.el[i];
+    po[i + 1] = po[i] + g.ek[i] + 2;
+  }
+  // edge i's polyline is points po[i] .. po[i + 1] - 1: its start node, its interior points, its end node
+  const np = po[m], plat = new Int32Array(np), plon = new Int32Array(np), pe = new Int32Array(np);
+  let q = 0;
+  for (let i = 0; i < m; i++) {
+    let j = po[i], y = lat[ea[i]], x = lon[ea[i]];
+    plat[j] = y; plon[j] = x; pe[j++] = i;
+    for (let k = g.ek[i]; k > 0; k--, q += 2) { y += g.ec[q]; x += g.ec[q + 1]; plat[j] = y; plon[j] = x; pe[j++] = i; }
+    plat[j] = lat[eb[i]]; plon[j] = lon[eb[i]]; pe[j] = i;
+  }
+  if (q !== g.ec.length) throw new Error('graph.json interior points do not match');
+  // the edges of every node, in edge order (the order in which the reference router tries them)
+  const ao = new Int32Array(n + 1);
+  for (let i = 0; i < m; i++) { ao[ea[i] + 1]++; if (eb[i] !== ea[i]) ao[eb[i] + 1]++; }
+  for (let v = 0; v < n; v++) ao[v + 1] += ao[v];
+  const adj = new Int32Array(ao[n]), put = ao.slice(0, n);
+  for (let i = 0; i < m; i++) { adj[put[ea[i]]++] = i; if (eb[i] !== ea[i]) adj[put[eb[i]]++] = i; }
+  // grid of polyline segments (segment s runs from point s to point s + 1 of the same edge); cell row = floor(lat / GCELL) - y0
+  let ya = Infinity, yb = -Infinity, xa = Infinity, xb = -Infinity;
+  for (let j = 0; j < np; j++) {
+    if (plat[j] < ya) ya = plat[j]; if (plat[j] > yb) yb = plat[j];
+    if (plon[j] < xa) xa = plon[j]; if (plon[j] > xb) xb = plon[j];
+  }
+  const y0 = Math.floor(ya / GCELL), x0 = Math.floor(xa / GCELL), rows = Math.floor(yb / GCELL) - y0 + 1, cols = Math.floor(xb / GCELL) - x0 + 1;
+  const co = new Int32Array(rows * cols + 1);
+  const cells = fn => {
+    for (let s = 0; s < np - 1; s++) {
+      if (pe[s + 1] !== pe[s]) continue;               // the last point of an edge starts no segment
+      const r0 = Math.floor(Math.min(plat[s], plat[s + 1]) / GCELL) - y0, r1 = Math.floor(Math.max(plat[s], plat[s + 1]) / GCELL) - y0;
+      const c0 = Math.floor(Math.min(plon[s], plon[s + 1]) / GCELL) - x0, c1 = Math.floor(Math.max(plon[s], plon[s + 1]) / GCELL) - x0;
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) fn(r * cols + c, s);
+    }
+  };
+  cells(c => { co[c + 1]++; });
+  for (let c = 0; c < rows * cols; c++) co[c + 1] += co[c];
+  const cs = new Int32Array(co[rows * cols]), at = co.slice(0, rows * cols);
+  cells((c, s) => { cs[at[c]++] = s; });
+  return {n, m, lat, lon, ea, eb, fl, cl, en, el, po, plat, plon, pe, ao, adj, y0, x0, rows, cols, co, cs,
+    names: g.names, cpm: g.car_kmh.map(k => k > 0 ? 3.6 / k : 0), hCar: 3.6 / g.h_car_kmh, restrictS: +g.restrict_s || 0, built: g.built || '',
+    seen: new Uint32Array(np), stamp: 0,                                                    // snap: segments already looked at
+    gv: new Float64Array(2 * n), from: new Int32Array(2 * n), via: new Int32Array(2 * n), how: new Uint8Array(2 * n), done: new Uint8Array(2 * n)};
 }
-async function reroute() {
-  if (!S.fix || !navigator.onLine || Date.now() - S.lastReroute < CFG.rerouteGapMs) return;
-  S.lastReroute = Date.now();
-  const seq = ++rerouteSeq, legAt = S.legIdx;
-  const base = S.legs[legAt], end = base.geom[base.geom.length - 1];
-  const url = CFG.osrm[base.mode] + S.fix.lon.toFixed(6) + ',' + S.fix.lat.toFixed(6) + ';' + end[1].toFixed(6) + ',' + end[0].toFixed(6) + '?overview=false&steps=true&geometries=geojson';
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), CFG.rerouteTimeoutMs);
+async function loadGraph() {
   try {
-    const r = await fetch(url, {cache: 'no-store', signal: ctl.signal});
-    const j = await r.json();
-    // the driver moved on, is back on the route, the app is waiting at a stop, or a newer request exists: this reply is stale
-    if (seq !== rerouteSeq || S.legIdx !== legAt || S.waiting || !S.offRoute) return;
-    if (j.code !== 'Ok' || !j.routes.length) throw new Error(j.code);
-    const nl = legFromOsrm(j.routes[0].legs[0], base.mode);
-    nl.to = base.to;
-    if (nl.geom.length < 2) throw new Error('short');
-    S.override = nl; S.rt = prepLeg(nl); S.lastAlong = 0; S.announced = {}; S.offCnt = 0; S.offRoute = false;
-    drawCurrent(); speak('Route updated.'); toast('New route to ' + (stopOf(base) ? 'stop ' + stopOf(base).o : 'the finish'));
-  } catch (e) { /* offline, timed out or no route: keep the arrow */ }
-  finally { clearTimeout(timer); }
+    const res = await fetch('graph.json');
+    if (!res.ok) throw new Error('graph.json: HTTP ' + res.status);
+    const text = await res.text(), t0 = performance.now();
+    const g = decodeGraph(JSON.parse(text));
+    g.ms = performance.now() - t0;                    // JSON parse and decode, in ms
+    GR = g;
+  } catch (e) { graphErr = String((e && e.message) || e); }   // rerouting then says that the road map did not load
+  return GR;
+}
+/* The nearest point, within maxM m, on an edge where a route of this mode may start or end (car: flag 1 or 2 and not flag 16;
+   foot: flag 4). lat, lon in micro-degrees. Planar distance around the query point; a tie goes to the lower edge, then the lower
+   segment. Returns {e, off (m from the edge's start node, in its el units), gap (m), lat, lon (micro-degrees)} or null. */
+function snapG(G, lat, lon, mode, maxM) {
+  const ky = 1e-6 * KM, kx = 1e-6 * KM * Math.cos(lat * 1e-6 * Math.PI / 180), px = lon * kx, py = lat * ky;
+  const dlat = Math.floor(maxM / ky) + 1, dlon = Math.floor(maxM / kx) + 1;
+  const r0 = Math.max(0, Math.floor((lat - dlat) / GCELL) - G.y0), r1 = Math.min(G.rows - 1, Math.floor((lat + dlat) / GCELL) - G.y0);
+  const c0 = Math.max(0, Math.floor((lon - dlon) / GCELL) - G.x0), c1 = Math.min(G.cols - 1, Math.floor((lon + dlon) / GCELL) - G.x0);
+  if (++G.stamp > 4e9) { G.seen.fill(0); G.stamp = 1; }
+  const st = G.stamp, car = mode === 'car';
+  let bd = Infinity, be = -1, bs = -1, bt = 0;
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      const cell = r * G.cols + c;
+      for (let k = G.co[cell]; k < G.co[cell + 1]; k++) {
+        const s = G.cs[k];
+        if (G.seen[s] === st) continue;
+        G.seen[s] = st;
+        const e = G.pe[s], f = G.fl[e];
+        if (car ? !(f & 3) || (f & F_NOSNAP) : !(f & F_FOOT)) continue;
+        const ax = G.plon[s] * kx, ay = G.plat[s] * ky, dx = G.plon[s + 1] * kx - ax, dy = G.plat[s + 1] * ky - ay, L2 = dx * dx + dy * dy;
+        const t = L2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L2));
+        const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+        if (d < bd || (d === bd && (e < be || (e === be && s < bs)))) { bd = d; be = e; bs = s; bt = t; }
+      }
+    }
+  }
+  if (be < 0 || bd > maxM) return null;
+  let before = 0, total = 0, seg = 0;
+  for (let j = G.po[be]; j < G.po[be + 1] - 1; j++) {
+    const l = Math.hypot((G.plon[j + 1] - G.plon[j]) * kx, (G.plat[j + 1] - G.plat[j]) * ky);
+    if (j < bs) before += l; else if (j === bs) seg = l;
+    total += l;
+  }
+  const along = before + bt * seg;
+  return {e: be, off: total > 0 ? G.el[be] * along / total : 0, gap: bd,
+    lat: G.plat[bs] + bt * (G.plat[bs + 1] - G.plat[bs]), lon: G.plon[bs] + bt * (G.plon[bs + 1] - G.plon[bs])};
+}
+/* binary heap of search states, in the order of the reference's (f, g, (node, r)) tuples: state k = 2 * node + r */
+const HP = {f: new Float64Array(4096), g: new Float64Array(4096), s: new Int32Array(4096), n: 0};
+function hpBefore(i, j) { const f = HP.f, g = HP.g; return f[i] < f[j] || (f[i] === f[j] && (g[i] < g[j] || (g[i] === g[j] && HP.s[i] < HP.s[j]))); }
+function hpSwap(i, j) {
+  let t = HP.f[i]; HP.f[i] = HP.f[j]; HP.f[j] = t;
+  t = HP.g[i]; HP.g[i] = HP.g[j]; HP.g[j] = t;
+  t = HP.s[i]; HP.s[i] = HP.s[j]; HP.s[j] = t;
+}
+function hpPush(f, g, s) {
+  if (HP.n === HP.f.length) ['f', 'g', 's'].forEach(k => { const a = new HP[k].constructor(2 * HP.n); a.set(HP[k]); HP[k] = a; });
+  let i = HP.n++;
+  HP.f[i] = f; HP.g[i] = g; HP.s[i] = s;
+  while (i > 0) { const p = (i - 1) >> 1; if (!hpBefore(i, p)) break; hpSwap(i, p); i = p; }
+}
+function hpPop() {                    // moves the first entry to slot HP.n (just past the heap) and returns that slot
+  const last = --HP.n;
+  hpSwap(0, last);
+  for (let i = 0; ;) {
+    const l = 2 * i + 1, r = l + 1;
+    let b = i;
+    if (l < last && hpBefore(l, b)) b = l;
+    if (r < last && hpBefore(r, b)) b = r;
+    if (b === i) break;
+    hpSwap(i, b); i = b;
+  }
+  return last;
+}
+/* A* from p to q ([lat, lon] degrees) for mode 'car' or 'foot', the same search as Graph.route() in build_graph.py. Car cost is
+   seconds (el * 3.6 / car_kmh, plus restrict_s to enter a restricted edge from a public one), foot cost is meters. Returns
+   {cost, net, gapStart, gapEnd, length (m), pieces: [[edge, from offset, to offset], ...], s, t} or {fail: 'start' | 'end' | 'route'}. */
+function routeG(G, p, q, mode) {
+  const s = snapG(G, micro(p[0]), micro(p[1]), mode, CFG.snapMax);
+  if (!s) return {fail: 'start'};
+  const t = snapG(G, micro(q[0]), micro(q[1]), mode, CFG.snapMax);
+  if (!t) return {fail: 'end'};
+  const car = mode === 'car', fm = car ? F_FWD : F_FOOT, bm = car ? F_BWD : F_FOOT;
+  const {lat, lon, ea, eb, fl, cl, el, ao, adj, gv, from, via, how, done} = G;
+  const cpm = car ? i => G.cpm[cl[i]] : () => 1;
+  const rs = car ? i => (fl[i] & F_RESTRICT ? 1 : 0) : () => 0;
+  const ky = 1e-6 * KM, kx = 1e-6 * KM * Math.cos(t.lat * 1e-6 * Math.PI / 180), hpm = 0.995 * (car ? G.hCar : 1);
+  const h = v => Math.hypot((t.lon - lon[v]) * kx, (t.lat - lat[v]) * ky) * hpm;     // never more than the true cost to the target
+  const E = s.e, so = s.off, F = t.e, to = t.off, RS = G.restrictS;
+  let best = Infinity, bestHow = 0, bestSt = -1;      // bestHow: 1 along the start edge only, 2 into F at its start node, 3 at its end node
+  if (E === F) {
+    const c = cpm(E);
+    if (to >= so && (fl[E] & fm)) { best = c * (to - so); bestHow = 1; }
+    if (to <= so && (fl[E] & bm) && c * (so - to) < best) { best = c * (so - to); bestHow = 1; }
+  }
+  gv.fill(Infinity); done.fill(0); HP.n = 0;
+  const cE = cpm(E), r0 = rs(E);
+  if (fl[E] & fm) { const k = 2 * eb[E] + r0; gv[k] = cE * (el[E] - so); from[k] = -1; via[k] = E; how[k] = 1; }
+  if (fl[E] & bm) { const k = 2 * ea[E] + r0, c0 = cE * so; if (c0 < gv[k]) { gv[k] = c0; from[k] = -1; via[k] = E; how[k] = 2; } }
+  [eb[E], ea[E]].forEach(v => { const k = 2 * v + r0; if (gv[k] < Infinity) hpPush(gv[k] + h(v), gv[k], k); });
+  const cF = cpm(F), rF = rs(F);
+  while (HP.n) {
+    const top = hpPop(), f = HP.f[top], g = HP.g[top], k = HP.s[top];
+    if (f >= best) break;
+    if (done[k] || g > gv[k]) continue;
+    done[k] = 1;
+    const v = k >> 1, r = k & 1;
+    if (v === ea[F] && (fl[F] & fm)) { const c = g + (rF && !r ? RS : 0) + cF * to; if (c < best) { best = c; bestHow = 2; bestSt = k; } }
+    if (v === eb[F] && (fl[F] & bm)) { const c = g + (rF && !r ? RS : 0) + cF * (el[F] - to); if (c < best) { best = c; bestHow = 3; bestSt = k; } }
+    for (let j = ao[v]; j < ao[v + 1]; j++) {
+      const i = adj[j];
+      let u;
+      if (ea[i] === v && (fl[i] & fm)) u = eb[i];
+      else if (eb[i] === v && (fl[i] & bm)) u = ea[i];
+      else continue;
+      const ri = rs(i), ku = 2 * u + ri, gu = g + el[i] * cpm(i) + (ri && !r ? RS : 0);
+      if (gu < gv[ku]) { gv[ku] = gu; from[ku] = k; via[ku] = i; how[ku] = 0; hpPush(gu + h(u), gu, ku); }
+    }
+  }
+  if (!bestHow) return {fail: 'route'};
+  const pieces = [];
+  if (bestHow === 1) pieces.push([E, so, to]);
+  else {
+    pieces.push(bestHow === 2 ? [F, 0, to] : [F, el[F], to]);
+    for (let k = bestSt, left = 2 * G.n; ; left--) {
+      if (left < 0) return {fail: 'route'};
+      const i = via[k], pk = from[k];
+      if (pk < 0) { pieces.push(how[k] === 1 ? [E, so, el[E]] : [E, so, 0]); break; }
+      pieces.push(ea[i] === (pk >> 1) ? [i, 0, el[i]] : [i, el[i], 0]);
+      k = pk;
+    }
+    pieces.reverse();
+  }
+  const net = pieces.reduce((a, pc) => a + Math.abs(pc[2] - pc[1]), 0);
+  return {cost: best, net, gapStart: s.gap, gapEnd: t.gap, length: s.gap + net + t.gap, pieces, s, t};
+}
+/* The polyline of edge i from offset a to offset b (m from its start node; b < a runs backward), micro-degree points. */
+function piecePts(G, i, a, b) {
+  const p0 = G.po[i], p1 = G.po[i + 1] - 1, L = G.el[i] || 1, rev = b < a;
+  if (rev) { a = G.el[i] - a; b = G.el[i] - b; }
+  const pt = k => rev ? p1 - k : p0 + k, nseg = p1 - p0, lens = [];
+  let tot = 0;
+  for (let k = 0; k < nseg; k++) {
+    const P = pt(k), Q = pt(k + 1), l = hav([G.plat[P] * 1e-6, G.plon[P] * 1e-6], [G.plat[Q] * 1e-6, G.plon[Q] * 1e-6]);
+    lens.push(l); tot += l;
+  }
+  tot = tot || 1;
+  const fa = a / L * tot, fb = b / L * tot, out = [];
+  for (let k = 0, run = 0; k < nseg; k++) {
+    const sl = lens[k], s0 = run, s1 = run + sl;
+    if (s1 >= fa && s0 <= fb && sl > 0) {
+      const P = pt(k), Q = pt(k + 1);
+      [Math.max(0, (fa - s0) / sl), Math.min(1, (fb - s0) / sl)].forEach(tt => {
+        const y = G.plat[P] + tt * (G.plat[Q] - G.plat[P]), x = G.plon[P] + tt * (G.plon[Q] - G.plon[P]), z = out[out.length - 1];
+        if (!z || z[0] !== y || z[1] !== x) out.push([y, x]);
+      });
+    }
+    run = s1;
+  }
+  return out;
+}
+
+/* ---------- reroute, on this device ---------- */
+const xyBearing = (a, b) => (Math.atan2(b[0] - a[0], b[1] - a[1]) / D2R + 360) % 360;   // planar [east, north] points -> degrees
+const turnOf = d => (d + 540) % 360 - 180;            // a change of bearing as a turn: -180 (left) to 180 (right)
+function turnMod(a) {
+  const x = Math.abs(a), side = a > 0 ? 'right' : 'left';
+  if (x <= CFG.turnDeg) return 'straight';
+  if (x <= 60) return 'slight ' + side;
+  if (x <= 135) return side;
+  if (x <= 165) return 'sharp ' + side;
+  return 'uturn';
+}
+/* The step at a junction, or null when the way simply goes on. a: the turn in degrees (right positive); was, name: the names
+   before and after; opts: the turns of the other ways the route could take there (none: the road only changes its name). */
+function classify(a, was, name, opts, walk) {
+  const mod = turnMod(a), renamed = name !== was;
+  if (!opts.length) return !renamed ? null : {type: mod === 'straight' || mod.startsWith('slight') ? 'new name' : 'turn', mod};   // a sharp bend reads as a turn
+  if (mod !== 'straight') {
+    if (!walk && (mod === 'left' || mod === 'right') && opts.every(o => Math.abs(o) > 45)) return {type: 'end of road', mod};   // no way goes on ahead
+    if (!renamed && mod.startsWith('slight')) return {type: 'continue', mod};
+    return {type: 'turn', mod};
+  }
+  if (renamed) return {type: 'new name', mod};
+  const fork = opts.filter(o => Math.abs(o) <= 45).sort((p, q) => Math.abs(p - a) - Math.abs(q - a))[0];   // another way that also goes on ahead
+  return fork === undefined ? null : {type: 'continue', mod: a < fork ? 'slight left' : 'slight right'};
+}
+/* A route from routeG() -> a leg in the route.json format: geom [[lat, lon], ...] and steps {type, mod, name, ref, loc, ba, ...}
+   for instr() and the voice prompts. The leg starts at the position when the road is more than CFG.lead m away, and always ends
+   at `end`. A step is made where the name changes, or where the way turns more than CFG.turnDeg degrees at a junction; steps
+   closer than CFG.mergeM m are merged into one. */
+function legFromRoute(G, r, from, end, base) {
+  const walk = base.mode === 'walk', fm = walk ? F_FOOT : F_FWD, bm = walk ? F_FOOT : F_BWD, LOOK = 10;   // LOOK: m over which a bearing is measured
+  const deg = (y, x) => [+(y * 1e-6).toFixed(6), +(x * 1e-6).toFixed(6)];
+  const nameOf = e => (e < 0 ? '' : String(G.names[G.en[e]] || ''));
+  // the parts: a straight line from the position to the road, the pieces on the road map, a straight line from the road to the end
+  const parts = [];
+  if (r.gapStart > CFG.lead[base.mode]) parts.push({e: -1, pts: [[from[0], from[1]], deg(r.s.lat, r.s.lon)]});
+  r.pieces.forEach(([e, a, b]) => parts.push({e, a, b, pts: piecePts(G, e, a, b).map(p => deg(p[0], p[1]))}));
+  const tail = r.gapEnd >= 0.5;
+  if (tail) parts.push({e: -1, last: true, pts: [deg(r.t.lat, r.t.lon), [end[0], end[1]]]});
+  let geom = [], joins = [], prev = -1;
+  parts.forEach((pt, j) => {
+    if (!pt.pts.length) return;
+    if (prev >= 0) joins.push({k: geom.length - 1, a: parts[prev], b: pt});
+    pt.pts.forEach(p => { const z = geom[geom.length - 1]; if (!z || z[0] !== p[0] || z[1] !== p[1]) geom.push(p); });
+    prev = j;
+  });
+  if (!tail && geom.length) geom[geom.length - 1] = [end[0], end[1]];     // the road reaches within 0.5 m of the end
+  if (geom.length < 2) { geom = [[from[0], from[1]], [end[0], end[1]]]; joins = []; }
+  // flat map around the first point, as prepLeg() uses
+  const k0 = Math.cos(geom[0][0] * D2R), toXY = (la, lo) => [lo * D2R * R * k0, la * D2R * R];
+  const xy = geom.map(p => toXY(p[0], p[1])), cum = [0];
+  for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+  const total = cum[cum.length - 1];
+  const pointAt = d => {                                // the point d m along the new leg, held to its ends
+    d = Math.max(0, Math.min(total, d));
+    let i = 0;
+    while (i < xy.length - 2 && cum[i + 1] < d) i++;
+    const t = Math.max(0, Math.min(1, (d - cum[i]) / ((cum[i + 1] - cum[i]) || 1)));
+    return [xy[i][0] + t * (xy[i + 1][0] - xy[i][0]), xy[i][1] + t * (xy[i + 1][1] - xy[i][1])];
+  };
+  const leave = (e, atStart) => {                       // bearing of edge e leaving its start node (atStart) or its end node, over LOOK m
+    const p0 = G.po[e], p1 = G.po[e + 1] - 1, step = atStart ? 1 : -1, stop = atStart ? p1 : p0;
+    let k = atStart ? p0 : p1, run = 0;
+    const A = toXY(G.plat[k] * 1e-6, G.plon[k] * 1e-6);
+    let P = A;
+    while (k !== stop) {
+      k += step;
+      const Q = toXY(G.plat[k] * 1e-6, G.plon[k] * 1e-6), l = Math.hypot(Q[0] - P[0], Q[1] - P[1]);
+      if (run + l >= LOOK) { const t = (LOOK - run) / l; return xyBearing(A, [P[0] + t * (Q[0] - P[0]), P[1] + t * (Q[1] - P[1])]); }
+      run += l; P = Q;
+    }
+    return xyBearing(A, P);
+  };
+  const first = parts.find(p => p.pts.length);
+  const steps = [{type: 'depart', mod: '', name: nameOf(first ? first.e : -1), loc: geom[0], ba: Math.round(xyBearing(xy[0], pointAt(LOOK))) % 360, along: 0}];
+  joins.forEach(J => {
+    const A = J.a, B = J.b, d = cum[J.k];
+    const inB = xyBearing(pointAt(d - LOOK), xy[J.k]), outB = xyBearing(xy[J.k], pointAt(d + LOOK)), a = turnOf(outB - inB);
+    let s = null;
+    if (B.last) {                                      // off the road map, straight to the end of the leg
+      if (walk && base.to.kind !== 'car' && r.gapEnd > 10) s = {type: 'offpath', mod: 'straight', name: ''};
+    } else {
+      const opts = [];
+      if (A.e < 0) {                                   // from the position onto the road: its other direction, when that is open
+        if (G.fl[B.e] & (B.b >= B.a ? bm : fm)) opts.push(turnOf(outB + 180 - inB));
+      } else {
+        const fwd = B.b > B.a || (B.a === B.b && B.a === 0), v = fwd ? G.ea[B.e] : G.eb[B.e];
+        for (let j = G.ao[v]; j < G.ao[v + 1]; j++) {
+          const i = G.adj[j];
+          if (i === A.e) continue;                     // back the way the route came
+          if (G.ea[i] === v && (G.fl[i] & fm) && !(i === B.e && fwd)) opts.push(turnOf(leave(i, true) - inB));
+          if (G.eb[i] === v && (G.fl[i] & bm) && !(i === B.e && !fwd)) opts.push(turnOf(leave(i, false) - inB));
+        }
+      }
+      const c = classify(a, nameOf(A.e), nameOf(B.e), opts, walk);
+      if (c) s = Object.assign(c, {name: nameOf(B.e), was: nameOf(A.e), opts});
+    }
+    if (s) steps.push(Object.assign(s, {loc: geom[J.k], ba: Math.round(outB) % 360, along: d, inB, outB}));
+  });
+  steps.push({type: 'arrive', mod: '', name: '', loc: geom[geom.length - 1], ba: 0, along: total});
+  const out = [];
+  steps.forEach(s => {
+    const z = out[out.length - 1], fixed = x => x.type === 'depart' || x.type === 'offpath';
+    if (!z) out.push(s);                               // depart
+    else if (s.type === 'arrive' || s.type === 'offpath') {
+      // a maneuver just before the arrival, or just before the walker leaves the path, is not said
+      while (!fixed(out[out.length - 1]) && s.along - out[out.length - 1].along < CFG.mergeM) out.pop();
+      out.push(s);
+    } else if (!fixed(z) && s.along - z.along < CFG.mergeM) {
+      out.pop();                                       // two maneuvers close together: one step, from the way in to the way out
+      const opts = z.opts.concat(s.opts), c = classify(turnOf(s.outB - z.inB), z.was, s.name, opts, walk);
+      if (c) out.push(Object.assign({}, z, c, {name: s.name, opts, outB: s.outB, ba: s.ba}));
+    } else out.push(s);
+  });
+  let dur = total * CFG.walkSpm;
+  if (!walk) {
+    dur = r.pieces.reduce((a, [e, x, y]) => a + Math.abs(y - x) * G.cpm[G.cl[e]], 0) +
+      ((r.gapStart > CFG.lead.drive ? r.gapStart : 0) + (tail ? r.gapEnd : 0)) * CFG.gapSpm;
+  }
+  const spm = total > 0 ? dur / total : 0, r1 = x => Math.round(x * 10) / 10;
+  return {mode: base.mode, dist: r1(total), dur: r1(dur), geom, offline: true,
+    steps: out.map((s, j) => {
+      const len = out[j + 1] ? Math.max(0, out[j + 1].along - s.along) : 0;
+      return {type: s.type, mod: s.mod || '', exit: null, name: s.name || '', ref: '', loc: [s.loc[0], s.loc[1]], ba: s.ba, dist: r1(len), dur: r1(len * spm)};
+    })};
+}
+/* A new leg from `from` ([lat, lon]) to the end of leg `base`, planned on this device. Returns {leg, route} or {fail: what the
+   banner says, in plain words}. */
+function planLeg(from, base) {
+  if (!GR) return {fail: graphErr ? 'The road map did not load. Follow the arrow.' : 'Loading the road map. Follow the arrow.'};
+  const walk = base.mode === 'walk', way = walk ? 'path' : 'road', end = base.geom[base.geom.length - 1];
+  const r = routeG(GR, from, end, walk ? 'foot' : 'car');
+  if (r.fail === 'start') return {fail: 'No ' + way + ' within ' + fmtDist(CFG.snapMax) + '. Follow the arrow.'};
+  if (r.fail === 'end') {
+    const where = {stop: 'the stop', park: 'the parking spot', car: 'the car', depot: 'McCluskey Services'}[base.to.kind] || 'the end';
+    return {fail: 'No ' + way + ' near ' + where + '. Follow the arrow.'};
+  }
+  if (r.fail) return {fail: 'No route found from here. Follow the arrow.'};
+  return {leg: legFromRoute(GR, r, from, end, base), route: r};
+}
+/* Off route: plan a new leg to the end of the current leg, on this device, with no network, at most once per CFG.rerouteGapMs.
+   Returns true when the new leg is in place (applyReroute then ran the newest fix again on it). While graph.json still loads, the
+   plan waits for it; a plan that is no longer wanted by then is dropped. */
+function reroute() {
+  if (!S.fix || Date.now() - S.lastReroute < CFG.rerouteGapMs) return false;
+  S.lastReroute = Date.now();
+  const seq = ++rerouteSeq, legAt = S.legIdx, from = [S.fix.lat, S.fix.lon];
+  if (GR || !graphReady) return applyReroute(seq, legAt, from);
+  S.rerouteNote = 'Loading the road map';
+  graphReady.then(() => applyReroute(seq, legAt, from));
+  return false;
+}
+function applyReroute(seq, legAt, from) {
+  // the driver moved on, is back on the route, the app is waiting at a stop, or a newer plan exists: this plan is not wanted
+  if (seq !== rerouteSeq || S.legIdx !== legAt || S.waiting || !S.offRoute) return false;
+  const base = S.legs[legAt];
+  let p, rt = null;
+  try {
+    p = planLeg(from, base);
+    if (p.leg) { p.leg.to = base.to; rt = prepLeg(p.leg); }
+  } catch (e) {                                       // a fault in the planner must not stop the guide: keep the arrow
+    rerouteErr = String((e && e.message) || e);
+    p = {fail: 'No route found from here. Follow the arrow.'};
+  }
+  if (!rt) { S.rerouteNote = p.fail; renderBanner(); return false; }       // the arrow stays, and the banner says why
+  S.override = p.leg; S.rt = rt; S.lastAlong = 0; S.announced = {}; S.offCnt = 0; S.offRoute = false; S.rerouteNote = '';
+  drawCurrent(); speak('Route updated.'); toast('New route to ' + (stopOf(base) ? 'stop ' + stopOf(base).o : 'the finish'));
+  if (S.fix) onFix(S.fix, true);
+  return true;
 }
 
 /* ---------- panel ---------- */
@@ -955,8 +1332,9 @@ function renderPanel() {
     '<li>Drive the crimson line. Most meters read from the car. The guide moves to the next stop when you reach each one.</li>' +
     '<li>Blue stops are walk-in stops. Park, then choose Walk to meter or Read from car.</li>' +
     '<li>Gold-ringed stops have ATTENTION meters. The guide pauses there so you can read the note.</li>' +
-    '<li>No signal? The map, the route and the turn list work offline. Rerouting needs data.</li></ol>' +
-    '<p>Route built ' + r.built + '. ' + r.source + '</p><p>App ' + APP_VERSION + '. Map data &copy; OpenStreetMap contributors. Routing by OSRM (FOSSGIS).</p>';
+    '<li>No signal? The map, the route, the turns and rerouting all work offline. Off the route, the guide plans a new way on this tablet.</li></ol>' +
+    '<p>Route built ' + r.built + '. ' + r.source + '</p><p>App ' + APP_VERSION + '. Map data &copy; OpenStreetMap contributors. Route lines by OSRM (FOSSGIS). Rerouting runs on this device' +
+    (GR && GR.built ? ', road map built ' + GR.built : '') + '.</p>';
   body.appendChild(help);
 }
 
@@ -1060,15 +1438,16 @@ function renderStart() {
   }
   updateOfflineLine();
 }
-/* "Offline ready." once a service worker controls this page and its cache holds the route and the offline map */
+/* "Offline ready." once a service worker controls this page and its cache holds the route, the offline map and the road map
+   for rerouting */
 async function updateOfflineLine() {
   const el = $('offlineLine');
   if (!el) return;
   let ready = false;
   try {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller && 'caches' in window) {
-      const [a, b] = await Promise.all([caches.match('route.json'), caches.match('basemap.json')]);   // old caches are deleted when a new worker starts
-      ready = !!(a && b);
+      const got = await Promise.all(['route.json', 'basemap.json', 'graph.json'].map(f => caches.match(f)));   // old caches are deleted when a new worker starts
+      ready = got.every(Boolean);
     }
   } catch (e) { ready = false; }
   el.textContent = ready ? 'Offline ready.' : 'Not offline ready yet. Keep this page open online for a minute.';
@@ -1193,6 +1572,7 @@ async function load() {
   }
 }
 load();
+graphReady = loadGraph();             // the road map for rerouting loads beside the route; the route never waits for it
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', updateOfflineLine);   // the first install takes control a moment after load
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ }); });
