@@ -81,6 +81,7 @@ button{font:inherit;cursor:pointer}
 #panel{position:absolute;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:1100;background:var(--card);
  box-shadow:-4px 0 18px rgba(0,0,0,.25);display:none;flex-direction:column}
 #panel.show{display:flex}
+#panel.over{z-index:1400}   /* opened from the start screen, which is above the normal panel level */
 #pHead{background:var(--primary);color:#fff;padding:12px 14px;padding-top:calc(12px + env(safe-area-inset-top));display:flex;align-items:center;gap:10px}
 #pHead h2{margin:0;font-size:18px;flex:1}
 #pHead button{background:none;border:none;color:#fff;font-size:26px;line-height:1}
@@ -196,6 +197,7 @@ const CFG = {
   leaveFixes: 2,                     // consecutive fixes that must show the vehicle driving away before the guide goes on
   rerouteGapMs: 20000,
   rerouteTimeoutMs: 8000,            // ms: give up on a reroute request after this long
+  skipConfirmMs: 4000,               // ms: the second tap on Skip must come within this time of the first
   zoom: {drive: 17, walk: 18},
   osrm: {drive: 'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
          walk: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/'},
@@ -221,6 +223,7 @@ const S = {
   sim: null, wake: null,
 };
 let rerouteSeq = 0;   // numbers reroute requests; setLeg() bumps it so a late reply for an old leg is dropped
+let skipArmed = 0, skipT = null;   // when the first tap on Skip came (ms), and the timer that ends the wait for a second tap
 
 /* ---------- geometry ---------- */
 const R = 6371008.8, D2R = Math.PI / 180;
@@ -491,15 +494,27 @@ function legLabel(leg) {
   return (leg.mode === 'walk' ? 'Walk to stop ' : 'Stop ') + st.o;
 }
 function firstLegOfStop(o) { return S.legs.findIndex(l => l.to && l.to.o === o); }
-function nextDriveLegAfterStop(o) {
+function lastLegOfStop(o) {            // the last leg that ends at stop o (its walk back to the car, when it has one)
   let i = S.legs.length - 1;
   for (let j = 0; j < S.legs.length; j++) if (S.legs[j].to && S.legs[j].to.o === o) i = j;
-  return Math.min(i + 1, S.legs.length - 1);
+  return i;
 }
+/* The first leg after leg i that the guide should lead to: a stop whose parking or stop leg belongs to a stop that is already
+   reached, skipped or passed is passed over. The leg back to the depot is always open. A car leg (the walk back) is open right
+   after the walk to its own stop; reached any other way (its parking and walk legs were passed over), nobody is on foot. */
+function nextOpenLeg(i) {
+  for (let j = i + 1; j < S.legs.length; j++) {
+    const to = S.legs[j].to;
+    const closed = !!(to.o && (S.done[to.o] || S.skipped[to.o] || S.passed[to.o]));
+    if (!closed || to.kind === 'depot' || (to.kind === 'car' && j === i + 1)) return j;
+  }
+  return S.legs.length - 1;
+}
+function nextOpenLegAfterStop(o) { return nextOpenLeg(lastLegOfStop(o)); }   // past the stop's walk legs, to the next drive
 function setLeg(i, why) {
   S.legIdx = Math.max(0, Math.min(S.legs.length - 1, i));
   S.override = null; S.rt = prepLeg(S.legs[S.legIdx]); S.lastAlong = 0; S.nav = null; S.announced = {}; S.offCnt = 0; S.offRoute = false;
-  S.arrivedLeg = -1; S.waiting = null; S.leaveCnt = 0; rerouteSeq++;
+  S.arrivedLeg = -1; S.waiting = null; S.leaveCnt = 0; rerouteSeq++; skipArmed = 0;
   lsSet('leg', S.legIdx); lsSet('done', S.done); lsSet('skipped', S.skipped); lsSet('passed', S.passed);
   drawRoute(); refreshStopIcons(); renderCard(); renderBanner();
   const leg = S.legs[S.legIdx];
@@ -521,7 +536,7 @@ function markStop(o, how) {
 /* The vehicle drove away from a stop that was waiting for a tap: keep guiding, and leave the stop flagged as Passed. */
 function leaveStop() {
   const st = stopOf(S.legs[S.legIdx]);
-  const to = S.waiting === 'park' ? nextDriveLegAfterStop(st.o) : S.legIdx + 1;
+  const to = S.waiting === 'park' ? nextOpenLegAfterStop(st.o) : nextOpenLeg(S.legIdx);
   const nx = stopOf(S.legs[to]);
   S.passed[st.o] = Date.now();
   speak(nx ? 'Continuing to stop ' + nx.o + '.' : 'Continuing to McCluskey Services.', true);
@@ -545,7 +560,7 @@ function arrived() {
     speak('Parking spot for stop ' + st.o + '. The meter is ' + sayDist(walkLeg ? walkLeg.dist : 0) + ' away. Walk in, or read from the car.', true);
     renderCard(); renderBanner(); return;
   }
-  if (leg.to.kind === 'car') { toast('Back at the car'); setLeg(S.legIdx + 1); return; }
+  if (leg.to.kind === 'car') { toast('Back at the car'); setLeg(nextOpenLeg(S.legIdx)); return; }
   // reached a stop
   const attn = st.meters.filter(m => m.attn);
   if (leg.mode === 'walk' || attn.length) {
@@ -558,7 +573,7 @@ function arrived() {
   markStop(st.o, 'done');
   toast('Stop ' + st.o + ' reached. Check FieldLogic for ' + st.meters.length + (st.meters.length === 1 ? ' read.' : ' reads.'), 4000);
   speak('Stop ' + st.o + ' reached.', true);
-  setLeg(S.legIdx + 1);
+  setLeg(nextOpenLeg(S.legIdx));
 }
 function doNext() {
   const leg = S.legs[S.legIdx], st = stopOf(leg);
@@ -566,19 +581,31 @@ function doNext() {
   if (leg.to.kind === 'depot') { arrived(); return; }                      // Finish button
   if (leg.to.kind === 'park') { setLeg(S.legIdx + 1); return; }            // walk in
   if (leg.to.kind === 'stop' && st) markStop(st.o, 'done');
-  if (S.legIdx < S.legs.length - 1) setLeg(S.legIdx + 1);
+  if (S.legIdx < S.legs.length - 1) setLeg(nextOpenLeg(S.legIdx));
 }
 function readFromCar() {
   const leg = S.legs[S.legIdx], st = stopOf(leg);
   if (st) markStop(st.o, 'done');
-  setLeg(nextDriveLegAfterStop(st.o));
+  setLeg(nextOpenLegAfterStop(st.o));
 }
+const skipIsArmed = () => skipArmed > 0 && Date.now() - skipArmed <= CFG.skipConfirmMs;
+/* Skip needs two taps within CFG.skipConfirmMs: a mis-tap in a moving vehicle must not drop a stop. On foot at a stop, the next
+   leg is the walk back to the car; the drive goes on from there. */
 function doSkip() {
   const st = currentTargetStop();
   if (!st) return;
+  if (!skipIsArmed()) {
+    skipArmed = Date.now();
+    clearTimeout(skipT);
+    skipT = setTimeout(() => { skipArmed = 0; renderCard(); }, CFG.skipConfirmMs + 20);   // the button text goes back by itself
+    renderCard();
+    return;
+  }
+  const onFoot = S.legs[S.legIdx].mode === 'walk';
+  skipArmed = 0; clearTimeout(skipT);
   markStop(st.o, 'skip');
   toast('Stop ' + st.o + ' skipped');
-  setLeg(nextDriveLegAfterStop(st.o));
+  setLeg(onFoot ? nextOpenLeg(S.legIdx) : nextOpenLegAfterStop(st.o));
 }
 
 /* ---------- rendering ---------- */
@@ -644,7 +671,7 @@ function renderCard() {
   // prompt and buttons
   const pr = $('prompt'), next = $('aNext'), skip = $('aSkip');
   pr.className = ''; pr.innerHTML = '';
-  next.className = 'btn primary'; skip.style.display = ''; skip.textContent = 'Skip stop';
+  next.className = 'btn primary'; skip.style.display = ''; skip.textContent = skipIsArmed() ? 'Tap again to skip' : 'Skip stop';
   next.onclick = doNext; skip.onclick = doSkip;
   if (S.waiting === 'park') {
     const w = S.legs[S.legIdx + 1];
@@ -843,7 +870,7 @@ async function reroute() {
 }
 
 /* ---------- panel ---------- */
-function openPanel() { renderPanel(); $('panel').classList.add('show'); }
+function openPanel() { renderPanel(); $('panel').classList.toggle('over', $('start').style.display !== 'none'); $('panel').classList.add('show'); }
 function closePanel() { $('panel').classList.remove('show'); }
 let resetArmed = 0;
 function renderPanel() {
@@ -868,7 +895,10 @@ function renderPanel() {
       '<button>Go</button>';
     row.querySelector('.rs div:first-child').textContent = st.site;
     row.querySelector('.rs div:last-child').textContent = st.meters.length + (st.meters.length === 1 ? ' meter' : ' meters') + (walk ? ' · walk-in stop' : '') + (st.road ? ' · ' + st.road : '');
-    row.querySelector('button').onclick = () => { closePanel(); delete S.done[st.o]; delete S.skipped[st.o]; delete S.passed[st.o]; setLeg(firstLegOfStop(st.o)); };
+    row.querySelector('button').onclick = () => {
+      closePanel(); delete S.done[st.o]; delete S.skipped[st.o]; delete S.passed[st.o]; setLeg(firstLegOfStop(st.o));
+      if (!S.started) renderStart();   // opened from the start screen: its buttons must name the new stop
+    };
     body.appendChild(row);
   });
   if (r.unmapped && r.unmapped.length) {
@@ -885,6 +915,7 @@ function renderPanel() {
     S.done = {}; S.skipped = {}; S.passed = {}; resetArmed = 0; closePanel();
     if (swap) adoptPending();
     setLeg(0);
+    if (!S.started) renderStart();
     toast(swap ? 'New route loaded. Stop 1 is next.' : 'Progress cleared. Stop 1 is next.');
   };
   const help = document.createElement('div'); help.className = 'help';
@@ -945,6 +976,11 @@ function begin() {
   setLeg(S.legIdx);
   if (!S.sim && S.fix) followTo([S.fix.lat, S.fix.lon], CFG.zoom[currentLeg().mode]);
 }
+function startNewDrive() {             // stop 1 next, nothing reached; a newer route that waits is loaded first
+  if (S.pending) adoptPending();
+  else { S.done = {}; S.skipped = {}; S.passed = {}; S.legIdx = 0; }
+  begin();
+}
 function renderStart() {
   const r = S.route, nm = r.stops.reduce((a, s) => a + s.meters.length, 0);
   const drive = S.legs.filter(l => l.mode === 'drive');
@@ -965,21 +1001,22 @@ function renderStart() {
   btns.innerHTML = '';
   const go = document.createElement('button');
   go.className = 'btn primary';
-  const resuming = !!S.pending || !!(S.legIdx > 0 && resumeStop);   // with a new route waiting, this session always runs the saved route
-  go.textContent = resuming ? (resumeStop ? 'Resume at stop ' + resumeStop.o : 'Resume the drive') : 'Start guidance';
-  go.onclick = begin;
+  const atEnd = S.legs.length > 1 && S.legIdx === S.legs.length - 1;   // the saved drive stopped on the last leg: the route is finished
+  const resuming = !atEnd && (!!S.pending || !!(S.legIdx > 0 && resumeStop));   // with a new route waiting, this session always runs the saved route
+  go.textContent = atEnd ? 'Start a new drive at stop 1' : resuming ? (resumeStop ? 'Resume at stop ' + resumeStop.o : 'Resume the drive') : 'Start guidance';
+  go.onclick = atEnd ? startNewDrive : begin;
   btns.appendChild(go);
-  if (resuming) {
-    const fresh = document.createElement('button');
-    fresh.className = 'btn';
-    if (S.pending) {
-      fresh.textContent = 'Start a new drive with the new route';
-      fresh.onclick = () => { adoptPending(); begin(); };
+  if (atEnd || resuming) {
+    const second = document.createElement('button');
+    second.className = 'btn';
+    if (atEnd) {
+      second.textContent = 'Review the last drive';
+      second.onclick = openPanel;                       // the stop list opens in front of this screen
     } else {
-      fresh.textContent = 'Start a new drive at stop 1';
-      fresh.onclick = () => { S.done = {}; S.skipped = {}; S.passed = {}; S.legIdx = 0; begin(); };
+      second.textContent = S.pending ? 'Start a new drive with the new route' : 'Start a new drive at stop 1';
+      second.onclick = startNewDrive;
     }
-    btns.appendChild(fresh);
+    btns.appendChild(second);
   }
   updateOfflineLine();
 }

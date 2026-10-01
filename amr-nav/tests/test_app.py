@@ -1258,6 +1258,189 @@ with sync_playwright() as p:
     check("with headings, driving the whole out-and-back leg (through the U-turn) stays within 25 m of the true distance",
           max(errs) <= 25, "largest error %.0f m" % max(errs))
     ctx.close()
+
+    # ---------- 24. stuck states: a second tap to skip, no guidance to stops already closed, a start screen after the last leg ----------
+    def li(o, kind):
+        """Index of the leg that ends at stop o with the given kind (stop, park or car)."""
+        return next(i for i, l in enumerate(legs) if l["to"].get("o") == o and l["to"]["kind"] == kind)
+
+    def nums(pg, what):
+        return pg.evaluate("() => Object.keys(S.%s).map(Number).sort((a, b) => a - b)" % what)
+
+    def at(pg):
+        return pg.evaluate("() => ({leg: S.legIdx, waiting: S.waiting})")
+
+    # a. Skip needs a second tap within 4 s
+    i2 = li(2, "stop")
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => setLeg(i)", i2)
+    check("skip test setup: the drive to stop 2 is leg %d and the button reads Skip stop" % i2,
+          legs[i2]["mode"] == "drive" and text(pg, "#aSkip") == "Skip stop", text(pg, "#aSkip"))
+    pg.click("#aSkip")
+    r = at(pg)
+    check("one tap on Skip does not skip: nothing is skipped or reached, and the leg stays",
+          r["leg"] == i2 and nums(pg, "skipped") == [] and nums(pg, "done") == [], json.dumps(r))
+    check("after one tap the button reads Tap again to skip", text(pg, "#aSkip") == "Tap again to skip", text(pg, "#aSkip"))
+    feed(pg, legs[i2]["geom"][0])                        # a GPS fix redraws the card
+    check("a GPS fix does not take the Tap again to skip text away", text(pg, "#aSkip") == "Tap again to skip", text(pg, "#aSkip"))
+    pg.click("#aSkip")
+    r = at(pg)
+    check("a second tap within 4 s skips stop 2 and moves to the next leg", nums(pg, "skipped") == [2] and r["leg"] == i2 + 1, json.dumps(r))
+    check("on the next leg the button reads Skip stop again", text(pg, "#aSkip") == "Skip stop", text(pg, "#aSkip"))
+    pg.click("#aSkip")                                   # arms the button on the drive to stop 3
+    pg.evaluate("(i) => setLeg(i)", i2 + 2)
+    check("moving to another leg takes the armed state away", text(pg, "#aSkip") == "Skip stop" and nums(pg, "skipped") == [2], text(pg, "#aSkip"))
+    pg.click("#aSkip")                                   # arms the button on the drive to stop 4
+    pg.wait_for_timeout(4400)
+    check("4 s after the first tap the button reads Skip stop again", text(pg, "#aSkip") == "Skip stop", text(pg, "#aSkip"))
+    pg.click("#aSkip")
+    r = at(pg)
+    check("a tap after the 4 s are over only arms the button again: stop 4 is not skipped",
+          nums(pg, "skipped") == [2] and r["leg"] == i2 + 2 and text(pg, "#aSkip") == "Tap again to skip", json.dumps(r))
+    ctx.close()
+
+    # b. Skip on the walk-in leg of stop 12 goes to the walk back to the car, not to the next drive
+    ip12, iw12, ic12 = li(12, "park"), li(12, "stop"), li(12, "car")
+    ctx, pg = guidance_page(br)
+    pg.evaluate("(i) => setLeg(i)", iw12)
+    check("walk-in skip test setup: the walk to stop 12 is leg %d and the car leg of stop 12 follows it" % iw12,
+          legs[iw12]["mode"] == "walk" and ic12 == iw12 + 1 and legs[ic12]["mode"] == "walk", "")
+    pg.click("#aSkip")
+    pg.click("#aSkip")
+    r = at(pg)
+    check("a confirmed skip on the walk-in leg of stop 12 goes to the car leg of stop 12",
+          nums(pg, "skipped") == [12] and r["leg"] == ic12 and r["waiting"] is None, json.dumps(r))
+    check("... and the card says Walk back to the car", text(pg, "#cSub").startswith("Walk back to the car"), text(pg, "#cSub"))
+    pg.evaluate("(i) => setLeg(i)", ip12)                # still driving to the parking spot: nobody is on foot, so skip drives on
+    pg.click("#aSkip")
+    pg.click("#aSkip")
+    r = at(pg)
+    check("a confirmed skip on the drive to the parking spot of stop 12 goes to the next drive leg (stop 13)",
+          r["leg"] == li(13, "stop") and legs[r["leg"]]["mode"] == "drive", json.dumps(r))
+    ctx.close()
+
+    # c. Go to stop 12 with stops 13, 14 and 15 closed: after its walk the guide drives on to stop 16
+    ctx, pg = guidance_page(br)
+    pg.evaluate("() => { [13, 14, 15].forEach(o => markStop(o, 'done')); }")
+    pg.click("#fList")
+    pg.locator("#row12 button").click()
+    pg.wait_for_timeout(400)
+    check("Go to stop 12 starts at its parking-spot leg", at(pg)["leg"] == ip12, json.dumps(at(pg)))
+    feed(pg, legs[ip12]["geom"][-1])
+    check("at the parking spot of stop 12 the guide waits", at(pg)["waiting"] == "park", json.dumps(at(pg)))
+    pg.click("#aNext")                                   # Walk to meter
+    feed(pg, legs[iw12]["geom"][-1])
+    check("at stop 12 on foot the guide waits for Done", at(pg)["waiting"] == "stop" and at(pg)["leg"] == iw12, json.dumps(at(pg)))
+    pg.click("#aNext")                                   # Done, walk back
+    check("Done at stop 12 starts the walk back to the car", at(pg)["leg"] == ic12 and nums(pg, "done") == [12, 13, 14, 15], json.dumps(at(pg)))
+    feed(pg, legs[ic12]["geom"][-1])                     # back at the car
+    r = at(pg)
+    check("back at the car, the guide drives on to stop 16 and not to stops 13, 14 or 15",
+          r["leg"] == li(16, "stop") and legs[r["leg"]]["mode"] == "drive" and r["waiting"] is None, json.dumps(r))
+    ctx.close()
+
+    def go(pg, i):
+        """setLeg(i) with no saved fix: setLeg replays the newest fix, which could arrive at the end of the leg the test just left."""
+        pg.evaluate("(i) => { S.fix = null; setLeg(i); }", i)
+
+    # e. every other way to move on after a stop passes over closed stops too
+    i3, i4 = li(3, "stop"), li(4, "stop")
+    ctx, pg = guidance_page(br)
+    pg.evaluate("() => markStop(3, 'done')")
+    go(pg, i2)
+    feed(pg, legs[i2]["geom"][-1])                       # stop 2 reached by driving (no ATTENTION meter): auto advance
+    check("auto advance after stop 2 passes over stop 3, which is closed", at(pg)["leg"] == i4, json.dumps(at(pg)))
+    go(pg, i2)
+    pg.click("#aNext")                                   # Reached, next
+    check("Reached, next after stop 2 passes over stop 3", at(pg)["leg"] == i4, json.dumps(at(pg)))
+    go(pg, i2)
+    pg.click("#aSkip")
+    pg.click("#aSkip")
+    check("Skip stop (two taps) at stop 2 passes over stop 3, and skips only stop 2",
+          at(pg)["leg"] == i4 and nums(pg, "skipped") == [2], json.dumps([at(pg), nums(pg, "skipped")]))
+    ip10 = li(10, "park")
+    pg.evaluate("() => markStop(11, 'skip')")
+    go(pg, ip10)
+    feed(pg, legs[ip10]["geom"][-1])
+    pg.click("#aSkip")                                   # Read from car
+    check("Read from car at the parking spot of stop 10 passes over stop 11, which was skipped",
+          at(pg)["leg"] == ip12 and 10 in nums(pg, "done"), json.dumps(at(pg)))
+    pg.evaluate("() => { markStop(8, 'done'); markStop(11, 'done'); }")
+    go(pg, i7)
+    feed(pg, end7)                                       # stop 7 has an ATTENTION meter: the guide waits
+    feed(pg, away(100), speed=5)
+    feed(pg, away(100), speed=5)                         # driving away: the guide goes on without a tap
+    r = at(pg)
+    check("auto-resume from stop 7 passes over stop 8, which is closed, and goes to stop 9",
+          r["leg"] == li(9, "stop") and r["waiting"] is None, json.dumps(r))
+    check("... and says that stop 9 comes next", "Continuing to stop 9." in pg.evaluate("() => window.__spoken"), "")
+    # a closed walk-in stop (10): from the drive before it, the guide goes past its parking, walk and walk-back legs to the drive to stop 11;
+    # from its own walk leg, the walk back to the car is the next leg
+    pg.evaluate("() => { S.done = {}; S.skipped = {}; S.passed = {}; markStop(10, 'done'); }")
+    r = pg.evaluate("(a) => typeof nextOpenLeg === 'function' ? [nextOpenLeg(a[0]), nextOpenLeg(a[1])] : null", [li(9, "stop"), li(10, "stop")])
+    check("with walk-in stop 10 closed, the next leg after stop 9 is the drive to stop 11, and after its walk the walk back to the car",
+          r == [li(11, "stop"), li(10, "car")], json.dumps(r))
+    pg.evaluate("() => { S.passed[10] = Date.now(); delete S.done[10]; }")
+    r = pg.evaluate("(a) => typeof nextOpenLeg === 'function' ? [nextOpenLeg(a[0]), nextOpenLeg(a[1])] : null", [li(9, "stop"), len(legs) - 2])
+    check("a passed stop is closed too, and the drive back to the depot is always open",
+          r == [li(11, "stop"), len(legs) - 1], json.dumps(r))
+    ctx.close()
+
+    # d. the last leg saved: the start screen offers a new drive first, and a way to look at the stops
+    NEW_BUILT_24 = "12/01/2026"
+    ctx = br.new_context(viewport={"width": 800, "height": 1280}, geolocation=DEPOT, permissions=["geolocation"])
+    rstate = {"edit": None, "served": None}
+    ctx.route(ROUTE_URL, route_editor(rstate))
+    pg = ctx.new_page()
+    attach(pg)
+    pg.goto(BASE + "?reset=1")
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.click("#startBtns button")                        # Start pins the route
+    pg.wait_for_timeout(600)
+    n_legs = pg.evaluate("() => S.legs.length")
+
+    def end_screen(edit=None):
+        """The drive is over (last leg saved, some stops marked); open the app again. Returns the start screen buttons."""
+        pg.evaluate("(n) => { markStop(1, 'done'); markStop(2, 'skip'); setLeg(n - 1); }", n_legs)
+        rstate["edit"] = edit
+        pg.reload()
+        pg.wait_for_selector("#startBtns button", timeout=20000)
+        return pg.evaluate("() => [...document.querySelectorAll('#startBtns button')].map(b => b.textContent)")
+
+    btns = end_screen()
+    check("with the last leg saved, the start screen offers Start a new drive at stop 1 first, then Review the last drive",
+          btns == ["Start a new drive at stop 1", "Review the last drive"], json.dumps(btns))
+    check("... and not Start guidance or Resume", pg.evaluate("() => S.legIdx") == n_legs - 1 and "Resume" not in " ".join(btns), json.dumps(btns))
+    pg.click('#startBtns button:has-text("Review the last drive")')
+    pg.wait_for_timeout(300)
+    r = pg.evaluate("""() => { const b = document.getElementById('pBody').getBoundingClientRect(), e = document.elementFromPoint(b.left + b.width / 2, b.top + 30);
+        return {shown: document.getElementById('panel').classList.contains('show'), rows: document.querySelectorAll('#pBody .row').length,
+                over: !!e && document.getElementById('panel').contains(e), started: S.started}; }""")
+    check("Review the last drive opens the stop list, in front of the start screen, without starting the drive",
+          r["shown"] and r["rows"] == 43 and r["over"] and r["started"] is False, json.dumps(r))
+    pg.screenshot(path=os.path.join(SHOTS, "24-review-last-drive.png"))
+    pg.locator("#row12 button").click()                  # Go from the list while the start screen is up
+    pg.wait_for_timeout(300)
+    btns2 = pg.evaluate("() => [...document.querySelectorAll('#startBtns button')].map(b => b.textContent)")
+    check("Go on a stop in that list makes the start screen offer Resume at stop 12 (the buttons are redrawn)",
+          btns2[0] == "Resume at stop 12" and pg.evaluate("() => S.started") is False, json.dumps(btns2))
+    btns = end_screen()
+    pg.click('#startBtns button:has-text("Start a new drive at stop 1")')
+    pg.wait_for_timeout(500)
+    r = pg.evaluate("() => ({leg: S.legIdx, done: Object.keys(S.done), skipped: Object.keys(S.skipped), started: S.started, built: S.route.built})")
+    check("Start a new drive at stop 1 after the last leg: leg 0, nothing reached, drive started",
+          r["leg"] == 0 and r["done"] == [] and r["skipped"] == [] and r["started"] and r["built"] == ROUTE_BUILT, json.dumps(r))
+    # a newer route waits too: the same two buttons, and the new drive uses the new route
+    btns = end_screen(lambda t: t.replace('"built":"' + ROUTE_BUILT + '"', '"built":"' + NEW_BUILT_24 + '"', 1))
+    line = pg.evaluate("() => document.getElementById('newRouteLine') ? document.getElementById('newRouteLine').textContent : null")
+    check("last leg saved and a new route waiting: the same two buttons, and the new-route line shows",
+          btns == ["Start a new drive at stop 1", "Review the last drive"] and line is not None and NEW_BUILT_24 in line, json.dumps([btns, line]))
+    pg.click('#startBtns button:has-text("Start a new drive at stop 1")')
+    pg.wait_for_timeout(500)
+    r = pg.evaluate("() => ({leg: S.legIdx, done: Object.keys(S.done), built: S.route.built, pending: S.pending, started: S.started, sig: lsGet('activeSig', null)})")
+    check("Start a new drive at stop 1 with a new route waiting uses the new route",
+          r["leg"] == 0 and r["done"] == [] and r["built"] == NEW_BUILT_24 and r["pending"] is None and r["started"] and r["sig"] == fnv1a_py(rstate["served"]), json.dumps(r))
+    ctx.close()
     br.close()
 
 errs = [e for e in errors if "favicon" not in e]
