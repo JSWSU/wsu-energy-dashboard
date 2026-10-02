@@ -146,7 +146,9 @@
       rec('exportOpenGmail', arguments);
       if (cfg.notApp) return '';
       if (cfg.gmail && cfg.gmail !== 'opened') return String(cfg.gmail);
-      N.mails.push({subject: String(subject), body: String(body), files: batches[batch] || [], args: arguments.length});
+      // Exports.names: the CSV first, then the photos by name, whatever order the page added them in
+      const files = (batches[batch] || []).slice().sort((a, b) => (/\.csv$/i.test(b.name) - /\.csv$/i.test(a.name)) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      N.mails.push({subject: String(subject), body: String(body), files, args: arguments.length});
       return 'opened';
     },
   });

@@ -166,10 +166,13 @@ function mrB64Blob(b64, type) {
 const MR_APP = {
   all: async () => JSON.parse(mrN('storeAll')),
   photo: async id => { const b = mrN('photoGet', id); return b ? mrB64Blob(b, 'image/jpeg') : null; },
+  /* Two writes with no rollback, so the order keeps every entry true: a new photo goes in before the entry that names
+     it, and a removed photo goes only after the entry that no longer names it (a failed write leaves at most a spare
+     photo file, never an entry that names a missing photo). */
   save: async (e, photo) => {
-    if (photo) mrOk('photoPut', e.id, await mrBlobB64(photo));      // the photo first: an entry never names a missing photo
-    else if (photo === null) mrOk('photoDelete', e.id);
+    if (photo) mrOk('photoPut', e.id, await mrBlobB64(photo));
     mrOk('storePut', e.id, JSON.stringify(e));
+    if (photo === null) { try { mrOk('photoDelete', e.id); } catch (x) { /* a spare photo file; the entry names none */ } }
   },
   del: async id => { mrOk('storeDelete', id); },
   draftGet: async () => {
@@ -345,9 +348,11 @@ async function mrOpenForm(opts) {
     else if (opts.editId) {
       const e = await mrGet(opts.editId);
       if (!e || e.status !== 'new') { toast('Only new reads can change.'); return; }
+      const photo = e.photoBytes ? await mrPhoto(e.id) : null;
       f = Object.assign(mrBlankForm(e.stop), {editId: e.id, meterRef: e.other ? null : e.ref, other: e.other,
         otherId: e.other ? e.meter : '', read: e.read, mult: e.mult, notes: e.notes,
-        keep: {meter: e.meter, ref: e.ref, bldg: e.bldg, site: e.site}, photo: e.photoBytes ? await mrPhoto(e.id) : null});
+        keep: {meter: e.meter, ref: e.ref, bldg: e.bldg, site: e.site}, photo,
+        photoChanged: !!e.photoBytes && !photo});   // its photo is gone from storage: Save clears the name (photoBytes 0)
     } else {
       const st = mrDefaultStop();
       f = mrBlankForm(st ? st.o : null);
@@ -818,12 +823,14 @@ async function mrBuildParts(entries) {
       .concat(photoList.map(p => new File([blobs.get(p.id)], p.name, {type: 'image/jpeg'})));
     const bytes = app ? new Blob([csv]).size + photoList.reduce((a, p) => a + p.bytes, 0) : files.reduce((a, f) => a + f.size, 0);
     if ((!app && files.length > MR_CFG.maxFilesPerShare) || bytes > MR_CFG.maxBytesPerPart) throw new Error('part ' + (i + 1) + ' is too large');
-    const photos = photoList.length;
-    return {ids: g.map(e => e.id), csv, files, photoList, bytes, photos, reads: g.length, csvName: nm.csv, subject: nm.subject,
-      text: g.length + (g.length === 1 ? ' manual read, ' : ' manual reads, ') + photos + (photos === 1 ? ' photo.' : ' photos.') +
-        (n > 1 ? ' Part ' + (i + 1) + ' of ' + n + '.' : ''),
-      state: 'ready', err: '', back: 0};
+    const photos = photoList.length, tail = n > 1 ? ' Part ' + (i + 1) + ' of ' + n + '.' : '';
+    return {ids: g.map(e => e.id), entries: g, names, csv, files, photoList, bytes, photos, reads: g.length, csvName: nm.csv,
+      subject: nm.subject, tail, text: mrPartText(g.length, photos, tail), state: 'ready', err: '', note: '', back: 0};
   });
+}
+/* The email body: what the part holds. */
+function mrPartText(reads, photos, tail) {
+  return reads + (reads === 1 ? ' manual read, ' : ' manual reads, ') + photos + (photos === 1 ? ' photo.' : ' photos.') + (tail || '');
 }
 function mrRenderExport() {
   const body = $('mrExportBody');
@@ -857,6 +864,11 @@ function mrRenderExport() {
       done: app ? 'Gmail opened. Marked exported. Check the email, then tap Send in Gmail.' : 'Shared. Marked exported.',
       saved: 'Saved to Downloads. Marked exported.'}[pt.state];
     box.appendChild(st);
+    if (pt.note) {
+      const nt = document.createElement('div');
+      nt.className = 'mr-note'; nt.textContent = pt.note;
+      box.appendChild(nt);
+    }
     const btns = document.createElement('div');
     btns.className = 'pbtns';
     const btn = (txt, fn, cls, off) => {
@@ -894,21 +906,35 @@ function mrRenderExport() {
 async function mrEmailTap(i) {
   const pt = MRX.parts[i];
   if (!pt || pt.state === 'sharing' || pt.state === 'done' || pt.state === 'markfail') return;
-  pt.state = 'sharing'; pt.err = '';
+  pt.state = 'sharing'; pt.err = ''; pt.note = '';
   mrRenderExport();
-  let b;
+  let b, text = pt.text;
   try {
     b = mrN('exportBegin');
     if (!b) throw new Error('the app did not answer');
-    mrOk('exportAddText', b, pt.csvName, pt.csv);
-    pt.photoList.forEach(ph => mrOk('exportAddPhoto', b, ph.id, ph.name));
+    /* The photos first. A photo gone from the app's store is left out, as in a browser: its read goes with no photo
+       name, so one lost file never blocks the part. Then the CSV, made again when a photo was left out. */
+    const missing = [];
+    pt.photoList.forEach(ph => {
+      try { mrOk('exportAddPhoto', b, ph.id, ph.name); }
+      catch (e) { if (/^error: no photo for /.test(String(e && e.message))) missing.push(ph); else throw e; }
+    });
+    let csv = pt.csv;
+    if (missing.length) {
+      const names = new Map(pt.names);
+      missing.forEach(ph => names.delete(ph.id));
+      csv = mrCsvText(pt.entries, names);
+      text = mrPartText(pt.reads, pt.photos - missing.length, pt.tail);
+      pt.note = 'Not found on this tablet, so left out: ' + missing.map(ph => ph.name).join(', ') + '. The read goes with no photo name.';
+    }
+    mrOk('exportAddText', b, pt.csvName, csv);
   } catch (e) {
     pt.state = 'failed'; pt.err = 'The files could not be made: ' + ((e && e.message) || 'storage error') + '.';
     mrRenderExport();
     return;
   }
   let r;
-  try { r = String(mrBridge().exportOpenGmail(b, pt.subject, pt.text)); } catch (e) { r = 'error: ' + ((e && e.message) || 'no answer'); }
+  try { r = String(mrBridge().exportOpenGmail(b, pt.subject, text)); } catch (e) { r = 'error: ' + ((e && e.message) || 'no answer'); }
   if (r === 'opened') { await mrExported(pt, 'done'); return; }
   if (r === 'error: timeout') {                       // no answer in time: Gmail may still have opened, so the reader says
     pt.state = 'unknown';

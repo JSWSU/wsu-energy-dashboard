@@ -756,6 +756,41 @@ def t_photo_busy(br):
 
 
 @A.case
+def t_photo_missing(br):
+    """A read must never name a photo the store does not hold, and an edit can always clear such a name."""
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    pg.evaluate("() => { CFG.skipConfirmMs = 1500; }")
+    seed(pg, [dict(id="pm1", savedAt=A.T1, meter="M1", ref="200301", stop=2, read="1", mult="1", photo=[160, 120])])
+    pg.evaluate("() => mrOpenForm({editId: 'pm1'})")
+    pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+    pg.click("#mrPhotoDel")
+    pg.evaluate("""() => { const N = window.AMRNative, real = N.storePut;                         // storePut fails once
+        N.storePut = function () { N.storePut = real; return 'error: No space left on device'; }; }""")
+    pg.click("#mrSave")
+    pg.wait_for_timeout(400)
+    r = pg.evaluate("() => [!!window.__native.st.photos.pm1, JSON.parse(window.__native.st.entries.pm1).photoBytes > 0, $('mrForm').hidden]")
+    A.check("app edit: Remove photo, then a save that fails: the photo file stays while the entry still names it",
+            r == [True, True, False], json.dumps(r))
+    pg.click("#mrSave")
+    pg.wait_for_selector("#mrForm", state="hidden", timeout=5000)
+    r = pg.evaluate("() => [!!window.__native.st.photos.pm1, JSON.parse(window.__native.st.entries.pm1).photoBytes]")
+    A.check("app edit: the save that works writes the entry first, then deletes the photo", r == [False, 0], json.dumps(r))
+    ctx.close()
+    for mode in MODES:
+        ctx, pg = A.open_app(br, mode=mode, start=False)
+        seed(pg, [dict(id="pm2", savedAt=A.T1, meter="M2", ref="200302", stop=2, read="2", mult="1", photo=[160, 120])])
+        pg.evaluate("() => mrStore() === MR_APP ? (delete window.__native.st.photos.pm2, window.__native.save()) : "
+                    "mrTx(['photos'], 'readwrite', st => { st.photos.delete('pm2'); })")       # the photo is gone (any cause)
+        pg.evaluate("() => mrOpenForm({editId: 'pm2'})")
+        pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+        pg.click("#mrSave")
+        pg.wait_for_selector("#mrForm", state="hidden", timeout=5000)
+        A.check(mode + " edit: a read whose photo is gone: an edit with no change saves it with no photo (photoBytes 0)",
+                entry(pg, "pm2")["photoBytes"] == 0, json.dumps(entry(pg, "pm2")["photoBytes"]))
+        ctx.close()
+
+
+@A.case
 def t_photo_draft(br):
     ctx, pg = A.open_app(br)
     open_form(pg)
@@ -1124,14 +1159,24 @@ def t_export_app_outcomes(br):
                 r[0] == "new" and want in (r[1] or "") and r[2] == ["Open in Gmail again"], json.dumps(r))
         ctx.close()
     ctx, pg = A.open_app(br, mode="app", start=False)
-    seed(pg, [dict(id="o2", savedAt=A.T1, meter="M2", ref="200202", read="1", mult="1", photo=[160, 120])])
+    seed(pg, [dict(id="o2", savedAt=A.T1, meter="M2", ref="200202", read="1", mult="1", photo=[160, 120]),
+              dict(id="o4", savedAt=A.T1 + 60000, meter="M4", ref="200204", read="4", mult="1", photo=[160, 120])])
     pg.evaluate("() => { delete window.__native.st.photos.o2; window.__native.save(); }")      # the photo is gone from the store
     open_export(pg)
     pg.click("#mrPart0 button")
-    pg.wait_for_timeout(400)
-    r = [entry(pg, "o2")["status"], A.dom(pg, "#mrPartState0"), len(A.native(pg)["mails"])]
-    A.check("app export: a photo missing from the store stops the part before Gmail opens; the read stays new",
-            r[0] == "new" and "could not be made" in (r[1] or "") and r[2] == 0, json.dumps(r))
+    A.pump_until(pg, lambda: len(A.native(pg)["mails"]) == 1, timeout=5)
+    mails = A.native(pg)["mails"]
+    files = [f["name"] for f in mails[0]["files"]] if mails else []
+    rows = mails[0]["files"][0]["text"].split("\r\n") if mails else []
+    A.check("app export: a photo missing from the app's store is left out (as in a browser); the part still goes to Gmail",
+            files == ["AMR-manual-reads-20261001-1433.csv", "200204-20261001-1433.jpg"], json.dumps(files))
+    A.check("app export: the CSV row of that read names no photo; the other row keeps its photo name",
+            len(rows) > 2 and rows[1].split(",")[9] == "" and rows[2].split(",")[9] == "200204-20261001-1433.jpg"
+            and mails[0]["body"] == "2 manual reads, 1 photo.", json.dumps(rows[1:3] + [mails[0]["body"] if mails else ""]))
+    note = pg.evaluate("() => $('mrPart0').textContent")
+    A.check("app export: the part says which photo was not found; both reads are marked exported",
+            "200202-20261001-1432.jpg" in note and "not found" in note.lower()
+            and [entry(pg, "o2")["status"], entry(pg, "o4")["status"]] == ["exported", "exported"], note)
     ctx.close()
     ctx, pg = A.open_app(br, mode="app", start=False)
     seed(pg, [dict(id="o3", savedAt=A.T1, meter="M3", ref="200203", read="1", mult="1", photo=[160, 120])])
