@@ -1,6 +1,6 @@
 {
  "format": "amr-app-manifest-1",
- "version": "2026.10.02-1",
+ "version": "2026.10.02-2",
  "minBridge": 2,
  "files": [
   {"path": "basemap.json", "size": 980501, "sha256": "42e6631e879bac3837e038a4fe2e58656e242848084a160e37b4338dc39e8277"},
@@ -10,11 +10,11 @@
   {"path": "icons/icon-192.png", "size": 9549, "sha256": "4b9efd198f75a2e801f64fd36e1f14331eb993e236d706c96e2a7225775247d7"},
   {"path": "icons/icon-512.png", "size": 25485, "sha256": "8cf4e635499345a2773c7712c9e5643b1e27fe928318bac8d3c9be4a35940a92"},
   {"path": "icons/maskable-512.png", "size": 14756, "sha256": "d161f772d02fa4e85634d43a63833001afae1f2bac3c3442fd20e6d2fe1ea21e"},
-  {"path": "index.html", "size": 134726, "sha256": "f4ab21be73b0e9e7ad28046354c7599e647334397e6c9d78eff56397f1398619"},
+  {"path": "index.html", "size": 135145, "sha256": "7f2a68e3ab5dc590ca9a47f0405aa503ac327b0d90f2f17329d25bc16bba894d"},
   {"path": "manifest.webmanifest", "size": 583, "sha256": "e055da28a7be322f0a2235edb6ca6391a22582927721fd31cb8511fcab9b59c5"},
-  {"path": "manual-reads.js", "size": 55553, "sha256": "90df5b0eabbbdb699dd717ce7aacfebcfc0e690fd4a638bf4bfb1766521e1a56"},
+  {"path": "manual-reads.js", "size": 55969, "sha256": "8aa5283e2f01a178b12e8aa5756e087ae78e4fc65c8e120d31fbe5d5f5d940b3"},
   {"path": "route.json", "size": 115072, "sha256": "6b9ffc1bf282b41f921a24d4b17c44a316626391ccce71c6e24a4953b37665b0"},
-  {"path": "sw.js", "size": 8742, "sha256": "707814749337669256b61aa72f1e2e6bb05a3c676e63cd8b34577fc77d538218"},
+  {"path": "sw.js", "size": 8742, "sha256": "a30de42b15d0e456873627c0d5d480b30a5d9fca2014a48c1b0de45547385eb8"},
   {"path": "vendor/leaflet/images/layers-2x.png", "size": 1259, "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf"},
   {"path": "vendor/leaflet/images/layers.png", "size": 696, "sha256": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6"},
   {"path": "vendor/leaflet/images/marker-icon-2x.png", "size": 2464, "sha256": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528"},

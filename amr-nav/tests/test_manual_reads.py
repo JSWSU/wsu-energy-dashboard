@@ -1699,11 +1699,39 @@ def t_map_reads_off(br):
     ctx.close()
 
 
+def fit_from_stop_box(pg, st, m):
+    """Open the form for meter m of stop st the way the reader does on the map: tap the stop pin, then Manual read on the
+    meter's row (the stop box lists every meter, also the ones that share a pin). Returns where the chosen row sits against
+    the sticky Cancel and Save bar."""
+    map_at(pg, [st["lat"], st["lon"]])
+    pg.click(".leaflet-marker-icon[title^='Stop %d:']" % st["o"])
+    pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
+    pg.click(".mp-pop .pp-m[data-ref='%s'] button" % m["ref"])
+    pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+    pg.wait_for_timeout(300)
+    return pg.evaluate("""() => { const fm = $('mrForm'), on = document.querySelector('#mrMeters .mr-m.on');
+        const ob = on ? on.getBoundingClientRect() : null, ft = fm.querySelector('.mr-foot').getBoundingClientRect(), fr = fm.getBoundingClientRect();
+        return {rows: $('mrMeters').querySelectorAll('.mr-m').length, chosen: on ? on.querySelector('input').value : null,
+                row: ob ? [Math.round(ob.top), Math.round(ob.bottom)] : null, foot: Math.round(ft.top), scroll: Math.round(fm.scrollTop),
+                seen: !!ob && ob.top >= fr.top && ob.bottom <= ft.top + 1}; }""")
+
+
+def box_vs_side(pg):
+    """Where the open map box sits against the side buttons (px), and whether the right edge of its first button takes a tap."""
+    return pg.evaluate("""() => { const w = document.querySelector('.mp-pop .leaflet-popup-content-wrapper').getBoundingClientRect(),
+        s = $('side').getBoundingClientRect(), bs = [...document.querySelectorAll('.mp-pop button')], b0 = bs[0].getBoundingClientRect(),
+        hit = document.elementFromPoint(b0.right - 3, b0.top + b0.height / 2);
+        return {box: [Math.round(w.left), Math.round(w.right)], width: Math.round(w.width), side: Math.round(s.left),
+                btn: Math.round(Math.max(...bs.map(b => b.getBoundingClientRect().right))), tap: !!hit && bs[0].contains(hit)}; }""")
+
+
 @A.case
 def t_map_form_fit(br):
     """Shot 04 of the UI samples (10/02/2026): on the field tablet held sideways (1280 x 800) the meter list cut its last
     row and hid Other meter inside a 40% box. Now the list has no height cap: every row shows in full, the form scrolls,
-    and the meter chosen on the map is in view above Cancel and Save."""
+    and the meter chosen on the map is in view above Cancel and Save. Review finding (10/02/2026): on the long stops
+    (stop 18 has 23 meters, stop 29 has 17) scrollIntoView put the chosen row under the sticky bar, on both tablet
+    orientations; the form now keeps the bar's height free below the row."""
     for mode in MODES:
         ctx, pg = A.open_app(br, mode=mode, viewport=(1280, 800))
         st = A.STOPS[2]
@@ -1722,6 +1750,54 @@ def t_map_form_fit(br):
                 "the chosen meter is in view above Cancel and Save",
                 r == {"cap": "none", "inner": False, "rows": len(st["meters"]) + 1, "chosen": last["ref"], "seen": True}, json.dumps(r))
         ctx.close()
+    A.check("route data: stop 18 has 23 meters and stop 29 has 17 (the long stops the fit checks below need)",
+            [len(A.STOPS[18]["meters"]), len(A.STOPS[29]["meters"])] == [23, 17])
+    for mode in MODES:
+        for label, vp in (("sideways (1280 x 800)", (1280, 800)), ("upright (800 x 1280)", (800, 1280))):
+            for o, i in ((18, -1), (18, 15), (29, -1)):
+                ctx, pg = A.open_app(br, mode=mode, viewport=vp)     # a fresh page for each: the form keeps its scroll position between opens
+                st = A.STOPS[o]
+                m = st["meters"][i]
+                r = fit_from_stop_box(pg, st, m)
+                A.check("%s form from the map, tablet %s: meter %d of %d at stop %d is in full view above Cancel and Save"
+                        % (mode, label, i % len(st["meters"]) + 1, len(st["meters"]), o),
+                        r["chosen"] == m["ref"] and r["rows"] == len(st["meters"]) + 1 and r["seen"] is True, json.dumps(r))
+                ctx.close()
+
+
+@A.case
+def t_map_box_phone(br):
+    """Review finding (10/02/2026): on a 412 px phone the stop box of stop 18 (381 px wide) covered the side buttons. A box is
+    now as wide as the room between the pads of the map pan (a minimum of 300 px and a maximum of 380 px on a wide screen),
+    so it stays left of the side buttons on every phone and keeps its full width on the tablet."""
+    st, m = A.STOPS[18], meter(2, "200001")
+    for label, vp in (("412 x 915", (412, 915)), ("360 x 780", (360, 780))):
+        ctx, pg = A.open_app(br, viewport=vp, is_mobile=True, has_touch=True, device_scale_factor=2.6)
+        map_at(pg, [st["lat"], st["lon"]])
+        pg.click(".leaflet-marker-icon[title^='Stop 18:']")
+        pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
+        pg.wait_for_timeout(700)                                  # the pan that brings the box into the pads settles
+        r = box_vs_side(pg)
+        A.check("phone %s: the stop box (stop 18, 23 meters) stays inside the screen and left of the side buttons; "
+                "the right edge of a Manual read button takes a tap" % label,
+                r["box"][0] >= 0 and r["box"][1] <= r["side"] and r["btn"] <= r["side"] and r["tap"] is True, json.dumps(r))
+        map_at(pg, [m["lat"], m["lon"]])
+        pg.click(".mpw[data-ref='200001']")
+        pg.wait_for_selector(".mp-pop .pp-head", timeout=5000)
+        pg.wait_for_timeout(700)
+        r = box_vs_side(pg)
+        A.check("phone %s: the meter box stays inside the screen and left of the side buttons; the right edge of Manual read takes a tap" % label,
+                r["box"][0] >= 0 and r["box"][1] <= r["side"] and r["btn"] <= r["side"] and r["tap"] is True, json.dumps(r))
+        ctx.close()
+    ctx, pg = A.open_app(br, viewport=(800, 1280))
+    map_at(pg, [st["lat"], st["lon"]])
+    pg.click(".leaflet-marker-icon[title^='Stop 18:']")
+    pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
+    pg.wait_for_timeout(700)
+    r = box_vs_side(pg)
+    A.check("tablet upright (800 x 1280): the stop box keeps its full width (381 px) and is left of the side buttons",
+            r["width"] == 381 and r["box"][1] <= r["side"], json.dumps(r))
+    ctx.close()
 
 
 with sync_playwright() as p:

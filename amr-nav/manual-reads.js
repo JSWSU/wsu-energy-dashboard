@@ -9,7 +9,7 @@
 'use strict';
 /* This file's version: always the same as APP_VERSION in index.html (bump both together; test_app_manifest.py checks).
    The page runs manual reads only when they match, so a page and an older or newer copy of this file never mix. */
-const MR_JS_VERSION = '2026.10.02-1';
+const MR_JS_VERSION = '2026.10.02-2';
 const MR_CFG = {
   db: 'amrNav-manualReads',     // IndexedDB name (browser); jswsu.github.io is shared with other pages, so the name says whose it is
   dbVersion: 1,                 // a schema change raises this by one and adds one step in mrDb(); an old step never changes
@@ -367,8 +367,13 @@ async function mrOpenForm(opts) {
   MR.form = f;
   mrPaintForm();
   $('mrForm').hidden = false;
+  /* The sticky Cancel and Save bar covers the bottom of the form, and scrollIntoView ignores it. The form keeps the bar's
+     height free at the bottom of its scroll box (plus 16 px: the form's own 8 px padding below the bar, and a gap of 8 px),
+     so the chosen meter (from the map, or an edit) stops above the bar, never under it. */
+  const foot = $('mrForm').querySelector('.mr-foot');
+  $('mrForm').style.scrollPaddingBottom = (foot ? foot.offsetHeight + 16 : 96) + 'px';
   const on = document.querySelector('#mrMeters .mr-m.on');
-  if (on) on.scrollIntoView({block: 'nearest'});        // the chosen meter (from the map, or an edit) is in view
+  if (on) on.scrollIntoView({block: 'nearest'});
   clearInterval(MR.gpsT);
   MR.gpsT = setInterval(mrGpsLine, 2000);
 }
