@@ -9,7 +9,7 @@
 'use strict';
 /* This file's version: always the same as APP_VERSION in index.html (bump both together; test_app_manifest.py checks).
    The page runs manual reads only when they match, so a page and an older or newer copy of this file never mix. */
-const MR_JS_VERSION = '2026.10.01-9';
+const MR_JS_VERSION = '2026.10.02-1';
 const MR_CFG = {
   db: 'amrNav-manualReads',     // IndexedDB name (browser); jswsu.github.io is shared with other pages, so the name says whose it is
   dbVersion: 1,                 // a schema change raises this by one and adds one step in mrDb(); an old step never changes
@@ -340,9 +340,10 @@ function mrStopMeters(stopO) {
 }
 function mrBlankForm(stopO) {
   return {editId: null, stopO: stopO == null ? null : Number(stopO), meterRef: null, other: false, otherId: '', read: '', mult: '',
-    notes: '', keep: null, photo: null, photoChanged: false, photoInfo: null, awaitingPhoto: false};
+    notes: '', keep: null, photo: null, photoChanged: false, photoInfo: null, awaitingPhoto: false, pickRef: null};
 }
-/* Open the form: {} for a new read, {editId} to change a new read, {draft} to bring back a form that was dropped. */
+/* Open the form: {} for a new read, {editId} to change a new read, {draft} to bring back a form that was dropped,
+   {pick: {stop, ref}} for a new read of the meter the reader tapped on the map (that stop and that meter chosen). */
 async function mrOpenForm(opts) {
   opts = opts || {};
   let f;
@@ -356,6 +357,8 @@ async function mrOpenForm(opts) {
         otherId: e.other ? e.meter : '', read: e.read, mult: e.mult, notes: e.notes,
         keep: {meter: e.meter, ref: e.ref, bldg: e.bldg, site: e.site}, photo,
         photoChanged: !!e.photoBytes && !photo});   // its photo is gone from storage: Save clears the name (photoBytes 0)
+    } else if (opts.pick) {
+      f = Object.assign(mrBlankForm(opts.pick.stop), {meterRef: String(opts.pick.ref), pickRef: String(opts.pick.ref)});
     } else {
       const st = mrDefaultStop();
       f = mrBlankForm(st ? st.o : null);
@@ -364,6 +367,8 @@ async function mrOpenForm(opts) {
   MR.form = f;
   mrPaintForm();
   $('mrForm').hidden = false;
+  const on = document.querySelector('#mrMeters .mr-m.on');
+  if (on) on.scrollIntoView({block: 'nearest'});        // the chosen meter (from the map, or an edit) is in view
   clearInterval(MR.gpsT);
   MR.gpsT = setInterval(mrGpsLine, 2000);
 }
@@ -492,10 +497,12 @@ function mrCloseForm() {
   MR.form = null;
   mrDraftDel().catch(() => { /* storage blocked: nothing to delete */ });
 }
-/* Cancel: a new form with anything filled in needs a second tap, so one stray tap cannot lose a read. */
+/* Cancel: a new form with anything filled in needs a second tap, so one stray tap cannot lose a read. The meter chosen
+   on the map is not something the reader typed: a form opened from the map with nothing else closes on one tap. */
 function mrCancelTap() {
   const f = MR.form ? mrReadForm() : null;
-  const filled = !!f && !f.editId && !!(f.read.trim() || f.mult.trim() || f.notes.trim() || f.otherId.trim() || f.meterRef || f.other || f.photo);
+  const filled = !!f && !f.editId && !!(f.read.trim() || f.mult.trim() || f.notes.trim() || f.otherId.trim() ||
+    (f.meterRef && f.meterRef !== f.pickRef) || f.other || f.photo);
   if (filled && !armTap('mrCancel', CFG.skipConfirmMs)) return;
   mrCloseForm();
 }

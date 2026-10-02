@@ -6,6 +6,7 @@ Never put an email address in this file: the repository is public."""
 import io
 import base64
 import json
+import math
 import os
 import re
 
@@ -637,11 +638,11 @@ def t_form_phone(br):
     A.check("phone: the form fits the width (no side scroll) and Save can be reached",
             r["over"] is False and r["sheet"][0] >= 0 and r["sheet"][1] <= 412 and r["save"], json.dumps(r))
     ctx.close()
-    # The meter list: no height cap on a screen narrower than 600 px (the sheet scrolls, so Other meter stays reachable);
-    # the tablet keeps the 40% cap. Stop 2 has 6 meters; Save with nothing filled in must show the Other meter row.
+    # The meter list: no height cap on any screen (the sheet scrolls, so Other meter stays reachable and no row is cut;
+    # shot 04, 10/02/2026). Stop 2 has 6 meters; Save with nothing filled in must show the Other meter row.
     m = A.STOPS[2]["meters"][0]
     for label, vp, kw, cap in (("phone", (412, 915), {"is_mobile": True, "has_touch": True, "device_scale_factor": 2.6}, "none"),
-                               ("tablet", (800, 1280), {}, "512px")):
+                               ("tablet", (800, 1280), {}, "none")):
         ctx, pg = A.open_app(br, viewport=vp, **kw)
         A.feed(pg, [m["lat"], m["lon"]], acc=9)
         open_form(pg)
@@ -655,7 +656,8 @@ def t_form_phone(br):
             A.check("phone: the meter list has no height cap and no inner scroll; after Save with nothing filled in the Other meter row is in view",
                     r["rows"] == 7 and r["cap"] == cap and r["inner"] is False and r["other"] and r["err"] != "", json.dumps(r))
         else:
-            A.check("tablet: the meter list keeps its 40% height cap (512 px of 1280)", r["cap"] == cap, json.dumps(r))
+            A.check("tablet: the meter list has no height cap and no inner scroll either (shot 04: no row cut)",
+                    r["cap"] == cap and r["inner"] is False and r["rows"] == 7, json.dumps(r))
         ctx.close()
 
 
@@ -1505,6 +1507,221 @@ def t_phone_list_export(br):
     b = pg.evaluate("() => [document.documentElement.scrollWidth > innerWidth, Math.round(document.querySelector('#mrExport .mr-sheet').getBoundingClientRect().right)]")
     A.check("phone: the list and the export sheet fit the width (no side scroll)", a == [False, 412] and b[0] is False and b[1] <= 412, json.dumps([a, b]))
     ctx.close()
+
+
+# ---------- meter pins on the map, the map boxes, and Manual read from the map (Task 21, owner features of 10/02/2026) ----------
+def hav_m(a, b):
+    """Meters between two [lat, lon] points (the page's hav(), the same earth radius)."""
+    p1, p2 = math.radians(a[0]), math.radians(b[0])
+    dp, dl = p2 - p1, math.radians(b[1] - a[1])
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * 6371008.8 * math.asin(math.sqrt(h))
+
+
+def pin_groups(st):
+    """The pins of one stop by the rule the owner approved: a meter joins the first pin within 3 m of that pin's first meter."""
+    gs = []
+    for m in st["meters"]:
+        g = next((g for g in gs if hav_m([g[0]["lat"], g[0]["lon"]], [m["lat"], m["lon"]]) <= 3), None)
+        if g:
+            g.append(m)
+        else:
+            gs.append([m])
+    return gs
+
+
+def map_at(pg, ll, z=18):
+    """Close any box and put ll in the middle of the map at zoom z (no animation)."""
+    pg.evaluate("([ll, z]) => { map.closePopup(); map.setView(ll, z, {animate: false}); }", [ll, z])
+    pg.wait_for_timeout(300)
+
+
+def meter(o, ref):
+    return next(m for m in A.STOPS[o]["meters"] if m["ref"] == ref)
+
+
+@A.case
+def t_map_pins(br):
+    """A pin for each meter at zoom 17 or closer (none at 16); meters at one spot share one pin with a count; an ATTENTION
+    pin is gold with !; a pin on its stop pin sits just beside it; every other pin sits on its meter."""
+    ctx, pg = A.open_app(br)
+    want = sum(len(pin_groups(st)) for st in A.ROUTE["stops"])
+    st2 = A.STOPS[2]
+    map_at(pg, [st2["lat"], st2["lon"]], 16)
+    n16 = pg.evaluate("() => document.querySelectorAll('.mpw').length")
+    map_at(pg, [st2["lat"], st2["lon"]], 17)
+    n17 = pg.evaluate("() => document.querySelectorAll('.mpw').length")
+    A.check("map: no meter pins at zoom 16; at zoom 17 one pin for each spot (%d pins for %d meters)" % (want, sum(len(s["meters"]) for s in A.ROUTE["stops"])),
+            n16 == 0 and n17 == want, json.dumps([n16, n17, want]))
+    map_at(pg, [st2["lat"], st2["lon"]], 18)
+    on = next(g[0] for g in pin_groups(st2) if hav_m([g[0]["lat"], g[0]["lon"]], [st2["lat"], st2["lon"]]) <= 3)
+    off = st2["meters"][0]
+    r = pg.evaluate("""([on, off, ll]) => { const c = e => { const b = e.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
+        const s = c(stopMarkers[2].getElement().querySelector('.sm')), p = c(document.querySelector(".mpw[data-ref='" + on + "'] .mp"));
+        const q = c(document.querySelector(".mpw[data-ref='" + off + "'] .mp")), mp = $('map').getBoundingClientRect(), pt = map.latLngToContainerPoint(ll);
+        return {side: [Math.round(p[0] - s[0]), Math.round(p[1] - s[1])], own: Math.round(Math.hypot(q[0] - mp.left - pt.x, q[1] - mp.top - pt.y))}; }""",
+                    [on["ref"], off["ref"], [off["lat"], off["lon"]]])
+    A.check("map: the pin of a meter at its stop pin (stop 2, ref %s) sits just beside the stop pin, up and to the right" % on["ref"],
+            15 <= r["side"][0] <= 30 and -25 <= r["side"][1] <= -8, json.dumps(r))
+    A.check("map: a pin away from its stop pin sits on its meter", r["own"] <= 1, json.dumps(r))
+    ctx.close()
+
+
+@A.case
+def t_map_meter_box(br):
+    for mode in MODES:
+        ctx, pg = A.open_app(br, mode=mode)
+        m = meter(2, "200001")
+        where = m["where"].split(" · ")
+        map_at(pg, [m["lat"], m["lon"]])
+        f0 = pg.evaluate("() => [S.follow, $('fFollow').className]")
+        pg.click(".mpw[data-ref='200001']")
+        pg.wait_for_selector(".mp-pop .pp-head", timeout=5000)
+        r = pg.evaluate("""() => { const p = document.querySelector('.mp-pop');
+            return {id: p.querySelector('.pp-head b').textContent, sub: p.querySelector('.pp-head small').textContent,
+                    kv: [...p.querySelectorAll('.pp-kv dd')].map(d => d.textContent),
+                    btn: [...p.querySelectorAll('.pp-foot button')].map(b => b.textContent), follow: [S.follow, $('fFollow').className]}; }""")
+        A.check(mode + " meter box: tapping a meter pin shows the meter ID, its stop, route ref, building number, site and spot, and Manual read",
+                r["id"] == m["meter"] and r["sub"] == "Stop 2" and r["kv"] == [m["ref"], m["bldg"], where[0], where[1]] and r["btn"] == ["Manual read"],
+                json.dumps(r))
+        A.check(mode + " map box: opening it turns map follow off (as a drag does)",
+                f0 == [True, "fab on"] and r["follow"] == [False, "fab off"], json.dumps([f0, r["follow"]]))
+        pg.click(".mp-pop .pp-foot button")
+        pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+        A.pump_until(pg, lambda: pg.evaluate("() => !document.querySelector('.mp-pop')"), timeout=3)   # the box fades out (0.2 s)
+        f = pg.evaluate("""() => [$('mrStop').value, (document.querySelector('#mrMeters input:checked') || {}).value, $('mrRead').value,
+            $('mrMult').value, !!document.querySelector('.mp-pop')]""")
+        A.check(mode + " Manual read in the meter box: the form opens on stop 2 with that meter chosen; face read and multiplier empty; the box closes",
+                f == ["2", "200001", "", "", False], json.dumps(f))
+        pg.fill("#mrRead", "1209334")
+        pg.fill("#mrMult", "1")
+        save_form(pg)
+        e = all_entries(pg)[-1]
+        A.check(mode + " a read picked on the map saves with that stop, meter, route ref, building number and site",
+                [e["stop"], e["meter"], e["ref"], e["bldg"], e["site"], e["read"]] == [2, m["meter"], m["ref"], m["bldg"], where[0], "1209334"],
+                json.dumps(e))
+        ctx.close()
+
+
+@A.case
+def t_map_stop_box(br):
+    ctx, pg = A.open_app(br)
+    st = A.STOPS[2]
+    map_at(pg, [st["lat"], st["lon"]])
+    pg.click(".leaflet-marker-icon[title^='Stop 2:']")
+    pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
+    r = pg.evaluate("""() => { const p = document.querySelector('.mp-pop');
+        return {title: p.querySelector('.pp-head b').textContent, sub: p.querySelector('.pp-head small').textContent,
+                rows: [...p.querySelectorAll('.pp-m')].map(r => [r.querySelector('b').textContent, r.querySelector('button').textContent]),
+                foot: [...p.querySelectorAll('.pp-foot button')].map(b => b.textContent), panel: $('panel').classList.contains('show'),
+                follow: S.follow}; }""")
+    A.check("stop box: tapping a stop pin opens its box (not the stop list): the stop, its site, every meter with Manual read, Show in stop list",
+            r["title"] == "Stop 2: %d meters" % len(st["meters"]) and r["sub"] == st["site"]
+            and r["rows"] == [[m["meter"], "Manual read"] for m in st["meters"]] and r["foot"] == ["Show in stop list"]
+            and r["panel"] is False and r["follow"] is False, json.dumps(r))
+    last = st["meters"][-1]
+    pg.click(".mp-pop .pp-m[data-ref='%s'] button" % last["ref"])
+    pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+    f = pg.evaluate("() => [$('mrStop').value, (document.querySelector('#mrMeters input:checked') || {}).value]")
+    A.check("stop box: Manual read on a row opens the form with stop 2 and that meter chosen", f == ["2", last["ref"]], json.dumps(f))
+    pg.click("#mrCancel")
+    A.check("cancel: a form opened from the map with nothing typed closes on one tap (the chosen meter is not typing)",
+            pg.evaluate("() => $('mrForm').hidden"))
+    open_form(pg)                                             # from the card: no meter chosen yet
+    pg.check("#mrMeters input[value='%s']" % pg.evaluate("() => document.querySelector('#mrMeters input').value"))
+    pg.click("#mrCancel")
+    A.check("cancel: a form where the reader picked a meter still needs a second tap", pg.evaluate("() => !$('mrForm').hidden"))
+    pg.click("#mrCancel")
+    map_at(pg, [st["lat"], st["lon"]])
+    pg.click(".leaflet-marker-icon[title^='Stop 2:']")
+    pg.wait_for_selector(".mp-pop .pp-foot button", timeout=5000)
+    pg.click(".mp-pop .pp-foot button")
+    A.pump_until(pg, lambda: pg.evaluate("() => $('panel').classList.contains('show') && !document.querySelector('.mp-pop')"), timeout=3)
+    A.check("stop box: Show in stop list opens the stop list with stop 2 and closes the box",
+            pg.evaluate("() => $('panel').classList.contains('show') && !!$('row2') && !document.querySelector('.mp-pop')"))
+    ctx.close()
+
+
+@A.case
+def t_map_groups(br):
+    ctx, pg = A.open_app(br)
+    st = A.STOPS[22]
+    g = st["meters"]                                          # the four meters of stop 22 share one spot
+    map_at(pg, [g[0]["lat"], g[0]["lon"]])
+    pins = pg.evaluate("""() => [...document.querySelectorAll(".mpw[data-stop='22']")].map(e => [e.dataset.n,
+        (e.querySelector('.mpn') || {}).textContent || '', e.querySelector('.mp').classList.contains('attn'), e.parentNode.title])""")
+    A.check("map: the four meters of stop 22 share one pin with the count 4; it is gold (two of them are ATTENTION meters)",
+            pins == [["4", "4", True, "4 meters at this spot"]], json.dumps(pins))
+    pg.click(".mpw[data-stop='22']")
+    pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
+    r = pg.evaluate("""() => { const p = document.querySelector('.mp-pop');
+        return {title: p.querySelector('.pp-head b').textContent, sub: p.querySelector('.pp-head small').textContent,
+                rows: [...p.querySelectorAll('.pp-m')].map(r => [r.dataset.ref, r.classList.contains('attn'), !!r.querySelector('.badge'),
+                       r.querySelectorAll('button').length]), foot: p.querySelectorAll('.pp-foot').length}; }""")
+    A.check("group box: 4 meters at this spot, the stop and its site, each meter with Manual read, ATTENTION meters marked",
+            r["title"] == "4 meters at this spot" and r["sub"] == "Stop 22: " + st["site"]
+            and r["rows"] == [[m["ref"], bool(m["attn"]), bool(m["attn"]), 1] for m in g] and r["foot"] == 0, json.dumps(r))
+    pg.click(".mp-pop .pp-m[data-ref='%s'] button" % g[1]["ref"])
+    pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+    f = pg.evaluate("() => [$('mrStop').value, (document.querySelector('#mrMeters input:checked') || {}).value]")
+    A.check("group box: Manual read opens the form with stop 22 and that meter chosen", f == ["22", g[1]["ref"]], json.dumps(f))
+    pg.click("#mrCancel")
+    m7 = meter(7, "200047")
+    map_at(pg, [m7["lat"], m7["lon"]], 19)
+    a = pg.evaluate("""() => { const e = document.querySelector(".mpw[data-ref='200047'] .mp"), n = document.querySelector(".mpw[data-ref='200009'] .mp");
+        return [e.classList.contains('attn'), getComputedStyle(e).backgroundColor, n.classList.contains('attn'), getComputedStyle(n).backgroundColor]; }""")
+    A.check("map: an ATTENTION meter's pin is gold (#c69214) with !; another meter's pin is white",
+            a == [True, "rgb(198, 146, 20)", False, "rgb(255, 255, 255)"], json.dumps(a))
+    pg.click(".mpw[data-ref='200047']")
+    pg.wait_for_selector(".mp-pop .pp-head", timeout=5000)
+    b = pg.evaluate("() => [document.querySelector('.mp-pop .pp-head b').textContent, (document.querySelector('.mp-pop .pp-note') || {}).textContent || '']")
+    A.check("meter box: an ATTENTION meter shows the ATTENTION badge and its note", b == [m7["meter"] + "ATTENTION", m7["note"]], json.dumps(b))
+    ctx.close()
+
+
+@A.case
+def t_map_reads_off(br):
+    """An app older than 1.1 (manual reads off): the boxes still show the meters, with no Manual read button."""
+    ctx, pg = A.open_app(br, mode="app", native_cfg={"bridge": "1"})
+    m = A.STOPS[2]["meters"][0]
+    map_at(pg, [m["lat"], m["lon"]])
+    pg.click(".mpw[data-ref='%s']" % m["ref"])
+    pg.wait_for_selector(".mp-pop .pp-head", timeout=5000)
+    r = [A.dom(pg, ".mp-pop .pp-head b"), pg.evaluate("() => document.querySelectorAll('.mp-pop button').length")]
+    st = A.STOPS[2]
+    map_at(pg, [st["lat"], st["lon"]])
+    pg.click(".leaflet-marker-icon[title^='Stop 2:']")
+    pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
+    s = pg.evaluate("() => [document.querySelectorAll('.mp-pop .pp-m').length, document.querySelectorAll('.mp-pop .pp-m button').length, "
+                    "[...document.querySelectorAll('.mp-pop .pp-foot button')].map(b => b.textContent)]")
+    A.check("manual reads off (an app older than 1.1): the meter box and the stop box show the meters with no Manual read button",
+            r == [m["meter"], 0] and s == [len(st["meters"]), 0, ["Show in stop list"]], json.dumps([r, s]))
+    ctx.close()
+
+
+@A.case
+def t_map_form_fit(br):
+    """Shot 04 of the UI samples (10/02/2026): on the field tablet held sideways (1280 x 800) the meter list cut its last
+    row and hid Other meter inside a 40% box. Now the list has no height cap: every row shows in full, the form scrolls,
+    and the meter chosen on the map is in view above Cancel and Save."""
+    for mode in MODES:
+        ctx, pg = A.open_app(br, mode=mode, viewport=(1280, 800))
+        st = A.STOPS[2]
+        last = st["meters"][-1]
+        map_at(pg, [last["lat"], last["lon"]])
+        pg.click(".mpw[data-ref='%s']" % last["ref"])
+        pg.wait_for_selector(".mp-pop .pp-foot button", timeout=5000)
+        pg.click(".mp-pop .pp-foot button")
+        pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+        pg.wait_for_timeout(300)
+        r = pg.evaluate("""() => { const box = $('mrMeters'), on = document.querySelector('#mrMeters .mr-m.on');
+            const ob = on ? on.getBoundingClientRect() : null, ft = document.querySelector('#mrForm .mr-foot').getBoundingClientRect();
+            return {cap: getComputedStyle(box).maxHeight, inner: box.scrollHeight > box.clientHeight + 1, rows: box.querySelectorAll('.mr-m').length,
+                    chosen: on ? on.querySelector('input').value : null, seen: !!ob && ob.top >= 0 && ob.bottom <= ft.top + 1}; }""")
+        A.check(mode + " form from the map, tablet sideways (1280 x 800): no height cap and no inner scroll (no meter row cut, shot 04); "
+                "the chosen meter is in view above Cancel and Save",
+                r == {"cap": "none", "inner": False, "rows": len(st["meters"]) + 1, "chosen": last["ref"], "seen": True}, json.dumps(r))
+        ctx.close()
 
 
 with sync_playwright() as p:

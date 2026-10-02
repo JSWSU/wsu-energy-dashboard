@@ -124,6 +124,38 @@ button{font:inherit;cursor:pointer}
 .sm.attn{border-color:var(--accent)}
 .sm.depot{background:#374151}
 .me{width:30px;height:30px}
+/* meter pins (zoom CFG.meterPinZoom or closer) and the map boxes (Leaflet popups) */
+.mpw{width:36px;height:36px;display:flex;align-items:center;justify-content:center}   /* a 36 px tap area around the small pin */
+.mp{position:relative;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--primary);box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.mp::after{content:'';position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:var(--primary)}
+.mp.attn{width:20px;height:20px;background:var(--accent);border:2px solid #fff;box-shadow:0 0 0 1.5px var(--accent),0 1px 4px rgba(0,0,0,.45)}
+.mp.attn::after{content:'!';left:0;right:0;top:0;bottom:0;width:auto;height:auto;margin:0;background:none;border-radius:0;color:#fff;
+ font:800 13px/16px -apple-system,"Segoe UI",Roboto,sans-serif;text-align:center}
+.mp .mpn{position:absolute;top:-11px;left:11px;background:#374151;color:#fff;font-size:10.5px;font-weight:800;border-radius:8px;padding:0 4px;
+ line-height:14px;border:1.5px solid #fff;white-space:nowrap}
+.mp-pop .leaflet-popup-content-wrapper{padding:0;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.3)}
+.mp-pop .leaflet-popup-content{margin:0;font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text)}
+.leaflet-container .mp-pop a.leaflet-popup-close-button{width:44px;height:44px;font:26px/44px -apple-system,"Segoe UI",Roboto,sans-serif;color:#fff}
+.pp-head{background:var(--primary);color:#fff;padding:10px 46px 10px 14px}
+.pp-head b{display:block;font-size:17px;line-height:1.25}
+.pp-head b.id{font-family:Consolas,Menlo,monospace}
+.pp-head small{display:block;font-size:13px;opacity:.92;margin-top:2px}
+.pp-head .badge{vertical-align:2px}
+.pp-kv{display:grid;grid-template-columns:max-content 1fr;gap:5px 14px;margin:12px 14px 2px;font-size:15px}
+.pp-kv dt{color:var(--muted)}
+.pp-kv dd{margin:0;font-weight:600}
+.pp-kv dd.mono{font-family:Consolas,Menlo,monospace}
+.pp-note{margin:10px 14px 0;background:var(--warn-bg);color:var(--warn-text);font-size:13.5px;border-radius:8px;padding:6px 10px}
+.pp-foot{display:flex;gap:8px;padding:12px 14px 14px}
+.pp-list{max-height:min(54vh,430px);overflow:auto}
+.pp-m{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid #f0edea}
+.pp-m.attn{background:var(--warn-bg)}
+.pp-m .rs{flex:1;min-width:0}
+.pp-m .rs b{font-family:Consolas,Menlo,monospace;font-size:14.5px}
+.pp-m .rs small{display:block;color:var(--muted);font-size:12.5px}
+.pp-m .rs em{display:block;font-style:normal;color:var(--warn-text);font-size:12.5px}
+.pp-m button{flex:0 0 auto;border:1px solid var(--border);background:#fff;border-radius:8px;min-height:44px;padding:6px 12px;font-weight:700;
+ color:var(--primary);font-size:14.5px}
 /* manual reads: overlay parts shared by the form, the list and the export sheet; then the form */
 .mr-over{position:absolute;inset:0;z-index:1450;background:rgba(17,24,39,.55);display:flex;justify-content:center;align-items:flex-start;
  overflow:auto;padding:calc(8px + env(safe-area-inset-top)) 8px 8px}
@@ -141,8 +173,7 @@ button{font:inherit;cursor:pointer}
 .mr-err{color:#b91c1c;font-size:14px;font-weight:600}
 .mr-bad{border-color:#b91c1c !important;box-shadow:0 0 0 1px #b91c1c}
 .mr-bad:focus{outline:2px solid #b91c1c;outline-offset:0}   /* a bad field stays red while it has focus */
-#mrMeters{max-height:40vh;overflow:auto;border:1px solid var(--border);border-radius:8px}
-@media (max-width:599.98px){#mrMeters{max-height:none}}   /* phone: no cap, the sheet scrolls, so Other meter stays in reach */
+#mrMeters{border:1px solid var(--border);border-radius:8px;overflow:hidden}   /* no height cap: every row shows in full, the sheet scrolls (shot 04) */
 .mr-m{display:flex;gap:10px;align-items:flex-start;padding:10px;border-bottom:1px solid #f0edea;font-size:14px;cursor:pointer}
 .mr-m:last-child{border-bottom:none}
 .mr-m.on{background:#fdf2f4}
@@ -272,7 +303,7 @@ button{font:inherit;cursor:pointer}
 <script src="manual-reads.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '2026.10.01-9';
+const APP_VERSION = '2026.10.02-1';
 /* Manual reads run only when manual-reads.js loaded and is this page's own version: after a deploy the service worker
    can serve this page with no manual-reads.js (offline) or an older one. Off, the reads stay stored, unseen this time. */
 const MR_ON = typeof mrInit === 'function' && typeof MR_JS_VERSION === 'string' && MR_JS_VERSION === APP_VERSION;
@@ -304,6 +335,8 @@ const CFG = {
   skipConfirmMs: 4000,               // ms: the second tap on Skip, or on a button that clears progress, must come within this time of the first
   wakeRetryMs: 10000,                // ms: after the system drops the screen lock, ask again at most once in this time
   zoom: {drive: 17, walk: 18},
+  meterPinZoom: 17,                  // the map shows a pin for each meter at this zoom or closer
+  sameSpotM: 3,                      // m: meters of one stop this close share one pin; a pin this close to its stop pin shows beside it
   simSpeed: {drive: 11, walk: 1.4},  // m/s at 1x
 };
 const LSK = 'amrNav.v1.';
@@ -541,6 +574,7 @@ const canvas = L.canvas({padding: 0.5});
 const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'});
 const baseGroup = L.layerGroup().addTo(map), bldgGroup = L.layerGroup(), pathGroup = L.layerGroup();
 const routeGroup = L.layerGroup().addTo(map), stopGroup = L.layerGroup().addTo(map);
+const meterGroup = L.layerGroup();    // the meter pins: on the map only at CFG.meterPinZoom or closer (zoomLayers)
 let curLine = null, curCase = null, meMarker = null, accCircle = null;
 const stopMarkers = {};
 
@@ -573,6 +607,7 @@ function zoomLayers() {
   const street = streetShown();   // street tiles already draw buildings and paths; only the offline map needs these groups
   if (z >= 15 && !street) { if (!map.hasLayer(bldgGroup)) bldgGroup.addTo(map); if (!map.hasLayer(pathGroup)) pathGroup.addTo(map); }
   else { map.removeLayer(bldgGroup); map.removeLayer(pathGroup); }
+  if (z >= CFG.meterPinZoom) { if (!map.hasLayer(meterGroup)) meterGroup.addTo(map); } else map.removeLayer(meterGroup);   // on both map styles
   bldgGroup.eachLayer(l => l.bringToBack && l.bringToBack());
 }
 map.on('zoomend', zoomLayers);
@@ -625,10 +660,112 @@ function drawStops() {
   S.route.stops.forEach(st => {
     const mk = L.marker([st.lat, st.lon], {icon: L.divIcon({className: '', html: '<div class="' + stopClass(st) + '">' + st.o + '</div>',
       iconSize: [26, 26], iconAnchor: [13, 13]}), title: 'Stop ' + st.o + ': ' + st.site, keyboard: false});
-    mk.on('click', () => { openPanel(); setTimeout(() => { const el = $('row' + st.o); if (el) el.scrollIntoView({block: 'center'}); }, 250); });
+    mk.on('click', () => mpOpen([st.lat, st.lon], mpStopBox(st), [0, -10]));   // the stop box: its meters, each with Manual read
     mk.addTo(stopGroup);
     stopMarkers[st.o] = mk;
   });
+  drawMeterPins();
+}
+/* ---------- meter pins and the map boxes ---------- */
+/* At zoom CFG.meterPinZoom or closer each meter shows as a small round pin, gold with "!" when it is an ATTENTION meter.
+   The meters of one stop within CFG.sameSpotM of each other share one pin with a count. A pin that would sit under its
+   stop pin shows just beside it (MP_SIDE). Tapping a pin opens its box: one meter, or the meters at that spot; tapping a
+   stop pin opens the stop's box. Manual read in a box opens the form with that stop and that meter chosen. */
+const MP_SIDE = [21, -15];             // px: a pin on its stop pin moves this far right (x) and up (y < 0)
+/* The pins of one stop: a meter joins the first pin within CFG.sameSpotM of that pin's first meter. */
+function mpGroups(st) {
+  const gs = [];
+  st.meters.forEach(m => {
+    if (m.lat == null || m.lon == null) return;
+    const g = gs.find(x => hav([x.lat, x.lon], [m.lat, m.lon]) <= CFG.sameSpotM);
+    if (g) g.meters.push(m); else gs.push({lat: m.lat, lon: m.lon, meters: [m]});
+  });
+  return gs;
+}
+function drawMeterPins() {
+  meterGroup.clearLayers();
+  S.route.stops.forEach(st => mpGroups(st).forEach(g => {
+    const n = g.meters.length, attn = g.meters.some(m => m.attn);
+    const onStop = hav([g.lat, g.lon], [st.lat, st.lon]) <= CFG.sameSpotM;
+    const dx = onStop ? MP_SIDE[0] : 0, dy = onStop ? MP_SIDE[1] : 0;
+    const ref = String(g.meters[0].ref).replace(/[^A-Za-z0-9_-]/g, '');
+    const html = '<div class="mpw" data-stop="' + st.o + '" data-ref="' + ref + '" data-n="' + n + '"><div class="mp' + (attn ? ' attn' : '') + '">' +
+      (n > 1 ? '<span class="mpn">' + n + '</span>' : '') + '</div></div>';
+    const mk = L.marker([g.lat, g.lon], {icon: L.divIcon({className: '', html, iconSize: [36, 36], iconAnchor: [18 - dx, 18 - dy]}),
+      title: n > 1 ? n + ' meters at this spot' : 'Meter ' + g.meters[0].meter, keyboard: false, zIndexOffset: -500});
+    mk.on('click', () => mpOpen([g.lat, g.lon], n > 1 ? mpGroupBox(st, g) : mpMeterBox(st, g.meters[0]), [dx, dy - 4]));
+    mk.addTo(meterGroup);
+  }));
+}
+/* The room a box leaves free: the banner at the top, the side buttons at the right, and the card at the bottom when it
+   spans the screen (portrait). */
+function mpPad() {
+  const m = $('map').getBoundingClientRect(), b = $('banner').getBoundingClientRect(), c = $('card').getBoundingClientRect();
+  const sd = $('side').getBoundingClientRect(), wide = c.right >= m.width * 0.6;
+  return {tl: [10, b.bottom - m.top + 10], br: [m.right - sd.left + 10, wide ? m.bottom - c.top + 10 : 10]};
+}
+/* Open a box at ll. The map stops following the GPS (as after a drag), so the box stays where the reader tapped. */
+function mpOpen(ll, el, off) {
+  const p = mpPad();
+  S.follow = false; $('fFollow').className = 'fab off';
+  L.popup({className: 'mp-pop', maxWidth: 380, minWidth: 300, offset: off || [0, 0], autoPanPaddingTopLeft: p.tl,
+    autoPanPaddingBottomRight: p.br}).setLatLng(ll).setContent(el).openOn(map);
+}
+function mpEl(html) { const d = document.createElement('div'); d.innerHTML = html; return d; }
+/* A meter's "where" text, for example "CHEM STO" + middle dot + "110": the site "CHEM STO" and the spot "110". */
+function mpWhere(m) {
+  const p = String(m.where || '').split(' · ');
+  return {site: p[0].trim(), spot: p.slice(1).join(' · ').trim()};
+}
+/* Manual read shows only while manual reads are on (manual-reads.js of this version, and an app with every call). */
+const mpCanRead = () => MR_ON && !MR.off;
+function mpRead(o, ref) { map.closePopup(); if (mpCanRead()) mrOpenForm({pick: {stop: o, ref}}); }
+/* One meter: its ID (with ATTENTION), its stop, route ref, building number, site and spot, its note, then Manual read. */
+function mpMeterBox(st, m) {
+  const w = mpWhere(m), read = mpCanRead();
+  const el = mpEl('<div class="pp-head"><b class="id"></b><small></small></div><dl class="pp-kv"><dt>Ref</dt><dd class="mono" data-k="ref"></dd>' +
+    '<dt>Building</dt><dd class="mono" data-k="bldg"></dd><dt>Site</dt><dd data-k="site"></dd>' + (w.spot ? '<dt>Location</dt><dd data-k="spot"></dd>' : '') + '</dl>' +
+    (m.note ? '<p class="pp-note"></p>' : '') + (read ? '<div class="pp-foot"><button class="btn primary" type="button">Manual read</button></div>' : ''));
+  el.querySelector('b').textContent = m.meter;
+  if (m.attn) el.querySelector('b').insertAdjacentHTML('beforeend', '<span class="badge">ATTENTION</span>');
+  el.querySelector('small').textContent = 'Stop ' + st.o;
+  el.querySelector('[data-k=ref]').textContent = m.ref;
+  el.querySelector('[data-k=bldg]').textContent = m.bldg;
+  el.querySelector('[data-k=site]').textContent = w.site;
+  if (w.spot) el.querySelector('[data-k=spot]').textContent = w.spot;
+  if (m.note) el.querySelector('.pp-note').textContent = m.note;
+  if (read) el.querySelector('.pp-foot button').onclick = () => mpRead(st.o, m.ref);
+  return el;
+}
+/* A list of meters, each with Manual read: all of a stop's meters, or the meters that share one spot. */
+function mpListBox(st, title, sub, meters, foot) {
+  const read = mpCanRead();
+  const el = mpEl('<div class="pp-head"><b></b><small></small></div><div class="pp-list"></div>' + (foot ? '<div class="pp-foot"></div>' : ''));
+  el.querySelector('b').textContent = title;
+  el.querySelector('small').textContent = sub;
+  const list = el.querySelector('.pp-list');
+  meters.forEach(m => {
+    const r = mpEl('<div class="rs"><b></b><small></small></div>' + (read ? '<button type="button">Manual read</button>' : ''));
+    r.className = 'pp-m' + (m.attn ? ' attn' : '');
+    r.dataset.ref = m.ref;
+    r.querySelector('b').textContent = m.meter;
+    if (m.attn) r.querySelector('b').insertAdjacentHTML('afterend', '<span class="badge">ATTENTION</span>');
+    r.querySelector('small').textContent = 'ref ' + m.ref + (m.where ? ' · ' + m.where : '');
+    if (m.note) { const e = document.createElement('em'); e.textContent = m.note; r.querySelector('.rs').appendChild(e); }
+    if (read) r.querySelector('button').onclick = () => mpRead(st.o, m.ref);
+    list.appendChild(r);
+  });
+  if (foot) el.querySelector('.pp-foot').appendChild(foot);
+  return el;
+}
+function mpStopBox(st) {
+  const b = document.createElement('button');
+  b.className = 'btn'; b.type = 'button'; b.textContent = 'Show in stop list';
+  b.onclick = () => { map.closePopup(); openPanel(); setTimeout(() => { const el = $('row' + st.o); if (el) el.scrollIntoView({block: 'center'}); }, 250); };
+  return mpListBox(st, 'Stop ' + st.o + ': ' + st.meters.length + (st.meters.length === 1 ? ' meter' : ' meters'), st.site, st.meters, b);
+}
+function mpGroupBox(st, g) {
+  return mpListBox(st, g.meters.length + ' meters at this spot', 'Stop ' + st.o + ': ' + st.site, g.meters, null);
 }
 function refreshStopIcons() {
   S.route.stops.forEach(st => {
