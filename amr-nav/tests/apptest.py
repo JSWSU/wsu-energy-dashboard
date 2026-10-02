@@ -137,6 +137,9 @@ def case(fn):
 
 def run_cases(br):
     only = os.environ.get("AMR_TEST_CASE")             # run one case by name while working on it
+    if only and only not in [fn.__name__ for fn in CASES]:
+        check("AMR_TEST_CASE names a case of this file (" + only + ")", False, "known: " + " ".join(fn.__name__ for fn in CASES)[:300])
+        return
     for fn in CASES:
         if only and fn.__name__ != only:
             continue
