@@ -285,14 +285,6 @@ async function mrPersist(ask) {
     return !!(ask && navigator.storage.persist && await navigator.storage.persist());
   } catch (e) { return false; }
 }
-/* Counts of new and exported reads in MR.count; MR.storeOk is false when the store cannot be read. */
-async function mrRefreshCounts() {
-  let all = [];
-  try { all = await mrAll(); MR.storeOk = true; } catch (e) { MR.storeOk = false; }
-  MR.count = {new: all.filter(e => e.status === 'new').length, exported: all.filter(e => e.status === 'exported').length};
-  return MR.count;
-}
-
 /* ---------- the Manual read form ---------- */
 /* GPS for a new read: the newest fix while it is fresh (CFG.fixStaleMs), with its accuracy in ft; else null.
    A weak fix is kept: the accuracy column says how good it is. */
@@ -513,7 +505,6 @@ function mrFocusInto(ev) { setTimeout(() => { try { ev.target.scrollIntoView({bl
 function mrVisibility() {
   if (document.visibilityState !== 'visible' && MR.form) mrDraftNow();
 }
-function mrAfterChange() { mrRefreshCounts(); }
 /* Called once by the main script after it starts load(). */
 function mrInit() {
   MR.off = MR_APP_MODE && !MR_HAS_STORE;               // an app older than 1.1 has no store for the reads: keep them off there
@@ -529,6 +520,8 @@ function mrInit() {
   $('mrPhotoBtn').onclick = mrPhotoTap;
   $('mrPhotoDel').onclick = mrPhotoRemove;
   $('mrCam').onchange = () => mrPhotoPicked($('mrCam').files && $('mrCam').files[0]);
+  $('mrListClose').onclick = mrCloseList;
+  $('mrNew').onclick = () => mrOpenForm({});
   document.addEventListener('visibilitychange', mrVisibility);
   mrRefreshCounts();
 }
@@ -617,4 +610,130 @@ function mrPendingPhoto() {
   if (mrBridge()) { try { b = mrN('takePendingPhoto'); } catch (e) { b = ''; } }
   if (b) mrPhotoPicked(new File([mrB64Blob(b, 'image/jpeg')], 'camera.jpg', {type: 'image/jpeg'}));
   else mrDraftSoon();
+}
+
+/* ---------- the Manual reads list ---------- */
+const mrEntryText = () => 'Manual reads' + (MR.count.new ? ' (' + MR.count.new + ' new)' : '');
+/* Counts (MR.count; MR.storeOk is false when the store cannot be read), then the entry points: the start screen button
+   (only when a read is stored) and the stop list button. With manual reads off (an app older than 1.1) nothing is read. */
+async function mrRefreshCounts() {
+  let all = [];
+  if (!MR.off) {
+    try { all = await mrAll(); MR.storeOk = true; } catch (e) { MR.storeOk = false; }
+  }
+  MR.count = {new: all.filter(e => e.status === 'new').length, exported: all.filter(e => e.status === 'exported').length};
+  const box = $('mrStartBtns');
+  box.innerHTML = '';
+  if (all.length) {
+    const b = document.createElement('button');
+    b.className = 'btn'; b.id = 'mrStartList'; b.type = 'button'; b.textContent = mrEntryText(); b.onclick = mrOpenList;
+    box.appendChild(b);
+  }
+  const pb = $('bManual');
+  if (pb) { pb.textContent = mrEntryText(); pb.hidden = MR.off; }
+  return MR.count;
+}
+function mrOpenList() {
+  const l = $('mrList');
+  l.classList.toggle('over', $('start').style.display !== 'none');
+  l.hidden = false;
+  mrRenderList();
+}
+function mrCloseList() { $('mrList').hidden = true; }
+async function mrRenderList() {
+  const body = $('mrListBody'), xb = $('mrExportBtn');
+  let all;
+  try { all = await mrAll(); } catch (e) {
+    body.innerHTML = '<p class="mr-note">The reads cannot be opened. Storage is blocked or full on this device, or it holds data from a newer app version. Restart the app.</p>';
+    xb.disabled = true;
+    return;
+  }
+  MR.persisted = await mrPersist(false);
+  const nw = all.filter(e => e.status === 'new'), ex = all.filter(e => e.status === 'exported');
+  body.innerHTML = '';
+  const add = (tag, cls, txt, id) => {
+    const el = document.createElement(tag);
+    el.className = cls; el.textContent = txt;
+    if (id) el.id = id;
+    body.appendChild(el);
+    return el;
+  };
+  add('p', 'sum', nw.length + ' new, ' + ex.length + ' exported. Stored on this device only.', 'mrSum');
+  add('p', 'mr-note', mrBridge() ? 'Kept in the app on this tablet until you clear them. Uninstalling the app deletes them.'
+    : MR.persisted ? 'Protected: the browser keeps these reads when storage runs low.'
+    : 'Not protected: the browser can delete these reads when storage runs low or when site data is cleared. Export them soon.', 'mrKeep');
+  add('div', 'sec', 'New');
+  if (!nw.length) add('p', 'mr-note', 'No new reads.');
+  nw.slice().reverse().forEach(e => body.appendChild(mrRow(e, true)));
+  if (ex.length) {
+    add('div', 'sec', 'Exported');
+    ex.slice().reverse().forEach(e => body.appendChild(mrRow(e, false)));
+    /* "Exported" means Gmail opened (or the share went to an app), not that the mail went out: Clear waits 7 days (K8). */
+    const cut = Date.now() - MR_CFG.clearAfterMs, old = ex.filter(e => e.exportedAt > 0 && e.exportedAt < cut).length;
+    add('p', 'mr-note', 'Clear only after you see the email in Gmail Sent. Reads can be cleared 7 days after export.', 'mrClearNote');
+    if (old) {
+      const b = document.createElement('button');
+      b.className = 'btn'; b.id = 'mrClear'; b.type = 'button';
+      armButton(b, 'mrClear', 'Clear ' + old + ' exported over 7 days ago', 'Tap again to clear ' + old);
+      b.onclick = mrClearTap;
+      const wrap = document.createElement('div');
+      wrap.className = 'pbtns';
+      wrap.appendChild(b);
+      body.appendChild(wrap);
+    }
+  }
+  xb.disabled = !nw.length;
+  xb.textContent = nw.length ? 'Export ' + nw.length + ' new' : 'Nothing new to export';
+}
+/* One read in the list: meter, read x multiplier, then date, time, stop, photo and GPS. An exported read shows its CSV file
+   name on a line of its own, kept on one line and cut with an ellipsis when it is too long (ruling S4). */
+function mrRow(e, isNew) {
+  const row = document.createElement('div');
+  row.className = 'row mr-row';
+  row.dataset.id = e.id;
+  row.innerHTML = '<div class="rs"><div></div><div></div></div>';
+  const rs = row.querySelector('.rs');
+  rs.children[0].textContent = e.meter + ': ' + e.read + ' x ' + e.mult;
+  rs.children[1].textContent = e.date + ' ' + e.time + (e.stop != null ? ' \u00b7 stop ' + e.stop : '') +
+    (e.photoBytes ? ' \u00b7 photo' : '') + (e.lat == null ? ' \u00b7 no GPS' : '');
+  if (e.exportName) {
+    const f = document.createElement('div');
+    f.className = 'mr-file'; f.textContent = e.exportName; f.title = e.exportName;
+    rs.appendChild(f);
+  }
+  const btn = (txt, fn, cls) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = txt; b.className = cls; b.onclick = fn;
+    row.appendChild(b);
+    return b;
+  };
+  if (isNew) {
+    btn('Edit', () => mrOpenForm({editId: e.id}), 'mr-edit');
+    armButton(btn('Delete', () => mrDeleteTap(e.id), 'mr-del'), 'mrDel:' + e.id, 'Delete', 'Tap again');
+  } else {
+    btn('Mark new', () => mrMarkNew(e.id), 'mr-renew');
+  }
+  return row;
+}
+async function mrDeleteTap(id) {
+  if (!armTap('mrDel:' + id, CFG.skipConfirmMs)) return;
+  try { await mrDelete(id); toast('Read deleted.'); } catch (x) { toast('Could not delete. Storage is blocked.'); }
+  mrAfterChange();
+}
+async function mrMarkNew(id) {
+  try { await mrSetStatus([id], 'new'); toast('Marked new. It goes out with the next export.'); } catch (x) { toast('Could not change it. Storage is blocked.'); }
+  mrAfterChange();
+}
+async function mrClearTap() {
+  if (!armTap('mrClear', CFG.skipConfirmMs)) return;
+  try {
+    const n = await mrClearExported();
+    toast(n + (n === 1 ? ' exported read cleared.' : ' exported reads cleared.'));
+  } catch (x) { toast('Could not clear. Storage is blocked.'); }
+  mrAfterChange();
+}
+/* After any change: the counts, and the list when it is open. */
+function mrAfterChange() {
+  mrRefreshCounts();
+  if (!$('mrList').hidden) mrRenderList();
 }

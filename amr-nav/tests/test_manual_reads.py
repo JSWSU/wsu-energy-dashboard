@@ -740,6 +740,212 @@ def t_photo_pending(br):
     ctx.close()
 
 
+PERSIST_MOCK = """window.__persistCalls = 0; window.__kept = false;
+Object.defineProperty(StorageManager.prototype, 'persisted', {configurable: true, value: async function () { return window.__kept; }});
+Object.defineProperty(StorageManager.prototype, 'persist', {configurable: true, value: async function () { window.__persistCalls++; window.__kept = true; return true; }});"""
+
+
+def entry(pg, eid):
+    return next((e for e in all_entries(pg) if e["id"] == eid), None)
+
+
+@A.case
+def t_list(br):
+    ctx, pg = A.open_app(br, start=False)
+    pg.evaluate("() => { CFG.skipConfirmMs = 1500; }")
+    seed(pg, [dict(id="a", savedAt=A.T1, meter="0353_DW_001", ref="200041", bldg="0353", site="CREAM ANNEX", stop=2, read="004512", mult="10", photo=[640, 480]),
+              dict(id="b", savedAt=A.T1 + 60000, meter="0357_DW_001", ref="200043", stop=2, read="7", mult="1"),
+              dict(id="c", savedAt=A.T1 - 86400000, meter="0066ADW_001", ref="200038", stop=3, read="1", mult="1", status="exported",
+                   exportedAt=A.T1 - 10 * 86400000)])
+    A.check("start screen: a Manual reads button with the new count", A.dom(pg, "#mrStartList") == "Manual reads (2 new)", A.dom(pg, "#mrStartList"))
+    pg.click("#mrStartList")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    A.pump_until(pg, lambda: pg.evaluate("() => document.querySelectorAll('#mrListBody .mr-row').length") == 3, timeout=3)
+    r = pg.evaluate("""() => ({over: $('mrList').classList.contains('over'), sum: $('mrSum').textContent,
+        rows: [...document.querySelectorAll('#mrListBody .mr-row')].map(r => [r.dataset.id, [...r.querySelectorAll('button')].map(b => b.textContent)]),
+        exp: $('mrExportBtn').textContent, clear: $('mrClear') && $('mrClear').textContent})""")
+    A.check("list: over the start screen; newest first; new reads have Edit and Delete, exported ones Mark new; Export and Clear",
+            r == {"over": True, "sum": "2 new, 1 exported. Stored on this device only.",
+                  "rows": [["b", ["Edit", "Delete"]], ["a", ["Edit", "Delete"]], ["c", ["Mark new"]]],
+                  "exp": "Export 2 new", "clear": "Clear 1 exported over 7 days ago"}, json.dumps(r))
+    row_a = pg.evaluate("() => document.querySelector('.mr-row[data-id=\"a\"] .rs').textContent")
+    A.check("list: a row shows meter, read x multiplier, date, time, stop and photo",
+            row_a.startswith("0353_DW_001: 004512 x 10") and "10/01/2026 14:32" in row_a and "stop 2" in row_a and "photo" in row_a, row_a)
+    pg.click(".mr-row[data-id='a'] .mr-edit")
+    pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+    A.pump_until(pg, lambda: not pg.evaluate("() => $('mrThumb').hidden"), timeout=3)
+    r = pg.evaluate("""() => [$('mrFormTitle').textContent, $('mrRead').value, $('mrMult').value, $('mrStop').value,
+        (document.querySelector('#mrMeters input:checked') || {}).value, !$('mrThumb').hidden, $('mrGps').textContent]""")
+    A.check("edit: the form opens with the saved values and photo",
+            r == ["Edit read", "004512", "10", "2", "200041", True, "Date, time and GPS stay as first saved."], json.dumps(r))
+    pg.fill("#mrRead", "004513")
+    save_form(pg)
+    e = entry(pg, "a")
+    A.check("edit: Save changes the read; date, time and GPS stay; the photo stays",
+            [e["read"], e["savedAt"], e["time"], e["photoBytes"] > 0, e["editedAt"] is not None] == ["004513", A.T1, "14:32", True, True], json.dumps(e))
+    A.pump_until(pg, lambda: A.dom(pg, ".mr-row[data-id='b'] .mr-del") == "Delete", timeout=3)
+    pg.click(".mr-row[data-id='b'] .mr-del")
+    t1 = A.dom(pg, ".mr-row[data-id='b'] .mr-del")
+    pg.wait_for_timeout(1700)
+    t2 = A.dom(pg, ".mr-row[data-id='b'] .mr-del")
+    still = entry(pg, "b") is not None
+    pg.click(".mr-row[data-id='b'] .mr-del")
+    pg.click(".mr-row[data-id='b'] .mr-del")
+    gone = A.pump_until(pg, lambda: entry(pg, "b") is None, timeout=3)
+    A.check("delete: one tap arms it (Tap again); when the time runs out nothing is deleted; two taps delete",
+            [t1, t2, still, gone] == ["Tap again", "Delete", True, True], json.dumps([t1, t2, still, gone]))
+    A.pump_until(pg, lambda: pg.query_selector(".mr-row[data-id='c'] .mr-renew") is not None, timeout=3)
+    pg.click(".mr-row[data-id='c'] .mr-renew")
+    A.pump_until(pg, lambda: entry(pg, "c")["status"] == "new", timeout=3)
+    c = entry(pg, "c")
+    A.check("Mark new: an exported read goes back to new, so it goes out with the next export (Gmail closed without Send)",
+            [c["status"], c["exportName"]] == ["new", None], json.dumps(c))
+    pg.evaluate("() => mrSetStatus(['a', 'c'], 'exported', 'AMR-manual-reads-x.csv').then(mrAfterChange)")
+    A.pump_until(pg, lambda: pg.query_selector(".mr-row[data-id='a'] .mr-renew") is not None, timeout=3)
+    A.check("list: exported reads have no Edit button", pg.query_selector(".mr-row[data-id='a'] .mr-edit") is None)
+    note = A.dom(pg, "#mrClearNote") or ""
+    A.check("clear (K8): reads exported today cannot be cleared yet; the list says to clear only after the email is in Gmail Sent",
+            pg.query_selector("#mrClear") is None and "Gmail Sent" in note and "7 days" in note, note)
+    pg.evaluate("""async () => { for (const id of ['a', 'c']) { const e = await mrGet(id); e.exportedAt = Date.now() - 8 * 86400000;
+        await mrSaveEntry(e, undefined); } mrAfterChange(); }""")
+    A.pump_until(pg, lambda: A.dom(pg, "#mrClear") == "Clear 2 exported over 7 days ago", timeout=3)
+    pg.click("#mrClear")
+    t1 = A.dom(pg, "#mrClear")
+    pg.click("#mrClear")
+    cleared = A.pump_until(pg, lambda: len(all_entries(pg)) == 0, timeout=3)
+    A.check("clear: two taps clear the reads exported over 7 days ago", t1 == "Tap again to clear 2" and cleared, t1)
+    A.pump_until(pg, lambda: A.dom(pg, "#mrExportBtn") == "Nothing new to export", timeout=3)
+    A.check("list: with nothing new, Export says so and is off; the start screen button is gone",
+            pg.evaluate("() => $('mrExportBtn').disabled") and A.dom(pg, "#mrStartList") is None)
+    pg.click("#mrListClose")
+    seed(pg, [dict(id="d", savedAt=A.T1, meter="X", read="1", mult="1", other=True)])
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(600)
+    pg.click("#fList")
+    A.check("stop list: a Manual reads button with the new count", A.dom(pg, "#bManual") == "Manual reads (1 new)", A.dom(pg, "#bManual"))
+    pg.click("#bManual")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    r = pg.evaluate("() => [$('panel').classList.contains('show'), $('mrList').classList.contains('over')]")
+    A.check("stop list: Manual reads closes the stop list and opens the reads (normal level while guiding)", r == [False, False], json.dumps(r))
+    pg.click("#mrNew")
+    pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+    z = pg.evaluate("() => [+getComputedStyle($('mrForm')).zIndex, +getComputedStyle($('mrList')).zIndex]")
+    A.check("list: New read opens the form above the list", z[0] > z[1], json.dumps(z))
+    ctx.close()
+
+
+@A.case
+def t_list_app(br):
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    pg.evaluate("() => { CFG.skipConfirmMs = 1500; }")
+    seed(pg, [dict(id="a", savedAt=A.T1, meter="0353_DW_001", ref="200041", stop=2, read="004512", mult="10", photo=[320, 240]),
+              dict(id="c", savedAt=A.T1 - 86400000, meter="0066ADW_001", ref="200038", stop=3, read="1", mult="1", status="exported")])
+    pg.click("#mrStartList")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    A.pump_until(pg, lambda: pg.evaluate("() => document.querySelectorAll('#mrListBody .mr-row').length") == 2, timeout=3)
+    keep = A.dom(pg, "#mrKeep")
+    A.check("app list: the reads are kept in the app on this tablet", keep == "Kept in the app on this tablet until you clear them. Uninstalling the app deletes them.", keep)
+    pg.click(".mr-row[data-id='a'] .mr-del")
+    pg.click(".mr-row[data-id='a'] .mr-del")
+    gone = A.pump_until(pg, lambda: pg.evaluate("() => !('a' in window.__native.st.entries) && !('a' in window.__native.st.photos)"), timeout=3)
+    A.check("app list: two taps delete the read and its photo from the app's store", gone)
+    pg.click(".mr-row[data-id='c'] .mr-renew")
+    renewed = A.pump_until(pg, lambda: pg.evaluate("() => JSON.parse(window.__native.st.entries.c).status === 'new'"), timeout=3)
+    A.check("app list: Mark new is saved in the app's store", renewed)
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"bridge": "1"})
+    pg.evaluate("() => openPanel()")                 # the start screen covers the side buttons
+    r = pg.evaluate("() => [document.getElementById('mrStartList'), $('bManual').hidden]")
+    A.check("an app older than 1.1: no Manual reads button on the start screen or in the stop list", r == [None, True], json.dumps(r))
+    ctx.close()
+
+
+@A.case
+def t_list_protected(br):
+    ctx, pg = A.open_app(br, init=PERSIST_MOCK)
+    seed(pg, [dict(id="p0", savedAt=A.T1, meter="X0", read="1", mult="1", other=True)])
+    pg.click("#fList")
+    pg.click("#bManual")
+    pg.wait_for_selector("#mrKeep", timeout=5000)
+    before = A.dom(pg, "#mrKeep")
+    pg.click("#mrListClose")
+    open_form(pg)
+    pg.check("#mrMeters input[value='__other']")
+    pg.fill("#mrOther", "X1")
+    pg.fill("#mrRead", "1")
+    pg.fill("#mrMult", "1")
+    save_form(pg)
+    asked = A.pump_until(pg, lambda: pg.evaluate("() => window.__persistCalls") >= 1, timeout=3)
+    pg.click("#fList")
+    pg.click("#bManual")
+    A.pump_until(pg, lambda: (A.dom(pg, "#mrKeep") or "").startswith("Protected"), timeout=3)
+    after = A.dom(pg, "#mrKeep") or ""
+    A.check("browser list: Not protected until the browser keeps the reads; the first Save asks for it; then Protected",
+            (before or "").startswith("Not protected") and asked and after.startswith("Protected"), json.dumps([before, after]))
+    ctx.close()
+
+
+@A.case
+def t_list_no_route(br):
+    ctx = A.new_context(br)
+    ctx.route(re.compile(r"/amr-nav/route\.json(\?.*)?$"), lambda route: route.fulfill(status=500, content_type="text/plain", body="down"))
+    n = len(A.errors)
+    pg = ctx.new_page()
+    A.attach(pg)
+    pg.goto(A.BASE + "?sim=1")
+    A.wait_for(pg, lambda: "did not load" in A.text(pg, "#startBody"), timeout=20)
+    seed(pg, [dict(id="n1", savedAt=A.T1, meter="0353_DW_001", ref="200041", read="1", mult="1")])
+    pg.click("#mrStartList")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    A.pump_until(pg, lambda: pg.evaluate("() => document.querySelectorAll('#mrListBody .mr-row').length") == 1, timeout=3)
+    ok = pg.evaluate("() => [document.querySelectorAll('#mrListBody .mr-row').length, $('mrExportBtn').disabled]")
+    A.check("no route: the start screen still offers the stored reads; the list opens with Export on", ok == [1, False], json.dumps(ok))
+    ctx.close()
+    extra = A.errors[n:]
+    A.check("no route: the only console errors are the expected route failure ones",
+            all(("route.json is missing or damaged" in e) or ("Failed to load resource" in e) for e in extra), " || ".join(extra)[:300])
+    del A.errors[n:]
+
+
+@A.case
+def t_list_rulings(br):
+    """S4: an exported read's CSV name stays on one line, cut with an ellipsis, full name in the title.
+    S5: in portrait (under 900 px wide) the lists use the whole screen; in landscape they stay a side panel."""
+    name = "AMR-manual-reads-20261001-1432-part12of12.csv"
+    ctx, pg = A.open_app(br, start=False, viewport=(320, 640))
+    seed(pg, [dict(id="x", savedAt=A.T1, meter="0353_DW_001", ref="200041", stop=2, read="004512", mult="10", status="exported")])
+    pg.evaluate("(n) => mrSetStatus(['x'], 'exported', n).then(mrAfterChange)", name)
+    pg.evaluate("() => mrOpenList()")                        # the start card is taller than this small screen
+    pg.wait_for_selector(".mr-row[data-id='x'] .mr-file", timeout=5000)
+    r = pg.evaluate("""() => { const f = document.querySelector('.mr-row[data-id="x"] .mr-file'), s = getComputedStyle(f);
+        return {text: f.textContent, title: f.title, ws: s.whiteSpace, tov: s.textOverflow, ov: s.overflow,
+                oneLine: f.getBoundingClientRect().height < 1.6 * parseFloat(s.lineHeight === 'normal' ? s.fontSize : s.lineHeight) + 1,
+                cut: f.scrollWidth > f.clientWidth}; }""")
+    A.check("S4: the CSV name has its own line: one line, cut with an ellipsis, the full name in the title",
+            r == {"text": name, "title": name, "ws": "nowrap", "tov": "ellipsis", "ov": "hidden", "oneLine": True, "cut": True}, json.dumps(r))
+    ctx.close()
+    ctx, pg = A.open_app(br, start=False)                    # 800 x 1280: the tablet in portrait
+    seed(pg, [dict(id="y", savedAt=A.T1, meter="X", read="1", mult="1", other=True)])
+    pg.click("#mrStartList")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    w = lambda sel: pg.evaluate("(s) => Math.round(document.querySelector(s).getBoundingClientRect().width)", sel)
+    portrait = [w("#mrList"), pg.evaluate("() => innerWidth")]
+    pg.click("#mrListClose")
+    pg.evaluate("() => openPanel()")
+    portrait.append(w("#panel"))
+    pg.evaluate("() => closePanel()")
+    pg.set_viewport_size({"width": 1280, "height": 800})     # landscape: side panels
+    pg.click("#mrStartList")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    land = [w("#mrList")]
+    pg.click("#mrListClose")
+    pg.evaluate("() => openPanel()")
+    land.append(w("#panel"))
+    A.check("S5: portrait (800 px wide): the Manual reads list and the stop list use the whole width; landscape: a 440 px side panel",
+            portrait == [800, 800, 800] and land == [440, 440], json.dumps([portrait, land]))
+    ctx.close()
+
+
 with sync_playwright() as p:
     br = p.chromium.launch()
     A.run_cases(br)

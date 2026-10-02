@@ -156,6 +156,18 @@ button{font:inherit;cursor:pointer}
  border-radius:0 0 12px 12px;flex-wrap:wrap}
 .mr-photo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
 #mrThumb{width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
+#mrList{position:absolute;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:1100;background:var(--card);
+ box-shadow:-4px 0 18px rgba(0,0,0,.25);display:flex;flex-direction:column}
+#mrList[hidden]{display:none}
+#mrList.over{z-index:1400}   /* opened from the start screen, which is above the normal panel level */
+#mrList .mr-head{border-radius:0;padding-top:calc(12px + env(safe-area-inset-top))}
+#mrListBody{overflow:auto;flex:1}
+#mrList .mr-foot{position:static;border-radius:0}
+.mr-row .rs div:first-child{font-family:Consolas,Menlo,monospace}
+.mr-row .rs div+div{font-size:12.5px;color:var(--muted)}
+.mr-row .rs .mr-file{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* ruling S4: the CSV name never breaks inside */
+#mrStartBtns:empty{display:none}
+@media (max-width:899.98px){#mrList,#panel{width:100vw}}   /* ruling S5: portrait, the lists use the whole screen; landscape keeps a side panel */
 @media (min-width:900px) and (orientation:landscape){
  #banner{right:auto;width:520px}
  #card{right:auto;width:520px}
@@ -231,11 +243,18 @@ button{font:inherit;cursor:pointer}
  </div>
 </div>
 
+<aside id="mrList" aria-label="Manual reads" hidden>
+ <div class="mr-head"><h2>Manual reads</h2><button id="mrListClose" type="button" aria-label="Close">&times;</button></div>
+ <div id="mrListBody" class="mr-body"></div>
+ <div class="mr-foot"><button class="btn" id="mrNew" type="button">New read</button><button class="btn primary" id="mrExportBtn" type="button">Export</button></div>
+</aside>
+
 <div id="start">
  <div id="startCard">
   <header><h1>AMR Route Guide</h1><p>Sensus AMR water meter read route, WSU Pullman</p></header>
   <div class="body" id="startBody"><p>Loading the route&hellip;</p></div>
   <div class="btns" id="startBtns"></div>
+  <div class="btns" id="mrStartBtns"></div>
  </div>
 </div>
 
@@ -1569,8 +1588,11 @@ function renderPanel() {
   }
   const h2 = document.createElement('div'); h2.className = 'sec'; h2.textContent = 'Drive'; body.appendChild(h2);
   const pb = document.createElement('div'); pb.className = 'pbtns';
-  pb.innerHTML = '<button class="btn" id="bReset">Start a new drive</button><a class="btn ghost" id="bRoutePage" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="../route.html">Printable route page</a>';
+  pb.innerHTML = '<button class="btn" id="bManual" type="button">Manual reads</button><button class="btn" id="bReset">Start a new drive</button><a class="btn ghost" id="bRoutePage" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="../route.html">Printable route page</a>';
   body.appendChild(pb);
+  $('bManual').textContent = typeof mrEntryText === 'function' ? mrEntryText() : 'Manual reads';
+  $('bManual').hidden = typeof MR === 'undefined' || MR.off;
+  $('bManual').onclick = () => { closePanel(); if (typeof mrOpenList === 'function') mrOpenList(); };
   if (NATIVE) $('bRoutePage').onclick = ev => { ev.preventDefault(); openOutside(LIVE + 'route.html'); };   // in the app it opens in the browser
   armButton($('bReset'), 'reset', 'Start a new drive', 'Tap again to clear progress');
   $('bReset').onclick = () => {
