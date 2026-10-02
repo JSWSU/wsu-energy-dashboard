@@ -156,7 +156,9 @@ def t_app_speech(br):
             "stopSpeech" in calls and len(A.native(pg)["spoken"]) == n, json.dumps(calls[-5:]))
     ctx.close()
     ctx, pg = A.open_app(br, mode="browser")
-    A.check("browser: the prompts still use speechSynthesis", pg.evaluate("() => window.__spoken.length") >= 1)
+    # the start button also speaks a blank ' ' to unlock speech: only a prompt with words counts
+    A.check("browser: the prompts still use speechSynthesis",
+            pg.evaluate("() => window.__spoken.filter(t => String(t).trim()).length") >= 1, json.dumps(pg.evaluate("() => window.__spoken")[:3]))
     ctx.close()
 
 
