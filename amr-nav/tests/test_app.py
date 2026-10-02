@@ -1858,7 +1858,7 @@ with sync_playwright() as p:
           json.dumps([r0, r]))
     ctx.close()
 
-    # f. the app page opens at once from the saved copy (stale while revalidate); version 2026.10.01-4; every save inside e.waitUntil
+    # f. the app page opens at once from the saved copy (stale while revalidate); version 2026.10.01-5; every save inside e.waitUntil
     SW_TEXT = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sw.js"), encoding="utf-8").read()
     puts = [ln.strip() for ln in SW_TEXT.splitlines() if "cache.put(" in ln]
     check("sw.js: every cache.put runs inside e.waitUntil", bool(puts) and all("e.waitUntil(" in ln for ln in puts), " | ".join(puts))
@@ -1872,7 +1872,7 @@ with sync_playwright() as p:
     sw_controls(pg)
     wait_for(pg, lambda: "Offline ready." in text(pg, "#startBody"), timeout=20)
     v = pg.evaluate("async () => ({app: APP_VERSION, caches: (await caches.keys()).filter(k => k.startsWith('amr-nav-'))})")
-    check("app version 2026.10.01-4 and one worker cache, amr-nav-2026.10.01-4", v["app"] == "2026.10.01-4" and v["caches"] == ["amr-nav-2026.10.01-4"], json.dumps(v))
+    check("app version 2026.10.01-5 and one worker cache, amr-nav-2026.10.01-5", v["app"] == "2026.10.01-5" and v["caches"] == ["amr-nav-2026.10.01-5"], json.dumps(v))
     hold["on"] = True
     pg.goto("about:blank")
     t0 = time.time()

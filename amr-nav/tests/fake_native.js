@@ -151,3 +151,9 @@
     },
   });
 })();
+
+/* cfg.without: the calls this app build lacks, for example the first app 1.1 build (bridge 2) that had the store calls
+   only: no takePendingPhoto and no export calls. */
+(() => {
+  (window.__native.cfg.without || []).forEach(k => { delete window.AMRNative[k]; });
+})();

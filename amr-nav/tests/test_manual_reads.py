@@ -463,6 +463,22 @@ def t_form_app_save(br):
 def t_form_off_old_app(br):
     ctx, pg = A.open_app(br, mode="app", native_cfg={"bridge": "1"})
     A.check("an app older than 1.1 (bridge 1): no Manual read button (its store is missing)", pg.evaluate("() => $('aManual').hidden && MR.off"))
+    pg.click("#fList")
+    help_txt = pg.evaluate("() => document.querySelector('#pBody .help').textContent")
+    A.check("an app older than 1.1: the help says a newer AMR Route Guide app is needed",
+            "Manual reads need a newer AMR Route Guide app on this tablet." in help_txt, help_txt[-200:])
+    ctx.close()
+    # The first app 1.1 build (bridge 2) had the store calls only: no camera return and no Gmail export. MIN_BRIDGE cannot
+    # tell it from the full build, so the page checks every call it uses.
+    store_only = ["takePendingPhoto", "exportBegin", "exportAddText", "exportAddPhoto", "exportOpenGmail"]
+    ctx, pg = A.open_app(br, mode="app", native_cfg={"without": store_only})
+    pg.click("#fList")
+    r = pg.evaluate("() => [$('aManual').hidden, MR.off, $('bManual').hidden, typeof AMRNative.storeAll, typeof AMRNative.exportBegin, "
+                    "document.querySelector('#pBody .help').textContent]")
+    A.check("an app build with the store calls only (bridge 2, no camera return, no Gmail export): manual reads stay off",
+            r[:5] == [True, True, True, "function", "undefined"], json.dumps(r[:5]))
+    A.check("that build: the help says a newer AMR Route Guide app is needed (never that Gmail opens)",
+            "need a newer AMR Route Guide app" in r[5] and "Open in Gmail" not in r[5], r[5][-200:])
     ctx.close()
 
 

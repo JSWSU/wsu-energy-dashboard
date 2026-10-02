@@ -120,11 +120,16 @@ const MR = {count: {new: 0, exported: 0}, storeOk: true, persisted: false, form:
   photoUrl: null, off: false, draftPhotoSent: null};
 /* The mode is fixed once, when this file loads. Inside the app (window.AMRNative is there) the reads always go to the
    app's store and the export always goes through the app: never to IndexedDB (WebView storage, spec 5) and never to the
-   share menu (spec 7), even when one bridge call answers nothing for a moment. The store calls exist from bridge
-   version 2 (app 1.1). */
+   share menu (spec 7), even when one bridge call answers nothing for a moment. The calls exist from bridge version 2
+   (app 1.1), but the first 1.1 build had the store calls only (no camera return, no Gmail export) with the same bridge
+   version, so manual reads need every call in MR_CALLS. */
+const MR_CALLS = ['storeAll', 'storePut', 'storeDelete', 'photoPut', 'photoGet', 'photoDelete', 'draftGet', 'draftPut',
+  'draftDelete', 'takePendingPhoto', 'exportBegin', 'exportAddText', 'exportAddPhoto', 'exportOpenGmail'];
 const MR_APP_MODE = (() => { try { return !!window.AMRNative; } catch (e) { return false; } })();
-const MR_HAS_STORE = (() => { try { return MR_APP_MODE && typeof window.AMRNative.storeAll === 'function'; } catch (e) { return false; } })();
-/* The app's store, or null (a browser, or an app older than 1.1). In the app the reads live in the app's own files:
+const MR_HAS_STORE = (() => {
+  try { return MR_APP_MODE && MR_CALLS.every(k => typeof window.AMRNative[k] === 'function'); } catch (e) { return false; }
+})();
+/* The app's store, or null (a browser, or an app without every call). In the app the reads live in the app's own files:
    Android never clears them, app updates keep them, an uninstall deletes them. */
 function mrBridge() { return MR_HAS_STORE ? window.AMRNative : null; }
 /* One call to the app's store. An answer that starts with "error", or no store, throws. */
@@ -515,7 +520,7 @@ function mrVisibility() {
 }
 /* Called once by the main script after it starts load(). */
 function mrInit() {
-  MR.off = MR_APP_MODE && !MR_HAS_STORE;               // an app older than 1.1 has no store for the reads: keep them off there
+  MR.off = MR_APP_MODE && !MR_HAS_STORE;               // an app without every MR_CALLS call: keep manual reads off there
   $('aManual').hidden = MR.off;
   $('aManual').onclick = () => mrOpenForm({});
   $('mrStop').onchange = mrStopChanged;
@@ -625,7 +630,7 @@ function mrPendingPhoto() {
 /* ---------- the Manual reads list ---------- */
 const mrEntryText = () => 'Manual reads' + (MR.count.new ? ' (' + MR.count.new + ' new)' : '');
 /* Counts (MR.count; MR.storeOk is false when the store cannot be read), then the entry points: the start screen button
-   (only when a read is stored) and the stop list button. With manual reads off (an app older than 1.1) nothing is read. */
+   (only when a read is stored) and the stop list button. With manual reads off (an app without every MR_CALLS call) nothing is read. */
 async function mrRefreshCounts() {
   let all = [];
   if (!MR.off) {
@@ -920,7 +925,7 @@ async function mrExported(pt, state) {
 /* ---------- help ---------- */
 /* The help list items about manual reads (the stop list, How to use), in the app's or the browser's words. */
 function mrHelpLines() {
-  if (MR.off) return '<li>Manual reads need app version 1.1 or later on this tablet.</li>';
+  if (MR.off) return '<li>Manual reads need a newer AMR Route Guide app on this tablet.</li>';
   return '<li>Manual read: tap Manual read on the stop card. Pick the meter, type the face read as the dial shows and the multiplier, and add a photo if needed. The reads stay on this tablet.</li>' +
     (mrBridge() ? '<li>To email them: Manual reads (in this list), Export, then Open in Gmail. Gmail opens with the addresses filled in. Check the email, then tap Send.</li>'
       : '<li>To email them: Manual reads (in this list), Export, then Share. Pick Gmail and type the addresses. One email holds up to 9 photos.</li>');
