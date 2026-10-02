@@ -916,3 +916,12 @@ async function mrExported(pt, state) {
   mrRenderExport();
   mrAfterChange();
 }
+
+/* ---------- help ---------- */
+/* The help list items about manual reads (the stop list, How to use), in the app's or the browser's words. */
+function mrHelpLines() {
+  if (MR.off) return '<li>Manual reads need app version 1.1 or later on this tablet.</li>';
+  return '<li>Manual read: tap Manual read on the stop card. Pick the meter, type the face read as the dial shows and the multiplier, and add a photo if needed. The reads stay on this tablet.</li>' +
+    (mrBridge() ? '<li>To email them: Manual reads (in this list), Export, then Open in Gmail. Gmail opens with the addresses filled in. Check the email, then tap Send.</li>'
+      : '<li>To email them: Manual reads (in this list), Export, then Share. Pick Gmail and type the addresses. One email holds up to 9 photos.</li>');
+}

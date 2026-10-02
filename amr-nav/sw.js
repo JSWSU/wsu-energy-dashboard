@@ -6,7 +6,7 @@
    (network first, so the first open after a deploy gets the road map that belongs to the new route), and only a reply that
    is a whole graph is saved or served: a damaged one gives way to the saved copy. Map tiles go straight to the network and
    are never cached. */
-const VERSION = 'amr-nav-2026.10.01-3';
+const VERSION = 'amr-nav-2026.10.01-4';
 const FRESH_TIMEOUT_MS = 3000;     // route.json and graph.json: give up on the network after this long and use the saved copy
 const CORE = [
   './', './index.html', './manual-reads.js', './manifest.webmanifest', './route.json', './graph.json', './basemap.json',

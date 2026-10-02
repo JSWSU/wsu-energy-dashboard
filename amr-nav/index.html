@@ -272,7 +272,7 @@ button{font:inherit;cursor:pointer}
 <script src="manual-reads.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '2026.10.01-3';
+const APP_VERSION = '2026.10.01-4';
 const CFG = {
   arrive: {drive: 45, walk: 15},     // m: arrival radius at the end of a leg
   off: {drive: 45, walk: 25},        // m: off-route distance
@@ -1621,7 +1621,7 @@ function renderPanel() {
     '<li>Drive the crimson line. Most meters read from the car. The guide moves to the next stop when you reach each one.</li>' +
     '<li>Blue stops are walk-in stops. Park, then choose Walk to meter or Read from car.</li>' +
     '<li>Gold-ringed stops have ATTENTION meters. The guide pauses there so you can read the note.</li>' +
-    '<li>No signal? The map, the route, the turns and rerouting all work offline. Off the route, the guide plans a new way on this tablet.</li></ol>' +
+    '<li>No signal? The map, the route, the turns and rerouting all work offline. Off the route, the guide plans a new way on this tablet.</li>' + (typeof mrHelpLines === 'function' ? mrHelpLines() : '') + '</ol>' +
     '<p>Route built ' + r.built + '. ' + r.source + '</p>' + (NATIVE ? '<p id="appLine"></p>' : '') + '<p>App ' + APP_VERSION + '. Map data &copy; OpenStreetMap contributors. Route lines by OSRM (FOSSGIS). Rerouting runs on this device' +
     (GR && GR.built ? ', road map built ' + GR.built : '') + '.</p>';
   body.appendChild(help);

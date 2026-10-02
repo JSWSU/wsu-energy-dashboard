@@ -1256,6 +1256,33 @@ def t_export_offline(br):
     ctx.close()
 
 
+@A.case
+def t_help_layers(br):
+    for mode, want in (("app", "Open in Gmail"), ("browser", "Pick Gmail and type the addresses")):
+        ctx, pg = A.open_app(br, mode=mode)
+        pg.click("#fList")
+        help_txt = pg.evaluate("() => document.querySelector('#pBody .help').textContent")
+        A.check(mode + " help: the stop list explains Manual read and how to email the reads", "Manual read" in help_txt and want in help_txt, help_txt[-300:])
+        z = pg.evaluate("() => ['toast', 'mrExport', 'mrForm', 'start'].map(id => +getComputedStyle($(id)).zIndex)")
+        A.check(mode + ": the toast shows above the manual reads screens and the start screen", z[0] > max(z[1:]), json.dumps(z))
+        ctx.close()
+
+
+@A.case
+def t_phone_list_export(br):
+    ctx, pg = A.open_app(br, viewport=(412, 915), start=False, is_mobile=True, has_touch=True, device_scale_factor=2.6)
+    seed(pg, [dict(id="ph%d" % k, savedAt=A.T1 + k * 60000, meter="M%d" % k, ref=str(200400 + k), read="1", mult="1", photo=[320, 240]) for k in range(3)])
+    pg.click("#mrStartList")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    a = pg.evaluate("() => [document.documentElement.scrollWidth > innerWidth, Math.round($('mrList').getBoundingClientRect().width)]")
+    pg.wait_for_function("() => /^Export \\d+ new$/.test($('mrExportBtn').textContent)", timeout=5000)
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0", timeout=10000)
+    b = pg.evaluate("() => [document.documentElement.scrollWidth > innerWidth, Math.round(document.querySelector('#mrExport .mr-sheet').getBoundingClientRect().right)]")
+    A.check("phone: the list and the export sheet fit the width (no side scroll)", a == [False, 412] and b[0] is False and b[1] <= 412, json.dumps([a, b]))
+    ctx.close()
+
+
 with sync_playwright() as p:
     br = p.chromium.launch()
     A.run_cases(br)
