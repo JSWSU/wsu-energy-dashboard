@@ -502,8 +502,16 @@ function mrGpsLine() {
 }
 /* Keep a focused field in view above the on-screen keyboard. */
 function mrFocusInto(ev) { setTimeout(() => { try { ev.target.scrollIntoView({block: 'center'}); } catch (x) { /* gone */ } }, 300); }
+/* Going to the back: keep the open form. Coming back: a browser share that has not finished after MR_CFG.pendingShareMs
+   offers Mark exported (an Android browser can miss the end of a share, so its promise never settles). */
 function mrVisibility() {
-  if (document.visibilityState !== 'visible' && MR.form) mrDraftNow();
+  if (document.visibilityState !== 'visible') { if (MR.form) mrDraftNow(); return; }
+  MRX.parts.forEach(pt => {
+    if (pt.state !== 'sharing' || mrInApp()) return;
+    const at = Date.now();
+    pt.back = at;
+    setTimeout(() => { if (pt.state === 'sharing' && pt.back === at) { pt.state = 'unknown'; mrRenderExport(); } }, MR_CFG.pendingShareMs);
+  });
 }
 /* Called once by the main script after it starts load(). */
 function mrInit() {
@@ -522,6 +530,8 @@ function mrInit() {
   $('mrCam').onchange = () => mrPhotoPicked($('mrCam').files && $('mrCam').files[0]);
   $('mrListClose').onclick = mrCloseList;
   $('mrNew').onclick = () => mrOpenForm({});
+  $('mrExportBtn').onclick = mrOpenExport;
+  $('mrExportClose').onclick = mrCloseExport;
   document.addEventListener('visibilitychange', mrVisibility);
   mrRefreshCounts();
 }
@@ -736,4 +746,173 @@ async function mrClearTap() {
 function mrAfterChange() {
   mrRefreshCounts();
   if (!$('mrList').hidden) mrRenderList();
+}
+
+/* ---------- export ---------- */
+const MRX = {parts: [], ready: false, error: ''};
+/* In the app, Gmail opens through the app (the To line is the app's own); in a browser, the share menu or Downloads.
+   Fixed at load (MR_APP_MODE): a bridge call that answers nothing for a moment never sends the app to the share menu. */
+const mrInApp = () => MR_APP_MODE;
+/* True when this browser can share files. Without it, Export saves the files to Downloads. */
+function mrCanShareFiles() {
+  try { return !!(navigator.share && navigator.canShare && navigator.canShare({files: [new File(['x'], 'x.csv', {type: 'text/csv'})]})); }
+  catch (e) { return false; }
+}
+async function mrOpenExport() {
+  let nw;
+  try { nw = (await mrAll()).filter(e => e.status === 'new'); } catch (e) { toast('The reads cannot be opened. Storage is blocked.'); return; }
+  if (!nw.length) { toast('No new reads to export.'); return; }
+  MRX.parts = []; MRX.ready = false; MRX.error = '';
+  $('mrExport').hidden = false;
+  mrRenderExport();
+  try { MRX.parts = await mrBuildParts(nw); MRX.ready = true; }
+  catch (e) { MRX.error = 'The files could not be made: ' + ((e && e.message) || 'storage error') + '.'; }
+  mrRenderExport();
+}
+function mrCloseExport() {
+  $('mrExport').hidden = true;
+  MRX.parts = []; MRX.ready = false; MRX.error = '';
+  mrAfterChange();
+}
+/* Make the parts before any tap. In a browser every file is made now (a share must start within a few seconds of its
+   tap); a photo gone from storage is left out and its read goes with no photo name. In the app the CSV text is made
+   now and the app copies the photos from its own store when the part is emailed. */
+async function mrBuildParts(entries) {
+  const app = mrInApp(), blobs = new Map();
+  if (!app) {
+    for (const e of entries) {
+      if (!(e.photoBytes > 0)) continue;
+      const b = await mrPhoto(e.id);
+      if (b) blobs.set(e.id, b);
+    }
+  }
+  const list = app ? entries.slice() : entries.map(e => Object.assign({}, e, {photoBytes: blobs.has(e.id) ? blobs.get(e.id).size : 0}));
+  const names = mrPhotoNames(list), groups = mrSplit(list, app ? Infinity : MR_CFG.maxFilesPerShare), n = groups.length;
+  const latest = Math.max(...list.map(e => e.savedAt));
+  return groups.map((g, i) => {
+    const nm = mrPartNames(latest, i, n), csv = mrCsvText(g, names);
+    const photoList = g.filter(e => names.has(e.id)).map(e => ({id: e.id, name: names.get(e.id), bytes: e.photoBytes}));
+    const files = app ? null : [new File([csv], nm.csv, {type: 'text/csv'})]
+      .concat(photoList.map(p => new File([blobs.get(p.id)], p.name, {type: 'image/jpeg'})));
+    const bytes = app ? new Blob([csv]).size + photoList.reduce((a, p) => a + p.bytes, 0) : files.reduce((a, f) => a + f.size, 0);
+    if ((!app && files.length > MR_CFG.maxFilesPerShare) || bytes > MR_CFG.maxBytesPerPart) throw new Error('part ' + (i + 1) + ' is too large');
+    const photos = photoList.length;
+    return {ids: g.map(e => e.id), csv, files, photoList, bytes, photos, reads: g.length, csvName: nm.csv, subject: nm.subject,
+      text: g.length + (g.length === 1 ? ' manual read, ' : ' manual reads, ') + photos + (photos === 1 ? ' photo.' : ' photos.') +
+        (n > 1 ? ' Part ' + (i + 1) + ' of ' + n + '.' : ''),
+      state: 'ready', err: '', back: 0};
+  });
+}
+function mrRenderExport() {
+  const body = $('mrExportBody');
+  body.innerHTML = '';
+  const p = (txt, cls) => { const el = document.createElement('p'); el.className = cls || 'mr-note'; el.textContent = txt; body.appendChild(el); return el; };
+  if (MRX.error) { p(MRX.error, 'mr-err'); return; }
+  if (!MRX.ready) { p('Making the files...'); return; }
+  const n = MRX.parts.length, app = mrInApp(), share = !app && mrCanShareFiles();
+  p(app ? 'Tap Open in Gmail. Gmail opens with the addresses, the subject and the files. Check the email, then tap Send in Gmail.'
+    : share ? 'Tap Share, then pick Gmail and type the addresses. Check the email, then tap Send.'
+    : 'This browser cannot share files. Save them to Downloads, then attach them to an email.', 'sum');
+  if (n > 1) p('This export has ' + n + ' parts. Send one email for each part.');
+  MRX.parts.forEach((pt, i) => {
+    const box = document.createElement('div');
+    box.className = 'mr-part'; box.id = 'mrPart' + i;
+    const head = document.createElement('b');
+    head.textContent = (n > 1 ? 'Part ' + (i + 1) + ' of ' + n + ': ' : '') + pt.reads + (pt.reads === 1 ? ' read, ' : ' reads, ') +
+      pt.photos + (pt.photos === 1 ? ' photo, ' : ' photos, ') + mrSizeText(pt.bytes);     // never "0.0 MB" (ruling S6)
+    box.appendChild(head);
+    const st = document.createElement('div');
+    st.className = 'mr-note'; st.id = 'mrPartState' + i;
+    st.textContent = {ready: 'Ready.', sharing: app ? 'Opening Gmail...' : 'Waiting for the share menu.',
+      unknown: 'Did Gmail open with these files? If yes, mark this part exported.', failed: 'Not sent. ' + pt.err,
+      done: app ? 'Gmail opened. Marked exported. Check the email, then tap Send in Gmail.' : 'Shared. Marked exported.',
+      saved: 'Saved to Downloads. Marked exported.'}[pt.state];
+    box.appendChild(st);
+    const btns = document.createElement('div');
+    btns.className = 'pbtns';
+    const btn = (txt, fn, cls, off) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn' + (cls ? ' ' + cls : ''); b.textContent = txt; b.disabled = !!off; b.onclick = fn;
+      btns.appendChild(b);
+    };
+    if (app) {
+      if (pt.state === 'ready' || pt.state === 'sharing') btn('Open in Gmail', () => mrEmailTap(i), 'primary', pt.state === 'sharing');
+      else if (pt.state === 'failed') btn('Open in Gmail again', () => mrEmailTap(i), 'primary');
+    } else if (pt.state === 'ready' || pt.state === 'sharing') {
+      if (share) btn('Share', () => mrShareTap(i), 'primary', pt.state === 'sharing');
+      else btn('Save to Downloads', () => mrSaveTap(i), 'primary');
+    } else if (pt.state === 'failed') {
+      if (share) btn('Share again', () => mrShareTap(i), 'primary');
+      btn('Save to Downloads', () => mrSaveTap(i));
+    } else if (pt.state === 'unknown') {
+      btn('Mark exported', () => mrExported(pt, 'done'), 'primary');
+    }
+    if (btns.childNodes.length) box.appendChild(btns);
+    body.appendChild(box);
+  });
+  if (n && MRX.parts.every(pt => pt.state === 'done' || pt.state === 'saved')) {
+    p('All done. The reads stay on this device until you clear them in Manual reads.', 'sum');
+  }
+}
+/* App: email part i. The app copies the CSV and the photos into its export folder and opens Gmail's compose screen with
+   its own To line. The part is marked exported only when Gmail opened. */
+async function mrEmailTap(i) {
+  const pt = MRX.parts[i];
+  if (!pt || pt.state === 'sharing' || pt.state === 'done') return;
+  pt.state = 'sharing'; pt.err = '';
+  mrRenderExport();
+  let b;
+  try {
+    b = mrN('exportBegin');
+    if (!b) throw new Error('the app did not answer');
+    mrOk('exportAddText', b, pt.csvName, pt.csv);
+    pt.photoList.forEach(ph => mrOk('exportAddPhoto', b, ph.id, ph.name));
+  } catch (e) {
+    pt.state = 'failed'; pt.err = 'The files could not be made: ' + ((e && e.message) || 'storage error') + '.';
+    mrRenderExport();
+    return;
+  }
+  let r;
+  try { r = String(mrBridge().exportOpenGmail(b, pt.subject, pt.text)); } catch (e) { r = 'error: ' + ((e && e.message) || 'no answer'); }
+  if (r === 'opened') { await mrExported(pt, 'done'); return; }
+  pt.state = 'failed';
+  pt.err = r === 'no gmail' ? 'Gmail is not on this tablet, or it is turned off. Nothing was sent.' : 'Gmail did not open (' + r + '). Nothing was sent.';
+  mrRenderExport();
+}
+/* Browser: share part i, straight from its tap (navigator.share needs the tap). The part is marked exported only when
+   the share resolves, which means the reader picked an app; a cancel (AbortError) leaves the reads new. */
+function mrShareTap(i) {
+  const pt = MRX.parts[i];
+  if (!pt || pt.state === 'sharing' || pt.state === 'done' || pt.state === 'saved') return;
+  pt.state = 'sharing'; pt.err = '';
+  let pr;
+  try { pr = navigator.share({files: pt.files, title: pt.subject, text: pt.text}); } catch (e) { pr = Promise.reject(e); }
+  mrRenderExport();
+  pr.then(() => mrExported(pt, 'done'), e => {
+    if (pt.state === 'done' || pt.state === 'saved') return;
+    if (e && e.name === 'AbortError') pt.state = 'ready';
+    else { pt.state = 'failed'; pt.err = ((e && e.name) || 'Error') + (e && e.message ? ': ' + e.message : '') + '.'; }
+    mrRenderExport();
+  });
+}
+/* Browser: save part i to Downloads, one link per file, all from this one tap. The browser may ask once to allow
+   several downloads. */
+function mrSaveTap(i) {
+  const pt = MRX.parts[i];
+  if (!pt || pt.state === 'done' || pt.state === 'saved') return;
+  pt.files.forEach(f => {
+    const a = document.createElement('a'), url = URL.createObjectURL(f);
+    a.href = url; a.download = f.name; a.style.display = 'none';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  });
+  toast('Saved ' + pt.files.length + (pt.files.length === 1 ? ' file' : ' files') + ' to Downloads. If the browser asks, tap Allow.', 6000);
+  mrExported(pt, 'saved');
+}
+async function mrExported(pt, state) {
+  if (pt.state === 'done' || pt.state === 'saved') return;
+  try { await mrSetStatus(pt.ids, 'exported', pt.csvName); pt.state = state; }
+  catch (e) { pt.state = 'failed'; pt.err = 'The files went out, but the reads could not be marked exported. Storage is blocked.'; }
+  mrRenderExport();
+  mrAfterChange();
 }

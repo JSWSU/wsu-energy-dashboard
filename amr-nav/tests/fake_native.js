@@ -113,3 +113,41 @@
     return b;
   };
 })();
+
+/* Version 2: the Gmail export (Exports.java and Mail.java in the app). The page sends one part's files; "Gmail" here
+   records them in window.__native.mails. cfg.gmail: 'opened' (default), 'no gmail' or 'error: ...'. The page never
+   passes an address: the real app fixes the To line itself. */
+(() => {
+  const N = window.__native, st = N.st, cfg = N.cfg, batches = {};
+  let seq = 0;
+  N.mails = [];
+  if (cfg.bridge !== '' && Number(cfg.bridge) < 2) return;     // an app older than 1.1 has no export calls
+  const rec = (name, args) => { N.calls.push([name].concat(Array.from(args).map(a => (typeof a === 'string' && a.length > 200 ? a.slice(0, 20) + '...' : a)))); };
+  Object.assign(window.AMRNative, {
+    exportBegin() { rec('exportBegin', arguments); if (cfg.notApp) return ''; const b = 'b' + (++seq); batches[b] = []; return b; },
+    exportAddText(batch, name, text) {
+      rec('exportAddText', arguments);
+      if (cfg.notApp) return '';
+      if (!batches[batch]) return 'error: no such batch';
+      batches[batch].push({name: String(name), size: new TextEncoder().encode(String(text)).length, text: String(text)});
+      return 'ok';
+    },
+    exportAddPhoto(batch, id, name) {
+      rec('exportAddPhoto', arguments);
+      if (cfg.notApp) return '';
+      if (!batches[batch]) return 'error: no such batch';
+      const b = st.photos[id];
+      if (!b) return 'error: no photo for ' + name;
+      const bin = atob(b);
+      batches[batch].push({name: String(name), size: bin.length, head: [0, 1, 2].map(k => bin.charCodeAt(k))});
+      return 'ok';
+    },
+    exportOpenGmail(batch, subject, body) {
+      rec('exportOpenGmail', arguments);
+      if (cfg.notApp) return '';
+      if (cfg.gmail && cfg.gmail !== 'opened') return String(cfg.gmail);
+      N.mails.push({subject: String(subject), body: String(body), files: batches[batch] || [], args: arguments.length});
+      return 'opened';
+    },
+  });
+})();

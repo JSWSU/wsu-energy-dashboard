@@ -946,6 +946,316 @@ def t_list_rulings(br):
     ctx.close()
 
 
+SHARE_MOCK = """
+window.__shares = []; window.__shareMode = 'resolve';
+Object.defineProperty(Navigator.prototype, 'canShare', {configurable: true, writable: true,
+  value: function (d) { return !!(d && Array.isArray(d.files)); }});
+Object.defineProperty(Navigator.prototype, 'share', {configurable: true, writable: true, value: async function (d) {
+  const rec = {keys: Object.keys(d).sort(), title: d.title, text: d.text, files: []};
+  for (const f of d.files || []) {
+    const u8 = new Uint8Array(await f.arrayBuffer());
+    rec.files.push({name: f.name, type: f.type, size: f.size, head: Array.from(u8.slice(0, 3)), csv: f.type === 'text/csv' ? Array.from(u8) : null});
+  }
+  window.__shares.push(rec);
+  const m = window.__shareMode;
+  if (m === 'abort') throw new DOMException('Share canceled', 'AbortError');
+  if (m === 'fail') throw new DOMException('Permission denied', 'NotAllowedError');
+  if (m === 'hang') return new Promise(() => {});
+  if (m === 'later') return new Promise(res => { window.__resolveShare = res; });
+}});
+"""
+CSV_HEAD = ("Date,Time,Meter ID,Route ref,Building number,Site name,Face read,Multiplier,Notes,Photo file name,"
+            "GPS latitude,GPS longitude,GPS accuracy (ft),Stop number")
+
+
+def shares(pg):
+    return pg.evaluate("() => window.__shares")
+
+
+def open_export(pg):
+    """From the start screen: Manual reads, then Export. Waits until the parts are made."""
+    pg.click("#mrStartList")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    pg.wait_for_function("() => /^Export \\d+ new$/.test($('mrExportBtn').textContent)", timeout=5000)
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=10000)
+
+
+def csv_rows(rec):
+    raw = bytes(next(f for f in rec["files"] if f["type"] == "text/csv")["csv"])
+    return raw, raw.decode("utf-8-sig").split("\r\n")
+
+
+def two_reads(pg):
+    m = A.STOPS[2]["meters"][0]
+    site = m["where"].split(" · ")[0]
+    seed(pg, [dict(id="a", savedAt=A.T1, meter=m["meter"], ref=m["ref"], bldg=m["bldg"], site=site, stop=2, read="004512", mult="10",
+                   notes='Lid "stuck", used bar', gps={"lat": 46.727212, "lon": -117.146276, "accFt": 30}, photo=[640, 480]),
+              dict(id="b", savedAt=A.T1 + 180000, meter="AIRPORT-X", other=True, read="7", mult="1")])
+    return m, site
+
+
+@A.case
+def t_export_app(br):
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    m, site = two_reads(pg)
+    open_export(pg)
+    r = pg.evaluate("() => [$('mrExportBody').textContent, [...document.querySelectorAll('#mrPart0 button')].map(b => b.textContent)]")
+    A.check("app export: one part with Open in Gmail; the sheet says Gmail opens with the addresses and to tap Send there",
+            r[1] == ["Open in Gmail"] and "addresses" in r[0] and "tap Send in Gmail" in r[0], json.dumps(r))
+    head = A.dom(pg, "#mrPart0 b") or ""
+    A.check("export (S6): a small part gives its size in KB, never 0.0 MB", re.fullmatch(r"2 reads, 1 photo, \d+ KB", head) is not None, head)
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: pg.evaluate("async () => (await mrAll()).every(e => e.status === 'exported')"), timeout=5)
+    mail = A.native(pg)["mails"][0]
+    A.check("app export: Gmail gets the CSV first, then the photo; the CSV name is the latest read's time (14:35), not today",
+            [f["name"] for f in mail["files"]] == ["AMR-manual-reads-20261001-1435.csv", m["ref"] + "-20261001-1432.jpg"], json.dumps([f["name"] for f in mail["files"]]))
+    A.check("app export: the photo is a JPEG from the app's store", mail["files"][1]["head"] == [255, 216, 255], json.dumps(mail["files"][1]))
+    A.check("app export: subject and body; the page passes no address (three arguments: batch, subject, body)",
+            mail["subject"] == "AMR manual reads 10/01/2026 14:35" and mail["body"] == "2 manual reads, 1 photo." and mail["args"] == 3, json.dumps(mail)[:300])
+    lines = mail["files"][0]["text"].lstrip("﻿").split("\r\n")
+    A.check("app export CSV: byte order mark, the 14 columns, CRLF rows",
+            mail["files"][0]["text"].startswith("﻿") and lines[0] == CSV_HEAD and lines[-1] == "", lines[0])
+    want1 = ",".join(["10/01/2026", "14:32", m["meter"], m["ref"], m["bldg"], site, "004512", "10", '"Lid ""stuck"", used bar"',
+                      m["ref"] + "-20261001-1432.jpg", "46.727212", "-117.146276", "30", "2"])
+    A.check("app export CSV: a row keeps leading zeros, quotes the notes, names the photo, and has GPS and the stop", lines[1] == want1, lines[1])
+    A.check("app export CSV: an Other meter row", lines[2] == "10/01/2026,14:35,AIRPORT-X,,,,7,1,,,,,,", lines[2])
+    st = pg.evaluate("async () => (await mrAll()).map(e => [e.status, e.exportName])")
+    A.check("app export: once Gmail opened, the reads are marked exported with the CSV name",
+            st == [["exported", "AMR-manual-reads-20261001-1435.csv"]] * 2, json.dumps(st))
+    A.check("app export: the part says Gmail opened and to tap Send there", "Gmail opened" in (A.dom(pg, "#mrPartState0") or ""), A.dom(pg, "#mrPartState0"))
+    ctx.close()
+
+
+@A.case
+def t_export_app_parts(br):
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, [dict(id="p%d" % k, savedAt=A.T1 + k * 60000, meter="M%d" % k, ref=str(200100 + k), read=str(k), mult="1",
+                   photo=[160, 120], photoBytes=8000000) for k in range(3)])
+    open_export(pg)
+    heads = pg.evaluate("() => [...document.querySelectorAll('#mrExportBody .mr-part')].map(p => p.querySelector('b').textContent)")
+    A.check("app parts: 3 photos of 8 MB make 2 emails (each part at most 18 MB of files)",
+            len(heads) == 2 and heads[0].startswith("Part 1 of 2: 2 reads, 2 photos") and heads[1].startswith("Part 2 of 2: 1 read, 1 photo"), json.dumps(heads))
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(A.native(pg)["mails"]) == 1, timeout=5)
+    st = {e["id"]: e["status"] for e in all_entries(pg)}
+    mail = A.native(pg)["mails"][0]
+    A.check("app parts: part 1 is one email named part1of2; only its reads are marked exported",
+            mail["files"][0]["name"] == "AMR-manual-reads-20261001-1434-part1of2.csv" and mail["subject"] == "AMR manual reads 10/01/2026 14:34, part 1 of 2"
+            and st == {"p0": "exported", "p1": "exported", "p2": "new"}, json.dumps([mail["files"][0]["name"], st]))
+    pg.click("#mrPart1 button")
+    A.pump_until(pg, lambda: all(e["status"] == "exported" for e in all_entries(pg)), timeout=5)
+    A.check("app parts: part 2 from its own tap; then every read is exported; All done shows",
+            len(A.native(pg)["mails"]) == 2 and "All done" in pg.evaluate("() => $('mrExportBody').textContent"))
+    ctx.close()
+
+
+@A.case
+def t_export_app_outcomes(br):
+    for gmail, want in (("no gmail", "Gmail is not on this tablet"), ("error: boom", "Gmail did not open")):
+        ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"gmail": gmail})
+        seed(pg, [dict(id="o1", savedAt=A.T1, meter="M1", ref="200201", read="1", mult="1", photo=[160, 120])])
+        open_export(pg)
+        pg.click("#mrPart0 button")
+        pg.wait_for_timeout(400)
+        r = [entry(pg, "o1")["status"], A.dom(pg, "#mrPartState0"), pg.evaluate("() => [...document.querySelectorAll('#mrPart0 button')].map(b => b.textContent)")]
+        A.check("app export, " + gmail + ": nothing is marked; the part says so and offers Open in Gmail again",
+                r[0] == "new" and want in (r[1] or "") and r[2] == ["Open in Gmail again"], json.dumps(r))
+        ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, [dict(id="o2", savedAt=A.T1, meter="M2", ref="200202", read="1", mult="1", photo=[160, 120])])
+    pg.evaluate("() => { delete window.__native.st.photos.o2; window.__native.save(); }")      # the photo is gone from the store
+    open_export(pg)
+    pg.click("#mrPart0 button")
+    pg.wait_for_timeout(400)
+    r = [entry(pg, "o2")["status"], A.dom(pg, "#mrPartState0"), len(A.native(pg)["mails"])]
+    A.check("app export: a photo missing from the store stops the part before Gmail opens; the read stays new",
+            r[0] == "new" and "could not be made" in (r[1] or "") and r[2] == 0, json.dumps(r))
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, [dict(id="o3", savedAt=A.T1, meter="M3", ref="200203", read="1", mult="1", photo=[160, 120])])
+    open_export(pg)
+    pg.evaluate("() => { window.__native.cfg.notApp = true; }")          # the bridge answers nothing for a moment
+    pg.click("#mrPart0 button")
+    pg.wait_for_timeout(400)
+    r = [A.dom(pg, "#mrPartState0"), pg.evaluate("() => [...document.querySelectorAll('#mrPart0 button')].map(b => b.textContent)"),
+         pg.evaluate("() => mrInApp()"), len(A.native(pg)["mails"])]
+    pg.evaluate("() => { window.__native.cfg.notApp = false; }")
+    A.check("app export, the bridge answers nothing: the part fails before Gmail and never falls back to the share menu; the read stays new",
+            "could not be made" in (r[0] or "") and r[1] == ["Open in Gmail again"] and r[2] is True and r[3] == 0
+            and entry(pg, "o3")["status"] == "new", json.dumps(r))
+    ctx.close()
+
+
+@A.case
+def t_export_share(br):
+    ctx, pg = A.open_app(br, start=False, init=SHARE_MOCK)
+    m, site = two_reads(pg)
+    open_export(pg)
+    r = pg.evaluate("() => [$('mrExportBody').textContent, [...document.querySelectorAll('#mrPart0 button')].map(b => b.textContent)]")
+    A.check("browser export: one part with a Share button; the sheet says to pick Gmail, type the addresses and tap Send",
+            r[1] == ["Share"] and "pick Gmail" in r[0] and "type the addresses" in r[0] and "tap Send" in r[0], json.dumps(r))
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(shares(pg)) == 1 and pg.evaluate("async () => (await mrAll()).every(e => e.status === 'exported')"), timeout=5)
+    rec = shares(pg)[0]
+    names = [f["name"] for f in rec["files"]]
+    A.check("browser export: one share, the CSV first, then the photo; the name comes from the latest read (14:35)",
+            names == ["AMR-manual-reads-20261001-1435.csv", m["ref"] + "-20261001-1432.jpg"], json.dumps(names))
+    A.check("browser export: exact types text/csv and image/jpeg (the browser checks them)",
+            [f["type"] for f in rec["files"]] == ["text/csv", "image/jpeg"] and rec["files"][1]["head"] == [255, 216, 255], json.dumps([f["type"] for f in rec["files"]]))
+    A.check("browser export: the title is the subject, the text says what is in it, no url",
+            rec["keys"] == ["files", "text", "title"] and rec["title"] == "AMR manual reads 10/01/2026 14:35" and rec["text"] == "2 manual reads, 1 photo.",
+            json.dumps([rec["keys"], rec["title"], rec["text"]]))
+    raw, lines = csv_rows(rec)
+    A.check("browser CSV: UTF-8 with a byte order mark and CRLF line ends", raw[:3] == b"\xef\xbb\xbf" and raw.endswith(b"\r\n"), repr(raw[:40]))
+    A.check("browser CSV: the 14 columns", lines[0] == CSV_HEAD, lines[0])
+    st = pg.evaluate("async () => (await mrAll()).map(e => [e.status, e.exportName])")
+    A.check("browser export: after the share resolves, the reads are marked exported with the CSV name",
+            st == [["exported", "AMR-manual-reads-20261001-1435.csv"]] * 2, json.dumps(st))
+    A.check("browser export: the part says Shared", "Shared" in (A.dom(pg, "#mrPartState0") or ""), A.dom(pg, "#mrPartState0"))
+    ctx.close()
+
+
+@A.case
+def t_export_parts(br):
+    ctx, pg = A.open_app(br, start=False, init=SHARE_MOCK)
+    specs = [dict(id="p%02d" % k, savedAt=A.T1 + k * 60000, meter="M%02d" % k, ref=str(200100 + k), read=str(k), mult="1", photo=[320, 240]) for k in range(11)]
+    specs.append(dict(id="p11", savedAt=A.T1 + 11 * 60000, meter="M11", ref="200111", read="11", mult="1"))
+    seed(pg, specs)
+    open_export(pg)
+    heads = pg.evaluate("() => [...document.querySelectorAll('#mrExportBody .mr-part')].map(p => p.querySelector('b').textContent)")
+    A.check("browser parts: 11 photos make 2 parts (one share carries at most 10 files)",
+            len(heads) == 2 and heads[0].startswith("Part 1 of 2: 9 reads, 9 photos") and heads[1].startswith("Part 2 of 2: 3 reads, 2 photos"), json.dumps(heads))
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(shares(pg)) == 1 and "Shared" in (A.dom(pg, "#mrPartState0") or ""), timeout=5)
+    s1 = shares(pg)[0]
+    st = {e["id"]: e["status"] for e in all_entries(pg)}
+    A.check("browser parts: part 1 shares 10 files (the CSV and 9 photos) named part1of2; only its reads are marked exported",
+            len(s1["files"]) == 10 and s1["files"][0]["name"] == "AMR-manual-reads-20261001-1443-part1of2.csv"
+            and s1["title"] == "AMR manual reads 10/01/2026 14:43, part 1 of 2"
+            and sorted(k for k, v in st.items() if v == "exported") == ["p%02d" % k for k in range(9)],
+            json.dumps([len(s1["files"]), s1["files"][0]["name"], s1["title"], st]))
+    A.check("browser parts: photo names are <route ref>-<YYYYMMDD-HHMM>.jpg",
+            [f["name"] for f in s1["files"][1:4]] == ["200100-20261001-1432.jpg", "200101-20261001-1433.jpg", "200102-20261001-1434.jpg"],
+            json.dumps([f["name"] for f in s1["files"][1:4]]))
+    pg.click("#mrPart1 button")
+    A.pump_until(pg, lambda: len(shares(pg)) == 2, timeout=5)
+    A.pump_until(pg, lambda: all(e["status"] == "exported" for e in all_entries(pg)), timeout=5)
+    s2 = shares(pg)[1]
+    A.check("browser parts: part 2 is a second share, from its own tap, with the rest; then every read is exported",
+            [f["name"] for f in s2["files"]] == ["AMR-manual-reads-20261001-1443-part2of2.csv", "200109-20261001-1441.jpg", "200110-20261001-1442.jpg"]
+            and all(e["status"] == "exported" for e in all_entries(pg)), json.dumps([f["name"] for f in s2["files"]]))
+    A.check("browser parts: All done shows", "All done" in pg.evaluate("() => $('mrExportBody').textContent"))
+    ctx.close()
+
+
+@A.case
+def t_export_outcomes(br):
+    ctx, pg = A.open_app(br, start=False, init=SHARE_MOCK)
+    seed(pg, [dict(id="o1", savedAt=A.T1, meter="M1", ref="200201", read="1", mult="1", photo=[320, 240])])
+    open_export(pg)
+    pg.evaluate("() => { window.__shareMode = 'abort'; }")
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(shares(pg)) == 1, timeout=5)
+    pg.wait_for_timeout(300)
+    r = [entry(pg, "o1")["status"], pg.evaluate("() => [...document.querySelectorAll('#mrPart0 button')].map(b => [b.textContent, b.disabled])")]
+    A.check("browser: cancel in the share menu (AbortError): the read stays new and Share is ready again", r == ["new", [["Share", False]]], json.dumps(r))
+    pg.evaluate("() => { window.__shareMode = 'fail'; }")
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(shares(pg)) == 2, timeout=5)
+    pg.wait_for_timeout(300)
+    r = [entry(pg, "o1")["status"], pg.evaluate("() => [...document.querySelectorAll('#mrPart0 button')].map(b => b.textContent)"), A.dom(pg, "#mrPartState0")]
+    A.check("browser: a refused share (NotAllowedError): still new; Share again and Save to Downloads are offered",
+            r[0] == "new" and r[1] == ["Share again", "Save to Downloads"] and "NotAllowedError" in (r[2] or ""), json.dumps(r))
+    dls = []
+    pg.on("download", lambda d: dls.append(d))
+    pg.click("#mrPart0 button:has-text('Save to Downloads')")
+    A.pump_until(pg, lambda: len(dls) == 2, timeout=8)
+    A.pump_until(pg, lambda: entry(pg, "o1")["status"] == "exported", timeout=5)
+    A.check("browser: Save to Downloads saves the CSV and the photo, and the read is marked exported",
+            sorted(d.suggested_filename for d in dls) == ["200201-20261001-1432.jpg", "AMR-manual-reads-20261001-1432.csv"]
+            and entry(pg, "o1")["status"] == "exported", json.dumps([d.suggested_filename for d in dls]))
+    pg.evaluate("() => mrSetStatus(['o1'], 'new').then(() => { mrCloseExport(); window.__shareMode = 'hang'; MR_CFG.pendingShareMs = 500; })")
+    pg.evaluate("() => mrOpenExport()")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=10000)
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(shares(pg)) == 3, timeout=5)
+    pg.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")    # the reader comes back to the page
+    A.pump_until(pg, lambda: "Mark exported" in pg.evaluate("() => $('mrPart0').textContent"), timeout=5)
+    st0 = entry(pg, "o1")["status"]
+    pg.click("#mrPart0 button:has-text('Mark exported')")
+    A.pump_until(pg, lambda: entry(pg, "o1")["status"] == "exported", timeout=5)
+    A.check("browser: a share that never finishes: the read stays new until the reader taps Mark exported",
+            st0 == "new" and entry(pg, "o1")["status"] == "exported", st0)
+    ctx.close()
+    ctx, pg = A.open_app(br, start=False, init=SHARE_MOCK)
+    seed(pg, [dict(id="l1", savedAt=A.T1, meter="M1", ref="200202", read="1", mult="1")])
+    open_export(pg)
+    pg.evaluate("() => { window.__shareMode = 'later'; }")
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: pg.evaluate("() => typeof window.__resolveShare === 'function'"), timeout=5)
+    pg.click("#mrExportClose")
+    pg.evaluate("() => window.__resolveShare()")
+    A.check("browser: a share that resolves after the export sheet closed still marks the read exported",
+            A.pump_until(pg, lambda: entry(pg, "l1")["status"] == "exported", timeout=5))
+    ctx.close()
+
+
+@A.case
+def t_export_no_share(br):
+    ctx, pg = A.open_app(br, start=False)
+    if pg.evaluate("() => typeof navigator.share === 'function'"):
+        ctx.close()
+        ctx, pg = A.open_app(br, start=False, init="delete Navigator.prototype.share; delete Navigator.prototype.canShare;")
+    seed(pg, [dict(id="d1", savedAt=A.T1, meter="M1", ref="200301", read="0012", mult="1", photo=[320, 240])])
+    open_export(pg)
+    r = pg.evaluate("() => [$('mrExportBody').textContent, [...document.querySelectorAll('#mrPart0 button')].map(b => b.textContent)]")
+    A.check("browser, no share menu: the sheet says so and offers Save to Downloads", "cannot share files" in r[0] and r[1] == ["Save to Downloads"], json.dumps(r))
+    dls = []
+    pg.on("download", lambda d: dls.append(d))
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(dls) == 2, timeout=8)
+    csv = next((d for d in dls if d.suggested_filename.endswith(".csv")), None)
+    raw = open(csv.path(), "rb").read() if csv else b""
+    A.check("browser, no share menu: both files download; the CSV is the same file (BOM, header, leading zeros)",
+            len(dls) == 2 and raw.startswith(b"\xef\xbb\xbfDate,Time,") and b",0012,1," in raw, repr(raw[:60]))
+    A.pump_until(pg, lambda: entry(pg, "d1")["status"] == "exported", timeout=5)
+    A.check("browser, no share menu: the read is marked exported; a toast says to tap Allow if the browser asks",
+            entry(pg, "d1")["status"] == "exported" and "tap Allow" in (A.dom(pg, "#toast") or ""), A.dom(pg, "#toast"))
+    ctx.close()
+
+
+@A.case
+def t_export_offline(br):
+    ctx, pg = A.open_app(br, start=False, init=SHARE_MOCK)
+    A.wait_for(pg, lambda: pg.evaluate("() => !!(navigator.serviceWorker && navigator.serviceWorker.controller)"), timeout=20)
+    A.wait_for(pg, lambda: "Offline ready." in A.text(pg, "#startBody"), timeout=20)
+    ctx.set_offline(True)
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    pg.click("#startBtns button")
+    pg.wait_for_timeout(600)
+    open_form(pg)
+    pg.check("#mrMeters input[value='__other']")
+    pg.fill("#mrOther", "OFF1")
+    pg.fill("#mrRead", "0001")
+    pg.fill("#mrMult", "1")
+    save_form(pg)
+    pg.click("#fList")
+    pg.click("#bManual")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    pg.wait_for_function("() => /^Export \\d+ new$/.test($('mrExportBtn').textContent)", timeout=5000)
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=10000)
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(shares(pg)) == 1, timeout=5)
+    ok = A.pump_until(pg, lambda: all_entries(pg)[0]["status"] == "exported", timeout=5)
+    A.check("browser offline (no network at all): a read is saved and exported",
+            ok and shares(pg)[0]["files"][0]["name"].startswith("AMR-manual-reads-"), json.dumps(shares(pg)[0]["files"][0]["name"]))
+    ctx.set_offline(False)
+    ctx.close()
+
+
 with sync_playwright() as p:
     br = p.chromium.launch()
     A.run_cases(br)
