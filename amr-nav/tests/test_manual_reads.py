@@ -228,6 +228,43 @@ def t_store_app_flaky(br):
 
 
 @A.case
+def t_fake_bridge(br):
+    """Ruling C1: the bridge stand-in answers as the app does (Bridge.java and ReadStore.java): ids and the draft photo,
+    '' for a missing photo or draft, 'ok' for a delete, size limits, and one JSON list that leaves out a damaged entry."""
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    r = pg.evaluate("""() => { const N = window.AMRNative, st = window.__native.st, jpg = '/9j/4AAQ', out = {};
+        out.draftId = [N.storePut('draft', '{"id":"draft"}').startsWith('error'), N.photoPut('draft', jpg), N.photoGet('draft') === jpg];
+        out.missing = [N.photoGet('mr-none'), N.draftGet(), N.photoDelete('mr-none'), N.storeDelete('mr-none')];
+        out.draft = [N.draftPut('[1]').startsWith('error'), N.draftPut(' {"form":{}} '), N.draftGet()];
+        out.put = [N.storePut('mr-a', '{"id":"mr-a"}'), N.storePut('mr-b', 'x').startsWith('error'),
+                   N.storePut('mr-c', '{"x":"' + 'a'.repeat(70000) + '"}').startsWith('error')];
+        out.photo = [N.photoPut('mr-a', '/9j/').startsWith('error'), N.photoPut('mr-a', '/9j/' + 'A'.repeat(11200000)).startsWith('error'),
+                     N.photoPut('mr-a', 'AAAA').startsWith('error'), N.photoPut('mr-a', jpg)];
+        out.delDraft = [N.storeDelete('draft'), N.photoGet('draft') === jpg, N.photoGet('mr-a') === jpg];
+        st.entries['mr-d'] = '{"id":"mr-d",}';
+        try { out.all = JSON.parse(N.storeAll()).map(e => e.id); } catch (e) { out.all = 'not one JSON list'; }
+        window.__native.cfg.storeError = 'error: disk full';
+        out.full = [N.storeAll(), N.storePut('mr-e', '{}'), N.photoDelete('mr-a'), N.draftDelete(), N.storeDelete('mr-a')];
+        return out; }""")
+    A.check("fake bridge (C1): storePut refuses id draft; photoPut and photoGet take it",
+            r["draftId"] == [True, "ok", True], json.dumps(r["draftId"]))
+    A.check("fake bridge (C1): a missing photo or draft answers ''; photoDelete and storeDelete of a missing one answer ok",
+            r["missing"] == ["", "", "ok", "ok"], json.dumps(r["missing"]))
+    A.check("fake bridge (C1): draftPut refuses text that is not an object and keeps the trimmed text",
+            r["draft"] == [True, "ok", '{"form":{}}'], json.dumps(r["draft"]))
+    A.check("fake bridge (C1): storePut refuses text that is not an object and an entry over 64 KB",
+            r["put"] == ["ok", True, True], json.dumps(r["put"]))
+    A.check("fake bridge (C1): photoPut refuses under 4 bytes, over 8 MB and a file that is not a JPEG",
+            r["photo"] == [True, True, True, "ok"], json.dumps(r["photo"]))
+    A.check("fake bridge (C1): storeDelete('draft') deletes nothing (the form's photo and the saved read's photo stay)",
+            r["delDraft"] == ["ok", True, True], json.dumps(r["delDraft"]))
+    A.check("fake bridge (C1): storeAll is one JSON list that leaves out a damaged entry", r["all"] == ["mr-a"], json.dumps(r["all"]))
+    A.check("fake bridge (C1): a full store fails the reads and writes; the deletes still answer ok (the app's never fail)",
+            r["full"] == ["error: disk full", "error: disk full", "ok", "ok", "ok"], json.dumps(r["full"]))
+    ctx.close()
+
+
+@A.case
 def t_store_blocked(br):
     for mode, kw in (("browser", {"init": BLOCK_IDB}), ("app", {"native_cfg": {"storeError": "error: disk full"}})):
         ctx, pg = A.open_app(br, mode=mode, start=False, **kw)
