@@ -207,7 +207,7 @@ button{font:inherit;cursor:pointer}
  <div id="actions">
   <button class="btn primary" id="aNext">Next</button>
   <button class="btn" id="aSkip">Skip stop</button>
-  <button class="btn" id="aManual" type="button">Manual read</button>
+  <button class="btn" id="aManual" type="button" hidden>Manual read</button>
   <button class="btn ghost" id="aGmaps">Google Maps</button>
  </div>
 </div>
@@ -272,7 +272,10 @@ button{font:inherit;cursor:pointer}
 <script src="manual-reads.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '2026.10.01-8';
+const APP_VERSION = '2026.10.01-9';
+/* Manual reads run only when manual-reads.js loaded and is this page's own version: after a deploy the service worker
+   can serve this page with no manual-reads.js (offline) or an older one. Off, the reads stay stored, unseen this time. */
+const MR_ON = typeof mrInit === 'function' && typeof MR_JS_VERSION === 'string' && MR_JS_VERSION === APP_VERSION;
 const CFG = {
   arrive: {drive: 45, walk: 15},     // m: arrival radius at the end of a leg
   off: {drive: 45, walk: 25},        // m: off-route distance
@@ -1601,9 +1604,9 @@ function renderPanel() {
   const pb = document.createElement('div'); pb.className = 'pbtns';
   pb.innerHTML = '<button class="btn" id="bManual" type="button">Manual reads</button><button class="btn" id="bReset">Start a new drive</button><a class="btn ghost" id="bRoutePage" style="text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="../route.html">Printable route page</a>';
   body.appendChild(pb);
-  $('bManual').textContent = typeof mrEntryText === 'function' ? mrEntryText() : 'Manual reads';
-  $('bManual').hidden = typeof MR === 'undefined' || MR.off;
-  $('bManual').onclick = () => { closePanel(); if (typeof mrOpenList === 'function') mrOpenList(); };
+  $('bManual').textContent = MR_ON ? mrEntryText() : 'Manual reads';
+  $('bManual').hidden = !MR_ON || MR.off;
+  $('bManual').onclick = () => { closePanel(); if (MR_ON) mrOpenList(); };
   if (NATIVE) $('bRoutePage').onclick = ev => { ev.preventDefault(); openOutside(LIVE + 'route.html'); };   // in the app it opens in the browser
   armButton($('bReset'), 'reset', 'Start a new drive', 'Tap again to clear progress');
   $('bReset').onclick = () => {
@@ -1621,7 +1624,7 @@ function renderPanel() {
     '<li>Drive the crimson line. Most meters read from the car. The guide moves to the next stop when you reach each one.</li>' +
     '<li>Blue stops are walk-in stops. Park, then choose Walk to meter or Read from car.</li>' +
     '<li>Gold-ringed stops have ATTENTION meters. The guide pauses there so you can read the note.</li>' +
-    '<li>No signal? The map, the route, the turns and rerouting all work offline. Off the route, the guide plans a new way on this tablet.</li>' + (typeof mrHelpLines === 'function' ? mrHelpLines() : '') + '</ol>' +
+    '<li>No signal? The map, the route, the turns and rerouting all work offline. Off the route, the guide plans a new way on this tablet.</li>' + (MR_ON ? mrHelpLines() : '') + '</ol>' +
     '<p>Route built ' + r.built + '. ' + r.source + '</p>' + (NATIVE ? '<p id="appLine"></p>' : '') + '<p>App ' + APP_VERSION + '. Map data &copy; OpenStreetMap contributors. Route lines by OSRM (FOSSGIS). Rerouting runs on this device' +
     (GR && GR.built ? ', road map built ' + GR.built : '') + '.</p>';
   body.appendChild(help);
@@ -1873,15 +1876,15 @@ async function load() {
     if (SIM) simStart(); else startGps();
     loaded = true;
     if (NATIVE) { nativeCall('ready', APP_VERSION); nativeDrive(); }   // this web copy works: the app keeps it
-    if (typeof mrAfterLoad === 'function') mrAfterLoad(true);
+    if (MR_ON) mrAfterLoad(true);
   } catch (e) {
     $('startBody').innerHTML = '<p>The route did not load. Connect to the internet once, then reopen the app.</p>';
     console.error(e);
-    if (typeof mrAfterLoad === 'function') mrAfterLoad(false);   // stored manual reads stay listable and exportable
+    if (MR_ON) mrAfterLoad(false);   // stored manual reads stay listable and exportable
   }
 }
 load();
-if (typeof mrInit === 'function') mrInit();
+if (MR_ON) mrInit();
 startGraphLoad();                     // the road map for rerouting loads beside the route; the route never waits for it
 if (!NATIVE && 'serviceWorker' in navigator) {    // the app keeps its own files and runs no service worker
   navigator.serviceWorker.addEventListener('controllerchange', updateOfflineLine);   // the first install takes control a moment after load

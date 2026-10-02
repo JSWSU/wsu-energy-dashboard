@@ -29,6 +29,11 @@ sw = open(os.path.join(APP, "sw.js"), encoding="utf-8").read()
 v = re.search(r"APP_VERSION = '([^']+)'", idx).group(1)
 swv = re.search(r"const VERSION = 'amr-nav-([^']+)'", sw).group(1)
 check("sw.js VERSION is amr-nav- plus APP_VERSION", swv == v, [swv, v])
+mr_path = os.path.join(APP, "manual-reads.js")
+if os.path.exists(mr_path):
+    mrm = re.search(r"const MR_JS_VERSION = '([^']+)'", open(mr_path, encoding="utf-8").read())
+    check("manual-reads.js MR_JS_VERSION is APP_VERSION (the page runs it only when they match; bump both together)",
+          bool(mrm) and mrm.group(1) == v, [mrm.group(1) if mrm else None, v])
 try:
     now = mam.build(APP)
     check("every file under amr-nav is tracked by git (tests/ aside) and has a name the app can serve", True)

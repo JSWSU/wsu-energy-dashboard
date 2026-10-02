@@ -7,6 +7,9 @@
    This file loads before the main script. Its functions use these names from the main script, at call time only:
    S, CFG, $, toast, armTap, armButton, disarm, hav, currentTargetStop, closePanel. Every name here starts with mr or MR. */
 'use strict';
+/* This file's version: always the same as APP_VERSION in index.html (bump both together; test_app_manifest.py checks).
+   The page runs manual reads only when they match, so a page and an older or newer copy of this file never mix. */
+const MR_JS_VERSION = '2026.10.01-9';
 const MR_CFG = {
   db: 'amrNav-manualReads',     // IndexedDB name (browser); jswsu.github.io is shared with other pages, so the name says whose it is
   dbVersion: 1,                 // a schema change raises this by one and adds one step in mrDb(); an old step never changes
@@ -117,7 +120,7 @@ function mrMakeEntry(o) {
 
 /* ---------- storage: the app's own files (installed app) or IndexedDB (browser), on this device only ---------- */
 const MR = {count: {new: 0, exported: 0}, storeOk: true, persisted: false, form: null, saving: false, draftT: null, gpsT: null,
-  photoUrl: null, off: false, draftPhotoSent: null, photoBusy: false};
+  photoUrl: null, off: false, skew: false, draftPhotoSent: null, photoBusy: false};
 /* The mode is fixed once, when this file loads. Inside the app (window.AMRNative is there) the reads always go to the
    app's store and the export always goes through the app: never to IndexedDB (WebView storage, spec 5) and never to the
    share menu (spec 7), even when one bridge call answers nothing for a moment. The calls exist from bridge version 2
@@ -523,8 +526,14 @@ function mrVisibility() {
     setTimeout(() => { if (pt.state === 'sharing' && pt.back === at) { pt.state = 'unknown'; mrRenderExport(); } }, MR_CFG.pendingShareMs);
   });
 }
-/* Called once by the main script after it starts load(). */
+/* Called once by the main script after it starts load(). A page of another version (an older page did not check
+   MR_JS_VERSION) keeps manual reads off: MR.skew, no button, no help line. */
 function mrInit() {
+  if (typeof APP_VERSION === 'undefined' || APP_VERSION !== MR_JS_VERSION) {
+    MR.off = true; MR.skew = true;
+    $('aManual').hidden = true;
+    return;
+  }
   MR.off = MR_APP_MODE && !MR_HAS_STORE;               // an app without every MR_CALLS call: keep manual reads off there
   $('aManual').hidden = MR.off;
   $('aManual').onclick = () => mrOpenForm({});
@@ -988,6 +997,7 @@ async function mrExported(pt, state) {
 /* ---------- help ---------- */
 /* The help list items about manual reads (the stop list, How to use), in the app's or the browser's words. */
 function mrHelpLines() {
+  if (MR.skew) return '';                               // a page of another version: nothing about manual reads this time
   if (MR.off) return '<li>Manual reads need a newer AMR Route Guide app on this tablet.</li>';
   return '<li>Manual read: tap Manual read on the stop card. Pick the meter, type the face read as the dial shows and the multiplier, and add a photo if needed. The reads stay on this tablet.</li>' +
     (mrBridge() ? '<li>To email them: Manual reads (in this list), Export, then Open in Gmail. Gmail opens with the addresses filled in. Check the email, then tap Send.</li>'

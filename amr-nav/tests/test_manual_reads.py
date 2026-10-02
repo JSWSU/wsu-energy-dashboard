@@ -30,6 +30,45 @@ def t_loaded(br):
     ctx.close()
 
 
+def quiet_503(n0):
+    """Drop the 'Failed to load resource' console lines a refused manual-reads.js leaves (they are the test's own)."""
+    A.errors[n0:] = [e for e in A.errors[n0:] if "Failed to load resource" not in e]
+
+
+@A.case
+def t_script_pairing(br):
+    """The website, after a deploy: the service worker can serve a new index.html while manual-reads.js is missing
+    (503 offline) or an older copy. The Manual read button is hidden in the markup and shows only when manual-reads.js
+    is there and has the page's own version (MR_JS_VERSION === APP_VERSION): never a button that does nothing."""
+    idx = open(os.path.join(A.APP, "index.html"), encoding="utf-8").read()
+    A.check("index.html: the Manual read button is hidden in the markup (only mrInit shows it)",
+            re.search(r'<button[^>]*id="aManual"[^>]*\bhidden\b', idx) is not None)
+    n0 = len(A.errors)
+    ctx = A.new_context(br)
+    ctx.route("**/amr-nav/manual-reads.js", lambda r: r.fulfill(status=503, body="Offline"))
+    ctx, pg = A.open_app(br, ctx=ctx)
+    pg.click("#fList")
+    r = pg.evaluate("() => [typeof mrInit, $('aManual').hidden, $('bManual').hidden, document.querySelector('#pBody .help').textContent.includes('Manual read')]")
+    A.check("manual-reads.js not served (503): no Manual read button, no Manual reads button, no manual reads help",
+            r == ["undefined", True, True, False], json.dumps(r))
+    ctx.close()
+    quiet_503(n0)
+    mr = open(os.path.join(A.APP, "manual-reads.js"), encoding="utf-8").read()
+    old = re.sub(r"const MR_JS_VERSION = '[^']+'", "const MR_JS_VERSION = '2000.01.01-1'", mr)
+    ctx = A.new_context(br)
+    ctx.route("**/amr-nav/manual-reads.js", lambda r: r.fulfill(status=200, body=old, content_type="text/javascript"))
+    ctx, pg = A.open_app(br, ctx=ctx)
+    pg.click("#fList")
+    r = pg.evaluate("() => [typeof mrInit, $('aManual').hidden, $('aManual').onclick === null, $('bManual').hidden, "
+                    "document.querySelector('#pBody .help').textContent.includes('Manual read')]")
+    A.check("an older manual-reads.js with a newer page: manual reads stay off for this open (no button, no help line)",
+            r == ["function", True, True, True, False], json.dumps(r))
+    r = pg.evaluate("() => { mrInit(); return [$('aManual').hidden, MR.off, mrHelpLines()]; }")   # as an older page would call it
+    A.check("an older page calling this manual-reads.js: mrInit keeps manual reads off and its help line empty",
+            r == [True, True, ""], json.dumps(r))
+    ctx.close()
+
+
 @A.case
 def t_pure(br):
     ctx, pg = A.open_app(br, start=False)
