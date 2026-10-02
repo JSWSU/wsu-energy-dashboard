@@ -122,6 +122,139 @@ def t_offline_file(br):
     ctx.close()
 
 
+BLOCK_IDB = ("Object.defineProperty(window, 'indexedDB', {configurable: true, get() { return {open() { "
+             "throw new DOMException('The user denied permission to access the database.', 'SecurityError'); }}; }});")
+
+
+def seed(pg, specs):
+    """Store entries through the app's own mrMakeEntry and mrSaveEntry. A spec holds the mrMakeEntry fields (id, savedAt,
+    meter, ref, bldg, site, stop, other, read, mult, notes, gps), plus status ('new' or 'exported'), exportedAt (ms; default
+    savedAt), photo ([w, h]: a JPEG drawn in the page) and photoBytes (to pretend a larger photo for the part split)."""
+    pg.evaluate("""async (specs) => {
+      for (const s of specs) {
+        let blob;
+        if (s.photo) {
+          const c = document.createElement('canvas'); c.width = s.photo[0]; c.height = s.photo[1];
+          const g = c.getContext('2d'); g.fillStyle = '#4a7a8c'; g.fillRect(0, 0, c.width, c.height);
+          g.fillStyle = '#fff'; g.font = '40px sans-serif'; g.fillText(s.meter, 20, 60);
+          blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+        }
+        const e = mrMakeEntry(Object.assign({}, s, {photoBytes: s.photoBytes || (blob ? blob.size : 0)}));
+        if (s.status === 'exported') { e.status = 'exported'; e.exportedAt = s.exportedAt || s.savedAt; e.exportName = 'AMR-manual-reads-test.csv'; }
+        await mrSaveEntry(e, blob);
+      }
+      await mrRefreshCounts();
+    }""", specs)
+
+
+def all_entries(pg):
+    return pg.evaluate("async () => (await mrAll()).map(e => Object.assign({}, e))")
+
+
+@A.case
+def t_store(br):
+    for mode in MODES:
+        ctx, pg = A.open_app(br, mode=mode, start=False)
+        seed(pg, [dict(id="s1", savedAt=A.T1, meter="0353_DW_001", ref="200041", read="004512", mult="10", photo=[640, 480]),
+                  dict(id="s2", savedAt=A.T1 + 60000, meter="0357_DW_001", ref="200043", read="7", mult="1")])
+        r = [[e["id"], e["status"], e["read"], e["photoBytes"] > 0] for e in all_entries(pg)]
+        A.check(mode + " store: two reads in save order, the photo with the first", r == [["s1", "new", "004512", True], ["s2", "new", "7", False]], json.dumps(r))
+        b = pg.evaluate("async () => { const b = await mrPhoto('s1'); return b ? [b.type, b.size > 1000] : null; }")
+        A.check(mode + " store: the photo comes back as a JPEG blob", b == ["image/jpeg", True], json.dumps(b))
+        A.check(mode + " store: counts of new and exported reads", pg.evaluate("() => mrRefreshCounts()") == {"new": 2, "exported": 0})
+        pg.reload()
+        pg.wait_for_selector("#startBtns button", timeout=20000)
+        n1 = len(all_entries(pg))
+        pg2 = ctx.new_page()
+        A.attach(pg2)
+        pg.close()
+        pg2.goto(A.BASE + "?sim=1")
+        pg2.wait_for_selector("#startBtns button", timeout=20000)
+        n2 = len(all_entries(pg2))
+        A.check(mode + " store: reads survive a reload and an app close (a new page, the same profile)", n1 == 2 and n2 == 2, f"{n1} {n2}")
+        pg2.evaluate("() => mrSetStatus(['s1'], 'exported', 'AMR-manual-reads-20261001-1432.csv')")
+        r = [[e["id"], e["status"], e["exportName"]] for e in all_entries(pg2)]
+        A.check(mode + " store: mark exported keeps the read and records the CSV name",
+                r == [["s1", "exported", "AMR-manual-reads-20261001-1432.csv"], ["s2", "new", None]], json.dumps(r))
+        k0 = pg2.evaluate("async () => [await mrClearExported(), (await mrAll()).map(e => e.id)]")
+        A.check(mode + " store: a read exported today is not cleared (K8: exported is not sent)", k0 == [0, ["s1", "s2"]], json.dumps(k0))
+        pg2.evaluate("async () => { const e = await mrGet('s1'); e.exportedAt = Date.now() - 8 * 86400000; await mrSaveEntry(e, undefined); }")
+        k = pg2.evaluate("async () => { const n = await mrClearExported(); return [n, (await mrAll()).map(e => e.id), await mrPhoto('s1')]; }")
+        A.check(mode + " store: clear removes only reads exported more than 7 days ago, with their photos", k == [1, ["s2"], None], json.dumps(k))
+        pg2.evaluate("() => { newDrive({adopt: true}); }")
+        pg2.goto(A.BASE + "?sim=1&reset=1")
+        pg2.wait_for_selector("#startBtns button", timeout=20000)
+        A.check(mode + " store: Start a new drive and ?reset=1 leave the reads alone", len(all_entries(pg2)) == 1)
+        d = pg2.evaluate("""async () => {
+            const c = document.createElement('canvas'); c.width = 64; c.height = 48;
+            const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+            await mrDraftPut({form: {read: '12', photo: blob}}); const a = await mrDraftGet(); await mrDraftDel();
+            const b = await mrDraftGet(); return [a.k, a.form.read, typeof a.at, a.form.photo instanceof Blob, a.form.photo.type, b === undefined]; }""")
+        A.check(mode + " store: a draft with its photo is put, read back and deleted", d == ["current", "12", "number", True, "image/jpeg", True], json.dumps(d))
+        pg2.evaluate("() => mrDelete('s2')")
+        A.check(mode + " store: delete removes the read", len(all_entries(pg2)) == 0)
+        ctx.close()
+
+
+@A.case
+def t_store_app_files(br):
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, [dict(id="f1", savedAt=A.T1, meter="M1", ref="200041", read="1", mult="1", photo=[320, 240])])
+    r = pg.evaluate("async () => ({dbs: (await indexedDB.databases()).map(d => d.name), st: Object.keys(window.__native.st.entries), "
+                    "ph: Object.keys(window.__native.st.photos), persisted: await mrPersist(true)})")
+    A.check("app: reads and photos go to the app's own store; IndexedDB is never opened; the app keeps them (protected)",
+            r == {"dbs": [], "st": ["f1"], "ph": ["f1"], "persisted": True}, json.dumps(r))
+    ctx.close()
+
+
+@A.case
+def t_store_app_flaky(br):
+    """In the app, a store call that answers '' for a moment (the page did not count as the app's own page) never sends a
+    read to IndexedDB: the save fails and says so. The mode is fixed when the page loads."""
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    pg.evaluate("() => { window.__native.cfg.bridge = ''; window.__native.cfg.notApp = true; }")
+    r = pg.evaluate("""async () => {
+        let saved = 'saved', listed = 'listed';
+        try { await mrSaveEntry(mrMakeEntry({savedAt: Date.now(), meter: 'M', read: '1', mult: '1'}), undefined); } catch (e) { saved = 'refused'; }
+        try { await mrAll(); } catch (e) { listed = 'refused'; }
+        return {saved, listed, app: mrStore() === MR_APP && !!mrBridge(), dbs: (await indexedDB.databases()).map(d => d.name)}; }""")
+    A.check("app: a store call that answers nothing fails the save and the list; IndexedDB is never used in the app",
+            r == {"saved": "refused", "listed": "refused", "app": True, "dbs": []}, json.dumps(r))
+    pg.evaluate("() => { window.__native.cfg.bridge = '2'; window.__native.cfg.notApp = false; }")
+    seed(pg, [dict(id="f2", savedAt=A.T1, meter="M2", read="1", mult="1")])
+    A.check("app: once the bridge answers again, the read saves in the app's store",
+            pg.evaluate("() => Object.keys(window.__native.st.entries)") == ["f2"])
+    ctx.close()
+
+
+@A.case
+def t_store_blocked(br):
+    for mode, kw in (("browser", {"init": BLOCK_IDB}), ("app", {"native_cfg": {"storeError": "error: disk full"}})):
+        ctx, pg = A.open_app(br, mode=mode, start=False, **kw)
+        r = pg.evaluate("async () => { try { await mrAll(); return 'opened'; } catch (e) { return 'refused'; } }")
+        c = pg.evaluate("async () => [await mrRefreshCounts(), MR.storeOk]")
+        A.check(mode + " store: a blocked or full store is refused cleanly; counts are 0 and storeOk is false (no page error)",
+                r == "refused" and c == [{"new": 0, "exported": 0}, False], json.dumps([r, c]))
+        ctx.close()
+
+
+@A.case
+def t_store_versions(br):
+    ctx, pg = A.open_app(br, start=False)
+    seed(pg, [dict(id="v1", savedAt=A.T1, meter="0353_DW_001", ref="200041", read="1", mult="1")])
+    r = pg.evaluate("""() => new Promise(res => { const q = indexedDB.open('amrNav-manualReads', 2);
+        q.onupgradeneeded = () => { q.result.createObjectStore('later', {keyPath: 'k'}); };
+        q.onblocked = () => res('blocked');
+        q.onsuccess = () => { const names = [...q.result.objectStoreNames]; q.result.close(); res(names); }; })""")
+    A.check("browser store: the page closes its connection when a newer version opens (no blocked upgrade); its stores are kept",
+            r == ["drafts", "entries", "later", "photos"], json.dumps(r))
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    k = pg.evaluate("async () => { try { await mrAll(); return 'opened'; } catch (e) { return e.name; } }")
+    A.check("browser store: a database from a newer app version is refused with VersionError, not a page error", k == "VersionError", k)
+    ctx.close()
+
+
 with sync_playwright() as p:
     br = p.chromium.launch()
     A.run_cases(br)

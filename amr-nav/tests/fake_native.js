@@ -11,7 +11,7 @@
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { saved = {}; }
   const st = Object.assign({drive: false}, saved);
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* full: the tests keep their data small */ } };
-  const cfg = Object.assign({bridge: '1', app: '1.0', web: '', source: 'built in', pending: '', check: 'never', speak: 'ok', open: 'ok'},
+  const cfg = Object.assign({bridge: '2', app: '1.1', web: '', source: 'built in', pending: '', check: 'never', speak: 'ok', open: 'ok'},
     window.__nativeCfg || {});
   const N = window.__native = {calls: [], spoken: [], opened: [], ready: [], drive: [], cfg, st, save};
   const rec = (name, args) => { N.calls.push([name].concat(Array.from(args))); };
@@ -29,4 +29,43 @@
     ttsInfo() { rec('ttsInfo', arguments); return JSON.stringify({ready: true, engine: 'fake', voice: 'en-US', offline: true, error: ''}); },
     openExternal(url) { rec('openExternal', arguments); N.opened.push(String(url)); return cfg.open; },
   };
+})();
+
+/* Version 2: the manual reads store (ReadStore.java in the app): entries as JSON text by id, photos as base64 by id,
+   one draft. cfg.storeError (for example 'error: disk full') makes the store calls answer it, like a full app store.
+   cfg.notApp makes every call answer '', as the real bridge does while the page does not count as the app's own.
+   An app older than 1.1 (cfg.bridge '1') has none of these calls. */
+(() => {
+  const N = window.__native, st = N.st, cfg = N.cfg;
+  if (cfg.bridge !== '' && Number(cfg.bridge) < 2) return;
+  st.entries = st.entries || {}; st.photos = st.photos || {}; st.draft = st.draft || '';
+  const short = a => (typeof a === 'string' && a.length > 200 ? a.slice(0, 20) + '...(' + a.length + ')' : a);
+  const rec = (name, args) => { N.calls.push([name].concat(Array.from(args).map(short))); };
+  const off = () => !!cfg.notApp;
+  const fail = () => (cfg.storeError ? String(cfg.storeError) : '');
+  const okId = id => /^[A-Za-z0-9_-]{1,64}$/.test(String(id));
+  Object.assign(window.AMRNative, {
+    storeAll() { rec('storeAll', arguments); if (off()) return ''; return fail() || '[' + Object.keys(st.entries).sort().map(k => st.entries[k]).join(',') + ']'; },
+    storePut(id, json) {
+      rec('storePut', arguments);
+      if (off()) return '';
+      if (fail()) return fail();
+      const j = String(json).trim();
+      if (!okId(id) || id === 'draft' || !(j.startsWith('{') && j.endsWith('}'))) return 'error: bad entry';
+      st.entries[id] = j; N.save(); return 'ok';
+    },
+    storeDelete(id) { rec('storeDelete', arguments); if (off()) return ''; if (fail()) return fail(); delete st.entries[id]; delete st.photos[id]; N.save(); return 'ok'; },
+    photoPut(id, b64) {
+      rec('photoPut', arguments);
+      if (off()) return '';
+      if (fail()) return fail();
+      if (!okId(id) || !String(b64).startsWith('/9j/')) return 'error: not a JPEG';
+      st.photos[id] = String(b64); N.save(); return 'ok';
+    },
+    photoGet(id) { rec('photoGet', arguments); if (off()) return ''; return fail() || st.photos[id] || ''; },
+    photoDelete(id) { rec('photoDelete', arguments); if (off()) return ''; delete st.photos[id]; N.save(); return 'ok'; },
+    draftGet() { rec('draftGet', arguments); if (off()) return ''; return fail() || st.draft || ''; },
+    draftPut(json) { rec('draftPut', arguments); if (off()) return ''; if (fail()) return fail(); st.draft = String(json); N.save(); return 'ok'; },
+    draftDelete() { rec('draftDelete', arguments); if (off()) return ''; st.draft = ''; N.save(); return 'ok'; },
+  });
 })();

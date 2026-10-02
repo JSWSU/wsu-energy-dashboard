@@ -1,7 +1,7 @@
 {
  "format": "amr-app-manifest-1",
  "version": "2026.10.01-3",
- "minBridge": 1,
+ "minBridge": 2,
  "files": [
   {"path": "basemap.json", "size": 980501, "sha256": "42e6631e879bac3837e038a4fe2e58656e242848084a160e37b4338dc39e8277"},
   {"path": "graph.json", "size": 271376, "sha256": "a498ebdee008f04c23a4442ea4ba30bc3da70a13b32199f295514a41595edb7d"},
@@ -10,9 +10,9 @@
   {"path": "icons/icon-192.png", "size": 9549, "sha256": "4b9efd198f75a2e801f64fd36e1f14331eb993e236d706c96e2a7225775247d7"},
   {"path": "icons/icon-512.png", "size": 25485, "sha256": "8cf4e635499345a2773c7712c9e5643b1e27fe928318bac8d3c9be4a35940a92"},
   {"path": "icons/maskable-512.png", "size": 14756, "sha256": "d161f772d02fa4e85634d43a63833001afae1f2bac3c3442fd20e6d2fe1ea21e"},
-  {"path": "index.html", "size": 117590, "sha256": "a1e7ba7ea0bc564ac1ac90af392793a97d98c5dfd9a3af2c2c889321d1ddf590"},
+  {"path": "index.html", "size": 117813, "sha256": "533efcbff0e72fdf64138a86cf13d431e8dd9ddb3377fbb71100eb5299be1602"},
   {"path": "manifest.webmanifest", "size": 583, "sha256": "e055da28a7be322f0a2235edb6ca6391a22582927721fd31cb8511fcab9b59c5"},
-  {"path": "manual-reads.js", "size": 8054, "sha256": "88326f967ed8da5e1658de9c66994260bf231b4b333329c1b2634c2b683b36de"},
+  {"path": "manual-reads.js", "size": 17675, "sha256": "16b22ead910e1d103886f21a44ae83a921fd346cd2d17de8ff42f4df80fb0f15"},
   {"path": "route.json", "size": 115072, "sha256": "6b9ffc1bf282b41f921a24d4b17c44a316626391ccce71c6e24a4953b37665b0"},
   {"path": "sw.js", "size": 8742, "sha256": "5a50271b6f89ad8613e82e34ef40cacddca52866a038b27a6ba3639c254f5f22"},
   {"path": "vendor/leaflet/images/layers-2x.png", "size": 1259, "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf"},

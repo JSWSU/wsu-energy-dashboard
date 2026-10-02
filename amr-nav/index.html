@@ -222,7 +222,7 @@ const $ = id => document.getElementById(id);
 /* In the AMR Route Guide app this page runs in a WebView and the app adds window.AMRNative: voice, links that leave the
    app, the app's version and its update state go through it. In a browser it is not there and nothing changes. */
 const NATIVE = (() => { try { return window.AMRNative && typeof window.AMRNative.bridgeVersion === 'function' ? window.AMRNative : null; } catch (e) { return null; } })();
-const MIN_BRIDGE = 1;                // the oldest app bridge this page works with; make_app_manifest.py copies it into app-manifest.json
+const MIN_BRIDGE = 2;                // the oldest app bridge this page works with; make_app_manifest.py copies it into app-manifest.json
 const LIVE = 'https://jswsu.github.io/wsu-energy-dashboard/';   // the public site, for links that leave the app
 /* One bridge call that can never stop the page: '' when the app lacks the call or the call failed. */
 function nativeCall(name, ...args) {
@@ -1780,12 +1780,15 @@ async function load() {
     if (SIM) simStart(); else startGps();
     loaded = true;
     if (NATIVE) { nativeCall('ready', APP_VERSION); nativeDrive(); }   // this web copy works: the app keeps it
+    if (typeof mrAfterLoad === 'function') mrAfterLoad(true);
   } catch (e) {
     $('startBody').innerHTML = '<p>The route did not load. Connect to the internet once, then reopen the app.</p>';
     console.error(e);
+    if (typeof mrAfterLoad === 'function') mrAfterLoad(false);   // stored manual reads stay listable and exportable
   }
 }
 load();
+if (typeof mrInit === 'function') mrInit();
 startGraphLoad();                     // the road map for rerouting loads beside the route; the route never waits for it
 if (!NATIVE && 'serviceWorker' in navigator) {    // the app keeps its own files and runs no service worker
   navigator.serviceWorker.addEventListener('controllerchange', updateOfflineLine);   // the first install takes control a moment after load

@@ -114,3 +114,185 @@ function mrMakeEntry(o) {
     lat: g ? g.lat : null, lon: g ? g.lon : null, accFt: g ? g.accFt : null,
     routeSig: (typeof S !== 'undefined' && S.routeSig) || ''};
 }
+
+/* ---------- storage: the app's own files (installed app) or IndexedDB (browser), on this device only ---------- */
+const MR = {count: {new: 0, exported: 0}, storeOk: true, persisted: false, form: null, saving: false, draftT: null, gpsT: null,
+  photoUrl: null, off: false, draftPhotoSent: null};
+/* The mode is fixed once, when this file loads. Inside the app (window.AMRNative is there) the reads always go to the
+   app's store and the export always goes through the app: never to IndexedDB (WebView storage, spec 5) and never to the
+   share menu (spec 7), even when one bridge call answers nothing for a moment. The store calls exist from bridge
+   version 2 (app 1.1). */
+const MR_APP_MODE = (() => { try { return !!window.AMRNative; } catch (e) { return false; } })();
+const MR_HAS_STORE = (() => { try { return MR_APP_MODE && typeof window.AMRNative.storeAll === 'function'; } catch (e) { return false; } })();
+/* The app's store, or null (a browser, or an app older than 1.1). In the app the reads live in the app's own files:
+   Android never clears them, app updates keep them, an uninstall deletes them. */
+function mrBridge() { return MR_HAS_STORE ? window.AMRNative : null; }
+/* One call to the app's store. An answer that starts with "error", or no store, throws. */
+function mrN(name, ...args) {
+  const n = mrBridge();
+  if (!n || typeof n[name] !== 'function') throw new Error('the app store has no ' + name);
+  const r = n[name](...args), s = r == null ? '' : String(r);
+  if (s.startsWith('error')) throw new Error(s);
+  return s;
+}
+/* A store write: any answer but "ok" throws, '' included (the bridge answers '' while the page does not count as the
+   app's own), so the form says "Could not save" instead of losing the read. */
+function mrOk(name, ...args) {
+  const s = mrN(name, ...args);
+  if (s !== 'ok') throw new Error('the app did not save (' + (s || 'no answer') + ')');
+  return s;
+}
+/* A Blob as base64 text for the bridge, and back. */
+function mrBlobB64(blob) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(',')[1] || '');
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+function mrB64Blob(b64, type) {
+  const bin = atob(b64), u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return new Blob([u], {type: type || 'image/jpeg'});
+}
+
+/* The app's store. The draft's photo is kept as the photo with id "draft"; it is sent again only when it changed. */
+const MR_APP = {
+  all: async () => JSON.parse(mrN('storeAll')),
+  photo: async id => { const b = mrN('photoGet', id); return b ? mrB64Blob(b, 'image/jpeg') : null; },
+  save: async (e, photo) => {
+    if (photo) mrOk('photoPut', e.id, await mrBlobB64(photo));      // the photo first: an entry never names a missing photo
+    else if (photo === null) mrOk('photoDelete', e.id);
+    mrOk('storePut', e.id, JSON.stringify(e));
+  },
+  del: async id => { mrOk('storeDelete', id); },
+  draftGet: async () => {
+    const j = mrN('draftGet');
+    if (!j) return undefined;
+    const d = JSON.parse(j);
+    if (d.form) {
+      if (d.form.hasPhoto) { const b = mrN('photoGet', 'draft'); d.form.photo = b ? mrB64Blob(b, 'image/jpeg') : null; MR.draftPhotoSent = d.form.photo; }
+      delete d.form.hasPhoto;
+    }
+    return d;
+  },
+  draftPut: async d => {
+    const form = Object.assign({}, d.form || {}), photo = form.photo || null;
+    delete form.photo;
+    form.hasPhoto = !!photo;
+    if (photo && photo !== MR.draftPhotoSent) { mrOk('photoPut', 'draft', await mrBlobB64(photo)); MR.draftPhotoSent = photo; }
+    mrOk('draftPut', JSON.stringify(Object.assign({k: 'current', at: Date.now()}, d, {form})));
+  },
+  draftDel: async () => { mrOk('draftDelete'); mrOk('photoDelete', 'draft'); MR.draftPhotoSent = null; },
+};
+
+let mrDbP = null;
+/* IndexedDB (browser). Open it once. One upgrade step per version: a later version adds a step and never changes an
+   earlier one, so a device that skipped versions runs every missing step in order. */
+function mrDb() {
+  if (mrDbP) return mrDbP;
+  mrDbP = new Promise((resolve, reject) => {
+    let req;
+    try { req = indexedDB.open(MR_CFG.db, MR_CFG.dbVersion); } catch (e) { reject(e); return; }
+    req.onupgradeneeded = ev => {
+      const db = req.result;
+      if (ev.oldVersion < 1) {
+        db.createObjectStore('entries', {keyPath: 'id'}).createIndex('status', 'status');
+        db.createObjectStore('photos', {keyPath: 'id'});    // {id: entry id, blob: the JPEG}
+        db.createObjectStore('drafts', {keyPath: 'k'});     // {k: 'current', form, at}: the open form, kept across a reload
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => { db.close(); mrDbP = null; };   // a newer page version in another tab can upgrade
+      resolve(db);
+    };
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => toast('Close the other Route Guide tabs to finish the update.');
+  });
+  mrDbP.catch(() => { mrDbP = null; });                 // try again at the next use
+  return mrDbP;
+}
+/* Run work(stores) in one transaction. Resolves when it is complete, with work's return value (or, when that is a
+   request, its result). */
+function mrTx(names, mode, work) {
+  return mrDb().then(db => new Promise((resolve, reject) => {
+    let tx, out;
+    try { tx = db.transaction(names, mode); } catch (e) { reject(e); return; }
+    const st = {};
+    names.forEach(n => { st[n] = tx.objectStore(n); });
+    tx.oncomplete = () => resolve(out instanceof IDBRequest ? out.result : out);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new DOMException('Transaction aborted', 'AbortError'));
+    try { out = work(st); } catch (e) { try { tx.abort(); } catch (x) { /* already finished */ } reject(e); }
+  }));
+}
+const MR_IDB = {
+  all: () => mrTx(['entries'], 'readonly', st => st.entries.getAll()),
+  photo: id => mrTx(['photos'], 'readonly', st => st.photos.get(id)).then(r => (r ? r.blob : null)),
+  save: (e, photo) => mrTx(['entries', 'photos'], 'readwrite', st => {
+    st.entries.put(e);
+    if (photo) st.photos.put({id: e.id, blob: photo});
+    else if (photo === null) st.photos.delete(e.id);
+  }),
+  del: id => mrTx(['entries', 'photos'], 'readwrite', st => { st.entries.delete(id); st.photos.delete(id); }),
+  draftGet: () => mrTx(['drafts'], 'readonly', st => st.drafts.get('current')),
+  draftPut: d => mrTx(['drafts'], 'readwrite', st => { st.drafts.put(Object.assign({k: 'current', at: Date.now()}, d)); }),
+  draftDel: () => mrTx(['drafts'], 'readwrite', st => { st.drafts.delete('current'); }),
+};
+
+const mrStore = () => (MR_APP_MODE ? MR_APP : MR_IDB);      // in the app never IndexedDB, whatever one call answers
+const mrAll = () => Promise.resolve().then(() => mrStore().all()).then(a => a.sort((x, y) => x.savedAt - y.savedAt));
+const mrGet = id => mrAll().then(a => a.find(e => e.id === id));
+const mrPhoto = id => Promise.resolve().then(() => mrStore().photo(id));
+/* Save an entry. photo: a Blob to store, null to remove the stored photo, undefined to keep it. */
+const mrSaveEntry = (e, photo) => Promise.resolve().then(() => mrStore().save(e, photo));
+const mrDelete = id => Promise.resolve().then(() => mrStore().del(id));
+const mrDraftGet = () => Promise.resolve().then(() => mrStore().draftGet());
+const mrDraftPut = d => Promise.resolve().then(() => mrStore().draftPut(d));
+const mrDraftDel = () => Promise.resolve().then(() => mrStore().draftDel());
+/* Mark entries 'exported' (with the CSV name and the time) or back to 'new'. */
+async function mrSetStatus(ids, status, csvName) {
+  const now = Date.now(), want = new Set(ids);
+  for (const e of await mrAll()) {
+    if (!want.has(e.id)) continue;
+    e.status = status;
+    e.exportedAt = status === 'exported' ? now : null;
+    e.exportName = status === 'exported' ? csvName : null;
+    await mrSaveEntry(e, undefined);
+  }
+}
+/* Delete the exported entries (and their photos) exported more than MR_CFG.clearAfterMs ago. In the app "exported"
+   means only that Gmail's compose screen opened, not that the mail went out (K8). Resolves with the number deleted. */
+async function mrClearExported() {
+  let n = 0;
+  const cut = Date.now() - MR_CFG.clearAfterMs;
+  for (const e of await mrAll()) {
+    if (e.status !== 'exported' || !(e.exportedAt > 0 && e.exportedAt < cut)) continue;
+    await mrDelete(e.id);
+    n++;
+  }
+  return n;
+}
+/* True when the reads are kept when storage runs low: always in the app (its own files); in a browser, when it grants
+   persistent storage. ask: request it (the browser shows no prompt). */
+async function mrPersist(ask) {
+  if (MR_APP_MODE) return MR_HAS_STORE;
+  try {
+    if (!navigator.storage || !navigator.storage.persisted) return false;
+    if (await navigator.storage.persisted()) return true;
+    return !!(ask && navigator.storage.persist && await navigator.storage.persist());
+  } catch (e) { return false; }
+}
+/* Counts of new and exported reads in MR.count; MR.storeOk is false when the store cannot be read. */
+async function mrRefreshCounts() {
+  let all = [];
+  try { all = await mrAll(); MR.storeOk = true; } catch (e) { MR.storeOk = false; }
+  MR.count = {new: all.filter(e => e.status === 'new').length, exported: all.filter(e => e.status === 'exported').length};
+  return MR.count;
+}
+/* Called once by the main script after it starts load(). */
+function mrInit() { mrRefreshCounts(); }
+/* Called by load() when the route is on screen (ok) or failed to load. */
+function mrAfterLoad(ok) { mrRefreshCounts(); }
