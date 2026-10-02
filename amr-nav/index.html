@@ -154,6 +154,8 @@ button{font:inherit;cursor:pointer}
 .mr-note{font-size:13.5px;color:var(--muted);margin:8px 0}
 .mr-foot{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 14px 14px;background:var(--card);border-top:1px solid var(--border);
  border-radius:0 0 12px 12px;flex-wrap:wrap}
+.mr-photo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+#mrThumb{width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
 @media (min-width:900px) and (orientation:landscape){
  #banner{right:auto;width:520px}
  #card{right:auto;width:520px}
@@ -220,6 +222,9 @@ button{font:inherit;cursor:pointer}
    <div class="mr-err" id="mrMultErr" role="alert"></div>
    <label class="mr-lab" for="mrNotes">Notes (optional)</label>
    <textarea id="mrNotes" rows="3" maxlength="500"></textarea>
+   <div class="mr-photo"><img id="mrThumb" alt="Photo of the meter face" hidden><button class="btn" id="mrPhotoBtn" type="button">Photo</button><button class="btn" id="mrPhotoDel" type="button" hidden>Remove photo</button></div>
+   <p class="mr-note" id="mrPhotoNote"></p>
+   <input id="mrCam" type="file" accept="image/*" capture="environment" hidden>
    <p class="mr-note" id="mrGps"></p>
   </div>
   <div class="mr-foot"><button class="btn" id="mrCancel" type="button">Cancel</button><button class="btn primary" id="mrSave" type="button">Save</button></div>

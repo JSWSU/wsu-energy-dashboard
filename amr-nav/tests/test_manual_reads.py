@@ -4,6 +4,7 @@ Run (repository root served on 127.0.0.1, port from AMR_TEST_PORT):  py amr-nav\
 One case only: set AMR_TEST_CASE to its name first.
 Never put an email address in this file: the repository is public."""
 import io
+import base64
 import json
 import os
 import re
@@ -601,6 +602,142 @@ def t_form_phone(br):
         else:
             A.check("tablet: the meter list keeps its 40% height cap (512 px of 1280)", r["cap"] == cap, json.dumps(r))
         ctx.close()
+
+
+def jpeg_bytes(w, h, orientation=None, detail=False):
+    """A JPEG made with Pillow. orientation: an EXIF Orientation value. detail: a photo-like picture (gradient and noise);
+    else one colour with a red block in the stored top-left corner."""
+    if detail:
+        grad = Image.linear_gradient("L").resize((w, h))
+        img = Image.merge("RGB", (grad, Image.effect_noise((w, h), 12), grad.transpose(Image.Transpose.FLIP_LEFT_RIGHT)))
+    else:
+        img = Image.new("RGB", (w, h), (90, 140, 170))
+        img.paste((220, 30, 30), (0, 0, w // 4, h // 4))
+    buf = io.BytesIO()
+    if orientation:
+        exif = Image.Exif()
+        exif[0x0112] = orientation
+        img.save(buf, "JPEG", quality=90, exif=exif.tobytes())
+    else:
+        img.save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+
+def pick_photo(pg, data, name="IMG_0001.jpg"):
+    """Hand a file to the camera input, as the camera app does; True when the page has finished with it."""
+    n = pg.evaluate("() => MR.photoSeq || 0")
+    pg.set_input_files("#mrCam", files=[{"name": name, "mimeType": "image/jpeg", "buffer": data}])
+    return A.pump_until(pg, lambda: pg.evaluate("() => MR.photoSeq || 0") > n, timeout=15)
+
+
+@A.case
+def t_photo(br):
+    ctx, pg = A.open_app(br)
+    open_form(pg)
+    cam = pg.evaluate("() => { const c = $('mrCam'); return [c.type, c.accept, c.getAttribute('capture'), $('mrPhotoBtn').textContent, $('mrThumb').hidden]; }")
+    A.check("photo: a camera input for the back camera; the button says Photo; no thumbnail yet",
+            cam == ["file", "image/*", "environment", "Photo", True], json.dumps(cam))
+    sizes = pg.evaluate("() => [300, 30000, 99999, 100000, 523456].map(mrSizeText)")
+    A.check("photo (S6): the size note never says 0.0 MB: under 0.1 MB it gives KB",
+            sizes == ["1 KB", "30 KB", "100 KB", "0.1 MB", "0.5 MB"], json.dumps(sizes))
+    ok = pick_photo(pg, jpeg_bytes(400, 200, orientation=6))
+    r = pg.evaluate("""async () => { const b = await createImageBitmap(MR.form.photo); const c = document.createElement('canvas');
+        c.width = b.width; c.height = b.height; const g = c.getContext('2d', {willReadFrequently: true}); g.drawImage(b, 0, 0);
+        const tr = g.getImageData(b.width - 10, 10, 1, 1).data, tl = g.getImageData(10, 10, 1, 1).data;
+        return {w: b.width, h: b.height, type: MR.form.photo.type, redTopRight: tr[0] > 150 && tr[1] < 100, redTopLeft: tl[0] > 150 && tl[1] < 100,
+                thumb: !$('mrThumb').hidden, btn: $('mrPhotoBtn').textContent, del: !$('mrPhotoDel').hidden}; }""")
+    A.check("photo: EXIF orientation applied (400x200 tagged 6 becomes 200x400; the red corner moves to the top right); JPEG; Retake photo and Remove photo",
+            ok and r == {"w": 200, "h": 400, "type": "image/jpeg", "redTopRight": True, "redTopLeft": False, "thumb": True,
+                         "btn": "Retake photo", "del": True}, json.dumps(r))
+    ok = pick_photo(pg, jpeg_bytes(3264, 2448, detail=True), "IMG_0002.jpg")
+    r = pg.evaluate("() => Object.assign({size: MR.form.photo.size, note: $('mrPhotoNote').textContent}, MR.form.photoInfo)")
+    A.check("photo: a 3264x2448 camera photo is kept at 2000x1500, about 0.5 MB (first quality at or under 600 KB, else 0.5)",
+            ok and r["w"] == 2000 and r["h"] == 1500 and r["size"] <= 1000000 and (r["size"] <= 600000 or r["q"] == 0.5), json.dumps(r))
+    A.check("photo (S6): the note gives the size of a large photo in MB",
+            re.fullmatch(r"Photo kept with the read, \d\.\d MB\.", r["note"]) is not None, r["note"])
+    head = pg.evaluate("""async () => { const u = new Uint8Array(await MR.form.photo.slice(0, 4096).arrayBuffer());
+        return [Array.from(u.slice(0, 3)), String.fromCharCode(...u).includes('Exif')]; }""")
+    A.check("photo: the kept photo is a JPEG with no EXIF block (no GPS or time tags inside it)", head == [[255, 216, 255], False], json.dumps(head))
+    ok = pick_photo(pg, b"not a picture", "x.jpg")
+    r = pg.evaluate("() => [MR.form.photoInfo && MR.form.photoInfo.w, $('mrPhotoNote').textContent]")
+    A.check("photo: a file that is not a picture keeps the last photo and says Try again", ok and r == [2000, "The photo could not be read. Try again."], json.dumps(r))
+    pg.click("#mrPhotoDel")
+    r = pg.evaluate("() => [MR.form.photo, $('mrThumb').hidden, $('mrPhotoBtn').textContent]")
+    A.check("photo: Remove photo clears it", r == [None, True, "Photo"], json.dumps(r))
+    pick_photo(pg, jpeg_bytes(1200, 900), "IMG_0003.jpg")
+    note = pg.evaluate("() => [MR.form.photo.size, $('mrPhotoNote').textContent]")
+    A.check("photo (S6): a photo under 0.1 MB shows its size in KB, never 0.0 MB",
+            note[0] < 100000 and re.fullmatch(r"Photo kept with the read, \d+ KB\.", note[1]) is not None, json.dumps(note))
+    pg.check("#mrMeters input[value='__other']")
+    pg.fill("#mrOther", "P1")
+    pg.fill("#mrRead", "5")
+    pg.fill("#mrMult", "1")
+    save_form(pg)
+    r = pg.evaluate("async () => { const e = (await mrAll())[0]; const b = await mrPhoto(e.id); return [e.photoBytes, b ? b.size : -1]; }")
+    A.check("photo: Save stores the photo; the entry records its size", r[0] > 0 and r[0] == r[1], json.dumps(r))
+    ctx.close()
+
+
+@A.case
+def t_photo_app(br):
+    ctx, pg = A.open_app(br, mode="app")
+    open_form(pg)
+    pick_photo(pg, jpeg_bytes(1200, 900), "IMG_0004.jpg")
+    pg.check("#mrMeters input[value='__other']")
+    pg.fill("#mrOther", "P2")
+    pg.fill("#mrRead", "6")
+    pg.fill("#mrMult", "1")
+    save_form(pg)
+    r = pg.evaluate("""() => { const st = window.__native.st, id = Object.keys(st.entries)[0], e = JSON.parse(st.entries[id]);
+        return [e.photoBytes === atob(st.photos[id]).length, st.photos[id].slice(0, 4)]; }""")
+    A.check("app photo: Save puts the photo in the app's store (base64 JPEG) and the entry records its size", r == [True, "/9j/"], json.dumps(r))
+    ctx.close()
+
+
+@A.case
+def t_photo_draft(br):
+    ctx, pg = A.open_app(br)
+    open_form(pg)
+    pg.check("#mrMeters input[value='__other']")
+    pg.fill("#mrOther", "D1")
+    pg.fill("#mrRead", "0031")
+    with pg.expect_file_chooser() as fc:
+        pg.click("#mrPhotoBtn")
+    saved = A.pump_until(pg, lambda: pg.evaluate("async () => { const d = await mrDraftGet(); return !!(d && d.form && d.form.read === '0031'); }"), timeout=3)
+    A.check("browser photo: Photo saves the form as a draft before the camera opens", saved)
+    n = pg.evaluate("() => MR.photoSeq || 0")
+    fc.value.set_files(files=[{"name": "IMG_0004.jpg", "mimeType": "image/jpeg", "buffer": jpeg_bytes(800, 600)}])
+    A.pump_until(pg, lambda: pg.evaluate("() => MR.photoSeq || 0") > n, timeout=10)
+    A.pump_until(pg, lambda: pg.evaluate("async () => { const d = await mrDraftGet(); return !!(d && d.form && d.form.photo); }"), timeout=3)
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    back = A.pump_until(pg, lambda: pg.evaluate("() => !$('mrForm').hidden && !$('mrThumb').hidden"), timeout=8)
+    r = pg.evaluate("() => [$('mrOther').value, $('mrRead').value, MR.form && MR.form.photo && MR.form.photo.type]")
+    A.check("browser photo: after a reload the draft comes back with its photo", back and r == ["D1", "0031", "image/jpeg"], json.dumps(r))
+    ctx.close()
+
+
+@A.case
+def t_photo_pending(br):
+    """Android closed the app while the camera was open: the form comes back, and the camera's photo with it."""
+    ctx, pg = A.open_app(br, mode="app")
+    open_form(pg)
+    pg.check("#mrMeters input[value='__other']")
+    pg.fill("#mrOther", "D2")
+    pg.fill("#mrRead", "0032")
+    with pg.expect_file_chooser():
+        pg.click("#mrPhotoBtn")
+    saved = A.pump_until(pg, lambda: pg.evaluate("() => { const d = window.__native.st.draft; return !!d && JSON.parse(d).form.awaitingPhoto === true; }"), timeout=4)
+    A.check("app photo: Photo keeps the form as a draft that waits for a photo, before the camera opens", saved)
+    b64 = base64.b64encode(jpeg_bytes(1200, 900)).decode("ascii")
+    pg.evaluate("(b) => { window.__native.st.pending = b; window.__native.save(); }", b64)   # the app kept the camera's photo
+    pg.reload()
+    pg.wait_for_selector("#startBtns button", timeout=20000)
+    back = A.pump_until(pg, lambda: pg.evaluate("() => !$('mrForm').hidden && !$('mrThumb').hidden"), timeout=10)
+    r = pg.evaluate("() => [$('mrOther').value, $('mrRead').value, MR.form && MR.form.photo && MR.form.photo.type, MR.form && MR.form.awaitingPhoto, window.__native.st.pending || '']")
+    A.check("app photo: after Android closed the app, the form comes back with the camera's photo, taken over once",
+            back and r == ["D2", "0032", "image/jpeg", False, ""], json.dumps(r[:4]))
+    ctx.close()
 
 
 with sync_playwright() as p:

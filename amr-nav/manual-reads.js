@@ -374,6 +374,7 @@ function mrPaintForm() {
   mrShowErrors({}, true);
   disarm('mrCancel');
   armButton($('mrCancel'), 'mrCancel', 'Cancel', 'Tap again to discard');
+  mrPaintPhoto();
   mrGpsLine();
 }
 function mrPaintMeters() {
@@ -525,6 +526,9 @@ function mrInit() {
   });
   $('mrCancel').onclick = mrCancelTap;
   $('mrSave').onclick = mrSave;
+  $('mrPhotoBtn').onclick = mrPhotoTap;
+  $('mrPhotoDel').onclick = mrPhotoRemove;
+  $('mrCam').onchange = () => mrPhotoPicked($('mrCam').files && $('mrCam').files[0]);
   document.addEventListener('visibilitychange', mrVisibility);
   mrRefreshCounts();
 }
@@ -533,6 +537,84 @@ function mrAfterLoad(ok) {
   mrRefreshCounts();
   if (MR.off) return;
   mrDraftGet().then(d => {
-    if (d && d.form && !MR.form) return mrOpenForm({draft: d.form}).then(() => toast('Your unsaved manual read is back.'));
+    if (d && d.form && !MR.form) return mrOpenForm({draft: d.form}).then(() => { toast('Your unsaved manual read is back.'); mrPendingPhoto(); });
   }).catch(() => { /* storage blocked */ });
+}
+
+/* ---------- photo ---------- */
+/* Shrink a camera photo: upright pixels (createImageBitmap applies the EXIF orientation), long side at most
+   MR_CFG.photoLongPx, JPEG at the first quality in MR_CFG.photoQualities that gives MR_CFG.photoTargetBytes or less
+   (else the last quality). The canvas JPEG has no EXIF, so no GPS or time tags leave the device inside the photo. */
+async function mrShrink(file) {
+  const bmp = await createImageBitmap(file, {imageOrientation: 'from-image'});
+  const k = Math.min(1, MR_CFG.photoLongPx / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  bmp.close();
+  let blob = null, q = 0;
+  for (q of MR_CFG.photoQualities) {
+    blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
+    if (blob && blob.size <= MR_CFG.photoTargetBytes) break;
+  }
+  c.width = c.height = 0;                        // free the canvas memory at once
+  if (!blob) throw new Error('JPEG encode failed');
+  return {blob, w, h, q};
+}
+/* Photo: keep the form as a draft that waits for a photo first (Android can close the page, or the app, while the
+   camera is open), then open the camera. The camera opens from this tap, so nothing slow runs before cam.click(). */
+function mrPhotoTap() {
+  if (!MR.form) return;
+  MR.form.awaitingPhoto = true;
+  mrDraftNow();
+  const cam = $('mrCam');
+  cam.value = '';
+  cam.click();
+}
+async function mrPhotoPicked(file) {
+  if (!file || !MR.form) return;
+  $('mrPhotoBtn').disabled = true;
+  $('mrPhotoNote').textContent = 'Saving the photo...';
+  try {
+    const out = await mrShrink(file);
+    if (!MR.form) return;
+    MR.form.photo = out.blob; MR.form.photoChanged = true; MR.form.photoInfo = {w: out.w, h: out.h, q: out.q}; MR.form.awaitingPhoto = false;
+    mrPaintPhoto();
+    mrDraftNow();
+  } catch (e) {
+    $('mrPhotoNote').textContent = 'The photo could not be read. Try again.';
+  } finally {
+    $('mrPhotoBtn').disabled = false;
+    $('mrCam').value = '';
+    MR.photoSeq = (MR.photoSeq || 0) + 1;
+  }
+}
+function mrPhotoRemove() {
+  if (!MR.form) return;
+  MR.form.photo = null; MR.form.photoChanged = true; MR.form.photoInfo = null;
+  mrPaintPhoto();
+  mrDraftSoon();
+}
+/* A file size for the reader: KB under 0.1 MB, so a small photo never shows "0.0 MB" (ruling S6); else MB, one decimal. */
+function mrSizeText(bytes) {
+  return bytes < 100000 ? Math.max(1, Math.round(bytes / 1000)) + ' KB' : (bytes / 1e6).toFixed(1) + ' MB';
+}
+function mrPaintPhoto() {
+  const f = MR.form, img = $('mrThumb');
+  if (MR.photoUrl) { URL.revokeObjectURL(MR.photoUrl); MR.photoUrl = null; }
+  if (f.photo) { MR.photoUrl = URL.createObjectURL(f.photo); img.src = MR.photoUrl; img.hidden = false; }
+  else { img.removeAttribute('src'); img.hidden = true; }
+  $('mrPhotoBtn').textContent = f.photo ? 'Retake photo' : 'Photo';
+  $('mrPhotoDel').hidden = !f.photo;
+  $('mrPhotoNote').textContent = f.photo ? 'Photo kept with the read, ' + mrSizeText(f.photo.size) + '.' : 'Optional: one photo of the meter face.';
+}
+/* A restored form that waited for a photo: in the app, take the photo the camera made while Android had closed the app. */
+function mrPendingPhoto() {
+  if (!MR.form || !MR.form.awaitingPhoto) return;
+  MR.form.awaitingPhoto = false;
+  let b = '';
+  if (mrBridge()) { try { b = mrN('takePendingPhoto'); } catch (e) { b = ''; } }
+  if (b) mrPhotoPicked(new File([mrB64Blob(b, 'image/jpeg')], 'camera.jpg', {type: 'image/jpeg'}));
+  else mrDraftSoon();
 }

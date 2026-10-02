@@ -100,3 +100,16 @@
     draftDelete() { rec('draftDelete', arguments); if (off()) return ''; st.draft = ''; N.save(); return 'ok'; },
   });
 })();
+
+/* Version 2: a photo the camera took while Android had closed the app (the app keeps it once; st.pending, base64). */
+(() => {
+  const N = window.__native, st = N.st, cfg = N.cfg;
+  if (cfg.bridge !== '' && Number(cfg.bridge) < 2) return;
+  window.AMRNative.takePendingPhoto = function () {
+    N.calls.push(['takePendingPhoto']);
+    if (cfg.notApp) return '';
+    const b = st.pending || '';
+    st.pending = ''; N.save();
+    return b;
+  };
+})();
