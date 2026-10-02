@@ -988,7 +988,7 @@ def csv_rows(rec):
 
 def two_reads(pg):
     m = A.STOPS[2]["meters"][0]
-    site = m["where"].split(" · ")[0]
+    site = m["where"].split(" \u00b7 ")[0]
     seed(pg, [dict(id="a", savedAt=A.T1, meter=m["meter"], ref=m["ref"], bldg=m["bldg"], site=site, stop=2, read="004512", mult="10",
                    notes='Lid "stuck", used bar', gps={"lat": 46.727212, "lon": -117.146276, "accFt": 30}, photo=[640, 480]),
               dict(id="b", savedAt=A.T1 + 180000, meter="AIRPORT-X", other=True, read="7", mult="1")])
@@ -1013,9 +1013,9 @@ def t_export_app(br):
     A.check("app export: the photo is a JPEG from the app's store", mail["files"][1]["head"] == [255, 216, 255], json.dumps(mail["files"][1]))
     A.check("app export: subject and body; the page passes no address (three arguments: batch, subject, body)",
             mail["subject"] == "AMR manual reads 10/01/2026 14:35" and mail["body"] == "2 manual reads, 1 photo." and mail["args"] == 3, json.dumps(mail)[:300])
-    lines = mail["files"][0]["text"].lstrip("﻿").split("\r\n")
+    lines = mail["files"][0]["text"].lstrip("\ufeff").split("\r\n")
     A.check("app export CSV: byte order mark, the 14 columns, CRLF rows",
-            mail["files"][0]["text"].startswith("﻿") and lines[0] == CSV_HEAD and lines[-1] == "", lines[0])
+            mail["files"][0]["text"].startswith("\ufeff") and lines[0] == CSV_HEAD and lines[-1] == "", lines[0])
     want1 = ",".join(["10/01/2026", "14:32", m["meter"], m["ref"], m["bldg"], site, "004512", "10", '"Lid ""stuck"", used bar"',
                       m["ref"] + "-20261001-1432.jpg", "46.727212", "-117.146276", "30", "2"])
     A.check("app export CSV: a row keeps leading zeros, quotes the notes, names the photo, and has GPS and the stop", lines[1] == want1, lines[1])
