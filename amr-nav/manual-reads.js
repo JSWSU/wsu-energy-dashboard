@@ -301,20 +301,32 @@ function mrGpsNow() {
   if (!f || S.blocked || Date.now() - S.fixAt > CFG.fixStaleMs) return null;
   return {lat: +f.lat.toFixed(6), lon: +f.lon.toFixed(6), accFt: Math.round((f.acc || 0) * 3.28084)};
 }
-/* The stop the form opens on. The stop the card shows comes first: when one of its meters is within MR_CFG.nearStopM of a
-   fresh fix, or when the card shows its parking spot (parked there). Otherwise the stop with the nearest meter within
-   MR_CFG.nearStopM (the card can already show the next stop: drive-by stops move on when reached); else the card's stop;
-   else none. */
+/* The stop the drive reached last: the newest stop marked reached (a drive-by arrival, Reached or Done, Read from car) or
+   passed (the car left it after it was reached). Skipped stops do not count: a stop can be skipped from far away. */
+function mrLastReached() {
+  let best = null, bt = -Infinity;
+  [S.done, S.passed].forEach(m => Object.keys(m || {}).forEach(o => {
+    const t = Number(m[o]);
+    if (S.stopBy[o] && t > bt) { bt = t; best = S.stopBy[o]; }
+  }));
+  return best;
+}
+/* The stop the form opens on. Parked at the card's parking spot: the card's stop. Otherwise the candidates are the card's
+   stop and the stop the drive reached last (drive-by stops move the card on when reached, so the reader can still stand at
+   that stop): the candidate with the nearest meter within MR_CFG.nearStopM of a fresh fix wins (the card's stop on a tie).
+   With no candidate that near: the stop with the nearest meter within MR_CFG.nearStopM; else the card's stop; else none. */
 function mrDefaultStop() {
   if (!S.route) return null;
   const card = currentTargetStop() || null, g = mrGpsNow();
-  if (!g) return card;
+  if (!g || (card && S.waiting === 'park')) return card;
   const nearM = st => Math.min(...st.meters.concat([st]).filter(p => p.lat != null && p.lon != null)
     .map(p => hav([g.lat, g.lon], [p.lat, p.lon])));
-  if (card && (S.waiting === 'park' || nearM(card) <= MR_CFG.nearStopM)) return card;
-  let best = null, bd = Infinity;
-  S.route.stops.forEach(st => { const d = nearM(st); if (d < bd) { bd = d; best = st; } });
-  return best && bd <= MR_CFG.nearStopM ? best : card;
+  const nearest = sts => {
+    let best = null, bd = Infinity;
+    sts.forEach(st => { if (!st) return; const d = nearM(st); if (d < bd) { bd = d; best = st; } });
+    return bd <= MR_CFG.nearStopM ? best : null;
+  };
+  return nearest([card, mrLastReached()]) || nearest(S.route.stops) || card;
 }
 /* The meters the form lists for a stop number; null lists the route's meters with no location on file. */
 function mrStopMeters(stopO) {
@@ -367,7 +379,7 @@ function mrPaintForm() {
 function mrPaintMeters() {
   const f = MR.form, box = $('mrMeters');
   box.innerHTML = '';
-  mrStopMeters(f.stopO).forEach(m => box.appendChild(mrMeterRow(m.ref, m.meter, 'ref ' + m.ref + (m.where ? ' · ' + m.where : ''),
+  mrStopMeters(f.stopO).forEach(m => box.appendChild(mrMeterRow(m.ref, m.meter, 'ref ' + m.ref + (m.where ? ' \u00b7 ' + m.where : ''),
     m.note, !f.other && f.meterRef === m.ref)));
   box.appendChild(mrMeterRow('', 'Other meter', 'Not on this list. Type its ID.', '', f.other));
   $('mrOther').hidden = !f.other;
@@ -407,16 +419,20 @@ function mrReadForm() {
   f.otherId = $('mrOther').value; f.read = $('mrRead').value; f.mult = $('mrMult').value; f.notes = $('mrNotes').value;
   return f;
 }
+/* Show the check messages. A meter error with Other meter picked is about the typed ID: the ID field turns red and takes
+   the focus, not the meter list. */
 function mrShowErrors(err, quiet) {
+  const idBad = !!err.meter && !!(MR.form && MR.form.other);
   [['meter', 'mrMeters'], ['read', 'mrRead'], ['mult', 'mrMult']].forEach(([k, id]) => {
     $(id + 'Err').textContent = err[k] || '';
-    $(id).classList.toggle('mr-bad', !!err[k]);
+    $(id).classList.toggle('mr-bad', !!err[k] && !(k === 'meter' && idBad));
   });
+  $('mrOther').classList.toggle('mr-bad', idBad);
   const first = ['meter', 'read', 'mult'].find(k => err[k]);
   if (first && !quiet) {
-    const el = $({meter: 'mrMeters', read: 'mrRead', mult: 'mrMult'}[first]);
+    const el = $({meter: idBad ? 'mrOther' : 'mrMeters', read: 'mrRead', mult: 'mrMult'}[first]);
     el.scrollIntoView({block: 'center'});
-    if (first !== 'meter') el.focus();
+    if (el.id !== 'mrMeters') el.focus();
   }
 }
 /* The meter facts an entry stores: from the list (the stop's meters, or the meters with no location), or the typed ID.
@@ -489,7 +505,7 @@ function mrGpsLine() {
   const el = $('mrGps');
   if (MR.form.editId) { el.textContent = 'Date, time and GPS stay as first saved.'; return; }
   const g = mrGpsNow();
-  el.textContent = g ? 'GPS ±' + g.accFt + ' ft. It is saved with the read.' : 'No current GPS fix. The read saves without a position.';
+  el.textContent = g ? 'GPS \u00b1' + g.accFt + ' ft. It is saved with the read.' : 'No current GPS fix. The read saves without a position.';
 }
 /* Keep a focused field in view above the on-screen keyboard. */
 function mrFocusInto(ev) { setTimeout(() => { try { ev.target.scrollIntoView({block: 'center'}); } catch (x) { /* gone */ } }, 300); }

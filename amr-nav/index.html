@@ -142,6 +142,7 @@ button{font:inherit;cursor:pointer}
 .mr-bad{border-color:#b91c1c !important;box-shadow:0 0 0 1px #b91c1c}
 .mr-bad:focus{outline:2px solid #b91c1c;outline-offset:0}   /* a bad field stays red while it has focus */
 #mrMeters{max-height:40vh;overflow:auto;border:1px solid var(--border);border-radius:8px}
+@media (max-width:599.98px){#mrMeters{max-height:none}}   /* phone: no cap, the sheet scrolls, so Other meter stays in reach */
 .mr-m{display:flex;gap:10px;align-items:flex-start;padding:10px;border-bottom:1px solid #f0edea;font-size:14px;cursor:pointer}
 .mr-m:last-child{border-bottom:none}
 .mr-m.on{background:#fdf2f4}

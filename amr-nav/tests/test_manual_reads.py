@@ -310,9 +310,10 @@ def t_form_basics(br):
 
 @A.case
 def t_form_card_stop(br):
-    """Ruling S1 (UI samples, 10/01/2026): the form prefers the stop the card shows. Parked at stop 1, a stop 2 meter is
-    nearer than the stop 1 meter, but the form opens on stop 1: a meter of the card's stop is within 150 m of the fix, and
-    the card shows stop 1's parking spot. Only when neither holds does the stop with the nearest meter win."""
+    """Ruling S1 as the controller amended it (10/01/2026): parked at a stop's parking spot, the form opens on the card's
+    stop. Otherwise the candidates are the card's stop and the stop the drive reached last; the candidate with the nearest
+    meter within 150 m wins; with none, the stop with the nearest meter within 150 m; else the card's stop. Parked at stop 1,
+    a stop 2 meter is nearer than the stop 1 meter, but the form opens on stop 1."""
     ctx, pg = A.open_app(br)
     park = A.STOPS[1]["park"]
     far = A.STOPS[2]["meters"][0]                            # 0353_DW_001: more than 150 m from every stop 1 meter
@@ -331,8 +332,50 @@ def t_form_card_stop(br):
         S.waiting = 'park'; out.parked = mrDefaultStop().o;      // the card shows stop 1's parking spot: stop 1, even beside a stop 2 meter
         S.waiting = null; out.free = mrDefaultStop().o;          // neither: the stop with the nearest meter
         S.waiting = 'park'; return out; }""", [far["lat"], far["lon"]])
-    A.check("form: the card's stop wins when one of its meters is within 150 m, or when the card shows its parking spot; else the nearest meter's stop",
+    A.check("form: the card's stop wins when one of its meters is within 150 m (no stop reached yet), or when parked at its parking spot; else the nearest meter's stop",
             r == {"meterNear": 1, "parked": 1, "free": 2}, json.dumps(r))
+    ctx.close()
+
+
+@A.case
+def t_form_driveby(br):
+    """Review Focus 1: drive-by stops move the card on when the car reaches them. Standing at a meter of the stop the drive
+    reached last, the form opens on that stop, not on the card's next stop. Real route: a stop 7 meter lies 27 to 67 m from
+    the stop 6 meters, and a stop 25 meter 93 m from the stop 24 meters. The arrival runs through the app's own onFix."""
+    ctx, pg = A.open_app(br)
+
+    def by_name(n, name):
+        return next(m for m in A.STOPS[n]["meters"] if m["meter"] == name)
+
+    def reach(n):                                            # put the guide on the leg to stop n, then a fix at its end
+        end = pg.evaluate("(n) => { const i = firstLegOfStop(n); setLeg(i, 'silent'); const g = S.legs[i].geom; return g[g.length - 1]; }", n)
+        A.feed(pg, end, acc=9)
+        return pg.evaluate("(n) => [currentTargetStop().o, !!S.done[n], S.waiting]", n)
+
+    def form_stop(m):                                        # a fix at meter m, then Manual read: the stop the form opens on
+        A.feed(pg, [m["lat"], m["lon"]], acc=9)
+        open_form(pg)
+        v = pg.input_value("#mrStop")
+        pg.click("#mrCancel")
+        return [m["meter"], v]
+
+    for n in (6, 24):
+        moved = reach(n)
+        A.check("setup: the car reaches drive-by stop %d; the card moves on to stop %d" % (n, n + 1),
+                moved == [n + 1, True, None], json.dumps(moved))
+        got = [form_stop(m) for m in A.STOPS[n]["meters"]]
+        A.check("form: at each meter of drive-by stop %d (the stop the drive reached last) it opens on stop %d, not on the card's stop %d" % (n, n, n + 1),
+                len(got) > 0 and all(v == str(n) for _, v in got), json.dumps(got))
+        if n == 6:
+            got = form_stop(by_name(7, "0817ADW_001"))   # 27 m from a stop 6 meter: the card's stop is nearer here
+            A.check("form: at a meter of the card's stop (7), 27 m from a stop 6 meter, it opens on the card's stop",
+                    got[1] == "7", json.dumps(got))
+            moved = reach(7)                             # stop 7 has an attention meter: the card waits there
+            pg.click("#aNext")                           # Reached, next: the card moves on to stop 8
+            card = pg.evaluate("() => [currentTargetStop().o, !!S.done[7]]")
+            got = form_stop(by_name(7, "0817ADW_001"))
+            A.check("form: after Reached, next at stop 7 (card on stop 8), a stop 7 meter 27 m from a stop 6 meter opens stop 7, not stop 6",
+                    moved[2] == "stop" and card == [8, True] and got[1] == "7", json.dumps([moved, card, got]))
     ctx.close()
 
 
@@ -356,6 +399,10 @@ def t_form_ui_rulings(br):
     A.check("form: the bad face read has focus and still shows red (red border and a red focus outline)",
             s == [True, True, "rgb(185, 28, 28)", "solid", "rgb(185, 28, 28)"], json.dumps(s))
     ctx.close()
+    src = open(os.path.join(A.APP, "manual-reads.js"), encoding="utf-8").read().splitlines()
+    raw = [i + 1 for i, line in enumerate(src) if any(ord(c) > 127 for c in line) and not line.lstrip().startswith(("/*", "*", "//"))]
+    A.check("code: manual-reads.js writes the middle dot and the plus-minus sign as \\u escapes (every code line is ASCII)",
+            raw == [], json.dumps(raw))
 
 
 @A.case
@@ -409,12 +456,17 @@ def t_form_rules(br):
     pg.fill("#mrMult", "1")
     pg.click("#mrSave")
     A.check("form: Other meter needs a typed ID", A.dom(pg, "#mrMetersErr") == "Type the meter ID.", A.dom(pg, "#mrMetersErr"))
+    o = pg.evaluate("() => [$('mrOther').classList.contains('mr-bad'), document.activeElement === $('mrOther'), $('mrMeters').classList.contains('mr-bad')]")
+    A.check("form: Other meter with no typed ID: the ID field is red and has focus (the meter list is not marked)",
+            o == [True, True, False], json.dumps(o))
     pg.fill("#mrOther", "AIRPORT-X")
     pg.fill("#mrRead", "12a")
     pg.fill("#mrMult", "0")
     pg.click("#mrSave")
     errs = pg.evaluate("() => [$('mrReadErr').textContent, $('mrMultErr').textContent]")
     A.check("form: letters in the face read and a multiplier of 0 are refused", all(errs), json.dumps(errs))
+    A.check("form: a typed ID clears the red mark on the ID field at the next Save",
+            pg.evaluate("() => !$('mrOther').classList.contains('mr-bad') && $('mrMetersErr').textContent === ''"))
     pg.fill("#mrRead", "0007")
     pg.fill("#mrMult", "0.1")
     save_form(pg)
@@ -492,6 +544,26 @@ def t_form_phone(br):
     A.check("phone: the form fits the width (no side scroll) and Save can be reached",
             r["over"] is False and r["sheet"][0] >= 0 and r["sheet"][1] <= 412 and r["save"], json.dumps(r))
     ctx.close()
+    # The meter list: no height cap on a screen narrower than 600 px (the sheet scrolls, so Other meter stays reachable);
+    # the tablet keeps the 40% cap. Stop 2 has 6 meters; Save with nothing filled in must show the Other meter row.
+    m = A.STOPS[2]["meters"][0]
+    for label, vp, kw, cap in (("phone", (412, 915), {"is_mobile": True, "has_touch": True, "device_scale_factor": 2.6}, "none"),
+                               ("tablet", (800, 1280), {}, "512px")):
+        ctx, pg = A.open_app(br, viewport=vp, **kw)
+        A.feed(pg, [m["lat"], m["lon"]], acc=9)
+        open_form(pg)
+        pg.click("#mrSave")
+        pg.wait_for_timeout(300)
+        r = pg.evaluate("""() => { const box = $('mrMeters'), cs = getComputedStyle(box), b = box.getBoundingClientRect(),
+            o = document.querySelector('#mrMeters .mr-other').getBoundingClientRect();
+            return {rows: box.querySelectorAll('.mr-m').length, cap: cs.maxHeight, inner: box.scrollHeight > box.clientHeight + 1,
+                    other: o.top >= 0 && o.bottom <= innerHeight && o.bottom <= b.bottom + 1, err: $('mrMetersErr').textContent}; }""")
+        if label == "phone":
+            A.check("phone: the meter list has no height cap and no inner scroll; after Save with nothing filled in the Other meter row is in view",
+                    r["rows"] == 7 and r["cap"] == cap and r["inner"] is False and r["other"] and r["err"] != "", json.dumps(r))
+        else:
+            A.check("tablet: the meter list keeps its 40% height cap (512 px of 1280)", r["cap"] == cap, json.dumps(r))
+        ctx.close()
 
 
 with sync_playwright() as p:
