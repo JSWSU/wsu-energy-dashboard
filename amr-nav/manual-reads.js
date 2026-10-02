@@ -762,7 +762,7 @@ function mrAfterChange() {
 }
 
 /* ---------- export ---------- */
-const MRX = {parts: [], ready: false, error: ''};
+const MRX = {parts: [], ready: false, error: '', seq: 0};
 /* In the app, Gmail opens through the app (the To line is the app's own); in a browser, the share menu or Downloads.
    Fixed at load (MR_APP_MODE): a bridge call that answers nothing for a moment never sends the app to the share menu. */
 const mrInApp = () => MR_APP_MODE;
@@ -771,18 +771,27 @@ function mrCanShareFiles() {
   try { return !!(navigator.share && navigator.canShare && navigator.canShare({files: [new File(['x'], 'x.csv', {type: 'text/csv'})]})); }
   catch (e) { return false; }
 }
+/* Open the export sheet and make its parts. Each call (and each close) takes a new number (MRX.seq): a build that ends
+   after a newer Export tap, or after the sheet closed, is dropped, so parts on screen are never replaced while the
+   reader shares them. */
 async function mrOpenExport() {
+  const seq = ++MRX.seq;
   let nw;
   try { nw = (await mrAll()).filter(e => e.status === 'new'); } catch (e) { toast('The reads cannot be opened. Storage is blocked.'); return; }
+  if (seq !== MRX.seq) return;
   if (!nw.length) { toast('No new reads to export.'); return; }
   MRX.parts = []; MRX.ready = false; MRX.error = '';
   $('mrExport').hidden = false;
   mrRenderExport();
-  try { MRX.parts = await mrBuildParts(nw); MRX.ready = true; }
-  catch (e) { MRX.error = 'The files could not be made: ' + ((e && e.message) || 'storage error') + '.'; }
+  let parts = null, err = '';
+  try { parts = await mrBuildParts(nw); }
+  catch (e) { err = 'The files could not be made: ' + ((e && e.message) || 'storage error') + '.'; }
+  if (seq !== MRX.seq) return;
+  if (parts) { MRX.parts = parts; MRX.ready = true; } else MRX.error = err;
   mrRenderExport();
 }
 function mrCloseExport() {
+  MRX.seq++;
   $('mrExport').hidden = true;
   MRX.parts = []; MRX.ready = false; MRX.error = '';
   mrAfterChange();
@@ -836,8 +845,15 @@ function mrRenderExport() {
     box.appendChild(head);
     const st = document.createElement('div');
     st.className = 'mr-note'; st.id = 'mrPartState' + i;
+    /* markfail: the files went out (Gmail opened, the share went to an app, or Downloads) but the reads could not be
+       marked exported. Never "Not sent", and never a second email: Mark exported retries only the marking. */
+    const markfail = (pt.markAs === 'saved' ? 'Saved to Downloads' : app ? 'Gmail opened' : 'Shared') +
+      ', but the reads could not be marked exported (storage is blocked). ' +
+      (pt.markAs === 'saved' ? 'Do not save them again.' : app ? 'Do not open Gmail again for this part.' : 'Do not share them again.') +
+      ' Tap Mark exported.';
     st.textContent = {ready: 'Ready.', sharing: app ? 'Opening Gmail...' : 'Waiting for the share menu.',
       unknown: 'Did Gmail open with these files? If yes, mark this part exported.', failed: 'Not sent. ' + pt.err,
+      markfail,
       done: app ? 'Gmail opened. Marked exported. Check the email, then tap Send in Gmail.' : 'Shared. Marked exported.',
       saved: 'Saved to Downloads. Marked exported.'}[pt.state];
     box.appendChild(st);
@@ -848,9 +864,15 @@ function mrRenderExport() {
       b.type = 'button'; b.className = 'btn' + (cls ? ' ' + cls : ''); b.textContent = txt; b.disabled = !!off; b.onclick = fn;
       btns.appendChild(b);
     };
-    if (app) {
+    if (pt.state === 'markfail') {
+      btn('Mark exported', () => mrExported(pt, pt.markAs), 'primary');
+    } else if (app) {
       if (pt.state === 'ready' || pt.state === 'sharing') btn('Open in Gmail', () => mrEmailTap(i), 'primary', pt.state === 'sharing');
       else if (pt.state === 'failed') btn('Open in Gmail again', () => mrEmailTap(i), 'primary');
+      else if (pt.state === 'unknown') {
+        btn('Mark exported', () => mrExported(pt, 'done'), 'primary');
+        btn('Open in Gmail again', () => mrEmailTap(i));
+      }
     } else if (pt.state === 'ready' || pt.state === 'sharing') {
       if (share) btn('Share', () => mrShareTap(i), 'primary', pt.state === 'sharing');
       else btn('Save to Downloads', () => mrSaveTap(i), 'primary');
@@ -871,7 +893,7 @@ function mrRenderExport() {
    its own To line. The part is marked exported only when Gmail opened. */
 async function mrEmailTap(i) {
   const pt = MRX.parts[i];
-  if (!pt || pt.state === 'sharing' || pt.state === 'done') return;
+  if (!pt || pt.state === 'sharing' || pt.state === 'done' || pt.state === 'markfail') return;
   pt.state = 'sharing'; pt.err = '';
   mrRenderExport();
   let b;
@@ -888,6 +910,11 @@ async function mrEmailTap(i) {
   let r;
   try { r = String(mrBridge().exportOpenGmail(b, pt.subject, pt.text)); } catch (e) { r = 'error: ' + ((e && e.message) || 'no answer'); }
   if (r === 'opened') { await mrExported(pt, 'done'); return; }
+  if (r === 'error: timeout') {                       // no answer in time: Gmail may still have opened, so the reader says
+    pt.state = 'unknown';
+    mrRenderExport();
+    return;
+  }
   pt.state = 'failed';
   pt.err = r === 'no gmail' ? 'Gmail is not on this tablet, or it is turned off. Nothing was sent.' : 'Gmail did not open (' + r + '). Nothing was sent.';
   mrRenderExport();
@@ -896,7 +923,7 @@ async function mrEmailTap(i) {
    the share resolves, which means the reader picked an app; a cancel (AbortError) leaves the reads new. */
 function mrShareTap(i) {
   const pt = MRX.parts[i];
-  if (!pt || pt.state === 'sharing' || pt.state === 'done' || pt.state === 'saved') return;
+  if (!pt || pt.state === 'sharing' || pt.state === 'done' || pt.state === 'saved' || pt.state === 'markfail') return;
   pt.state = 'sharing'; pt.err = '';
   let pr;
   try { pr = navigator.share({files: pt.files, title: pt.subject, text: pt.text}); } catch (e) { pr = Promise.reject(e); }
@@ -912,7 +939,7 @@ function mrShareTap(i) {
    several downloads. */
 function mrSaveTap(i) {
   const pt = MRX.parts[i];
-  if (!pt || pt.state === 'done' || pt.state === 'saved') return;
+  if (!pt || pt.state === 'done' || pt.state === 'saved' || pt.state === 'markfail') return;
   pt.files.forEach(f => {
     const a = document.createElement('a'), url = URL.createObjectURL(f);
     a.href = url; a.download = f.name; a.style.display = 'none';
@@ -922,10 +949,12 @@ function mrSaveTap(i) {
   toast('Saved ' + pt.files.length + (pt.files.length === 1 ? ' file' : ' files') + ' to Downloads. If the browser asks, tap Allow.', 6000);
   mrExported(pt, 'saved');
 }
+/* Mark the part's reads exported: state 'done' (Gmail opened, or the share went to an app) or 'saved' (Downloads). When
+   the marking fails the files have still gone out: state 'markfail' remembers which (pt.markAs). */
 async function mrExported(pt, state) {
   if (pt.state === 'done' || pt.state === 'saved') return;
-  try { await mrSetStatus(pt.ids, 'exported', pt.csvName); pt.state = state; }
-  catch (e) { pt.state = 'failed'; pt.err = 'The files went out, but the reads could not be marked exported. Storage is blocked.'; }
+  try { await mrSetStatus(pt.ids, 'exported', pt.csvName); pt.state = state; pt.err = ''; }
+  catch (e) { pt.state = 'markfail'; pt.markAs = state; }
   mrRenderExport();
   mrAfterChange();
 }

@@ -1148,6 +1148,79 @@ def t_export_app_outcomes(br):
     ctx.close()
 
 
+FAIL_MARK = "() => { window.__realSetStatus = mrSetStatus; window.mrSetStatus = async () => { throw new Error('Storage is blocked'); }; }"
+REAL_MARK = "() => { window.mrSetStatus = window.__realSetStatus; }"
+
+
+def part_view(pg):
+    return [A.dom(pg, "#mrPartState0") or "", pg.evaluate("() => [...document.querySelectorAll('#mrPart0 button')].map(b => b.textContent)")]
+
+
+@A.case
+def t_export_marking(br):
+    """The files went out (Gmail opened, the share went to an app, or Downloads) but the reads could not be marked
+    exported: the part never says Not sent and never offers a second email; Mark exported retries only the marking.
+    Gmail's answer timed out: the reader says whether it opened. Two Export taps: one set of parts."""
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, [dict(id="k1", savedAt=A.T1, meter="M1", ref="200201", read="1", mult="1", photo=[160, 120])])
+    open_export(pg)
+    pg.evaluate(FAIL_MARK)
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(A.native(pg)["mails"]) == 1 and "Mark exported" in part_view(pg)[1], timeout=5)
+    v = part_view(pg)
+    A.check("app: Gmail opened but the marking failed: no 'Not sent', no Open in Gmail again; it says not to open Gmail again",
+            "Not sent" not in v[0] and "Do not open Gmail again" in v[0] and v[1] == ["Mark exported"]
+            and entry(pg, "k1")["status"] == "new", json.dumps(v))
+    pg.evaluate(REAL_MARK)
+    pg.click("#mrPart0 button:has-text('Mark exported')")
+    A.pump_until(pg, lambda: entry(pg, "k1")["status"] == "exported", timeout=5)
+    A.check("app: Mark exported marks the reads and opens no second email",
+            entry(pg, "k1")["status"] == "exported" and len(A.native(pg)["mails"]) == 1 and "Gmail opened" in part_view(pg)[0],
+            json.dumps([part_view(pg), len(A.native(pg)["mails"])]))
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"gmail": "error: timeout"})
+    seed(pg, [dict(id="k2", savedAt=A.T1, meter="M2", ref="200202", read="1", mult="1")])
+    open_export(pg)
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: "Mark exported" in part_view(pg)[1], timeout=5)
+    v = part_view(pg)
+    A.check("app: Gmail's answer timed out (it may still have opened): the reader is asked; Mark exported or Open in Gmail again",
+            "Did Gmail open" in v[0] and "Not sent" not in v[0] and v[1] == ["Mark exported", "Open in Gmail again"]
+            and entry(pg, "k2")["status"] == "new", json.dumps(v))
+    pg.click("#mrPart0 button:has-text('Mark exported')")
+    A.check("app: after a timeout, Mark exported marks the reads",
+            A.pump_until(pg, lambda: entry(pg, "k2")["status"] == "exported", timeout=5))
+    ctx.close()
+    ctx, pg = A.open_app(br, start=False, init=SHARE_MOCK)
+    seed(pg, [dict(id="k3", savedAt=A.T1, meter="M3", ref="200203", read="1", mult="1", photo=[160, 120])])
+    open_export(pg)
+    pg.evaluate(FAIL_MARK)
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(shares(pg)) == 1 and "Mark exported" in part_view(pg)[1], timeout=5)
+    v = part_view(pg)
+    A.check("browser: shared but the marking failed: no 'Not sent', no Share again or Save to Downloads; it says not to share again",
+            "Not sent" not in v[0] and "Do not share them again" in v[0] and v[1] == ["Mark exported"], json.dumps(v))
+    pg.evaluate(REAL_MARK)
+    pg.click("#mrPart0 button:has-text('Mark exported')")
+    A.check("browser: Mark exported marks the reads with no second share",
+            A.pump_until(pg, lambda: entry(pg, "k3")["status"] == "exported", timeout=5) and len(shares(pg)) == 1)
+    pg.evaluate("() => mrSetStatus(['k3'], 'new').then(() => mrCloseExport())")
+    pg.evaluate("""() => { const real = mrBuildParts; let n = 0; window.__buildGo = null;
+        window.mrBuildParts = async e => { n++; if (n === 1) await new Promise(r => { window.__buildGo = r; }); return real(e); };
+        mrOpenExport(); }""")
+    A.pump_until(pg, lambda: pg.evaluate("() => typeof window.__buildGo === 'function'"), timeout=5)   # build 1 is slow
+    pg.evaluate("() => { mrOpenExport(); }")                                                           # a second tap
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=10000)
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: len(shares(pg)) == 2, timeout=5)
+    pg.evaluate("() => window.__buildGo()")
+    pg.wait_for_timeout(500)
+    v = part_view(pg)
+    A.check("browser: two Export taps make one set of parts; a slower first build never replaces the parts on screen",
+            v[1] == [] and "Shared" in v[0] and pg.evaluate("() => MRX.parts.length") == 1, json.dumps(v))
+    ctx.close()
+
+
 @A.case
 def t_export_share(br):
     ctx, pg = A.open_app(br, start=False, init=SHARE_MOCK)
