@@ -76,7 +76,7 @@ button{font:inherit;cursor:pointer}
  text-align:center;width:52px;line-height:1.15}
 .leaflet-bottom{bottom:var(--ctlBottom,0px)}
 #gps.good{color:var(--green)} #gps.weak{color:#b45309} #gps.none{color:#dc2626}
-#toast{position:absolute;left:50%;transform:translateX(-50%);bottom:40%;z-index:1200;background:rgba(17,24,39,.92);color:#fff;
+#toast{position:absolute;left:50%;transform:translateX(-50%);bottom:40%;z-index:1500;background:rgba(17,24,39,.92);color:#fff;
  padding:10px 16px;border-radius:10px;font-weight:600;max-width:90vw;text-align:center;display:none}
 /* list panel */
 #panel{position:absolute;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:1100;background:var(--card);
@@ -124,6 +124,35 @@ button{font:inherit;cursor:pointer}
 .sm.attn{border-color:var(--accent)}
 .sm.depot{background:#374151}
 .me{width:30px;height:30px}
+/* manual reads: overlay parts shared by the form, the list and the export sheet; then the form */
+.mr-over{position:absolute;inset:0;z-index:1450;background:rgba(17,24,39,.55);display:flex;justify-content:center;align-items:flex-start;
+ overflow:auto;padding:calc(8px + env(safe-area-inset-top)) 8px 8px}
+.mr-over[hidden]{display:none}
+.mr-sheet{background:var(--card);border-radius:12px;width:100%;max-width:560px;box-shadow:0 10px 30px rgba(0,0,0,.35);margin-bottom:50vh}
+.mr-head{background:var(--primary);color:#fff;padding:12px 14px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px}
+.mr-head h2{margin:0;font-size:18px;flex:1}
+.mr-head button{background:none;border:none;color:#fff;font-size:26px;line-height:1;min-width:44px;min-height:44px}
+.mr-body{padding:10px 14px}
+.mr-lab{display:block;font-weight:700;font-size:14px;margin:12px 0 4px}
+.mr-body input[type=text],.mr-body select,.mr-body textarea{width:100%;min-height:48px;font:inherit;font-size:18px;padding:8px 10px;
+ border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)}
+#mrRead,#mrMult{font-family:Consolas,Menlo,monospace;font-size:22px;letter-spacing:.04em}
+#mrOther{margin-top:8px}
+.mr-err{color:#b91c1c;font-size:14px;font-weight:600}
+.mr-bad{border-color:#b91c1c !important;box-shadow:0 0 0 1px #b91c1c}
+.mr-bad:focus{outline:2px solid #b91c1c;outline-offset:0}   /* a bad field stays red while it has focus */
+#mrMeters{max-height:40vh;overflow:auto;border:1px solid var(--border);border-radius:8px}
+.mr-m{display:flex;gap:10px;align-items:flex-start;padding:10px;border-bottom:1px solid #f0edea;font-size:14px;cursor:pointer}
+.mr-m:last-child{border-bottom:none}
+.mr-m.on{background:#fdf2f4}
+.mr-m input{width:22px;height:22px;margin:2px 0 0;flex:0 0 22px}
+.mr-m b{display:block;font-family:Consolas,Menlo,monospace}
+.mr-m.mr-other b{font-family:inherit}   /* "Other meter" is a label, not a meter ID */
+.mr-m small{display:block;color:var(--muted);font-size:13px}
+.mr-m em{display:block;font-style:normal;color:var(--warn-text);font-size:13px}
+.mr-note{font-size:13.5px;color:var(--muted);margin:8px 0}
+.mr-foot{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 14px 14px;background:var(--card);border-top:1px solid var(--border);
+ border-radius:0 0 12px 12px;flex-wrap:wrap}
 @media (min-width:900px) and (orientation:landscape){
  #banner{right:auto;width:520px}
  #card{right:auto;width:520px}
@@ -159,6 +188,7 @@ button{font:inherit;cursor:pointer}
  <div id="actions">
   <button class="btn primary" id="aNext">Next</button>
   <button class="btn" id="aSkip">Skip stop</button>
+  <button class="btn" id="aManual" type="button">Manual read</button>
   <button class="btn ghost" id="aGmaps">Google Maps</button>
  </div>
 </div>
@@ -170,6 +200,30 @@ button{font:inherit;cursor:pointer}
  <div id="pHead"><h2>Stops</h2><button id="pClose" aria-label="Close">&times;</button></div>
  <div id="pBody"></div>
 </aside>
+
+<div id="mrForm" class="mr-over" role="dialog" aria-modal="true" aria-labelledby="mrFormTitle" hidden>
+ <div class="mr-sheet">
+  <div class="mr-head"><h2 id="mrFormTitle">Manual read</h2></div>
+  <div class="mr-body">
+   <label class="mr-lab" for="mrStop">Stop</label>
+   <select id="mrStop"></select>
+   <div class="mr-lab" id="mrMeterLab">Meter</div>
+   <div id="mrMeters" role="radiogroup" aria-labelledby="mrMeterLab"></div>
+   <input id="mrOther" type="text" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Other meter ID" placeholder="Type the meter ID" hidden>
+   <div class="mr-err" id="mrMetersErr" role="alert"></div>
+   <label class="mr-lab" for="mrRead">Face read, as the dial shows</label>
+   <input id="mrRead" type="text" inputmode="decimal" autocomplete="off" spellcheck="false">
+   <div class="mr-err" id="mrReadErr" role="alert"></div>
+   <label class="mr-lab" for="mrMult">Multiplier</label>
+   <input id="mrMult" type="text" inputmode="decimal" autocomplete="off" spellcheck="false">
+   <div class="mr-err" id="mrMultErr" role="alert"></div>
+   <label class="mr-lab" for="mrNotes">Notes (optional)</label>
+   <textarea id="mrNotes" rows="3" maxlength="500"></textarea>
+   <p class="mr-note" id="mrGps"></p>
+  </div>
+  <div class="mr-foot"><button class="btn" id="mrCancel" type="button">Cancel</button><button class="btn primary" id="mrSave" type="button">Save</button></div>
+ </div>
+</div>
 
 <div id="start">
  <div id="startCard">

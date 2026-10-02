@@ -255,6 +255,245 @@ def t_store_versions(br):
     ctx.close()
 
 
+def open_form(pg):
+    pg.click("#aManual")
+    pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+    pg.wait_for_timeout(200)
+
+
+def save_form(pg):
+    pg.click("#mrSave")
+    pg.wait_for_selector("#mrForm", state="hidden", timeout=5000)
+
+
+@A.case
+def t_form_basics(br):
+    ctx, pg = A.open_app(br)
+    tops = pg.evaluate("() => ['aNext', 'aSkip', 'aManual', 'aGmaps'].map(id => Math.round($(id).getBoundingClientRect().top))")
+    A.check("card: Manual read is in the button row, one row on the tablet (800 px wide)",
+            len(set(tops)) == 1 and A.dom(pg, "#aManual") == "Manual read", json.dumps(tops))
+    m0 = A.STOPS[2]["meters"][0]
+    card_stop = A.dom(pg, "#cNo")
+    A.feed(pg, [m0["lat"], m0["lon"]], acc=9)               # the reader stands at stop 2; the card still shows stop 1
+    open_form(pg)
+    r = pg.evaluate("""() => ({stop: $('mrStop').value, read: $('mrRead').value, mult: $('mrMult').value,
+        ac: [$('mrRead').autocomplete, $('mrMult').autocomplete], types: [$('mrRead').type, $('mrMult').type],
+        rows: [...document.querySelectorAll('#mrMeters input')].map(i => i.value), title: $('mrFormTitle').textContent,
+        gps: $('mrGps').textContent})""")
+    A.check("form: opens on the stop nearest the GPS fix (stop 2), not the card's stop (stop 1)", card_stop == "1" and r["stop"] == "2", json.dumps([card_stop, r["stop"]]))
+    A.check("form: face read and multiplier start empty; text inputs with autocomplete off (leading zeros kept, nothing prefilled)",
+            r["read"] == "" and r["mult"] == "" and r["ac"] == ["off", "off"] and r["types"] == ["text", "text"] and r["title"] == "Manual read", json.dumps(r))
+    A.check("form: the stop's meters by route ref, then Other meter", r["rows"] == [m["ref"] for m in A.STOPS[2]["meters"]] + ["__other"], json.dumps(r["rows"]))
+    A.check("form: the GPS line gives the accuracy in ft", "GPS \u00b130 ft" in r["gps"], r["gps"])
+    pg.click("#mrSave")
+    errs = pg.evaluate("() => [$('mrMetersErr').textContent, $('mrReadErr').textContent, $('mrMultErr').textContent, $('mrForm').hidden]")
+    A.check("form: Save with nothing filled in shows three messages, keeps the form open and saves nothing",
+            all(errs[:3]) and errs[3] is False and len(all_entries(pg)) == 0, json.dumps(errs))
+    pg.check("#mrMeters input[value='%s']" % m0["ref"])
+    pg.fill("#mrRead", "004512")
+    pg.fill("#mrMult", "10")
+    pg.fill("#mrNotes", "Lid stuck")
+    save_form(pg)
+    e = all_entries(pg)[0]
+    A.check("form: the saved read keeps leading zeros and copies meter, route ref, building number, site name and stop",
+            [e["read"], e["mult"], e["meter"], e["ref"], e["bldg"], e["site"], e["stop"], e["notes"], e["other"]] ==
+            ["004512", "10", m0["meter"], m0["ref"], m0["bldg"], m0["where"].split(" \u00b7 ")[0], 2, "Lid stuck", False], json.dumps(e))
+    A.check("form: GPS from the fresh fix, 6 decimals, accuracy 9 m = 30 ft",
+            [e["lat"], e["lon"], e["accFt"]] == [round(m0["lat"], 6), round(m0["lon"], 6), 30], json.dumps([e["lat"], e["lon"], e["accFt"]]))
+    A.check("form: date MM/DD/YYYY and 24 h time",
+            bool(re.fullmatch(r"\d\d/\d\d/\d{4}", e["date"]) and re.fullmatch(r"\d\d:\d\d", e["time"])), e["date"] + " " + e["time"])
+    A.check("form: a toast says the read is saved", ("Read saved: " + m0["meter"]) in (A.dom(pg, "#toast") or ""), A.dom(pg, "#toast"))
+    open_form(pg)
+    A.check("form: the next form is empty again (the multiplier is never prefilled)", pg.input_value("#mrMult") == "" and pg.input_value("#mrRead") == "")
+    ctx.close()
+
+
+@A.case
+def t_form_card_stop(br):
+    """Ruling S1 (UI samples, 10/01/2026): the form prefers the stop the card shows. Parked at stop 1, a stop 2 meter is
+    nearer than the stop 1 meter, but the form opens on stop 1: a meter of the card's stop is within 150 m of the fix, and
+    the card shows stop 1's parking spot. Only when neither holds does the stop with the nearest meter win."""
+    ctx, pg = A.open_app(br)
+    park = A.STOPS[1]["park"]
+    far = A.STOPS[2]["meters"][0]                            # 0353_DW_001: more than 150 m from every stop 1 meter
+    A.feed(pg, park, acc=9)                                  # the car reaches stop 1's parking spot
+    r = pg.evaluate("""(p) => { const d = st => Math.min(...st.meters.map(m => hav(p, [m.lat, m.lon])));
+        return {waiting: S.waiting, card: currentTargetStop().o, d1: Math.round(d(S.stopBy[1])), d2: Math.round(d(S.stopBy[2]))}; }""", park)
+    A.check("setup: parked at stop 1; a stop 2 meter is nearer than the stop 1 meter, and both are within 150 m",
+            r["waiting"] == "park" and r["card"] == 1 and r["d2"] < r["d1"] <= 150, json.dumps(r))
+    open_form(pg)
+    A.check("form: parked at stop 1, it opens on the card's stop (stop 1), not on stop 2 with the nearer meter",
+            pg.input_value("#mrStop") == "1", pg.input_value("#mrStop"))
+    pg.click("#mrCancel")
+    r = pg.evaluate("""(far) => { const out = {};
+        S.waiting = null; out.meterNear = mrDefaultStop().o;     // not marked parked: the stop 1 meter is within 150 m
+        S.fix = {lat: far[0], lon: far[1], acc: 9, heading: null, speed: 0}; S.fixAt = Date.now();
+        S.waiting = 'park'; out.parked = mrDefaultStop().o;      // the card shows stop 1's parking spot: stop 1, even beside a stop 2 meter
+        S.waiting = null; out.free = mrDefaultStop().o;          // neither: the stop with the nearest meter
+        S.waiting = 'park'; return out; }""", [far["lat"], far["lon"]])
+    A.check("form: the card's stop wins when one of its meters is within 150 m, or when the card shows its parking spot; else the nearest meter's stop",
+            r == {"meterNear": 1, "parked": 1, "free": 2}, json.dumps(r))
+    ctx.close()
+
+
+@A.case
+def t_form_ui_rulings(br):
+    """Rulings S2 and S3 (UI samples, 10/01/2026): a bad field stays red while it has focus; the Other meter label uses the
+    body font, the meter IDs the meter font."""
+    ctx, pg = A.open_app(br)
+    open_form(pg)
+    f = pg.evaluate("""() => ({rows: [...document.querySelectorAll('#mrMeters .mr-m b')].map(b => getComputedStyle(b).fontFamily),
+        body: getComputedStyle(document.body).fontFamily})""")
+    A.check("form: meter IDs in the meter font (Consolas); the Other meter label in the body font",
+            len(f["rows"]) > 1 and all("Consolas" in x for x in f["rows"][:-1]) and f["rows"][-1] == f["body"], json.dumps(f))
+    ref = pg.evaluate("() => document.querySelector('#mrMeters input').value")
+    pg.check("#mrMeters input[value='%s']" % ref)
+    pg.fill("#mrRead", "12a")
+    pg.fill("#mrMult", "1")
+    pg.click("#mrSave")
+    s = pg.evaluate("""() => { const el = $('mrRead'), cs = getComputedStyle(el);
+        return [document.activeElement === el, el.classList.contains('mr-bad'), cs.borderTopColor, cs.outlineStyle, cs.outlineColor]; }""")
+    A.check("form: the bad face read has focus and still shows red (red border and a red focus outline)",
+            s == [True, True, "rgb(185, 28, 28)", "solid", "rgb(185, 28, 28)"], json.dumps(s))
+    ctx.close()
+
+
+@A.case
+def t_form_app_save(br):
+    ctx, pg = A.open_app(br, mode="app")
+    open_form(pg)
+    pg.check("#mrMeters input[value='__other']")
+    pg.fill("#mrOther", "TEST-1")
+    pg.fill("#mrRead", "0042")
+    pg.fill("#mrMult", "1")
+    save_form(pg)
+    st = pg.evaluate("() => Object.values(window.__native.st.entries).map(j => JSON.parse(j))")
+    calls = [c[0] for c in A.native(pg)["calls"]]
+    A.check("app: Save stores the read in the app's store (storePut), with no photo", len(st) == 1 and st[0]["read"] == "0042" and st[0]["meter"] == "TEST-1"
+            and "storePut" in calls and "photoPut" not in calls, json.dumps(st))
+    ctx.close()
+
+
+@A.case
+def t_form_off_old_app(br):
+    ctx, pg = A.open_app(br, mode="app", native_cfg={"bridge": "1"})
+    A.check("an app older than 1.1 (bridge 1): no Manual read button (its store is missing)", pg.evaluate("() => $('aManual').hidden && MR.off"))
+    ctx.close()
+
+
+@A.case
+def t_form_rules(br):
+    ctx, pg = A.open_app(br)
+    r = pg.evaluate("""() => { const out = {};
+        S.fix = null; out.none = mrGpsNow();
+        onFix({lat: 46.73, lon: -117.15, acc: 75, heading: null, speed: 0, t: Date.now()}); out.weak = mrGpsNow();
+        S.fixAt = Date.now() - CFG.fixStaleMs - 1000; out.stale = mrGpsNow();
+        S.fixAt = Date.now(); S.blocked = true; out.blocked = mrGpsNow(); S.blocked = false;
+        S.fix = null; return out; }""")
+    A.check("GPS at save: none before a fix; a weak fix kept with its accuracy (75 m = 246 ft); stale or blocked gives none",
+            r == {"none": None, "weak": {"lat": 46.73, "lon": -117.15, "accFt": 246}, "stale": None, "blocked": None}, json.dumps(r))
+    A.feed(pg, [46.70, -117.10], acc=5)                     # 3.7 km from every meter
+    open_form(pg)
+    cur = pg.evaluate("() => String(currentTargetStop().o)")
+    A.check("form: far from every stop it opens on the card's stop", pg.input_value("#mrStop") == cur, cur)
+    pg.click("#mrCancel")
+    A.check("cancel: an empty form closes on one tap", pg.evaluate("() => $('mrForm').hidden"))
+    pg.evaluate("() => { S.fix = null; }")
+    open_form(pg)
+    pg.select_option("#mrStop", "")
+    rows = pg.evaluate("() => [...document.querySelectorAll('#mrMeters input')].map(i => i.value)")
+    A.check("form: No stop lists the route's meters with no location on file, then Other meter",
+            rows == [m["ref"] for m in A.ROUTE.get("unmapped", [])] + ["__other"], json.dumps(rows))
+    pg.check("#mrMeters input[value='__other']")
+    pg.fill("#mrRead", "7")
+    pg.fill("#mrMult", "1")
+    pg.click("#mrSave")
+    A.check("form: Other meter needs a typed ID", A.dom(pg, "#mrMetersErr") == "Type the meter ID.", A.dom(pg, "#mrMetersErr"))
+    pg.fill("#mrOther", "AIRPORT-X")
+    pg.fill("#mrRead", "12a")
+    pg.fill("#mrMult", "0")
+    pg.click("#mrSave")
+    errs = pg.evaluate("() => [$('mrReadErr').textContent, $('mrMultErr').textContent]")
+    A.check("form: letters in the face read and a multiplier of 0 are refused", all(errs), json.dumps(errs))
+    pg.fill("#mrRead", "0007")
+    pg.fill("#mrMult", "0.1")
+    save_form(pg)
+    e = all_entries(pg)[-1]
+    A.check("form: Other meter saves the typed ID with no route ref, building or site; no stop; no GPS",
+            [e["meter"], e["ref"], e["bldg"], e["site"], e["stop"], e["other"], e["lat"], e["read"], e["mult"]] ==
+            ["AIRPORT-X", "", "", "", None, True, None, "0007", "0.1"], json.dumps(e))
+    A.check("form: the toast says there was no GPS fix", "No GPS fix" in (A.dom(pg, "#toast") or ""), A.dom(pg, "#toast"))
+    if A.ROUTE.get("unmapped"):
+        u = A.ROUTE["unmapped"][0]
+        open_form(pg)
+        pg.select_option("#mrStop", "")
+        pg.check("#mrMeters input[value='%s']" % u["ref"])
+        pg.fill("#mrRead", "1")
+        pg.fill("#mrMult", "1")
+        save_form(pg)
+        e = all_entries(pg)[-1]
+        A.check("form: a meter with no location on file keeps its route ref and site name",
+                [e["meter"], e["ref"], e["site"], e["stop"]] == [u["meter"], u["ref"], u["where"].split(" \u00b7 ")[0], None], json.dumps(e))
+    ctx.close()
+
+
+@A.case
+def t_form_draft(br):
+    for mode in MODES:
+        ctx, pg = A.open_app(br, mode=mode)
+        open_form(pg)
+        ref = pg.evaluate("() => document.querySelector('#mrMeters input').value")
+        pg.check("#mrMeters input[value='%s']" % ref)
+        pg.fill("#mrRead", "0099")
+        pg.fill("#mrMult", "100")
+        A.pump_until(pg, lambda: pg.evaluate("async () => { const d = await mrDraftGet(); return !!(d && d.form && d.form.mult === '100'); }"), timeout=5)
+        pg.reload()
+        pg.wait_for_selector("#startBtns button", timeout=20000)
+        back = A.pump_until(pg, lambda: pg.evaluate("() => !$('mrForm').hidden"), timeout=8)
+        r = pg.evaluate("() => [$('mrRead').value, $('mrMult').value, (document.querySelector('#mrMeters input:checked') || {}).value]")
+        A.check(mode + " draft: after a reload (Android can close the page while the camera is open) the unsaved form comes back",
+                back and r == ["0099", "100", ref], json.dumps(r))
+        A.check(mode + " draft: a toast says so", "unsaved manual read is back" in (A.dom(pg, "#toast") or ""), A.dom(pg, "#toast"))
+        pg.click("#mrCancel")
+        armed = [pg.evaluate("() => $('mrForm').hidden"), A.dom(pg, "#mrCancel")]
+        pg.click("#mrCancel")
+        gone = A.pump_until(pg, lambda: pg.evaluate("async () => $('mrForm').hidden && (await mrDraftGet()) === undefined"), timeout=3)
+        A.check(mode + " cancel: a filled form needs a second tap; then the form and its draft are gone",
+                armed == [False, "Tap again to discard"] and gone, json.dumps([armed, gone]))
+        ctx.close()
+
+
+@A.case
+def t_form_blocked(br):
+    for label, mode, kw in (("browser", "browser", {"init": BLOCK_IDB}), ("app", "app", {"native_cfg": {"storeError": "error: disk full"}}),
+                            ("app, bridge answers nothing", "app", {"native_cfg": {"notApp": True}})):
+        ctx, pg = A.open_app(br, mode=mode, **kw)
+        open_form(pg)
+        pg.check("#mrMeters input[value='__other']")
+        pg.fill("#mrOther", "X1")
+        pg.fill("#mrRead", "0042")
+        pg.fill("#mrMult", "1")
+        pg.click("#mrSave")
+        pg.wait_for_timeout(500)
+        r = pg.evaluate("() => [$('mrForm').hidden, $('mrRead').value, $('toast').textContent]")
+        A.check(label + ": a blocked or full store: Save keeps the form open with the values and says it could not save",
+                r[0] is False and r[1] == "0042" and "Could not save" in r[2], json.dumps(r))
+        ctx.close()
+
+
+@A.case
+def t_form_phone(br):
+    ctx, pg = A.open_app(br, viewport=(412, 915), is_mobile=True, has_touch=True, device_scale_factor=2.6)
+    open_form(pg)
+    r = pg.evaluate("""() => { const s = document.querySelector('#mrForm .mr-sheet').getBoundingClientRect();
+        $('mrSave').scrollIntoView({block: 'center'}); const b = $('mrSave').getBoundingClientRect();
+        return {over: document.documentElement.scrollWidth > innerWidth, sheet: [Math.round(s.left), Math.round(s.right)],
+                save: b.top >= 0 && b.bottom <= innerHeight}; }""")
+    A.check("phone: the form fits the width (no side scroll) and Save can be reached",
+            r["over"] is False and r["sheet"][0] >= 0 and r["sheet"][1] <= 412 and r["save"], json.dumps(r))
+    ctx.close()
+
+
 with sync_playwright() as p:
     br = p.chromium.launch()
     A.run_cases(br)

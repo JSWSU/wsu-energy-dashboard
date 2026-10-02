@@ -292,7 +292,231 @@ async function mrRefreshCounts() {
   MR.count = {new: all.filter(e => e.status === 'new').length, exported: all.filter(e => e.status === 'exported').length};
   return MR.count;
 }
+
+/* ---------- the Manual read form ---------- */
+/* GPS for a new read: the newest fix while it is fresh (CFG.fixStaleMs), with its accuracy in ft; else null.
+   A weak fix is kept: the accuracy column says how good it is. */
+function mrGpsNow() {
+  const f = S.fix;
+  if (!f || S.blocked || Date.now() - S.fixAt > CFG.fixStaleMs) return null;
+  return {lat: +f.lat.toFixed(6), lon: +f.lon.toFixed(6), accFt: Math.round((f.acc || 0) * 3.28084)};
+}
+/* The stop the form opens on. The stop the card shows comes first: when one of its meters is within MR_CFG.nearStopM of a
+   fresh fix, or when the card shows its parking spot (parked there). Otherwise the stop with the nearest meter within
+   MR_CFG.nearStopM (the card can already show the next stop: drive-by stops move on when reached); else the card's stop;
+   else none. */
+function mrDefaultStop() {
+  if (!S.route) return null;
+  const card = currentTargetStop() || null, g = mrGpsNow();
+  if (!g) return card;
+  const nearM = st => Math.min(...st.meters.concat([st]).filter(p => p.lat != null && p.lon != null)
+    .map(p => hav([g.lat, g.lon], [p.lat, p.lon])));
+  if (card && (S.waiting === 'park' || nearM(card) <= MR_CFG.nearStopM)) return card;
+  let best = null, bd = Infinity;
+  S.route.stops.forEach(st => { const d = nearM(st); if (d < bd) { bd = d; best = st; } });
+  return best && bd <= MR_CFG.nearStopM ? best : card;
+}
+/* The meters the form lists for a stop number; null lists the route's meters with no location on file. */
+function mrStopMeters(stopO) {
+  if (!S.route) return [];
+  if (stopO == null) return S.route.unmapped || [];
+  const st = S.stopBy[stopO];
+  return st ? st.meters : [];
+}
+function mrBlankForm(stopO) {
+  return {editId: null, stopO: stopO == null ? null : Number(stopO), meterRef: null, other: false, otherId: '', read: '', mult: '',
+    notes: '', keep: null, photo: null, photoChanged: false, photoInfo: null, awaitingPhoto: false};
+}
+/* Open the form: {} for a new read, {editId} to change a new read, {draft} to bring back a form that was dropped. */
+async function mrOpenForm(opts) {
+  opts = opts || {};
+  let f;
+  try {
+    if (opts.draft) f = Object.assign(mrBlankForm(null), opts.draft);
+    else if (opts.editId) {
+      const e = await mrGet(opts.editId);
+      if (!e || e.status !== 'new') { toast('Only new reads can change.'); return; }
+      f = Object.assign(mrBlankForm(e.stop), {editId: e.id, meterRef: e.other ? null : e.ref, other: e.other,
+        otherId: e.other ? e.meter : '', read: e.read, mult: e.mult, notes: e.notes,
+        keep: {meter: e.meter, ref: e.ref, bldg: e.bldg, site: e.site}, photo: e.photoBytes ? await mrPhoto(e.id) : null});
+    } else {
+      const st = mrDefaultStop();
+      f = mrBlankForm(st ? st.o : null);
+    }
+  } catch (x) { toast('The reads cannot be opened. Storage is blocked on this device.', 6000); return; }
+  MR.form = f;
+  mrPaintForm();
+  $('mrForm').hidden = false;
+  clearInterval(MR.gpsT);
+  MR.gpsT = setInterval(mrGpsLine, 2000);
+}
+function mrPaintForm() {
+  const f = MR.form, sel = $('mrStop');
+  $('mrFormTitle').textContent = f.editId ? 'Edit read' : 'Manual read';
+  sel.innerHTML = '';
+  sel.add(new Option(S.route && S.route.unmapped && S.route.unmapped.length ? 'No stop (meters with no location on file)' : 'No stop', ''));
+  if (S.route) S.route.stops.forEach(st => sel.add(new Option('Stop ' + st.o + ': ' + st.site, String(st.o))));
+  sel.value = f.stopO == null ? '' : String(f.stopO);
+  mrPaintMeters();
+  $('mrRead').value = f.read; $('mrMult').value = f.mult; $('mrNotes').value = f.notes;
+  mrShowErrors({}, true);
+  disarm('mrCancel');
+  armButton($('mrCancel'), 'mrCancel', 'Cancel', 'Tap again to discard');
+  mrGpsLine();
+}
+function mrPaintMeters() {
+  const f = MR.form, box = $('mrMeters');
+  box.innerHTML = '';
+  mrStopMeters(f.stopO).forEach(m => box.appendChild(mrMeterRow(m.ref, m.meter, 'ref ' + m.ref + (m.where ? ' · ' + m.where : ''),
+    m.note, !f.other && f.meterRef === m.ref)));
+  box.appendChild(mrMeterRow('', 'Other meter', 'Not on this list. Type its ID.', '', f.other));
+  $('mrOther').hidden = !f.other;
+  $('mrOther').value = f.otherId;
+}
+/* One row of the meter list; ref '' is the Other meter row (its title is a label, not a meter ID: body font). */
+function mrMeterRow(ref, title, sub, note, on) {
+  const lab = document.createElement('label');
+  lab.className = 'mr-m' + (ref ? '' : ' mr-other') + (on ? ' on' : '');
+  lab.innerHTML = '<input type="radio" name="mrMeter"><span><b></b><small></small><em></em></span>';
+  const inp = lab.querySelector('input');
+  inp.value = ref || '__other';
+  inp.checked = on;
+  lab.querySelector('b').textContent = title;
+  lab.querySelector('small').textContent = sub;
+  if (note) lab.querySelector('em').textContent = note; else lab.querySelector('em').remove();
+  inp.onchange = () => {
+    MR.form.other = !ref;
+    MR.form.meterRef = ref || null;
+    document.querySelectorAll('#mrMeters .mr-m').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
+    $('mrOther').hidden = !MR.form.other;
+    if (MR.form.other) $('mrOther').focus();
+    mrDraftSoon();
+  };
+  return lab;
+}
+function mrStopChanged() {
+  const f = mrReadForm();
+  if (!f.other && !mrStopMeters(f.stopO).some(m => m.ref === f.meterRef)) f.meterRef = null;
+  mrPaintMeters();
+  mrDraftSoon();
+}
+/* Copy the inputs into MR.form and return it. */
+function mrReadForm() {
+  const f = MR.form, v = $('mrStop').value;
+  f.stopO = v === '' ? null : Number(v);
+  f.otherId = $('mrOther').value; f.read = $('mrRead').value; f.mult = $('mrMult').value; f.notes = $('mrNotes').value;
+  return f;
+}
+function mrShowErrors(err, quiet) {
+  [['meter', 'mrMeters'], ['read', 'mrRead'], ['mult', 'mrMult']].forEach(([k, id]) => {
+    $(id + 'Err').textContent = err[k] || '';
+    $(id).classList.toggle('mr-bad', !!err[k]);
+  });
+  const first = ['meter', 'read', 'mult'].find(k => err[k]);
+  if (first && !quiet) {
+    const el = $({meter: 'mrMeters', read: 'mrRead', mult: 'mrMult'}[first]);
+    el.scrollIntoView({block: 'center'});
+    if (first !== 'meter') el.focus();
+  }
+}
+/* The meter facts an entry stores: from the list (the stop's meters, or the meters with no location), or the typed ID.
+   An edited read whose meter is no longer on the route keeps its saved facts. */
+function mrMeterInfo(f) {
+  if (f.other) return {meter: f.otherId.trim(), ref: '', bldg: '', site: ''};
+  const m = mrStopMeters(f.stopO).find(x => x.ref === f.meterRef);
+  if (m) return {meter: m.meter, ref: m.ref, bldg: m.bldg || '', site: mrSiteName(m.where)};
+  return f.keep && f.keep.ref && f.keep.ref === f.meterRef ? f.keep : null;
+}
+async function mrSave() {
+  if (!MR.form || MR.saving) return;
+  const f = mrReadForm(), err = mrCheck(f);
+  const info = err.meter ? null : mrMeterInfo(f);
+  if (!err.meter && !info) err.meter = 'Pick a meter, or pick Other meter.';
+  mrShowErrors(err);
+  if (Object.keys(err).length) return;
+  MR.saving = true;
+  $('mrSave').disabled = true;
+  const fields = Object.assign({}, info, {stop: f.stopO, other: f.other, read: f.read.trim(), mult: f.mult.trim(),
+    notes: f.notes.trim().slice(0, MR_CFG.notesMax)});
+  try {
+    let e, photo;
+    if (f.editId) {
+      e = await mrGet(f.editId);
+      if (!e || e.status !== 'new') { toast('This read was exported, so it cannot change.'); mrCloseForm(); return; }
+      Object.assign(e, fields, {other: !!fields.other, editedAt: Date.now()});
+      if (f.photoChanged) e.photoBytes = f.photo ? f.photo.size : 0;
+      photo = f.photoChanged ? (f.photo || null) : undefined;
+    } else {
+      e = mrMakeEntry(Object.assign({savedAt: Date.now(), gps: mrGpsNow(), photoBytes: f.photo ? f.photo.size : 0}, fields));
+      photo = f.photo || null;
+    }
+    await mrSaveEntry(e, photo);
+    mrCloseForm();
+    toast((f.editId ? 'Read updated: ' : 'Read saved: ') + e.meter + (!f.editId && e.lat == null ? '. No GPS fix.' : '.'));
+    MR.persisted = await mrPersist(true);
+    mrAfterChange();
+  } catch (x) {
+    toast('Could not save on this device. Storage is blocked or full. Write the read down.', 7000);
+  } finally {
+    MR.saving = false;
+    $('mrSave').disabled = false;
+  }
+}
+/* Close the form and drop its draft. */
+function mrCloseForm() {
+  $('mrForm').hidden = true;
+  clearInterval(MR.gpsT); clearTimeout(MR.draftT); disarm('mrCancel');
+  if (MR.photoUrl) { URL.revokeObjectURL(MR.photoUrl); MR.photoUrl = null; }
+  MR.form = null;
+  mrDraftDel().catch(() => { /* storage blocked: nothing to delete */ });
+}
+/* Cancel: a new form with anything filled in needs a second tap, so one stray tap cannot lose a read. */
+function mrCancelTap() {
+  const f = MR.form ? mrReadForm() : null;
+  const filled = !!f && !f.editId && !!(f.read.trim() || f.mult.trim() || f.notes.trim() || f.otherId.trim() || f.meterRef || f.other || f.photo);
+  if (filled && !armTap('mrCancel', CFG.skipConfirmMs)) return;
+  mrCloseForm();
+}
+function mrDraftSoon() { clearTimeout(MR.draftT); MR.draftT = setTimeout(mrDraftNow, MR_CFG.draftDelayMs); }
+/* Save the open form as the draft now (also before the camera opens: Android can close the page meanwhile). */
+function mrDraftNow() {
+  clearTimeout(MR.draftT);
+  if (!MR.form) return Promise.resolve();
+  return mrDraftPut({form: Object.assign({}, mrReadForm())}).catch(() => { /* storage blocked: Save says so */ });
+}
+function mrGpsLine() {
+  if (!MR.form) return;
+  const el = $('mrGps');
+  if (MR.form.editId) { el.textContent = 'Date, time and GPS stay as first saved.'; return; }
+  const g = mrGpsNow();
+  el.textContent = g ? 'GPS ±' + g.accFt + ' ft. It is saved with the read.' : 'No current GPS fix. The read saves without a position.';
+}
+/* Keep a focused field in view above the on-screen keyboard. */
+function mrFocusInto(ev) { setTimeout(() => { try { ev.target.scrollIntoView({block: 'center'}); } catch (x) { /* gone */ } }, 300); }
+function mrVisibility() {
+  if (document.visibilityState !== 'visible' && MR.form) mrDraftNow();
+}
+function mrAfterChange() { mrRefreshCounts(); }
 /* Called once by the main script after it starts load(). */
-function mrInit() { mrRefreshCounts(); }
-/* Called by load() when the route is on screen (ok) or failed to load. */
-function mrAfterLoad(ok) { mrRefreshCounts(); }
+function mrInit() {
+  MR.off = MR_APP_MODE && !MR_HAS_STORE;               // an app older than 1.1 has no store for the reads: keep them off there
+  $('aManual').hidden = MR.off;
+  $('aManual').onclick = () => mrOpenForm({});
+  $('mrStop').onchange = mrStopChanged;
+  ['mrRead', 'mrMult', 'mrNotes', 'mrOther'].forEach(id => {
+    $(id).addEventListener('input', mrDraftSoon);
+    $(id).addEventListener('focus', mrFocusInto);
+  });
+  $('mrCancel').onclick = mrCancelTap;
+  $('mrSave').onclick = mrSave;
+  document.addEventListener('visibilitychange', mrVisibility);
+  mrRefreshCounts();
+}
+/* Called by load() when the route is on screen (ok) or failed to load: a form that was dropped comes back. */
+function mrAfterLoad(ok) {
+  mrRefreshCounts();
+  if (MR.off) return;
+  mrDraftGet().then(d => {
+    if (d && d.form && !MR.form) return mrOpenForm({draft: d.form}).then(() => toast('Your unsaved manual read is back.'));
+  }).catch(() => { /* storage blocked */ });
+}
