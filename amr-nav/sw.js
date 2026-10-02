@@ -9,7 +9,7 @@
 const VERSION = 'amr-nav-2026.10.01-3';
 const FRESH_TIMEOUT_MS = 3000;     // route.json and graph.json: give up on the network after this long and use the saved copy
 const CORE = [
-  './', './index.html', './manifest.webmanifest', './route.json', './graph.json', './basemap.json',
+  './', './index.html', './manual-reads.js', './manifest.webmanifest', './route.json', './graph.json', './basemap.json',
   './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css',
   './vendor/leaflet/images/layers.png', './vendor/leaflet/images/layers-2x.png',
   './vendor/leaflet/images/marker-icon.png', './vendor/leaflet/images/marker-icon-2x.png', './vendor/leaflet/images/marker-shadow.png',
