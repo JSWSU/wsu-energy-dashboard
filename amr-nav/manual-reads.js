@@ -117,7 +117,7 @@ function mrMakeEntry(o) {
 
 /* ---------- storage: the app's own files (installed app) or IndexedDB (browser), on this device only ---------- */
 const MR = {count: {new: 0, exported: 0}, storeOk: true, persisted: false, form: null, saving: false, draftT: null, gpsT: null,
-  photoUrl: null, off: false, draftPhotoSent: null};
+  photoUrl: null, off: false, draftPhotoSent: null, photoBusy: false};
 /* The mode is fixed once, when this file loads. Inside the app (window.AMRNative is there) the reads always go to the
    app's store and the export always goes through the app: never to IndexedDB (WebView storage, spec 5) and never to the
    share menu (spec 7), even when one bridge call answers nothing for a moment. The calls exist from bridge version 2
@@ -442,7 +442,7 @@ function mrMeterInfo(f) {
   return f.keep && f.keep.ref && f.keep.ref === f.meterRef ? f.keep : null;
 }
 async function mrSave() {
-  if (!MR.form || MR.saving) return;
+  if (!MR.form || MR.saving || MR.photoBusy) return;      // a photo still being made smaller: Save waits for it
   const f = mrReadForm(), err = mrCheck(f);
   const info = err.meter ? null : mrMeterInfo(f);
   if (!err.meter && !info) err.meter = 'Pick a meter, or pick Other meter.';
@@ -473,7 +473,7 @@ async function mrSave() {
     toast('Could not save on this device. Storage is blocked or full. Write the read down.', 7000);
   } finally {
     MR.saving = false;
-    $('mrSave').disabled = false;
+    $('mrSave').disabled = !!MR.photoBusy;
   }
 }
 /* Close the form and drop its draft. */
@@ -580,20 +580,28 @@ function mrPhotoTap() {
   cam.value = '';
   cam.click();
 }
+/* While the photo is made smaller, Save is off (MR.photoBusy), so a read is never saved without the photo the reader
+   took. The photo belongs to the form it was taken for: when that form closed meanwhile (or another one opened), the
+   photo is dropped and never goes to another read. */
 async function mrPhotoPicked(file) {
   if (!file || !MR.form) return;
+  const form = MR.form;
+  MR.photoBusy = true;
   $('mrPhotoBtn').disabled = true;
+  $('mrSave').disabled = true;
   $('mrPhotoNote').textContent = 'Saving the photo...';
   try {
     const out = await mrShrink(file);
-    if (!MR.form) return;
-    MR.form.photo = out.blob; MR.form.photoChanged = true; MR.form.photoInfo = {w: out.w, h: out.h, q: out.q}; MR.form.awaitingPhoto = false;
+    if (MR.form !== form) return;
+    form.photo = out.blob; form.photoChanged = true; form.photoInfo = {w: out.w, h: out.h, q: out.q}; form.awaitingPhoto = false;
     mrPaintPhoto();
     mrDraftNow();
   } catch (e) {
-    $('mrPhotoNote').textContent = 'The photo could not be read. Try again.';
+    if (MR.form === form) $('mrPhotoNote').textContent = 'The photo could not be read. Try again.';
   } finally {
+    MR.photoBusy = false;
     $('mrPhotoBtn').disabled = false;
+    $('mrSave').disabled = MR.saving;
     $('mrCam').value = '';
     MR.photoSeq = (MR.photoSeq || 0) + 1;
   }

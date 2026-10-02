@@ -710,6 +710,51 @@ def t_photo_app(br):
     ctx.close()
 
 
+SLOW_SHRINK = """() => { const real = mrShrink; window.__shrinkGate = new Promise(r => { window.__shrinkGo = r; });
+    window.mrShrink = async f => { await window.__shrinkGate; return real(f); }; }"""
+
+
+@A.case
+def t_photo_busy(br):
+    """A photo still being made smaller: Save waits for it (never a read saved without its photo), and a form that
+    closed meanwhile never hands its photo to the next form."""
+    for mode in MODES:
+        ctx, pg = A.open_app(br, mode=mode)
+        open_form(pg)
+        pg.check("#mrMeters input[value='__other']")
+        pg.fill("#mrOther", "BUSY1")
+        pg.fill("#mrRead", "0041")
+        pg.fill("#mrMult", "1")
+        pg.evaluate(SLOW_SHRINK)
+        n = pg.evaluate("() => MR.photoSeq || 0")
+        pg.set_input_files("#mrCam", files=[{"name": "IMG_0005.jpg", "mimeType": "image/jpeg", "buffer": jpeg_bytes(1440, 1080)}])
+        A.pump_until(pg, lambda: A.dom(pg, "#mrPhotoNote") == "Saving the photo...", timeout=5)
+        r = pg.evaluate("() => { const off = $('mrSave').disabled; $('mrSave').click(); return [off, $('mrForm').hidden]; }")
+        pg.wait_for_timeout(300)
+        A.check(mode + " photo busy: Save is off while the photo is made smaller, and a tap then saves nothing",
+                r == [True, False] and not pg.evaluate("() => $('mrForm').hidden") and all_entries(pg) == [], json.dumps(r))
+        pg.evaluate("() => window.__shrinkGo()")
+        A.pump_until(pg, lambda: pg.evaluate("() => MR.photoSeq || 0") > n, timeout=10)
+        save_form(pg)
+        e = all_entries(pg)
+        b = pg.evaluate("async (id) => { const p = await mrPhoto(id); return p ? p.size : 0; }", e[0]["id"] if e else "")
+        A.check(mode + " photo busy: once the photo is ready, Save stores the read with its photo",
+                len(e) == 1 and e[0]["photoBytes"] > 0 and b == e[0]["photoBytes"], json.dumps([len(e), b]))
+        open_form(pg)
+        pg.evaluate(SLOW_SHRINK)
+        n = pg.evaluate("() => MR.photoSeq || 0")
+        pg.set_input_files("#mrCam", files=[{"name": "IMG_0006.jpg", "mimeType": "image/jpeg", "buffer": jpeg_bytes(1440, 1080)}])
+        A.pump_until(pg, lambda: A.dom(pg, "#mrPhotoNote") == "Saving the photo...", timeout=5)
+        pg.evaluate("() => { mrCloseForm(); }")                # the reader closed form A; form B opens
+        open_form(pg)
+        pg.evaluate("() => window.__shrinkGo()")
+        A.pump_until(pg, lambda: pg.evaluate("() => MR.photoSeq || 0") > n, timeout=10)
+        r = pg.evaluate("() => [!!MR.form.photo, $('mrThumb').hidden, $('mrPhotoNote').textContent, $('mrSave').disabled, $('mrPhotoBtn').disabled]")
+        A.check(mode + " photo busy: a photo of a form that closed is dropped; the next form gets none, and its buttons work",
+                r == [False, True, "Optional: one photo of the meter face.", False, False], json.dumps(r))
+        ctx.close()
+
+
 @A.case
 def t_photo_draft(br):
     ctx, pg = A.open_app(br)
