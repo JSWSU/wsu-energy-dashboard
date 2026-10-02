@@ -988,10 +988,16 @@ def t_list_app(br):
     renewed = A.pump_until(pg, lambda: pg.evaluate("() => JSON.parse(window.__native.st.entries.c).status === 'new'"), timeout=3)
     A.check("app list: Mark new is saved in the app's store", renewed)
     ctx.close()
-    ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"bridge": "1"})
+    # A read in this profile's IndexedDB (browser storage): an app page must never show or read it (spec 5), so the
+    # check can fail if the app mode ever fell back to IndexedDB.
+    ctx, pg = A.open_app(br, start=False)
+    seed(pg, [dict(id="idb1", savedAt=A.T1, meter="M1", ref="200201", read="1", mult="1")])
+    pg.close()
+    ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"bridge": "1"}, ctx=ctx)
     pg.evaluate("() => openPanel()")                 # the start screen covers the side buttons
     r = pg.evaluate("() => [document.getElementById('mrStartList'), $('bManual').hidden]")
-    A.check("an app older than 1.1: no Manual reads button on the start screen or in the stop list", r == [None, True], json.dumps(r))
+    A.check("an app older than 1.1: no Manual reads button on the start screen or in the stop list (a read in IndexedDB is never shown)",
+            r == [None, True], json.dumps(r))
     ctx.close()
 
 
