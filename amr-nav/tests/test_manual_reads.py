@@ -1556,13 +1556,55 @@ def meter(o, ref):
     return next(m for m in A.STOPS[o]["meters"] if m["ref"] == ref)
 
 
+# The map checks pick their stops and meters from the route data (Part D review, L8), so a new month's route.json keeps
+# them working: the messages name what was picked.
+def all_pins():
+    """Every pin of the route: (stop, its meters, on its stop pin), by the pin rule above."""
+    return [(st, g, hav_m([g[0]["lat"], g[0]["lon"]], [st["lat"], st["lon"]]) <= 3)
+            for st in A.ROUTE["stops"] for g in pin_groups(st)]
+
+
+def lone_pin(attn=None):
+    """The first meter (route order) with a pin of its own and no other pin or stop pin within 12 m, so a tap on it hits
+    only it. attn True: an ATTENTION meter with a note; else a meter with a spot after the site in its where text.
+    Returns (stop, meter)."""
+    for x in lone_pins(attn):
+        return x
+    raise AssertionError("route data: no meter with a pin of its own" + (" (ATTENTION, with a note)" if attn else ""))
+
+
+def lone_pins(attn=None):
+    """Every meter that lone_pin() could pick, in route order."""
+    pins = all_pins()
+    for st, g, on in pins:
+        m = g[0]
+        if len(g) != 1 or on:
+            continue
+        if attn and not (m.get("attn") and m.get("note")):
+            continue
+        if not attn and (m.get("attn") or " · " not in (m.get("where") or "")):
+            continue
+        p = [m["lat"], m["lon"]]
+        if any(g2 is not g and hav_m([g2[0]["lat"], g2[0]["lon"]], p) < 12 for _, g2, _ in pins):
+            continue
+        if any(hav_m([s["lat"], s["lon"]], p) < 12 for s in A.ROUTE["stops"]):
+            continue
+        yield st, m
+
+
+def long_stops():
+    """The stops with the most meters, longest first."""
+    return sorted(A.ROUTE["stops"], key=lambda s: (-len(s["meters"]), s["o"]))
+
+
 @A.case
 def t_map_pins(br):
     """A pin for each meter at zoom 17 or closer (none at 16); meters at one spot share one pin with a count; an ATTENTION
     pin is gold with !; a pin on its stop pin sits just beside it; every other pin sits on its meter."""
     ctx, pg = A.open_app(br)
     want = sum(len(pin_groups(st)) for st in A.ROUTE["stops"])
-    st2 = A.STOPS[2]
+    pins = all_pins()
+    st2 = next(st for st, g, on in pins if on and any(s is st and not o for s, _, o in pins))   # a stop with a pin on it and one away
     map_at(pg, [st2["lat"], st2["lon"]], 16)
     n16 = pg.evaluate("() => document.querySelectorAll('.mpw').length")
     map_at(pg, [st2["lat"], st2["lon"]], 17)
@@ -1570,14 +1612,14 @@ def t_map_pins(br):
     A.check("map: no meter pins at zoom 16; at zoom 17 one pin for each spot (%d pins for %d meters)" % (want, sum(len(s["meters"]) for s in A.ROUTE["stops"])),
             n16 == 0 and n17 == want, json.dumps([n16, n17, want]))
     map_at(pg, [st2["lat"], st2["lon"]], 18)
-    on = next(g[0] for g in pin_groups(st2) if hav_m([g[0]["lat"], g[0]["lon"]], [st2["lat"], st2["lon"]]) <= 3)
-    off = st2["meters"][0]
-    r = pg.evaluate("""([on, off, ll]) => { const c = e => { const b = e.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
-        const s = c(stopMarkers[2].getElement().querySelector('.sm')), p = c(document.querySelector(".mpw[data-ref='" + on + "'] .mp"));
+    on = next(g[0] for s, g, o in pins if s is st2 and o)
+    off = next(g[0] for s, g, o in pins if s is st2 and not o)
+    r = pg.evaluate("""([o, on, off, ll]) => { const c = e => { const b = e.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
+        const s = c(stopMarkers[o].getElement().querySelector('.sm')), p = c(document.querySelector(".mpw[data-ref='" + on + "'] .mp"));
         const q = c(document.querySelector(".mpw[data-ref='" + off + "'] .mp")), mp = $('map').getBoundingClientRect(), pt = map.latLngToContainerPoint(ll);
         return {side: [Math.round(p[0] - s[0]), Math.round(p[1] - s[1])], own: Math.round(Math.hypot(q[0] - mp.left - pt.x, q[1] - mp.top - pt.y))}; }""",
-                    [on["ref"], off["ref"], [off["lat"], off["lon"]]])
-    A.check("map: the pin of a meter at its stop pin (stop 2, ref %s) sits just beside the stop pin, up and to the right" % on["ref"],
+                    [st2["o"], on["ref"], off["ref"], [off["lat"], off["lon"]]])
+    A.check("map: the pin of a meter at its stop pin (stop %d, ref %s) sits just beside the stop pin, up and to the right" % (st2["o"], on["ref"]),
             15 <= r["side"][0] <= 30 and -25 <= r["side"][1] <= -8, json.dumps(r))
     A.check("map: a pin away from its stop pin sits on its meter", r["own"] <= 1, json.dumps(r))
     ctx.close()
@@ -1585,20 +1627,20 @@ def t_map_pins(br):
 
 @A.case
 def t_map_meter_box(br):
+    st, m = lone_pin()
     for mode in MODES:
         ctx, pg = A.open_app(br, mode=mode)
-        m = meter(2, "200001")
         where = m["where"].split(" · ")
         map_at(pg, [m["lat"], m["lon"]])
         f0 = pg.evaluate("() => [S.follow, $('fFollow').className]")
-        pg.click(".mpw[data-ref='200001']")
+        pg.click(".mpw[data-ref='%s']" % m["ref"])
         pg.wait_for_selector(".mp-pop .pp-head", timeout=5000)
         r = pg.evaluate("""() => { const p = document.querySelector('.mp-pop');
             return {id: p.querySelector('.pp-head b').textContent, sub: p.querySelector('.pp-head small').textContent,
                     kv: [...p.querySelectorAll('.pp-kv dd')].map(d => d.textContent),
                     btn: [...p.querySelectorAll('.pp-foot button')].map(b => b.textContent), follow: [S.follow, $('fFollow').className]}; }""")
-        A.check(mode + " meter box: tapping a meter pin shows the meter ID, its stop, route ref, building number, site and spot, and Manual read",
-                r["id"] == m["meter"] and r["sub"] == "Stop 2" and r["kv"] == [m["ref"], m["bldg"], where[0], where[1]] and r["btn"] == ["Manual read"],
+        A.check(mode + " meter box (stop %d, ref %s): tapping a meter pin shows the meter ID, its stop, route ref, building number, site and spot, and Manual read" % (st["o"], m["ref"]),
+                r["id"] == m["meter"] and r["sub"] == "Stop %d" % st["o"] and r["kv"] == [m["ref"], m["bldg"], where[0], where[1]] and r["btn"] == ["Manual read"],
                 json.dumps(r))
         A.check(mode + " map box: opening it turns map follow off (as a drag does)",
                 f0 == [True, "fab on"] and r["follow"] == [False, "fab off"], json.dumps([f0, r["follow"]]))
@@ -1607,16 +1649,106 @@ def t_map_meter_box(br):
         A.pump_until(pg, lambda: pg.evaluate("() => !document.querySelector('.mp-pop')"), timeout=3)   # the box fades out (0.2 s)
         f = pg.evaluate("""() => [$('mrStop').value, (document.querySelector('#mrMeters input:checked') || {}).value, $('mrRead').value,
             $('mrMult').value, !!document.querySelector('.mp-pop')]""")
-        A.check(mode + " Manual read in the meter box: the form opens on stop 2 with that meter chosen; face read and multiplier empty; the box closes",
-                f == ["2", "200001", "", "", False], json.dumps(f))
+        A.check(mode + " Manual read in the meter box: the form opens on that stop with that meter chosen; face read and multiplier empty; the box closes",
+                f == [str(st["o"]), m["ref"], "", "", False], json.dumps(f))
         pg.fill("#mrRead", "1209334")
         pg.fill("#mrMult", "1")
         save_form(pg)
         e = all_entries(pg)[-1]
         A.check(mode + " a read picked on the map saves with that stop, meter, route ref, building number and site",
-                [e["stop"], e["meter"], e["ref"], e["bldg"], e["site"], e["read"]] == [2, m["meter"], m["ref"], m["bldg"], where[0], "1209334"],
+                [e["stop"], e["meter"], e["ref"], e["bldg"], e["site"], e["read"]] == [st["o"], m["meter"], m["ref"], m["bldg"], where[0], "1209334"],
                 json.dumps(e))
         ctx.close()
+
+
+def follow_view(pg):
+    """[map follow, the Follow button's class, the car (the last fix) is on the map]."""
+    return pg.evaluate("""() => { const p = map.latLngToContainerPoint([S.fix.lat, S.fix.lon]), s = map.getSize();
+        return [S.follow, $('fFollow').className, p.x >= 0 && p.y >= 0 && p.x <= s.x && p.y <= s.y]; }""")
+
+
+def map_blank(pg):
+    """A point on the map with no pin, box or button on it: a tap there is a map tap."""
+    return pg.evaluate("""() => { const r = $('map').getBoundingClientRect();
+        for (let y = r.top + 40; y < r.bottom - 40; y += 37) for (let x = r.left + 30; x < r.right - 30; x += 41) {
+          const e = document.elementFromPoint(x, y);
+          if (e && $('map').contains(e) && !e.closest('.leaflet-marker-icon, .leaflet-popup, .leaflet-control')) return [x, y]; }
+        return null; }""")
+
+
+def map_drag(pg):
+    """Drag the map a little from a blank point (Leaflet's own drag: dragstart fires)."""
+    xy = map_blank(pg)
+    pg.mouse.move(xy[0], xy[1])
+    pg.mouse.down()
+    pg.mouse.move(xy[0] + 50, xy[1] + 30, steps=8)
+    pg.mouse.up()
+    pg.wait_for_timeout(300)
+
+
+@A.case
+def t_map_follow_back(br):
+    """Part D review (10/02/2026): a map box turned map follow off for the rest of the drive, so after Manual read from the
+    map the car drove off the screen. Follow is now off only while a box is open: closing it (the X, a map tap, Manual read,
+    Show in stop list) turns follow back on and brings the car back into view. A drag while the box is open keeps follow
+    off, as a drag always does; a box opened while follow was off leaves it off; a box that replaces an open box keeps
+    what the first box found."""
+    ctx, pg = A.open_app(br)
+    car = [A.DEPOT["latitude"], A.DEPOT["longitude"]]
+    st, m = max(lone_pins(), key=lambda x: hav_m(car, [x[1]["lat"], x[1]["lon"]]))   # the meter farthest from the car
+    A.feed(pg, car)                                               # the car at the depot, off the screen when the map shows the meter
+
+    def box():
+        map_at(pg, [m["lat"], m["lon"]])
+        pg.click(".mpw[data-ref='%s']" % m["ref"])
+        pg.wait_for_selector(".mp-pop .pp-head", timeout=5000)
+        return follow_view(pg)
+
+    def closed():
+        A.pump_until(pg, lambda: pg.evaluate("() => !document.querySelector('.mp-pop')"), timeout=3)   # the box fades out (0.2 s)
+        pg.wait_for_timeout(800)                                   # the pan back to the car (0.5 s)
+        return follow_view(pg)
+
+    shut, on = [False, "fab off", False], [True, "fab on", True]       # open: follow off and the car off the screen
+    r = {}
+    o = box()
+    pg.click(".mp-pop .leaflet-popup-close-button")
+    r["its X"] = [o, closed()]
+    o = box()
+    xy = map_blank(pg)
+    pg.mouse.click(xy[0], xy[1])
+    r["a map tap"] = [o, closed()]
+    o = box()
+    pg.click(".mp-pop .pp-foot button")
+    pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+    r["Manual read"] = [o, closed()]
+    pg.click("#mrCancel")                                         # a form from the map with nothing typed closes on one tap
+    map_at(pg, [st["lat"], st["lon"]])
+    pg.click(".leaflet-marker-icon[title^='Stop %d:']" % st["o"])
+    pg.wait_for_selector(".mp-pop .pp-foot button", timeout=5000)
+    o = follow_view(pg)
+    pg.click(".mp-pop .pp-foot button")
+    r["Show in stop list"] = [o, closed()]
+    pg.click("#pClose")
+    for k, v in r.items():
+        A.check("map box (stop %d, ref %s) closed by %s: follow was off while it was open; now it is on again and the car is in view"
+                % (st["o"], m["ref"], k), v == [shut, on], json.dumps(v))
+    box()
+    pg.evaluate("() => { document.querySelector(\".leaflet-marker-icon[title^='Stop %d:']\").click(); }" % st["o"])   # the stop box replaces it
+    pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
+    pg.click(".mp-pop .leaflet-popup-close-button")
+    v = closed()
+    A.check("map box: a box that replaced an open box closes with follow on again (the first box's state is kept)", v == on, json.dumps(v))
+    box()
+    map_drag(pg)
+    pg.evaluate("() => { map.closePopup(); }")
+    v = closed()
+    A.check("map box: a drag while it is open keeps follow off after it closes (as a drag always does)", v[:2] == shut[:2], json.dumps(v))
+    v = box()
+    pg.click(".mp-pop .leaflet-popup-close-button")
+    v2 = closed()
+    A.check("map box: a box opened while follow was off leaves it off when it closes", v[:2] == shut[:2] and v2[:2] == shut[:2], json.dumps([v, v2]))
+    ctx.close()
 
 
 @A.case
@@ -1661,34 +1793,39 @@ def t_map_stop_box(br):
 @A.case
 def t_map_groups(br):
     ctx, pg = A.open_app(br)
-    st = A.STOPS[22]
-    g = st["meters"]                                          # the four meters of stop 22 share one spot
+    pins = all_pins()
+    st, g = next(((s, x) for s, x, _ in pins if len(x) > 1 and any(m.get("attn") for m in x)),       # meters at one spot,
+                 next((s, x) for s, x, _ in pins if len(x) > 1))                                     # with an ATTENTION meter if any
+    n, gold = len(g), any(m.get("attn") for m in g)
+    ref0 = g[0]["ref"]
     map_at(pg, [g[0]["lat"], g[0]["lon"]])
-    pins = pg.evaluate("""() => [...document.querySelectorAll(".mpw[data-stop='22']")].map(e => [e.dataset.n,
-        (e.querySelector('.mpn') || {}).textContent || '', e.querySelector('.mp').classList.contains('attn'), e.parentNode.title])""")
-    A.check("map: the four meters of stop 22 share one pin with the count 4; it is gold (two of them are ATTENTION meters)",
-            pins == [["4", "4", True, "4 meters at this spot"]], json.dumps(pins))
-    pg.click(".mpw[data-stop='22']")
+    pin = pg.evaluate("""(r) => { const e = document.querySelector(".mpw[data-ref='" + r + "']");
+        return [e.dataset.stop, e.dataset.n, (e.querySelector('.mpn') || {}).textContent || '', e.querySelector('.mp').classList.contains('attn'), e.parentNode.title]; }""", ref0)
+    A.check("map: the %d meters at one spot of stop %d share one pin with the count %d; gold when one is an ATTENTION meter (%s)" % (n, st["o"], n, gold),
+            pin == [str(st["o"]), str(n), str(n), gold, "%d meters at this spot" % n], json.dumps(pin))
+    pg.click(".mpw[data-ref='%s']" % ref0)
     pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
     r = pg.evaluate("""() => { const p = document.querySelector('.mp-pop');
         return {title: p.querySelector('.pp-head b').textContent, sub: p.querySelector('.pp-head small').textContent,
                 rows: [...p.querySelectorAll('.pp-m')].map(r => [r.dataset.ref, r.classList.contains('attn'), !!r.querySelector('.badge'),
                        r.querySelectorAll('button').length]), foot: p.querySelectorAll('.pp-foot').length}; }""")
-    A.check("group box: 4 meters at this spot, the stop and its site, each meter with Manual read, ATTENTION meters marked",
-            r["title"] == "4 meters at this spot" and r["sub"] == "Stop 22: " + st["site"]
-            and r["rows"] == [[m["ref"], bool(m["attn"]), bool(m["attn"]), 1] for m in g] and r["foot"] == 0, json.dumps(r))
+    A.check("group box: %d meters at this spot, the stop and its site, each meter with Manual read, ATTENTION meters marked" % n,
+            r["title"] == "%d meters at this spot" % n and r["sub"] == "Stop %d: %s" % (st["o"], st["site"])
+            and r["rows"] == [[m["ref"], bool(m.get("attn")), bool(m.get("attn")), 1] for m in g] and r["foot"] == 0, json.dumps(r))
     pg.click(".mp-pop .pp-m[data-ref='%s'] button" % g[1]["ref"])
     pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
     f = pg.evaluate("() => [$('mrStop').value, (document.querySelector('#mrMeters input:checked') || {}).value]")
-    A.check("group box: Manual read opens the form with stop 22 and that meter chosen", f == ["22", g[1]["ref"]], json.dumps(f))
+    A.check("group box: Manual read opens the form with stop %d and that meter chosen" % st["o"], f == [str(st["o"]), g[1]["ref"]], json.dumps(f))
     pg.click("#mrCancel")
-    m7 = meter(7, "200047")
+    s7, m7 = lone_pin(attn=True)
+    plain = next(x[0] for _, x, _ in pins if not any(m.get("attn") for m in x))
     map_at(pg, [m7["lat"], m7["lon"]], 19)
-    a = pg.evaluate("""() => { const e = document.querySelector(".mpw[data-ref='200047'] .mp"), n = document.querySelector(".mpw[data-ref='200009'] .mp");
-        return [e.classList.contains('attn'), getComputedStyle(e).backgroundColor, n.classList.contains('attn'), getComputedStyle(n).backgroundColor]; }""")
-    A.check("map: an ATTENTION meter's pin is gold (#c69214) with !; another meter's pin is white",
+    a = pg.evaluate("""([r, q]) => { const e = document.querySelector(".mpw[data-ref='" + r + "'] .mp"), n = document.querySelector(".mpw[data-ref='" + q + "'] .mp");
+        return [e.classList.contains('attn'), getComputedStyle(e).backgroundColor, n.classList.contains('attn'), getComputedStyle(n).backgroundColor]; }""",
+                    [m7["ref"], plain["ref"]])
+    A.check("map: an ATTENTION meter's pin (ref %s) is gold (#c69214) with !; another meter's pin (ref %s) is white" % (m7["ref"], plain["ref"]),
             a == [True, "rgb(198, 146, 20)", False, "rgb(255, 255, 255)"], json.dumps(a))
-    pg.click(".mpw[data-ref='200047']")
+    pg.click(".mpw[data-ref='%s']" % m7["ref"])
     pg.wait_for_selector(".mp-pop .pp-head", timeout=5000)
     b = pg.evaluate("() => [document.querySelector('.mp-pop .pp-head b').textContent, (document.querySelector('.mp-pop .pp-note') || {}).textContent || '']")
     A.check("meter box: an ATTENTION meter shows the ATTENTION badge and its note", b == [m7["meter"] + "ATTENTION", m7["note"]], json.dumps(b))
@@ -1750,8 +1887,7 @@ def t_map_form_fit(br):
     orientations; the form now keeps the bar's height free below the row."""
     for mode in MODES:
         ctx, pg = A.open_app(br, mode=mode, viewport=(1280, 800))
-        st = A.STOPS[2]
-        last = st["meters"][-1]
+        st, last = lone_pin()
         map_at(pg, [last["lat"], last["lon"]])
         pg.click(".mpw[data-ref='%s']" % last["ref"])
         pg.wait_for_selector(".mp-pop .pp-foot button", timeout=5000)
@@ -1766,11 +1902,12 @@ def t_map_form_fit(br):
                 "the chosen meter is in view above Cancel and Save",
                 r == {"cap": "none", "inner": False, "rows": len(st["meters"]) + 1, "chosen": last["ref"], "seen": True}, json.dumps(r))
         ctx.close()
-    A.check("route data: stop 18 has 23 meters and stop 29 has 17 (the long stops the fit checks below need)",
-            [len(A.STOPS[18]["meters"]), len(A.STOPS[29]["meters"])] == [23, 17])
+    s1, s2 = long_stops()[:2]
+    A.check("route data: the two longest stops (stop %d, %d meters; stop %d, %d meters) have 12 meters or more, so the form scrolls"
+            % (s1["o"], len(s1["meters"]), s2["o"], len(s2["meters"])), len(s2["meters"]) >= 12)
     for mode in MODES:
         for label, vp in (("sideways (1280 x 800)", (1280, 800)), ("upright (800 x 1280)", (800, 1280))):
-            for o, i in ((18, -1), (18, 15), (29, -1)):
+            for o, i in ((s1["o"], -1), (s1["o"], len(s1["meters"]) * 2 // 3), (s2["o"], -1)):
                 ctx, pg = A.open_app(br, mode=mode, viewport=vp)     # a fresh page for each: the form keeps its scroll position between opens
                 st = A.STOPS[o]
                 m = st["meters"][i]
@@ -1785,35 +1922,55 @@ def t_map_form_fit(br):
 def t_map_box_phone(br):
     """Review finding (10/02/2026): on a 412 px phone the stop box of stop 18 (381 px wide) covered the side buttons. A box is
     now as wide as the room between the pads of the map pan (a minimum of 300 px and a maximum of 380 px on a wide screen),
-    so it stays left of the side buttons on every phone and keeps its full width on the tablet."""
-    st, m = A.STOPS[18], meter(2, "200001")
+    so it stays left of the side buttons on every phone and keeps its full width on the tablet.
+    Part D review (L1): on a 360 x 780 phone the stop box of the longest stop ran under the card at the bottom, so its last
+    Manual read buttons and Show in stop list took no tap. The list in a box is now only as tall as the room between the
+    banner and the card allows; the tablet keeps the full list height (430 px)."""
+    st, m = long_stops()[0], lone_pin()[1]
     for label, vp in (("412 x 915", (412, 915)), ("360 x 780", (360, 780))):
         ctx, pg = A.open_app(br, viewport=vp, is_mobile=True, has_touch=True, device_scale_factor=2.6)
         map_at(pg, [st["lat"], st["lon"]])
-        pg.click(".leaflet-marker-icon[title^='Stop 18:']")
+        pg.click(".leaflet-marker-icon[title^='Stop %d:']" % st["o"])
         pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
         pg.wait_for_timeout(700)                                  # the pan that brings the box into the pads settles
         r = box_vs_side(pg)
-        A.check("phone %s: the stop box (stop 18, 23 meters) stays inside the screen and left of the side buttons; "
-                "the right edge of a Manual read button takes a tap" % label,
+        A.check("phone %s: the stop box (stop %d, %d meters) stays inside the screen and left of the side buttons; "
+                "the right edge of a Manual read button takes a tap" % (label, st["o"], len(st["meters"])),
                 r["box"][0] >= 0 and r["box"][1] <= r["side"] and r["btn"] <= r["side"] and r["tap"] is True, json.dumps(r))
+        r = box_fit(pg)
+        A.check("phone %s: the whole stop box is above the card; Show in stop list and, with the list scrolled to its end, the last "
+                "Manual read take a tap" % label, r["bottom"] <= r["card"] and r["foot"] is True and r["last"] is True, json.dumps(r))
         map_at(pg, [m["lat"], m["lon"]])
-        pg.click(".mpw[data-ref='200001']")
+        pg.click(".mpw[data-ref='%s']" % m["ref"])
         pg.wait_for_selector(".mp-pop .pp-head", timeout=5000)
         pg.wait_for_timeout(700)
         r = box_vs_side(pg)
         A.check("phone %s: the meter box stays inside the screen and left of the side buttons; the right edge of Manual read takes a tap" % label,
                 r["box"][0] >= 0 and r["box"][1] <= r["side"] and r["btn"] <= r["side"] and r["tap"] is True, json.dumps(r))
         ctx.close()
-    ctx, pg = A.open_app(br, viewport=(800, 1280))
-    map_at(pg, [st["lat"], st["lon"]])
-    pg.click(".leaflet-marker-icon[title^='Stop 18:']")
-    pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
-    pg.wait_for_timeout(700)
-    r = box_vs_side(pg)
-    A.check("tablet upright (800 x 1280): the stop box keeps its full width (381 px) and is left of the side buttons",
-            r["width"] == 381 and r["box"][1] <= r["side"], json.dumps(r))
-    ctx.close()
+    for label, vp in (("upright (800 x 1280)", (800, 1280)), ("sideways (1280 x 800)", (1280, 800))):
+        ctx, pg = A.open_app(br, viewport=vp)
+        map_at(pg, [st["lat"], st["lon"]])
+        pg.click(".leaflet-marker-icon[title^='Stop %d:']" % st["o"])
+        pg.wait_for_selector(".mp-pop .pp-list", timeout=5000)
+        pg.wait_for_timeout(700)
+        r = box_vs_side(pg)
+        h = pg.evaluate("() => document.querySelector('.mp-pop .pp-list').clientHeight")
+        A.check("tablet %s: the stop box keeps its full width (381 px) and its full list height (430 px), left of the side buttons" % label,
+                r["width"] == 381 and h == 430 and r["box"][1] <= r["side"], json.dumps([r, h]))
+        ctx.close()
+
+
+def box_fit(pg):
+    """Where the open map box ends against the card, and whether Show in stop list and the last Manual read (the list
+    scrolled to its end) take a tap."""
+    return pg.evaluate("""() => { const w = document.querySelector('.mp-pop .leaflet-popup-content-wrapper').getBoundingClientRect(),
+        c = $('card').getBoundingClientRect(), l = document.querySelector('.mp-pop .pp-list'), foot = document.querySelector('.mp-pop .pp-foot button');
+        const tap = b => { const r = b.getBoundingClientRect(), e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!e && b.contains(e); };
+        l.scrollTop = l.scrollHeight;
+        const bs = l.querySelectorAll('button');
+        return {bottom: Math.round(w.bottom), card: Math.round(c.top), list: l.clientHeight, foot: foot ? tap(foot) : null,
+                last: bs.length ? tap(bs[bs.length - 1]) : null}; }""")
 
 
 # ---------- one-tap Send in the app; Share in a browser (Task 22, owner features of 10/02/2026) ----------

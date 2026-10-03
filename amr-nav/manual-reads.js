@@ -10,7 +10,7 @@
 'use strict';
 /* This file's version: always the same as APP_VERSION in index.html (bump both together; test_app_manifest.py checks).
    The page runs manual reads only when they match, so a page and an older or newer copy of this file never mix. */
-const MR_JS_VERSION = '2026.10.02-3';
+const MR_JS_VERSION = '2026.10.02-4';
 const MR_CFG = {
   db: 'amrNav-manualReads',     // IndexedDB name (browser); jswsu.github.io is shared with other pages, so the name says whose it is
   dbVersion: 1,                 // a schema change raises this by one and adds one step in mrDb(); an old step never changes

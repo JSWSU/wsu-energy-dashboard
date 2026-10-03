@@ -312,7 +312,7 @@ button{font:inherit;cursor:pointer}
 <script src="manual-reads.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '2026.10.02-3';
+const APP_VERSION = '2026.10.02-4';
 /* Manual reads run only when manual-reads.js loaded and is this page's own version: after a deploy the service worker
    can serve this page with no manual-reads.js (offline) or an older one. Off, the reads stay stored, unseen this time. */
 const MR_ON = typeof mrInit === 'function' && typeof MR_JS_VERSION === 'string' && MR_JS_VERSION === APP_VERSION;
@@ -707,21 +707,45 @@ function drawMeterPins() {
   }));
 }
 /* The room a box leaves free: the banner at the top, the side buttons at the right, and the card at the bottom when it
-   spans the screen (portrait). free: the width between the left and right pads. */
+   spans the screen (portrait). free: the width between the left and right pads; h: the height between the top and
+   bottom pads. */
 function mpPad() {
   const m = $('map').getBoundingClientRect(), b = $('banner').getBoundingClientRect(), c = $('card').getBoundingClientRect();
   const sd = $('side').getBoundingClientRect(), wide = c.right >= m.width * 0.6;
   const tl = [10, b.bottom - m.top + 10], br = [m.right - sd.left + 10, wide ? m.bottom - c.top + 10 : 10];
-  return {tl, br, free: m.width - tl[0] - br[0]};
+  return {tl, br, free: m.width - tl[0] - br[0], h: m.height - tl[1] - br[1]};
 }
-/* Open a box at ll. The map stops following the GPS (as after a drag), so the box stays where the reader tapped.
-   A box is 300 to 380 px wide, but never wider than the free width between the pads: on a narrow phone the pan cannot
-   bring a wider box clear of the side buttons. Leaflet adds 1 px to the width; the floor of 200 px keeps the text legible. */
+/* The open box (pop), and what it found when it opened: back, map follow was on; dragged, the reader dragged the map
+   while a box was open. */
+const MP = {pop: null, back: false, dragged: false};
+/* Open a box at ll. While a box is open the map stops following the GPS (as after a drag), so the box stays where the
+   reader tapped. When it closes (its X, a map tap, Manual read, Show in stop list) follow comes back on if it was on
+   when the box opened and the reader did not drag the map meanwhile; a box that replaces an open box keeps what the
+   first one found. A box is 300 to 380 px wide, but never wider than the free width between the pads: on a narrow
+   phone the pan cannot bring a wider box clear of the side buttons. Leaflet adds 1 px to the width; the floor of 200 px
+   keeps the text legible. Its meter list is never taller than the free height allows, so on a short phone the whole box,
+   its last Manual read buttons and Show in stop list stay above the card. */
 function mpOpen(ll, el, off) {
   const p = mpPad(), maxW = Math.max(200, Math.min(380, Math.floor(p.free) - 2));
+  if (!MP.pop) { MP.back = S.follow; MP.dragged = false; }
   S.follow = false; $('fFollow').className = 'fab off';
-  L.popup({className: 'mp-pop', maxWidth: maxW, minWidth: Math.min(300, maxW), offset: off || [0, 0], autoPanPaddingTopLeft: p.tl,
-    autoPanPaddingBottomRight: p.br}).setLatLng(ll).setContent(el).openOn(map);
+  const pop = L.popup({className: 'mp-pop', maxWidth: maxW, minWidth: Math.min(300, maxW), offset: off || [0, 0], autoPanPaddingTopLeft: p.tl,
+    autoPanPaddingBottomRight: p.br}).setLatLng(ll).setContent(el);
+  MP.pop = pop;
+  pop.on('remove', () => mpClosed(pop));
+  pop.openOn(map);
+  const list = el.querySelector('.pp-list'), box = pop.getElement();
+  if (list && box) {
+    const over = box.offsetHeight + 20 - p.h;     // 20 px: the tip under the box (Leaflet's pan counts it too)
+    if (over > 0) { list.style.maxHeight = Math.max(120, list.clientHeight - over) + 'px'; pop.update(); }
+  }
+}
+function mpClosed(pop) {
+  if (MP.pop !== pop) return;                     // a newer box took its place
+  MP.pop = null;
+  if (!MP.back || MP.dragged || S.follow) return;
+  S.follow = true; $('fFollow').className = 'fab on';
+  if (S.fix) followTo([S.fix.lat, S.fix.lon], CFG.zoom[currentLeg() ? currentLeg().mode : 'drive']);
 }
 function mpEl(html) { const d = document.createElement('div'); d.innerHTML = html; return d; }
 /* A meter's "where" text, for example "CHEM STO" + middle dot + "110": the site "CHEM STO" and the spot "110". */
@@ -1932,7 +1956,7 @@ $('fLayer').onclick = () => {
 $('fList').onclick = openPanel;
 $('pClose').onclick = closePanel;
 $('cToggle').onclick = () => { const c = $('card'); c.classList.toggle('open'); $('cToggle').innerHTML = c.classList.contains('open') ? '&#9660;' : '&#9650;'; layoutVars(); };
-map.on('dragstart', () => { S.follow = false; $('fFollow').className = 'fab off'; });
+map.on('dragstart', () => { S.follow = false; $('fFollow').className = 'fab off'; MP.dragged = true; });   // MP: a drag while a map box is open keeps follow off
 
 /* ---------- route signature and pinning ---------- */
 function fnv1a(text) {                 // 32-bit FNV-1a hash of the text, as 8 hex digits
