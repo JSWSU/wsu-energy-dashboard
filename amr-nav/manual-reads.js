@@ -10,7 +10,7 @@
 'use strict';
 /* This file's version: always the same as APP_VERSION in index.html (bump both together; test_app_manifest.py checks).
    The page runs manual reads only when they match, so a page and an older or newer copy of this file never mix. */
-const MR_JS_VERSION = '2026.10.02-4';
+const MR_JS_VERSION = '2026.10.02-5';
 const MR_CFG = {
   db: 'amrNav-manualReads',     // IndexedDB name (browser); jswsu.github.io is shared with other pages, so the name says whose it is
   dbVersion: 1,                 // a schema change raises this by one and adds one step in mrDb(); an old step never changes
@@ -352,6 +352,7 @@ async function mrOpenForm(opts) {
   try {
     if (opts.draft) f = Object.assign(mrBlankForm(null), opts.draft);
     else if (opts.editId) {
+      if (mrHeldIds().has(opts.editId)) { toast(MR_HELD_SAY); return; }
       const e = await mrGet(opts.editId);
       if (!e || e.status !== 'new') { toast('Only new reads can change.'); return; }
       const photo = e.photoBytes ? await mrPhoto(e.id) : null;
@@ -369,6 +370,7 @@ async function mrOpenForm(opts) {
   MR.form = f;
   mrPaintForm();
   $('mrForm').hidden = false;
+  $('mrForm').scrollTop = 0;                     // the form keeps its scroll position while hidden: every form opens at the top
   /* The sticky Cancel and Save bar covers the bottom of the form, and scrollIntoView ignores it. The form keeps the bar's
      height free at the bottom of its scroll box (plus 16 px: the form's own 8 px padding below the bar, and a gap of 8 px),
      so the chosen meter (from the map, or an edit) stops above the bar, never under it. */
@@ -475,6 +477,7 @@ async function mrSave() {
   try {
     let e, photo;
     if (f.editId) {
+      if (mrHeldIds().has(f.editId)) { toast(MR_HELD_SAY); return; }       // the form stays open with its values
       e = await mrGet(f.editId);
       if (!e || e.status !== 'new') { toast('This read was exported, so it cannot change.'); mrCloseForm(); return; }
       Object.assign(e, fields, {other: !!fields.other, editedAt: Date.now()});
@@ -486,6 +489,7 @@ async function mrSave() {
     }
     await mrSaveEntry(e, photo);
     mrCloseForm();
+    mrSendSay('', '');                           // the last Send's status line is about other reads now
     toast((f.editId ? 'Read updated: ' : 'Read saved: ') + e.meter + (!f.editId && e.lat == null ? '. No GPS fix.' : '.'));
     MR.persisted = await mrPersist(true);
     mrAfterChange();
@@ -692,11 +696,11 @@ function mrOpenList() {
 }
 function mrCloseList() { $('mrList').hidden = true; mrSendSay('', ''); }
 async function mrRenderList() {
-  const body = $('mrListBody'), xb = $('mrExportBtn');
+  const body = $('mrListBody');
   let all;
   try { all = await mrAll(); } catch (e) {
     body.innerHTML = '<p class="mr-note">The reads cannot be opened. Storage is blocked or full on this device, or it holds data from a newer app version. Restart the app.</p>';
-    xb.disabled = true;
+    mrPaintSend(0);                              // off, in the app's or the browser's words
     return;
   }
   MR.persisted = await mrPersist(false);
@@ -758,7 +762,11 @@ function mrRow(e, isNew) {
     row.appendChild(b);
     return b;
   };
-  if (isNew) {
+  if (isNew && mrHeldIds().has(e.id)) {          // in a held part: locked until the reader answers on the sheet
+    const h = document.createElement('div');
+    h.className = 'mr-held'; h.textContent = 'Tap Send to finish the last email.';
+    rs.appendChild(h);
+  } else if (isNew) {
     btn('Edit', () => mrOpenForm({editId: e.id}), 'mr-edit');
     armButton(btn('Delete', () => mrDeleteTap(e.id), 'mr-del'), 'mrDel:' + e.id, 'Delete', 'Tap again');
   } else {
@@ -767,12 +775,13 @@ function mrRow(e, isNew) {
   return row;
 }
 async function mrDeleteTap(id) {
+  if (mrHeldIds().has(id)) { toast(MR_HELD_SAY); return; }
   if (!armTap('mrDel:' + id, CFG.skipConfirmMs)) return;
-  try { await mrDelete(id); toast('Read deleted.'); } catch (x) { toast('Could not delete. Storage is blocked.'); }
+  try { await mrDelete(id); mrSendSay('', ''); toast('Read deleted.'); } catch (x) { toast('Could not delete. Storage is blocked.'); }
   mrAfterChange();
 }
 async function mrMarkNew(id) {
-  try { await mrSetStatus([id], 'new'); toast('Marked new. It goes out with the next export.'); } catch (x) { toast('Could not change it. Storage is blocked.'); }
+  try { await mrSetStatus([id], 'new'); mrSendSay('', ''); toast('Marked new. It goes out with the next export.'); } catch (x) { toast('Could not change it. Storage is blocked.'); }
   mrAfterChange();
 }
 async function mrClearTap() {
@@ -819,6 +828,7 @@ async function mrOpenExport() {
   mrRenderExport();
 }
 function mrCloseExport() {
+  if (mrInApp()) MRS.held = MRX.parts.filter(mrHeldState);    // an open question on the sheet stays held after it closes
   MRX.seq++;
   $('mrExport').hidden = true;
   MRX.parts = []; MRX.ready = false; MRX.error = '';
@@ -848,7 +858,8 @@ async function mrBuildParts(entries) {
     if ((!app && files.length > MR_CFG.maxFilesPerShare) || bytes > MR_CFG.maxBytesPerPart) throw new Error('part ' + (i + 1) + ' is too large');
     const photos = photoList.length, tail = n > 1 ? ' Part ' + (i + 1) + ' of ' + n + '.' : '';
     return {ids: g.map(e => e.id), entries: g, names, csv, files, photoList, bytes, photos, reads: g.length, csvName: nm.csv,
-      subject: nm.subject, tail, text: mrPartText(g.length, photos, tail), state: 'ready', err: '', note: '', back: 0};
+      subject: nm.subject, tail, label: n > 1 ? 'Part ' + (i + 1) + ' of ' + n + ': ' : '', text: mrPartText(g.length, photos, tail),
+      state: 'ready', err: '', errKind: '', note: '', back: 0};
   });
 }
 /* The email body: what the part holds. */
@@ -870,7 +881,7 @@ function mrRenderExport() {
     const box = document.createElement('div');
     box.className = 'mr-part'; box.id = 'mrPart' + i;
     const head = document.createElement('b');
-    head.textContent = (n > 1 ? 'Part ' + (i + 1) + ' of ' + n + ': ' : '') + pt.reads + (pt.reads === 1 ? ' read, ' : ' reads, ') +
+    head.textContent = pt.label + pt.reads + (pt.reads === 1 ? ' read, ' : ' reads, ') +     // a held part shown alone keeps its "Part 1 of 2"
       pt.photos + (pt.photos === 1 ? ' photo, ' : ' photos, ') + mrSizeText(pt.bytes);     // never "0.0 MB" (ruling S6)
     box.appendChild(head);
     const st = document.createElement('div');
@@ -929,7 +940,7 @@ function mrRenderExport() {
 async function mrEmailTap(i) {
   const pt = MRX.parts[i];
   if (!pt || pt.state === 'sharing' || pt.state === 'done' || pt.state === 'markfail') return;
-  pt.state = 'sharing'; pt.err = ''; pt.note = '';
+  pt.state = 'sharing'; pt.err = ''; pt.errKind = ''; pt.note = '';
   mrRenderExport();
   let b, text = pt.text;
   try {
@@ -952,7 +963,7 @@ async function mrEmailTap(i) {
     }
     mrOk('exportAddText', b, pt.csvName, csv);
   } catch (e) {
-    pt.state = 'failed'; pt.err = 'The files could not be made: ' + ((e && e.message) || 'storage error') + '.';
+    pt.state = 'failed'; pt.errKind = 'files'; pt.err = 'The files could not be made: ' + ((e && e.message) || 'storage error') + '.';
     mrRenderExport();
     return;
   }
@@ -965,6 +976,7 @@ async function mrEmailTap(i) {
     return;
   }
   pt.state = 'failed';
+  pt.errKind = r === 'no gmail' ? 'nogmail' : 'other';     // errKind: what mrSendTap tells on the list's status line
   pt.err = r === 'no gmail' ? 'Gmail is not on this tablet, or it is turned off. Nothing was sent.' : 'Gmail did not open (' + r + '). Nothing was sent.';
   mrRenderExport();
 }
@@ -1010,16 +1022,27 @@ async function mrExported(pt, state) {
 
 /* ---------- Send: the list's one-tap path in the app ---------- */
 /* busy: a Send tap is running (the button is off, so a second tap cannot make a second email). say, cls: the status
-   line above the buttons. held: a part whose Gmail answer did not come in time ('unknown'), or whose reads could not be
-   marked after Gmail opened ('markfail'): until the reader settles it on the export sheet, Send shows that part again
-   and never makes a new email for its reads. */
-const MRS = {busy: false, say: '', cls: '', held: null};
+   line above the buttons. held: the parts whose Gmail answer did not come in time ('unknown'), or whose reads could not
+   be marked after Gmail opened ('markfail'), kept when the export sheet closes (mrCloseExport). Until the reader settles
+   them on the sheet, Send shows them again and makes no new email for their reads, and their reads are locked (no Edit,
+   no Delete): a held part is a copy made at the first tap, so the email it sends again must still match the stored reads. */
+const MRS = {busy: false, say: '', cls: '', held: []};
+const MR_HELD_SAY = 'Answer the Gmail question first. Tap Send.';
+const mrHeldState = pt => pt.state === 'unknown' || pt.state === 'markfail';
+/* The ids of the reads in a held part (an open Gmail question). */
+function mrHeldIds() {
+  const ids = new Set();
+  MRS.held.filter(mrHeldState).forEach(pt => pt.ids.forEach(id => ids.add(id)));
+  return ids;
+}
 function mrSendSay(cls, txt) { MRS.cls = cls; MRS.say = txt; }
 /* The list's button. App: "Send N reads", the To line under it (MR_CFG.sendTo: names, never an address), and the status
-   line. Browser: "Share N reads"; it opens the export sheet (the share menu, or Downloads). */
+   line. Browser: "Share N reads"; it opens the export sheet (the share menu, or Downloads). A "Gmail is open" line is
+   about the last email: it goes when there are new reads again. */
 function mrPaintSend(n) {
   const app = mrInApp(), b = $('mrExportBtn'), to = $('mrSendTo'), line = $('mrSendState');
   const reads = n + (n === 1 ? ' read' : ' reads');
+  if (MRS.cls === 'ok' && n && !MRS.busy) mrSendSay('', '');
   b.disabled = !n || MRS.busy;
   b.textContent = app ? (MRS.busy ? 'Opening Gmail...' : n ? 'Send ' + reads : 'Nothing new to send')
     : (n ? 'Share ' + reads : 'Nothing new to share');
@@ -1038,17 +1061,20 @@ function mrShowParts(parts) {
 }
 /* App: one tap. When every new read fits in one email, Gmail's compose screen opens at once, through the same mrEmailTap
    as the sheet's Open in Gmail (the app's own To line; marked exported only on the answer 'opened'). When the reads need
-   several emails, the parts sheet opens. Gmail did not open: the status line says so and the reads stay new. No answer in
-   time, or the marking failed after Gmail opened: the sheet shows the part, and it never offers a second email. */
+   several emails, the parts sheet opens. Gmail did not open: the status line says so and the reads stay new. Gmail opened
+   but a photo was gone from the app's store: the line and the sheet say which. No answer in time: the sheet asks whether
+   Gmail opened (Mark exported, or Open in Gmail again: the app answers timeout when its call to Gmail did not start in
+   time). The marking failed after Gmail opened: the sheet offers only Mark exported, never a second email. Either way
+   the part is held (MRS.held) until the reader settles it. */
 async function mrSendTap() {
   if (MRS.busy) return;
   MRS.busy = true;
   mrSendSay('', '');
   mrPaintSend(0);
   try {
-    const h = MRS.held;
-    if (h && (h.state === 'unknown' || h.state === 'markfail')) { mrShowParts([h]); return; }
-    MRS.held = null;
+    const held = MRS.held.filter(mrHeldState);
+    if (held.length) { mrShowParts(held); return; }
+    MRS.held = [];
     let nw;
     try { nw = (await mrAll()).filter(e => e.status === 'new'); } catch (e) { toast('The reads cannot be opened. Storage is blocked.'); return; }
     if (!nw.length) return;
@@ -1060,11 +1086,13 @@ async function mrSendTap() {
     MRX.parts = parts; MRX.ready = true; MRX.error = '';    // the sheet stays closed
     const pt = parts[0];
     await mrEmailTap(0);
-    if (pt.state === 'done') mrSendSay('ok', 'Gmail is open. Tap Send in Gmail.');
-    else if (pt.state === 'failed') {
-      mrSendSay('bad', 'Gmail did not open. Try again.' + (/^Gmail is not on/.test(pt.err) ? ' Gmail is not on this tablet, or it is turned off.'
-        : /^The files could not be made/.test(pt.err) ? ' ' + pt.err : ''));
-    } else { MRS.held = pt; mrShowParts([pt]); }
+    if (pt.state === 'done') {
+      mrSendSay(pt.note ? 'bad' : 'ok', 'Gmail is open. Tap Send in Gmail.' + (pt.note ? ' ' + pt.note : ''));
+      if (pt.note) mrShowParts([pt]);                   // a photo was left out: the sheet says it too
+    } else if (pt.state === 'failed') {
+      mrSendSay('bad', 'Gmail did not open. Try again.' +
+        ({nogmail: ' Gmail is not on this tablet, or it is turned off.', files: ' ' + pt.err}[pt.errKind] || ''));
+    } else { MRS.held = [pt]; mrShowParts([pt]); }
   } finally {
     MRS.busy = false;
     mrAfterChange();

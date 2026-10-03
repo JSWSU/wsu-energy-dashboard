@@ -1916,6 +1916,26 @@ def t_map_form_fit(br):
                         % (mode, label, i % len(st["meters"]) + 1, len(st["meters"]), o),
                         r["chosen"] == m["ref"] and r["rows"] == len(st["meters"]) + 1 and r["seen"] is True, json.dumps(r))
                 ctx.close()
+    # Part D review (Task 21 deferred minor): the form kept its scroll position between opens, so a form opened after a long
+    # stop could open scrolled down with the Stop field out of view. One page: the last meter of the longest stop, then the
+    # first meter of the next longest, then the card's Manual read.
+    ctx, pg = A.open_app(br, viewport=(1280, 800))
+    fit_from_stop_box(pg, s1, s1["meters"][-1])
+    pg.click("#mrCancel")
+    r = fit_from_stop_box(pg, s2, s2["meters"][0])
+    top = stop_field_seen(pg)
+    A.check("form from the map after a long stop (one page): the first meter of stop %d is in view above Cancel and Save, and so is "
+            "the Stop field (the form opens at the top)" % s2["o"], r["seen"] is True and top, json.dumps([r, top]))
+    pg.click("#mrCancel")
+    open_form(pg)
+    A.check("the card's Manual read after a long stop (one page): the Stop field is in view", stop_field_seen(pg))
+    ctx.close()
+
+
+def stop_field_seen(pg):
+    """True when the form's Stop field is in full view."""
+    return pg.evaluate("() => { const s = $('mrStop').getBoundingClientRect(), f = $('mrForm').getBoundingClientRect(); "
+                       "return s.top >= f.top && s.bottom <= f.bottom; }")
 
 
 @A.case
@@ -2019,6 +2039,14 @@ def t_send_app_one(br):
     pg.click("#mrStartList")
     pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
     A.check("app list: the status line clears when the list closes", send_view(pg)["line"] is None, json.dumps(send_view(pg)))
+    pg.click("#mrListBody .mr-renew")                          # Mark new on one read, and Send it again
+    A.pump_until(pg, lambda: send_view(pg)["btn"] == "Send 1 read", timeout=3)
+    pg.click("#mrExportBtn")
+    A.pump_until(pg, lambda: send_view(pg)["line"] == "Gmail is open. Tap Send in Gmail.", timeout=5)
+    pg.click("#mrListBody .mr-renew")
+    A.pump_until(pg, lambda: send_view(pg)["btn"] == "Send 1 read", timeout=3)
+    A.check("app list (Part D review): Mark new after a Send clears the Gmail is open line (it was about the last email)",
+            send_view(pg)["line"] is None and len(A.native(pg)["mails"]) == 2, json.dumps(send_view(pg)))
     ctx.close()
 
 
@@ -2051,6 +2079,36 @@ def t_send_app_outcomes(br):
     A.check("app Send, the files cannot be made: Gmail did not open. Try again. and why; the read stays new; Gmail was never asked",
             v["line"] == "Gmail did not open. Try again. The files could not be made: error: disk full." and v["btn"] == "Send 1 read"
             and entry(pg, "o2")["status"] == "new" and gmail_calls(pg) == 0, json.dumps(v))
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, [dict(id="o5", savedAt=A.T1, meter="M5", ref="200205", read="1", mult="1", photo=[160, 120]),
+              dict(id="o6", savedAt=A.T1 + 60000, meter="M6", ref="200206", read="6", mult="1", photo=[160, 120])])
+    pg.evaluate("() => { delete window.__native.st.photos.o5; window.__native.save(); }")      # the photo is gone from the store
+    open_list(pg)
+    pg.click("#mrExportBtn")
+    A.pump_until(pg, lambda: len(A.native(pg)["mails"]) == 1 and (send_view(pg)["line"] or "").startswith("Gmail is open"), timeout=5)
+    v = send_view(pg)
+    r = [v["line"], pg.evaluate("() => $('mrSendState').className"), v["sheet"], A.dom(pg, "#mrPart0") or ""]
+    note = "Not found on this tablet, so left out: 200205-20261001-1432.jpg. The read goes with no photo name."
+    A.check("app Send (Part D review, M1), a photo gone from the app's store: Gmail opens without it, and the status line says so and names the photo",
+            r[0] == "Gmail is open. Tap Send in Gmail. " + note and r[1] == "mr-sendst bad", json.dumps(r))
+    A.check("app Send, a photo left out: the export sheet shows that part with the same note", r[2] is True and note in r[3], json.dumps(r))
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"gmail": "error: boom"})
+    seed(pg, [dict(id="o7", savedAt=A.T1, meter="M7", ref="200207", read="1", mult="1")])
+    open_list(pg)
+    pg.click("#mrExportBtn")
+    A.pump_until(pg, lambda: (send_view(pg)["line"] or "").startswith("Gmail did not open"), timeout=5)
+    pg.click("#mrNew")
+    pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
+    pg.check("#mrMeters input[value='__other']")
+    pg.fill("#mrOther", "X-1")
+    pg.fill("#mrRead", "5")
+    pg.fill("#mrMult", "1")
+    save_form(pg)
+    A.pump_until(pg, lambda: send_view(pg)["btn"] == "Send 2 reads", timeout=3)
+    A.check("app list (Part D review): a read saved after a failed Send clears the old Gmail did not open line",
+            send_view(pg)["line"] is None and send_view(pg)["btn"] == "Send 2 reads", json.dumps(send_view(pg)))
     ctx.close()
 
 
@@ -2104,6 +2162,134 @@ def t_send_app_safety(br):
     A.check("app Send: Mark exported marks the read with no second email",
             A.pump_until(pg, lambda: entry(pg, "s3")["status"] == "exported", timeout=5) and len(A.native(pg)["mails"]) == 1)
     ctx.close()
+
+
+def row_view(pg, eid):
+    """The list row of a read: its buttons and its held line, or None when the list shows no such row."""
+    return pg.evaluate("""(i) => { const r = document.querySelector("#mrListBody .mr-row[data-id='" + i + "']");
+        return r ? {btns: [...r.querySelectorAll('button')].map(b => b.textContent), held: (r.querySelector('.mr-held') || {}).textContent || null} : null; }""", eid)
+
+
+def sheet_parts(pg):
+    return pg.evaluate("() => [...document.querySelectorAll('#mrExportBody .mr-part')].map(p => p.querySelector('b').textContent)")
+
+
+@A.case
+def t_send_app_held(br):
+    """Part D review (10/02/2026): a part held after Gmail's answer did not come in time ('unknown') or after a failed
+    marking ('markfail') is a copy made at the first tap. Its reads now stay locked until the reader answers on the
+    sheet: no Edit and no Delete, so Open in Gmail again always sends what is stored, and a read is never marked sent
+    with a value the email did not carry. A read saved after the hold waits for the next Send. A Send that needs several
+    emails holds its parts the same way when the reader closes the sheet."""
+    ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"gmail": "error: timeout"})
+    pg.evaluate("() => { CFG.skipConfirmMs = 1500; }")
+    seed(pg, [dict(id="h1", savedAt=A.T1, meter="M1", ref="200201", read="000111", mult="1")])
+    open_list(pg)
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=5000)
+    pg.click("#mrExportClose")
+    A.pump_until(pg, lambda: (row_view(pg, "h1") or {}).get("held"), timeout=3)
+    A.check("held part: its read shows no Edit and no Delete, and says to tap Send to finish the last email",
+            row_view(pg, "h1") == {"btns": [], "held": "Tap Send to finish the last email."}, json.dumps(row_view(pg, "h1")))
+    pg.evaluate("() => { mrOpenForm({editId: 'h1'}); }")
+    pg.wait_for_timeout(300)
+    r = [pg.evaluate("() => $('mrForm').hidden"), A.dom(pg, "#toast")]
+    A.check("held part: an Edit of its read is refused: Answer the Gmail question first. Tap Send.",
+            r == [True, "Answer the Gmail question first. Tap Send."], json.dumps(r))
+    pg.evaluate("async () => { await mrDeleteTap('h1'); await mrDeleteTap('h1'); }")
+    e = entry(pg, "h1")
+    A.check("held part: a Delete of its read is refused (two taps); the read stays as stored",
+            e is not None and [e["read"], e["status"]] == ["000111", "new"], json.dumps(e))
+    seed(pg, [dict(id="h2", savedAt=A.T1 + 60000, meter="M2", ref="200202", read="5", mult="1")])   # saved after the hold
+    pg.evaluate("() => mrAfterChange()")
+    A.pump_until(pg, lambda: row_view(pg, "h2") is not None, timeout=3)
+    A.check("held part: a read saved after the hold keeps Edit and Delete", (row_view(pg, "h2") or {}).get("btns") == ["Edit", "Delete"],
+            json.dumps(row_view(pg, "h2")))
+    pg.evaluate("() => { window.__native.cfg.gmail = 'opened'; }")
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=5000)
+    A.check("held part: Send shows the held part again (1 read), not a new email for both reads",
+            part_view(pg)[1] == ["Mark exported", "Open in Gmail again"] and len(sheet_parts(pg)) == 1 and sheet_parts(pg)[0].startswith("1 read,"),
+            json.dumps([part_view(pg), sheet_parts(pg)]))
+    pg.click("#mrPart0 button:has-text('Open in Gmail again')")
+    A.pump_until(pg, lambda: entry(pg, "h1")["status"] == "exported", timeout=5)
+    mails = A.native(pg)["mails"]
+    rows = mails[0]["files"][0]["text"].split("\r\n") if mails else []
+    A.check("held part: Open in Gmail again emails the held read as stored (000111) and marks it sent; the later read stays new",
+            len(mails) == 1 and len(rows) == 3 and rows[1].split(",")[6] == "000111" and entry(pg, "h1")["read"] == "000111"
+            and entry(pg, "h2")["status"] == "new", json.dumps(rows))
+    pg.click("#mrExportClose")
+    A.pump_until(pg, lambda: send_view(pg)["btn"] == "Send 1 read", timeout=3)
+    A.check("held part settled: its row shows Mark new (no held line); the later read keeps Edit and Delete",
+            row_view(pg, "h1") == {"btns": ["Mark new"], "held": None} and (row_view(pg, "h2") or {}).get("btns") == ["Edit", "Delete"],
+            json.dumps([row_view(pg, "h1"), row_view(pg, "h2")]))
+    pg.click("#mrExportBtn")
+    A.pump_until(pg, lambda: entry(pg, "h2")["status"] == "exported", timeout=5)
+    mails = A.native(pg)["mails"]
+    A.check("held part settled: the next Send emails the read saved after the hold, in one tap",
+            len(mails) == 2 and ",M2," in mails[1]["files"][0]["text"], json.dumps([m["subject"] for m in mails]))
+    ctx.close()
+    big = [dict(id="p%d" % k, savedAt=A.T1 + k * 60000, meter="M%d" % k, ref=str(200100 + k), read=str(k), mult="1",
+                photo=[160, 120], photoBytes=8000000) for k in range(3)]
+    ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"gmail": "error: timeout"})
+    seed(pg, big)
+    open_list(pg)
+    pg.click("#mrExportBtn")                                  # the reads need 2 emails: the parts sheet
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart1 button", timeout=10000)
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: "Did Gmail open" in (A.dom(pg, "#mrPartState0") or ""), timeout=5)
+    pg.click("#mrExportClose")
+    A.pump_until(pg, lambda: (row_view(pg, "p0") or {}).get("held"), timeout=3)
+    b = [(row_view(pg, i) or {}).get("btns") for i in ("p0", "p1", "p2")]
+    A.check("several emails, no answer from Gmail for part 1, sheet closed: the reads of part 1 are locked; part 2's read is not",
+            b == [[], [], ["Edit", "Delete"]], json.dumps(b))
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=5000)
+    A.check("several emails: Send shows the held part 1 again (Part 1 of 2, Mark exported, Open in Gmail again), never a fresh part 1; Gmail asked once",
+            part_view(pg)[1] == ["Mark exported", "Open in Gmail again"] and len(sheet_parts(pg)) == 1
+            and sheet_parts(pg)[0].startswith("Part 1 of 2: 2 reads") and gmail_calls(pg) == 1, json.dumps([part_view(pg), sheet_parts(pg), gmail_calls(pg)]))
+    pg.click("#mrPart0 button:has-text('Mark exported')")
+    A.pump_until(pg, lambda: entry(pg, "p1")["status"] == "exported", timeout=5)
+    pg.click("#mrExportClose")
+    A.pump_until(pg, lambda: send_view(pg)["btn"] == "Send 1 read", timeout=3)
+    st = {e["id"]: e["status"] for e in all_entries(pg)}
+    A.check("several emails: Mark exported settles part 1; part 2's read is still new and Send offers it",
+            st == {"p0": "exported", "p1": "exported", "p2": "new"} and gmail_calls(pg) == 1, json.dumps(st))
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, big)
+    open_list(pg)
+    pg.evaluate(FAIL_MARK)
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart1 button", timeout=10000)
+    pg.click("#mrPart0 button")
+    A.pump_until(pg, lambda: "Do not open Gmail again" in (A.dom(pg, "#mrPartState0") or ""), timeout=5)
+    pg.click("#mrExportClose")
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=5000)
+    A.check("several emails, Gmail opened for part 1 but the marking failed, sheet closed: Send shows that part with Mark exported only; one email",
+            part_view(pg)[1] == ["Mark exported"] and len(sheet_parts(pg)) == 1 and len(A.native(pg)["mails"]) == 1,
+            json.dumps([part_view(pg), sheet_parts(pg), len(A.native(pg)["mails"])]))
+    pg.evaluate(REAL_MARK)
+    pg.click("#mrPart0 button:has-text('Mark exported')")
+    A.check("several emails: Mark exported marks part 1's reads with no second email",
+            A.pump_until(pg, lambda: entry(pg, "p1")["status"] == "exported", timeout=5) and len(A.native(pg)["mails"]) == 1
+            and entry(pg, "p2")["status"] == "new")
+    ctx.close()
+
+
+@A.case
+def t_send_blocked(br):
+    """Part D review (L7): when the store cannot be read, the list's button is painted like any other time: off, and in
+    the words of the app (Send) or the browser (Share)."""
+    for mode, kw, want in (("browser", {"init": BLOCK_IDB}, "Nothing new to share"),
+                           ("app", {"native_cfg": {"storeError": "error: disk full"}}, "Nothing new to send")):
+        ctx, pg = A.open_app(br, mode=mode, start=False, **kw)
+        pg.evaluate("() => mrOpenList()")
+        A.pump_until(pg, lambda: "cannot be opened" in (A.dom(pg, "#mrListBody") or ""), timeout=5)
+        v = send_view(pg)
+        A.check(mode + " list, storage blocked: the button reads " + want + " and is off", v["btn"] == want and v["off"] is True, json.dumps(v))
+        ctx.close()
 
 
 @A.case
