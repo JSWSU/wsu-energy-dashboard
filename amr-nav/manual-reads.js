@@ -2,14 +2,15 @@
    A reader saves a meter's face read, multiplier, notes and one photo, with the date, time and GPS, with no signal.
    The reads stay on this device and never go to the web site: in the AMR Route Guide app (window.AMRNative, bridge
    version 2 or later) in the app's own files; in a browser in IndexedDB. Export makes one CSV plus the photos per
-   part: the app opens Gmail with the addresses filled in by the app itself; a browser shares the files (the reader
-   picks Gmail and types the addresses) or saves them to Downloads. The reader taps Send in Gmail; nothing here sends.
+   part: the app opens Gmail with the addresses filled in by the app itself (the list's Send button: one tap when the
+   reads fit in one email); a browser shares the files (the reader picks Gmail and types the addresses) or saves them
+   to Downloads. The reader taps Send in Gmail; nothing here sends.
    This file loads before the main script. Its functions use these names from the main script, at call time only:
    S, CFG, $, toast, armTap, armButton, disarm, hav, currentTargetStop, closePanel. Every name here starts with mr or MR. */
 'use strict';
 /* This file's version: always the same as APP_VERSION in index.html (bump both together; test_app_manifest.py checks).
    The page runs manual reads only when they match, so a page and an older or newer copy of this file never mix. */
-const MR_JS_VERSION = '2026.10.02-2';
+const MR_JS_VERSION = '2026.10.02-3';
 const MR_CFG = {
   db: 'amrNav-manualReads',     // IndexedDB name (browser); jswsu.github.io is shared with other pages, so the name says whose it is
   dbVersion: 1,                 // a schema change raises this by one and adds one step in mrDb(); an old step never changes
@@ -24,6 +25,7 @@ const MR_CFG = {
   draftDelayMs: 500,            // ms after the last keystroke, the open form is saved as a draft
   pendingShareMs: 3000,         // ms after the reader comes back, a browser share that has not finished offers Mark exported
   clearAfterMs: 7 * 86400000,   // Clear removes only reads exported this long ago (K8): "exported" is not "sent"
+  sendTo: 'To John Slagboom and Energy',   // the line under Send in the app: names only; the addresses live in the app's code
 };
 const MR_COLS = ['Date', 'Time', 'Meter ID', 'Route ref', 'Building number', 'Site name', 'Face read', 'Multiplier', 'Notes',
   'Photo file name', 'GPS latitude', 'GPS longitude', 'GPS accuracy (ft)', 'Stop number'];
@@ -561,7 +563,7 @@ function mrInit() {
   $('mrCam').onchange = () => mrPhotoPicked($('mrCam').files && $('mrCam').files[0]);
   $('mrListClose').onclick = mrCloseList;
   $('mrNew').onclick = () => mrOpenForm({});
-  $('mrExportBtn').onclick = mrOpenExport;
+  $('mrExportBtn').onclick = () => (mrInApp() ? mrSendTap() : mrOpenExport());   // app: Send (one tap); browser: Share
   $('mrExportClose').onclick = mrCloseExport;
   document.addEventListener('visibilitychange', mrVisibility);
   mrRefreshCounts();
@@ -688,7 +690,7 @@ function mrOpenList() {
   l.hidden = false;
   mrRenderList();
 }
-function mrCloseList() { $('mrList').hidden = true; }
+function mrCloseList() { $('mrList').hidden = true; mrSendSay('', ''); }
 async function mrRenderList() {
   const body = $('mrListBody'), xb = $('mrExportBtn');
   let all;
@@ -707,7 +709,8 @@ async function mrRenderList() {
     body.appendChild(el);
     return el;
   };
-  add('p', 'sum', nw.length + ' new, ' + ex.length + ' exported. Stored on this device only.', 'mrSum');
+  const app = mrInApp();                         // in the app, exported means Gmail opened: the list says sent to Gmail
+  add('p', 'sum', nw.length + ' new, ' + ex.length + (app ? ' sent to Gmail' : ' exported') + '. Stored on this device only.', 'mrSum');
   add('p', 'mr-note', mrBridge() ? 'Kept in the app on this tablet until you clear them. Uninstalling the app deletes them.'
     : MR.persisted ? 'Protected: the browser keeps these reads when storage runs low.'
     : 'Not protected: the browser can delete these reads when storage runs low or when site data is cleared. Export them soon.', 'mrKeep');
@@ -715,7 +718,7 @@ async function mrRenderList() {
   if (!nw.length) add('p', 'mr-note', 'No new reads.');
   nw.slice().reverse().forEach(e => body.appendChild(mrRow(e, true)));
   if (ex.length) {
-    add('div', 'sec', 'Exported');
+    add('div', 'sec', app ? 'Sent to Gmail' : 'Exported');
     ex.slice().reverse().forEach(e => body.appendChild(mrRow(e, false)));
     /* "Exported" means Gmail opened (or the share went to an app), not that the mail went out: Clear waits 7 days (K8). */
     const cut = Date.now() - MR_CFG.clearAfterMs, old = ex.filter(e => e.exportedAt > 0 && e.exportedAt < cut).length;
@@ -731,8 +734,7 @@ async function mrRenderList() {
       body.appendChild(wrap);
     }
   }
-  xb.disabled = !nw.length;
-  xb.textContent = nw.length ? 'Export ' + nw.length + ' new' : 'Nothing new to export';
+  mrPaintSend(nw.length);
 }
 /* One read in the list: meter, read x multiplier, then date, time, stop, photo and GPS. An exported read shows its CSV file
    name on a line of its own, kept on one line and cut with an ellipsis when it is too long (ruling S4). */
@@ -1006,12 +1008,75 @@ async function mrExported(pt, state) {
   mrAfterChange();
 }
 
+/* ---------- Send: the list's one-tap path in the app ---------- */
+/* busy: a Send tap is running (the button is off, so a second tap cannot make a second email). say, cls: the status
+   line above the buttons. held: a part whose Gmail answer did not come in time ('unknown'), or whose reads could not be
+   marked after Gmail opened ('markfail'): until the reader settles it on the export sheet, Send shows that part again
+   and never makes a new email for its reads. */
+const MRS = {busy: false, say: '', cls: '', held: null};
+function mrSendSay(cls, txt) { MRS.cls = cls; MRS.say = txt; }
+/* The list's button. App: "Send N reads", the To line under it (MR_CFG.sendTo: names, never an address), and the status
+   line. Browser: "Share N reads"; it opens the export sheet (the share menu, or Downloads). */
+function mrPaintSend(n) {
+  const app = mrInApp(), b = $('mrExportBtn'), to = $('mrSendTo'), line = $('mrSendState');
+  const reads = n + (n === 1 ? ' read' : ' reads');
+  b.disabled = !n || MRS.busy;
+  b.textContent = app ? (MRS.busy ? 'Opening Gmail...' : n ? 'Send ' + reads : 'Nothing new to send')
+    : (n ? 'Share ' + reads : 'Nothing new to share');
+  to.hidden = !app;
+  to.textContent = app ? MR_CFG.sendTo : '';
+  line.hidden = !(app && MRS.say);
+  line.className = 'mr-sendst' + (MRS.cls ? ' ' + MRS.cls : '');
+  line.textContent = app ? MRS.say : '';
+}
+/* Show parts on the export sheet (one Open in Gmail button for each part). */
+function mrShowParts(parts) {
+  MRX.seq++;                                            // an Export build that is still running is dropped
+  MRX.parts = parts; MRX.ready = true; MRX.error = '';
+  $('mrExport').hidden = false;
+  mrRenderExport();
+}
+/* App: one tap. When every new read fits in one email, Gmail's compose screen opens at once, through the same mrEmailTap
+   as the sheet's Open in Gmail (the app's own To line; marked exported only on the answer 'opened'). When the reads need
+   several emails, the parts sheet opens. Gmail did not open: the status line says so and the reads stay new. No answer in
+   time, or the marking failed after Gmail opened: the sheet shows the part, and it never offers a second email. */
+async function mrSendTap() {
+  if (MRS.busy) return;
+  MRS.busy = true;
+  mrSendSay('', '');
+  mrPaintSend(0);
+  try {
+    const h = MRS.held;
+    if (h && (h.state === 'unknown' || h.state === 'markfail')) { mrShowParts([h]); return; }
+    MRS.held = null;
+    let nw;
+    try { nw = (await mrAll()).filter(e => e.status === 'new'); } catch (e) { toast('The reads cannot be opened. Storage is blocked.'); return; }
+    if (!nw.length) return;
+    let parts;
+    try { parts = await mrBuildParts(nw); }
+    catch (e) { mrSendSay('bad', 'Gmail did not open. Try again. The files could not be made: ' + ((e && e.message) || 'storage error') + '.'); return; }
+    if (parts.length > 1) { mrShowParts(parts); return; }
+    MRX.seq++;
+    MRX.parts = parts; MRX.ready = true; MRX.error = '';    // the sheet stays closed
+    const pt = parts[0];
+    await mrEmailTap(0);
+    if (pt.state === 'done') mrSendSay('ok', 'Gmail is open. Tap Send in Gmail.');
+    else if (pt.state === 'failed') {
+      mrSendSay('bad', 'Gmail did not open. Try again.' + (/^Gmail is not on/.test(pt.err) ? ' Gmail is not on this tablet, or it is turned off.'
+        : /^The files could not be made/.test(pt.err) ? ' ' + pt.err : ''));
+    } else { MRS.held = pt; mrShowParts([pt]); }
+  } finally {
+    MRS.busy = false;
+    mrAfterChange();
+  }
+}
+
 /* ---------- help ---------- */
 /* The help list items about manual reads (the stop list, How to use), in the app's or the browser's words. */
 function mrHelpLines() {
   if (MR.skew) return '';                               // a page of another version: nothing about manual reads this time
   if (MR.off) return '<li>Manual reads need a newer AMR Route Guide app on this tablet.</li>';
-  return '<li>Manual read: tap Manual read on the stop card. Pick the meter, type the face read as the dial shows and the multiplier, and add a photo if needed. The reads stay on this tablet.</li>' +
-    (mrBridge() ? '<li>To email them: Manual reads (in this list), Export, then Open in Gmail. Gmail opens with the addresses filled in. Check the email, then tap Send.</li>'
-      : '<li>To email them: Manual reads (in this list), Export, then Share. Pick Gmail and type the addresses. One email holds up to 9 photos.</li>');
+  return '<li>Manual read: tap Manual read on the stop card, or zoom in and tap a meter pin on the map. Pick the meter, type the face read as the dial shows and the multiplier, and add a photo if needed. The reads stay on this tablet.</li>' +
+    (mrBridge() ? '<li>To email them: open Manual reads (in this list) and tap Send. Gmail opens with the addresses, the CSV and the photos. Check the email, then tap Send in Gmail. Reads that need more than one email show one Open in Gmail button for each part.</li>'
+      : '<li>To email them: open Manual reads (in this list) and tap Share, then Share on each part. Pick Gmail and type the addresses. One email holds up to 9 photos.</li>');
 }

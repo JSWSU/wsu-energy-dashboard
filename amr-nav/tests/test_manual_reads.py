@@ -901,10 +901,10 @@ def t_list(br):
     r = pg.evaluate("""() => ({over: $('mrList').classList.contains('over'), sum: $('mrSum').textContent,
         rows: [...document.querySelectorAll('#mrListBody .mr-row')].map(r => [r.dataset.id, [...r.querySelectorAll('button')].map(b => b.textContent)]),
         exp: $('mrExportBtn').textContent, clear: $('mrClear') && $('mrClear').textContent})""")
-    A.check("list: over the start screen; newest first; new reads have Edit and Delete, exported ones Mark new; Export and Clear",
+    A.check("list: over the start screen; newest first; new reads have Edit and Delete, exported ones Mark new; Share and Clear",
             r == {"over": True, "sum": "2 new, 1 exported. Stored on this device only.",
                   "rows": [["b", ["Edit", "Delete"]], ["a", ["Edit", "Delete"]], ["c", ["Mark new"]]],
-                  "exp": "Export 2 new", "clear": "Clear 1 exported over 7 days ago"}, json.dumps(r))
+                  "exp": "Share 2 reads", "clear": "Clear 1 exported over 7 days ago"}, json.dumps(r))
     row_a = pg.evaluate("() => document.querySelector('.mr-row[data-id=\"a\"] .rs').textContent")
     A.check("list: a row shows meter, read x multiplier, date, time, stop and photo",
             row_a.startswith("0353_DW_001: 004512 x 10") and "10/01/2026 14:32" in row_a and "stop 2" in row_a and "photo" in row_a, row_a)
@@ -951,9 +951,10 @@ def t_list(br):
     pg.click("#mrClear")
     cleared = A.pump_until(pg, lambda: len(all_entries(pg)) == 0, timeout=3)
     A.check("clear: two taps clear the reads exported over 7 days ago", t1 == "Tap again to clear 2" and cleared, t1)
-    A.pump_until(pg, lambda: A.dom(pg, "#mrExportBtn") == "Nothing new to export", timeout=3)
-    A.check("list: with nothing new, Export says so and is off; the start screen button is gone",
-            pg.evaluate("() => $('mrExportBtn').disabled") and A.dom(pg, "#mrStartList") is None)
+    A.pump_until(pg, lambda: A.dom(pg, "#mrExportBtn") == "Nothing new to share", timeout=3)
+    A.check("list: with nothing new, the Share button says so and is off; the start screen button is gone",
+            A.dom(pg, "#mrExportBtn") == "Nothing new to share" and pg.evaluate("() => $('mrExportBtn').disabled")
+            and A.dom(pg, "#mrStartList") is None)
     pg.click("#mrListClose")
     seed(pg, [dict(id="d", savedAt=A.T1, meter="X", read="1", mult="1", other=True)])
     pg.click("#startBtns button")
@@ -1115,12 +1116,22 @@ def shares(pg):
     return pg.evaluate("() => window.__shares")
 
 
-def open_export(pg):
-    """From the start screen: Manual reads, then Export. Waits until the parts are made."""
+def open_list(pg):
+    """From the start screen: the Manual reads list, with its button ready (Send N reads in the app, Share N reads in a browser)."""
     pg.click("#mrStartList")
     pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
-    pg.wait_for_function("() => /^Export \\d+ new$/.test($('mrExportBtn').textContent)", timeout=5000)
-    pg.click("#mrExportBtn")
+    pg.wait_for_function("() => /^(Send|Share) \\d+ reads?$/.test($('mrExportBtn').textContent)", timeout=5000)
+
+
+def open_export(pg):
+    """From the start screen: Manual reads, then the export sheet. Browser: the list's Share button. App: the parts sheet
+    itself (mrOpenExport), the screen Send opens when the reads need several emails; one-tap Send has its own cases
+    (t_send_*). Waits until the parts are made."""
+    open_list(pg)
+    if pg.evaluate("() => mrInApp()"):
+        pg.evaluate("() => { mrOpenExport(); }")
+    else:
+        pg.click("#mrExportBtn")
     pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=10000)
 
 
@@ -1175,7 +1186,11 @@ def t_export_app_parts(br):
     ctx, pg = A.open_app(br, mode="app", start=False)
     seed(pg, [dict(id="p%d" % k, savedAt=A.T1 + k * 60000, meter="M%d" % k, ref=str(200100 + k), read=str(k), mult="1",
                    photo=[160, 120], photoBytes=8000000) for k in range(3)])
-    open_export(pg)
+    open_list(pg)
+    pg.click("#mrExportBtn")                                  # Send 3 reads: they need 2 emails, so the parts sheet opens
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=10000)
+    A.check("app Send, reads that need 2 emails: one tap opens the parts sheet and opens no Gmail by itself; no status line",
+            A.native(pg)["mails"] == [] and pg.evaluate("() => $('mrSendState').hidden"), json.dumps(A.native(pg)["mails"]))
     heads = pg.evaluate("() => [...document.querySelectorAll('#mrExportBody .mr-part')].map(p => p.querySelector('b').textContent)")
     A.check("app parts: 3 photos of 8 MB make 2 emails (each part at most 18 MB of files)",
             len(heads) == 2 and heads[0].startswith("Part 1 of 2: 2 reads, 2 photos") and heads[1].startswith("Part 2 of 2: 1 read, 1 photo"), json.dumps(heads))
@@ -1470,7 +1485,7 @@ def t_export_offline(br):
     pg.click("#fList")
     pg.click("#bManual")
     pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
-    pg.wait_for_function("() => /^Export \\d+ new$/.test($('mrExportBtn').textContent)", timeout=5000)
+    pg.wait_for_function("() => /^Share \\d+ reads?$/.test($('mrExportBtn').textContent)", timeout=5000)
     pg.click("#mrExportBtn")
     pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=10000)
     pg.click("#mrPart0 button")
@@ -1484,11 +1499,12 @@ def t_export_offline(br):
 
 @A.case
 def t_help_layers(br):
-    for mode, want in (("app", "Open in Gmail"), ("browser", "Pick Gmail and type the addresses")):
+    for mode, want in (("app", "tap Send. Gmail opens with the addresses"), ("browser", "Pick Gmail and type the addresses")):
         ctx, pg = A.open_app(br, mode=mode)
         pg.click("#fList")
         help_txt = pg.evaluate("() => document.querySelector('#pBody .help').textContent")
-        A.check(mode + " help: the stop list explains Manual read and how to email the reads", "Manual read" in help_txt and want in help_txt, help_txt[-300:])
+        A.check(mode + " help: the stop list explains Manual read (the card or a meter pin) and how to email the reads",
+                "Manual read" in help_txt and "meter pin" in help_txt and want in help_txt, help_txt[-400:])
         z = pg.evaluate("() => ['toast', 'mrExport', 'mrForm', 'start'].map(id => +getComputedStyle($(id)).zIndex)")
         A.check(mode + ": the toast shows above the manual reads screens and the start screen", z[0] > max(z[1:]), json.dumps(z))
         ctx.close()
@@ -1501,7 +1517,7 @@ def t_phone_list_export(br):
     pg.click("#mrStartList")
     pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
     a = pg.evaluate("() => [document.documentElement.scrollWidth > innerWidth, Math.round($('mrList').getBoundingClientRect().width)]")
-    pg.wait_for_function("() => /^Export \\d+ new$/.test($('mrExportBtn').textContent)", timeout=5000)
+    pg.wait_for_function("() => /^Share \\d+ reads?$/.test($('mrExportBtn').textContent)", timeout=5000)
     pg.click("#mrExportBtn")
     pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0", timeout=10000)
     b = pg.evaluate("() => [document.documentElement.scrollWidth > innerWidth, Math.round(document.querySelector('#mrExport .mr-sheet').getBoundingClientRect().right)]")
@@ -1797,6 +1813,154 @@ def t_map_box_phone(br):
     r = box_vs_side(pg)
     A.check("tablet upright (800 x 1280): the stop box keeps its full width (381 px) and is left of the side buttons",
             r["width"] == 381 and r["box"][1] <= r["side"], json.dumps(r))
+    ctx.close()
+
+
+# ---------- one-tap Send in the app; Share in a browser (Task 22, owner features of 10/02/2026) ----------
+V1_CALLS = {"bridgeVersion", "info", "ready", "setDriveActive", "speak", "stopSpeech", "ttsInfo", "openExternal"}
+
+
+def send_view(pg):
+    return pg.evaluate("""() => ({btn: $('mrExportBtn').textContent, off: $('mrExportBtn').disabled, line: $('mrSendState').hidden ? null : $('mrSendState').textContent,
+        sheet: !$('mrExport').hidden})""")
+
+
+def gmail_calls(pg):
+    return sum(1 for c in A.native(pg)["calls"] if c[0] == "exportOpenGmail")
+
+
+@A.case
+def t_send_app_one(br):
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    m, site = two_reads(pg)
+    open_list(pg)
+    r = pg.evaluate("""() => { const b = $('mrExportBtn').getBoundingClientRect(), t = $('mrSendTo').getBoundingClientRect();
+        return {btn: $('mrExportBtn').textContent, to: $('mrSendTo').textContent, under: !$('mrSendTo').hidden && t.top >= b.bottom - 1,
+                line: $('mrSendState').hidden}; }""")
+    A.check("app list: the button reads Send 2 reads, with To John Slagboom and Energy under it; no status line yet",
+            r == {"btn": "Send 2 reads", "to": "To John Slagboom and Energy", "under": True, "line": True}, json.dumps(r))
+    pg.click("#mrExportBtn")
+    A.pump_until(pg, lambda: len(A.native(pg)["mails"]) == 1 and send_view(pg)["line"] == "Gmail is open. Tap Send in Gmail.", timeout=5)
+    mail = A.native(pg)["mails"][0]
+    A.check("app Send: one tap opens Gmail at once with the CSV (the latest read's time, 14:35) and the photo; the page passes no address; no sheet",
+            [f["name"] for f in mail["files"]] == ["AMR-manual-reads-20261001-1435.csv", m["ref"] + "-20261001-1432.jpg"] and mail["args"] == 3
+            and mail["subject"] == "AMR manual reads 10/01/2026 14:35" and mail["body"] == "2 manual reads, 1 photo." and not send_view(pg)["sheet"],
+            json.dumps([[f["name"] for f in mail["files"]], mail["subject"], send_view(pg)]))
+    st = pg.evaluate("async () => (await mrAll()).map(e => [e.status, e.exportName])")
+    A.check("app Send: once Gmail opened, the reads are marked exported with the CSV name (as before)",
+            st == [["exported", "AMR-manual-reads-20261001-1435.csv"]] * 2, json.dumps(st))
+    A.pump_until(pg, lambda: send_view(pg)["btn"] == "Nothing new to send", timeout=3)
+    r = pg.evaluate("""() => ({line: [$('mrSendState').textContent, $('mrSendState').className], sum: $('mrSum').textContent,
+        secs: [...document.querySelectorAll('#mrListBody .sec')].map(s => [s.textContent, getComputedStyle(s).textTransform]),
+        btn: [$('mrExportBtn').textContent, $('mrExportBtn').disabled], to: $('mrSendTo').hidden})""")
+    A.check("app list after Send: the line says Gmail is open, tap Send in Gmail; the reads are under SENT TO GMAIL; nothing new to send",
+            r == {"line": ["Gmail is open. Tap Send in Gmail.", "mr-sendst ok"], "sum": "0 new, 2 sent to Gmail. Stored on this device only.",
+                  "secs": [["New", "uppercase"], ["Sent to Gmail", "uppercase"]], "btn": ["Nothing new to send", True], "to": False}, json.dumps(r))
+    used = sorted({c[0] for c in A.native(pg)["calls"]} - set(pg.evaluate("() => MR_CALLS")) - V1_CALLS)
+    A.check("app Send: it uses only the app calls the page already checks for (MR_CALLS); no new app call", used == [], json.dumps(used))
+    pg.click("#mrListClose")
+    pg.click("#mrStartList")
+    pg.wait_for_selector("#mrList:not([hidden])", timeout=5000)
+    A.check("app list: the status line clears when the list closes", send_view(pg)["line"] is None, json.dumps(send_view(pg)))
+    ctx.close()
+
+
+@A.case
+def t_send_app_outcomes(br):
+    for gmail, why in (("error: boom", ""), ("no gmail", " Gmail is not on this tablet, or it is turned off.")):
+        ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"gmail": gmail})
+        seed(pg, [dict(id="o1", savedAt=A.T1, meter="M1", ref="200201", read="1", mult="1", photo=[160, 120])])
+        open_list(pg)
+        pg.click("#mrExportBtn")
+        A.pump_until(pg, lambda: (send_view(pg)["line"] or "").startswith("Gmail did not open"), timeout=5)
+        v = send_view(pg)
+        A.check("app Send, " + gmail + ": the line says Gmail did not open. Try again.; the read stays new; Send is ready again; no sheet, no email",
+                v == {"btn": "Send 1 read", "off": False, "line": "Gmail did not open. Try again." + why, "sheet": False}
+                and entry(pg, "o1")["status"] == "new" and A.native(pg)["mails"] == [], json.dumps(v))
+        pg.evaluate("() => { window.__native.cfg.gmail = 'opened'; }")
+        pg.click("#mrExportBtn")
+        A.pump_until(pg, lambda: entry(pg, "o1")["status"] == "exported", timeout=5)
+        A.pump_until(pg, lambda: send_view(pg)["line"] == "Gmail is open. Tap Send in Gmail.", timeout=3)
+        A.check("app Send, after " + gmail + ": Try again opens Gmail once and the read is sent to Gmail",
+                len(A.native(pg)["mails"]) == 1 and send_view(pg)["line"] == "Gmail is open. Tap Send in Gmail.", json.dumps(send_view(pg)))
+        ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, [dict(id="o2", savedAt=A.T1, meter="M2", ref="200202", read="1", mult="1")])
+    open_list(pg)
+    pg.evaluate("() => { window.AMRNative.exportBegin = () => 'error: disk full'; }")   # the app cannot make the files
+    pg.click("#mrExportBtn")
+    A.pump_until(pg, lambda: (send_view(pg)["line"] or "").startswith("Gmail did not open"), timeout=5)
+    v = send_view(pg)
+    A.check("app Send, the files cannot be made: Gmail did not open. Try again. and why; the read stays new; Gmail was never asked",
+            v["line"] == "Gmail did not open. Try again. The files could not be made: error: disk full." and v["btn"] == "Send 1 read"
+            and entry(pg, "o2")["status"] == "new" and gmail_calls(pg) == 0, json.dumps(v))
+    ctx.close()
+
+
+@A.case
+def t_send_app_safety(br):
+    """The safety rules of Tasks 15 and 16 hold for one-tap Send: one tap, one email; a Gmail answer that did not come in
+    time, or a marking that failed after Gmail opened, never leads to a second email from the Send button."""
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, [dict(id="s1", savedAt=A.T1, meter="M1", ref="200201", read="1", mult="1", photo=[160, 120])])
+    open_list(pg)
+    pg.evaluate("() => { $('mrExportBtn').click(); $('mrExportBtn').click(); }")
+    A.pump_until(pg, lambda: entry(pg, "s1")["status"] == "exported", timeout=5)
+    pg.wait_for_timeout(300)
+    A.check("app Send: two quick taps open Gmail once (the button is off while a tap runs)", gmail_calls(pg) == 1, str(gmail_calls(pg)))
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"gmail": "error: timeout"})
+    seed(pg, [dict(id="s2", savedAt=A.T1, meter="M2", ref="200202", read="1", mult="1")])
+    open_list(pg)
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=5000)
+    v = part_view(pg)
+    A.check("app Send, no answer from Gmail in time: the export sheet asks whether Gmail opened (Mark exported, Open in Gmail again); the read stays new",
+            "Did Gmail open" in v[0] and v[1] == ["Mark exported", "Open in Gmail again"] and entry(pg, "s2")["status"] == "new"
+            and send_view(pg)["line"] is None, json.dumps([v, send_view(pg)]))
+    pg.click("#mrExportClose")
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=5000)
+    A.check("app Send, after the reader closed that sheet: Send shows the same question again and asks Gmail no second time",
+            part_view(pg)[1] == ["Mark exported", "Open in Gmail again"] and gmail_calls(pg) == 1, json.dumps([part_view(pg), gmail_calls(pg)]))
+    pg.click("#mrPart0 button:has-text('Mark exported')")
+    A.check("app Send: Mark exported settles it; the read is marked exported",
+            A.pump_until(pg, lambda: entry(pg, "s2")["status"] == "exported", timeout=5) and gmail_calls(pg) == 1)
+    ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False)
+    seed(pg, [dict(id="s3", savedAt=A.T1, meter="M3", ref="200203", read="1", mult="1", photo=[160, 120])])
+    open_list(pg)
+    pg.evaluate(FAIL_MARK)
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=5000)
+    v = part_view(pg)
+    A.check("app Send, Gmail opened but the marking failed: the sheet says not to open Gmail again and offers only Mark exported; one email",
+            "Do not open Gmail again" in v[0] and v[1] == ["Mark exported"] and len(A.native(pg)["mails"]) == 1
+            and entry(pg, "s3")["status"] == "new", json.dumps(v))
+    pg.click("#mrExportClose")
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=5000)
+    A.check("app Send, after the reader closed that sheet: Send shows the same part (Mark exported only); still one email",
+            part_view(pg)[1] == ["Mark exported"] and len(A.native(pg)["mails"]) == 1, json.dumps([part_view(pg), len(A.native(pg)["mails"])]))
+    pg.evaluate(REAL_MARK)
+    pg.click("#mrPart0 button:has-text('Mark exported')")
+    A.check("app Send: Mark exported marks the read with no second email",
+            A.pump_until(pg, lambda: entry(pg, "s3")["status"] == "exported", timeout=5) and len(A.native(pg)["mails"]) == 1)
+    ctx.close()
+
+
+@A.case
+def t_send_browser(br):
+    ctx, pg = A.open_app(br, start=False, init=SHARE_MOCK)
+    seed(pg, [dict(id="w1", savedAt=A.T1, meter="M1", ref="200201", read="1", mult="1", photo=[320, 240])])
+    open_list(pg)
+    r = [A.dom(pg, "#mrExportBtn"), pg.evaluate("() => [$('mrSendTo').hidden, $('mrSendState').hidden]")]
+    A.check("browser list: the button reads Share 1 read; no To line and no status line (the share menu has a blank To line)",
+            r == ["Share 1 read", [True, True]], json.dumps(r))
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=10000)
+    A.check("browser: Share 1 read opens the export sheet with Share (the share menu path); nothing is shared by itself",
+            part_view(pg)[1] == ["Share"] and shares(pg) == [], json.dumps(part_view(pg)))
     ctx.close()
 
 
