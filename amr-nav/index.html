@@ -313,7 +313,7 @@ button{font:inherit;cursor:pointer}
 <script src="manual-reads.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '2026.10.02-5';
+const APP_VERSION = '2026.10.02-6';
 /* Manual reads run only when manual-reads.js loaded and is this page's own version: after a deploy the service worker
    can serve this page with no manual-reads.js (offline) or an older one. Off, the reads stay stored, unseen this time. */
 const MR_ON = typeof mrInit === 'function' && typeof MR_JS_VERSION === 'string' && MR_JS_VERSION === APP_VERSION;

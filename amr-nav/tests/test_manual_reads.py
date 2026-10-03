@@ -2052,16 +2052,25 @@ def t_send_app_one(br):
 
 @A.case
 def t_send_app_outcomes(br):
-    for gmail, why in (("error: boom", ""), ("no gmail", " Gmail is not on this tablet, or it is turned off.")):
+    for gmail, why, sheet in (("error: boom", "", True), ("no gmail", " Gmail is not on this tablet, or it is turned off.", False)):
         ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"gmail": gmail})
         seed(pg, [dict(id="o1", savedAt=A.T1, meter="M1", ref="200201", read="1", mult="1", photo=[160, 120])])
         open_list(pg)
         pg.click("#mrExportBtn")
         A.pump_until(pg, lambda: (send_view(pg)["line"] or "").startswith("Gmail did not open"), timeout=5)
         v = send_view(pg)
-        A.check("app Send, " + gmail + ": the line says Gmail did not open. Try again.; the read stays new; Send is ready again; no sheet, no email",
-                v == {"btn": "Send 1 read", "off": False, "line": "Gmail did not open. Try again." + why, "sheet": False}
+        A.check("app Send, " + gmail + ": the line says Gmail did not open. Try again." + why + "; the read stays new; Send is ready again; no email; "
+                + ("the export sheet opens (Part D re-review)" if sheet else "no sheet"),
+                v == {"btn": "Send 1 read", "off": False, "line": "Gmail did not open. Try again." + why, "sheet": sheet}
                 and entry(pg, "o1")["status"] == "new" and A.native(pg)["mails"] == [], json.dumps(v))
+        if sheet:
+            pv = part_view(pg) + [send_view(pg)["sheet"]]
+            A.check("app Send (Part D re-review), " + gmail + ": the sheet is open and shows the part with the reason Gmail gave and Open in Gmail again",
+                    pv == ["Not sent. Gmail did not open (" + gmail + "). Nothing was sent.", ["Open in Gmail again"], True], json.dumps(pv))
+            pg.click("#mrExportClose")
+            A.check("app Send, " + gmail + ": the sheet closes; the line stays and Send is ready again",
+                    send_view(pg) == {"btn": "Send 1 read", "off": False, "line": "Gmail did not open. Try again.", "sheet": False},
+                    json.dumps(send_view(pg)))
         pg.evaluate("() => { window.__native.cfg.gmail = 'opened'; }")
         pg.click("#mrExportBtn")
         A.pump_until(pg, lambda: entry(pg, "o1")["status"] == "exported", timeout=5)
@@ -2069,6 +2078,21 @@ def t_send_app_outcomes(br):
         A.check("app Send, after " + gmail + ": Try again opens Gmail once and the read is sent to Gmail",
                 len(A.native(pg)["mails"]) == 1 and send_view(pg)["line"] == "Gmail is open. Tap Send in Gmail.", json.dumps(send_view(pg)))
         ctx.close()
+    ctx, pg = A.open_app(br, mode="app", start=False, native_cfg={"gmail": "error: boom"})
+    seed(pg, [dict(id="o8", savedAt=A.T1, meter="M8", ref="200208", read="1", mult="1")])
+    open_list(pg)
+    pg.click("#mrExportBtn")
+    pg.wait_for_selector("#mrExport:not([hidden]) #mrPart0 button", timeout=5000)
+    pg.evaluate("() => { window.__native.cfg.gmail = 'opened'; }")
+    pg.click("#mrPart0 button:has-text('Open in Gmail again')")
+    A.pump_until(pg, lambda: entry(pg, "o8")["status"] == "exported", timeout=5)
+    pv = part_view(pg)
+    pg.click("#mrExportClose")
+    A.pump_until(pg, lambda: send_view(pg)["btn"] == "Nothing new to send", timeout=3)
+    A.check("app Send (Part D re-review): Open in Gmail again on that sheet opens Gmail once; after the sheet closes no old Gmail did not open line stays",
+            len(A.native(pg)["mails"]) == 1 and pv[0].startswith("Gmail opened. Marked exported.") and send_view(pg)["line"] is None,
+            json.dumps([pv, send_view(pg), len(A.native(pg)["mails"])]))
+    ctx.close()
     ctx, pg = A.open_app(br, mode="app", start=False)
     seed(pg, [dict(id="o2", savedAt=A.T1, meter="M2", ref="200202", read="1", mult="1")])
     open_list(pg)
@@ -2099,6 +2123,7 @@ def t_send_app_outcomes(br):
     open_list(pg)
     pg.click("#mrExportBtn")
     A.pump_until(pg, lambda: (send_view(pg)["line"] or "").startswith("Gmail did not open"), timeout=5)
+    pg.click("#mrExportClose")                                 # the sheet with the reason (Part D re-review)
     pg.click("#mrNew")
     pg.wait_for_selector("#mrForm:not([hidden])", timeout=5000)
     pg.check("#mrMeters input[value='__other']")

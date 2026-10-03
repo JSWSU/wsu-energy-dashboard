@@ -10,7 +10,7 @@
 'use strict';
 /* This file's version: always the same as APP_VERSION in index.html (bump both together; test_app_manifest.py checks).
    The page runs manual reads only when they match, so a page and an older or newer copy of this file never mix. */
-const MR_JS_VERSION = '2026.10.02-5';
+const MR_JS_VERSION = '2026.10.02-6';
 const MR_CFG = {
   db: 'amrNav-manualReads',     // IndexedDB name (browser); jswsu.github.io is shared with other pages, so the name says whose it is
   dbVersion: 1,                 // a schema change raises this by one and adds one step in mrDb(); an old step never changes
@@ -976,7 +976,7 @@ async function mrEmailTap(i) {
     return;
   }
   pt.state = 'failed';
-  pt.errKind = r === 'no gmail' ? 'nogmail' : 'other';     // errKind: what mrSendTap tells on the list's status line
+  pt.errKind = r === 'no gmail' ? 'nogmail' : 'other';     // errKind: what mrSendTap tells (the status line; 'other' also opens the sheet)
   pt.err = r === 'no gmail' ? 'Gmail is not on this tablet, or it is turned off. Nothing was sent.' : 'Gmail did not open (' + r + '). Nothing was sent.';
   mrRenderExport();
 }
@@ -1014,7 +1014,7 @@ function mrSaveTap(i) {
    the marking fails the files have still gone out: state 'markfail' remembers which (pt.markAs). */
 async function mrExported(pt, state) {
   if (pt.state === 'done' || pt.state === 'saved') return;
-  try { await mrSetStatus(pt.ids, 'exported', pt.csvName); pt.state = state; pt.err = ''; }
+  try { await mrSetStatus(pt.ids, 'exported', pt.csvName); pt.state = state; pt.err = ''; mrSendSay('', ''); }    // an old Send line is out of date now
   catch (e) { pt.state = 'markfail'; pt.markAs = state; }
   mrRenderExport();
   mrAfterChange();
@@ -1061,7 +1061,8 @@ function mrShowParts(parts) {
 }
 /* App: one tap. When every new read fits in one email, Gmail's compose screen opens at once, through the same mrEmailTap
    as the sheet's Open in Gmail (the app's own To line; marked exported only on the answer 'opened'). When the reads need
-   several emails, the parts sheet opens. Gmail did not open: the status line says so and the reads stay new. Gmail opened
+   several emails, the parts sheet opens. Gmail did not open: the status line says so and the reads stay new; when the
+   app gave its own reason (errKind 'other'), the sheet opens on the part with that reason and Open in Gmail again. Gmail opened
    but a photo was gone from the app's store: the line and the sheet say which. No answer in time: the sheet asks whether
    Gmail opened (Mark exported, or Open in Gmail again: the app answers timeout when its call to Gmail did not start in
    time). The marking failed after Gmail opened: the sheet offers only Mark exported, never a second email. Either way
@@ -1092,6 +1093,7 @@ async function mrSendTap() {
     } else if (pt.state === 'failed') {
       mrSendSay('bad', 'Gmail did not open. Try again.' +
         ({nogmail: ' Gmail is not on this tablet, or it is turned off.', files: ' ' + pt.err}[pt.errKind] || ''));
+      if (pt.errKind === 'other') mrShowParts([pt]);    // the app's own reason is not plain words: the sheet shows it, the line stays plain
     } else { MRS.held = [pt]; mrShowParts([pt]); }
   } finally {
     MRS.busy = false;
