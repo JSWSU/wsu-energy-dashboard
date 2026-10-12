@@ -214,7 +214,7 @@ fetch('data-trends.json').then(r => r.json()).then(D => {
     const a = D.annual[fy];
     const prev = i > 0 ? D.annual[FYS[i-1]].cost : null;
     const dPct = prev ? ((a.cost - prev) / prev * 100) : null;
-    const note = fy === 'FY2026' ? 'June partial' : (a.forecast ? 'Forecast' : '');
+    const note = a.forecast ? 'Forecast' : '';
     const tr = document.createElement('tr');
     if (a.forecast) tr.className = 'fcast';
     tr.innerHTML = '<td>' + fy + '</td><td>' + fmtDollar(a.cost) + '</td>' +
