@@ -849,7 +849,11 @@ function initDashboard(D) {
   // --- Determine actual vs forecast months ---
   // Explicit flags from the exporter (workbook IsComplete row); fall back to
   // value comparison for older data.json files.
-  const isActual = fy27.isActual || fy27.totalActual.map((v, i) => v !== fy27.totalFcast[i]);
+  const isActualRaw = fy27.isActual || fy27.totalActual.map((v, i) => v !== fy27.totalFcast[i]);
+  // Keep only the unbroken run of true from July (index 0): a later complete month
+  // after an incomplete one must not count, so page, printout and email agree.
+  const gapIdx = isActualRaw.indexOf(false);
+  const isActual = gapIdx === -1 ? isActualRaw : isActualRaw.map((v, i) => i < gapIdx);
   const actualMonthCount = isActual.filter(Boolean).length;
   // Mask helper: actual-series value only where real bills exist, else null
   // (Chart.js skips null bars/points, so forecast-only months show no actual)
