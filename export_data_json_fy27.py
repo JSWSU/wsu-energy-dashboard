@@ -263,6 +263,25 @@ def apply_kwh_actual_override(energy_use: dict, hist: dict, fy_cal: list, elec_a
     return energy_use
 
 
+def apply_kintec_completeness(is_complete: list, kintec_cost: list) -> list:
+    """AND the workbook completeness flag with "the Kintec invoice is in".
+
+    Row 121 (IsComplete, read into is_complete by the caller) only reflects
+    the Avista electric/gas flags on the Executive Summary sheet. Kintec's
+    own gas invoice can lag a month or two behind those -- a month can show
+    "complete" on row 121 while Kintec Data has no cost row for that month
+    yet (the same under-billed gap build_forecast() already works around
+    for the FY27 base). A month should not count as actual (isActual, the
+    forecast override, the kWh override) until BOTH signals agree, so this
+    demotes any month where kintec_cost is 0 even though is_complete said
+    True. Returns a new list; does not mutate is_complete.
+    """
+    out = []
+    for complete, cost in zip(is_complete, kintec_cost):
+        out.append(bool(complete) and cost > 0)
+    return out
+
+
 def main() -> int:
     pythoncom.CoInitialize()
     xl = win32com.client.DispatchEx("Excel.Application")
@@ -285,6 +304,33 @@ def main() -> int:
         ws_hdd = wb.Sheets("HDD Data")
         ws_kin = wb.Sheets("Kintec Data")
         ws_con = wb.Sheets("Consolidated Data")
+
+        # FY27 calendar months, July 2026 - June 2027 (single source: used
+        # below to match Kintec invoice months for the completeness override,
+        # and again for the kWh-actual override and the verification block).
+        fy27_cal = [(2026, 7), (2026, 8), (2026, 9), (2026, 10), (2026, 11), (2026, 12),
+                    (2027, 1), (2027, 2), (2027, 3), (2027, 4), (2027, 5), (2027, 6)]
+
+        # Kintec: variable rows (read here -- before is_complete is first
+        # used below -- so the completeness override has the per-FY-month
+        # Kintec dollars from this same sheet read; no second workbook read).
+        last_kin = ws_kin.Cells(ws_kin.Rows.Count, 1).End(-4162).Row
+        months, dths, cost = [], [], []
+        kintec_by_cal: dict = {}
+        for r in range(2, last_kin + 1):
+            v = ws_kin.Cells(r, 1).Value
+            if not v:
+                continue
+            months.append(month_label(v))
+            d = int(_num(ws_kin.Cells(r, 6).Value))
+            c = int(_num(ws_kin.Cells(r, 5).Value))
+            dths.append(d)
+            cost.append(c)
+            if hasattr(v, "year"):
+                key = (v.year, v.month)
+                kintec_by_cal[key] = kintec_by_cal.get(key, 0) + c
+        kintec = {"months": months, "dths": dths, "cost": cost}
+        kintec_cost_by_fy = [kintec_by_cal.get((y, m), 0) for (y, m) in fy27_cal]
 
         # FY27 current-year section: rows 3-14
         fy27 = {
@@ -309,7 +355,17 @@ def main() -> int:
         # IsComplete flags live on row 121: month row r -> flag col (r - 1).
         ws_con_hist = read_monthly_history(wb.Sheets("Consolidated Data"))
         fc = build_forecast(ws_con_hist, hedge)
-        is_complete = [bool(ws_exec.Cells(121, r - 1).Value) for r in range(3, 15)]
+        is_complete_wb = [bool(ws_exec.Cells(121, r - 1).Value) for r in range(3, 15)]
+        # Row 121 only reflects the Avista electric/gas flags; Kintec's gas
+        # invoice can lag behind those, so a month cannot count as actual
+        # until BOTH the workbook flag and the Kintec invoice are in. Apply
+        # this before is_complete is used anywhere below (forecast override,
+        # kWh override, isActual export) so every downstream value follows.
+        is_complete = apply_kintec_completeness(is_complete_wb, kintec_cost_by_fy)
+        for i in range(12):
+            if is_complete_wb[i] and not is_complete[i]:
+                label = date(fy27_cal[i][0], fy27_cal[i][1], 1).strftime("%b %Y")
+                print(f"{label}: workbook complete, Kintec invoice missing -> forecast")
         for i in range(12):
             fy27["totalFcast"][i] = fc["totalFcast"][i]
             fy27["elecFcast"][i] = fc["elecFcast"][i]
@@ -323,11 +379,6 @@ def main() -> int:
                 fy27["gasActual"][i] = fc["gasFcast"][i]
         fy27["isActual"] = is_complete
         fy27["forecastMeta"] = fc["meta"]
-
-        # FY27 calendar months, July 2026 - June 2027 (single source: also
-        # used below for the kWh-actual override and the verification block).
-        fy27_cal = [(2026, 7), (2026, 8), (2026, 9), (2026, 10), (2026, 11), (2026, 12),
-                    (2027, 1), (2027, 2), (2027, 3), (2027, 4), (2027, 5), (2027, 6)]
 
         # FY26 gas section: rows 21-32 (header row 20 says "FY2026 Month")
         fy26gas = {
@@ -403,17 +454,8 @@ def main() -> int:
             "normal": read_col(ws_hdd, 6, 17, 5),
         }
 
-        # Kintec: variable rows
-        last_kin = ws_kin.Cells(ws_kin.Rows.Count, 1).End(-4162).Row
-        months, dths, cost = [], [], []
-        for r in range(2, last_kin + 1):
-            v = ws_kin.Cells(r, 1).Value
-            if not v:
-                continue
-            months.append(month_label(v))
-            dths.append(int(_num(ws_kin.Cells(r, 6).Value)))
-            cost.append(int(_num(ws_kin.Cells(r, 5).Value)))
-        kintec = {"months": months, "dths": dths, "cost": cost}
+        # Kintec was read earlier (right after the sheets were opened) so the
+        # completeness override above could use it without a second read.
 
         # Verification: FY27 months = Jul 2026 through Jun 2027 (fy27_cal, defined above)
         fy27_months = [date(y, m, 1) for (y, m) in fy27_cal]
