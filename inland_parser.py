@@ -53,6 +53,7 @@ class BillRecord:
     warnings: list[str] = field(default_factory=list)
     estimated: bool = False
     final_bill: bool = False
+    spill_surcharge: Optional[float] = None  # "Mandated Federal Spill Surcharge" line, bills from 07/30/2026
 
     @property
     def dedup_key(self) -> tuple[str, str]:
@@ -89,6 +90,23 @@ RE_DEMAND_CHARGE = re.compile(
     r"Demand Charge\s*(" + DEC + r")\s*kW\s*@\s*(" + DEC + r")\s*(" + MONEY + r")"
 )
 RE_SAC = re.compile(r"Service Availability Charge\s*(" + MONEY + r")")
+
+# Mandated Federal Spill Surcharge (bills from 07/30/2026 onward). Two forms seen:
+#  simple:  "Mandated Federal Spill Surcharge - 4% $21.82" (first billing cycle)
+#  rated:   "Mandated Federal <kWh> kWh @ <rate> $<charge> ... Spill Surcharge - 4%"
+#           (later cycles; pdfplumber interleaves bar-chart axis numbers between
+#           "Mandated Federal" and "Spill Surcharge" because they sit in adjacent
+#           PDF columns, so the label and amount are not adjacent text)
+# "Mandated" and the "- N%" suffix are optional/tolerant per spec. Anchored on the
+# literal "Federal" (unique to this charge line) and scoped to one account's block,
+# same as RE_ENERGY_CHARGE / RE_SAC.
+RE_SPILL_SURCHARGE_RATED = re.compile(
+    r"Federal.*?" + INT + r"\s*kWh\s*@\s*" + DEC + r"\s*(" + MONEY + r")",
+    re.DOTALL,
+)
+RE_SPILL_SURCHARGE_SIMPLE = re.compile(
+    r"Federal\s+Spill\s+Surcharge(?:\s*-\s*" + DEC + r"%)?\s*(" + MONEY + r")"
+)
 RE_OUTDOOR = re.compile(r"Outdoor Lighting(?: Charge)?\s*(" + MONEY + r")")
 RE_TOTAL_CURRENT = re.compile(r"Total Current Charges\s*(" + MONEY + r")")
 RE_WA_TAX = re.compile(r"WA State Tax.*?(" + MONEY + r")")
@@ -255,6 +273,13 @@ def parse_pdf(pdf_path: str | Path) -> list[BillRecord]:
         if m:
             rec.service_availability = _money(m.group(1))
 
+        # Mandated Federal Spill Surcharge (bills from 07/30/2026 onward)
+        m = RE_SPILL_SURCHARGE_RATED.search(block)
+        if not m:
+            m = RE_SPILL_SURCHARGE_SIMPLE.search(block)
+        if m:
+            rec.spill_surcharge = _money(m.group(1))
+
         # Outdoor Lighting
         m = RE_OUTDOOR.search(block)
         if m:
@@ -353,6 +378,7 @@ def validate(rec: BillRecord, tolerance: float = 0.02) -> list[str]:
             rec.demand_charge or 0,
             rec.service_availability or 0,
             rec.outdoor_lighting or 0,
+            rec.spill_surcharge or 0,
         ]
         expected_total = round(sum(parts), 2)
         # Inland rounds some statement totals to the whole dollar (observed
