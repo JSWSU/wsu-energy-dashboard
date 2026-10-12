@@ -389,4 +389,14 @@ def validate(rec: BillRecord, tolerance: float = 0.02) -> list[str]:
                 f"but bill says {rec.total_current_charges}"
             )
 
+    # 6. Spill surcharge is billed at 4% of the energy charge; a ratio
+    #    outside 3%..5% means the surcharge line was misread.
+    if rec.spill_surcharge is not None and rec.energy_charge and rec.energy_charge > 0:
+        ratio = rec.spill_surcharge / rec.energy_charge
+        if not 0.03 <= ratio <= 0.05:
+            errors.append(
+                f"spill surcharge: {rec.spill_surcharge}/{rec.energy_charge}={ratio:.4f} "
+                f"outside 0.03..0.05"
+            )
+
     return errors

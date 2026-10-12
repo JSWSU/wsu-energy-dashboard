@@ -216,8 +216,10 @@ def apply_forecast_override(energy_use: dict, fc: dict, is_complete: list) -> di
     elecActual/gasActual on the workbook's own broken forecast, so the
     Elec/Gas sub-line never summed to the headline Total; an earlier fix
     used a flat kWh->MMBTU factor for elecActual, which could exceed
-    totalActual and drive gasActual negative). Complete months are left
-    untouched. Mutates and returns energy_use.
+    totalActual and drive gasActual negative). For a complete month
+    totalActual and elecActual stay as read from the workbook and gasActual
+    becomes totalActual - elecActual, so the sum is exact every month.
+    Mutates and returns energy_use.
     """
     for i in range(len(is_complete)):
         energy_use["totalFcast"][i] = fc["mmbtuFcast"][i]
@@ -228,6 +230,11 @@ def apply_forecast_override(energy_use: dict, fc: dict, is_complete: list) -> di
             energy_use["kwhRate"][i] = round(fc["elecFcast"][i] / kwh_i, 4) if kwh_i else 0
             energy_use["elecActual"][i] = fc["elecMMFcast"][i]
             energy_use["gasActual"][i] = energy_use["totalActual"][i] - fc["elecMMFcast"][i]
+        else:
+            # Complete month: keep the workbook's totalActual and elecActual,
+            # but derive gas as the remainder so elec + gas == total exactly
+            # (the workbook's three columns are rounded independently).
+            energy_use["gasActual"][i] = energy_use["totalActual"][i] - energy_use["elecActual"][i]
     return energy_use
 
 
