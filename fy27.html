@@ -145,6 +145,7 @@
     .ps-header h1 { font-size: 15pt; font-weight: 700; margin: 0; }
     .ps-header p { font-size: 8pt; opacity: 0.9; margin: 2px 0 0; }
     .ps-header .verified { background: rgba(255,255,255,0.2); color: #fff; font-size: 7pt; padding: 1px 5px; border-radius: 3px; }
+    .ps-header .verify-fail { background: #fff; color: var(--red); font-size: 7pt; padding: 1px 5px; border-radius: 3px; font-weight: 700; }
     /* --- Budget banner --- */
     .ps-budget-print {
       padding: 4px 8px; border-radius: 3px; font-size: 7.5pt; font-weight: 500;
@@ -198,7 +199,10 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   #loading { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; }
   #error { position: fixed; inset: 0; background: var(--bg); align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 1rem; padding: 2rem; text-align: center; }
-  .verified { display: inline-flex; align-items: center; gap: 0.3rem; background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+  .verified { display: inline-flex; align-items: center; gap: 0.3rem; background: #ecfdf5; color: var(--green); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+  .verify-fail { display: inline-flex; align-items: center; gap: 0.3rem; background: #fef2f2; color: var(--red); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+  html.dark .verified { background: rgba(5,150,105,0.18); color: #6ee7b7; }
+  html.dark .verify-fail { background: rgba(220,38,38,0.20); color: #fca5a5; }
   /* --- Auth Gate --- */
   #authGate {
     position: fixed; inset: 0; z-index: 99999; background: var(--bg);
@@ -711,6 +715,32 @@ const fmtRate = v => '$' + v.toFixed(2);
 const fmtRateKwh = v => '$' + v.toFixed(4);
 const sum = arr => arr.reduce((a, b) => a + b, 0);
 
+// Compare exported dollars against the Consolidated Data verification block for every
+// month counted as actual (the normalized isActual), using the same 5% threshold the old
+// VBA macro used (or within $1,000 when the reference is under $20,000, so small bases
+// don't fail on noise). Returns null when there's nothing to verify against, so the badge
+// stays blank as before; otherwise { ok, idx } where idx is the first mismatching month.
+function checkConsolidatedVerification(verification, elecActual, gasActual, isActual) {
+  if (!verification || !verification.elecDollar || !verification.gasDollar) return null;
+  const within = (val, ref) => {
+    if (ref === null || ref === undefined) return true;
+    const diff = Math.abs(val - ref);
+    const pctOk = ref !== 0 && (diff / Math.abs(ref)) <= 0.05;
+    const dollarOk = Math.abs(ref) < 20000 && diff <= 1000;
+    return pctOk || dollarOk;
+  };
+  for (let i = 0; i < isActual.length; i++) {
+    if (!isActual[i]) continue;
+    if (!within(elecActual[i], verification.elecDollar[i]) || !within(gasActual[i], verification.gasDollar[i])) {
+      return { ok: false, idx: i };
+    }
+  }
+  return { ok: true, idx: null };
+}
+const verifyBadgeHTML = result => !result ? '' : result.ok
+  ? '<span class="verified">Verified vs Consolidated Data</span>'
+  : '<span class="verify-fail">Check: does not match Consolidated Data (' + MONTHS[result.idx] + ')</span>';
+
 Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 Chart.defaults.font.size = 12;
 Chart.defaults.plugins.legend.labels.usePointStyle = true;
@@ -858,6 +888,9 @@ function initDashboard(D) {
   // Mask helper: actual-series value only where real bills exist, else null
   // (Chart.js skips null bars/points, so forecast-only months show no actual)
   const maskAct = arr => arr.map((v, i) => isActual[i] ? v : null);
+  // Real check against Consolidated Data for every actual month (not just a check that the
+  // verification block exists), used by the badge wherever it's shown.
+  const verifyResult = checkConsolidatedVerification(D.verification, fy27.elecActual, fy27.gasActual, isActual);
 
   // --- KPI Cards ---
   const totalAct = sum(fy27.totalActual), totalFcast = sum(fy27.totalFcast);
@@ -886,7 +919,7 @@ function initDashboard(D) {
   } else {
     document.getElementById('kpiDelta').textContent = fmtDollarM(Math.abs(delta)) + (delta >= 0 ? ' under' : ' over');
     document.getElementById('kpiDeltaWrap').className = 'kpi-value ' + (delta >= 0 ? 'green' : 'red');
-    document.getElementById('kpiDeltaPct').textContent = fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' below forecast' : ' above forecast');
+    document.getElementById('kpiDeltaPct').textContent = fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' below full-year forecast' : ' above full-year forecast');
   }
   document.getElementById('kpiMMBTU').textContent = fmtNum(totalMMBTU);
   document.getElementById('kpiMMBTUSub').textContent = 'MMBTU (Elec: ' + fmtNum(totalElecMMBTU) + ' | Gas: ' + fmtNum(totalGasMMBTU) + ')';
@@ -901,10 +934,9 @@ function initDashboard(D) {
   document.getElementById('lastUpdated').textContent = D.lastUpdated;
   document.getElementById('footerDate').textContent = D.lastUpdated;
 
-  // Verification badge
-  if (D.verification) {
-    document.getElementById('verifiedBadge').innerHTML = '<span class="verified">Verified vs Consolidated Data</span>';
-  }
+  // Verification badge: really compares fy27 elec/gas dollars against Consolidated Data
+  // for every actual month, not just whether the verification block exists.
+  document.getElementById('verifiedBadge').innerHTML = verifyBadgeHTML(verifyResult);
 
 
   // --- Budget Status Banner ---
@@ -922,13 +954,13 @@ function initDashboard(D) {
     let cls, icon, label, detail;
     if (curDelta > 0 && curPct > 3) {
       cls = 'on-track'; icon = '\u2705'; label = 'Under Budget';
-      detail = 'Through ' + MONTHS[lastActualIdx] + ': actual spending is ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') below forecast.';
+      detail = 'Through ' + MONTHS[lastActualIdx] + ' (fiscal year to date): actual spending is ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') below forecast.';
     } else if (curDelta > 0) {
       cls = 'watch'; icon = '\u26A0\uFE0F'; label = 'Watch';
-      detail = 'Through ' + MONTHS[lastActualIdx] + ': ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') under forecast \u2014 margin is narrow.';
+      detail = 'Through ' + MONTHS[lastActualIdx] + ' (fiscal year to date): ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') under forecast \u2014 margin is narrow.';
     } else {
       cls = 'over-budget'; icon = '\uD83D\uDED1'; label = 'Over Budget';
-      detail = 'Through ' + MONTHS[lastActualIdx] + ': actual spending exceeds forecast by ' + fmtDollar(Math.abs(curDelta)) + ' (' + fmtPct(Math.abs(curPct)) + ').';
+      detail = 'Through ' + MONTHS[lastActualIdx] + ' (fiscal year to date): actual spending exceeds forecast by ' + fmtDollar(Math.abs(curDelta)) + ' (' + fmtPct(Math.abs(curPct)) + ').';
     }
     banner.className = 'budget-banner ' + cls;
     banner.innerHTML = '<span class="banner-icon">' + icon + '</span><span class="banner-label">' + label + '</span><span class="banner-detail">' + detail + ' (' + actualMonthCount + ' of 12 months actual)</span>';
@@ -1254,9 +1286,7 @@ function initDashboard(D) {
   (function buildPrintSummary() {
     // Date & verified badge
     document.querySelectorAll('.ps-date').forEach(el => { el.textContent = D.lastUpdated; });
-    if (D.verification) {
-      document.querySelectorAll('.ps-verified').forEach(el => { el.innerHTML = '<span class="verified">Verified</span>'; });
-    }
+    document.querySelectorAll('.ps-verified').forEach(el => { el.innerHTML = verifyBadgeHTML(verifyResult); });
 
     // Budget banner (mirror main banner logic)
     const psBanner = document.getElementById('psBudget');
@@ -1266,13 +1296,13 @@ function initDashboard(D) {
       let cls, icon, label, detail;
       if (curDelta > 0 && curPct > 3) {
         cls = 'on-track'; icon = '\u2705'; label = 'UNDER BUDGET';
-        detail = 'Through ' + MONTHS[lastActualIdx] + ': ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') below forecast.';
+        detail = 'Through ' + MONTHS[lastActualIdx] + ' (fiscal year to date): ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') below forecast.';
       } else if (curDelta > 0) {
         cls = 'watch'; icon = '\u26A0\uFE0F'; label = 'WATCH';
-        detail = 'Through ' + MONTHS[lastActualIdx] + ': ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') under forecast — narrow margin.';
+        detail = 'Through ' + MONTHS[lastActualIdx] + ' (fiscal year to date): ' + fmtDollar(curDelta) + ' (' + fmtPct(curPct) + ') under forecast — narrow margin.';
       } else {
         cls = 'over-budget'; icon = '\uD83D\uDED1'; label = 'OVER BUDGET';
-        detail = 'Through ' + MONTHS[lastActualIdx] + ': exceeds forecast by ' + fmtDollar(Math.abs(curDelta)) + ' (' + fmtPct(Math.abs(curPct)) + ').';
+        detail = 'Through ' + MONTHS[lastActualIdx] + ' (fiscal year to date): exceeds forecast by ' + fmtDollar(Math.abs(curDelta)) + ' (' + fmtPct(Math.abs(curPct)) + ').';
       }
       psBanner.className = 'ps-budget-print ' + cls;
       psBanner.innerHTML = '<strong>' + icon + ' ' + label + '</strong> ' + detail + ' (' + actualMonthCount + ' of 12 months actual)';
@@ -1284,7 +1314,7 @@ function initDashboard(D) {
     const kpis = [
       { label: FY.label+' Actual + Forecast', value: fmtDollarM(totalAct), sub: 'Actuals + forecast remaining', cls: '', valCls: '' },
       { label: FY.label+' Forecast', value: fmtDollarM(totalFcast), sub: 'Full-year projection', cls: 'forecast', valCls: 'blue' },
-      { label: 'Budget Variance', value: fmtDollarM(Math.abs(delta)) + (delta >= 0 ? ' under' : ' over'), sub: fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' below forecast' : ' above forecast'), cls: 'delta', valCls: delta >= 0 ? 'green' : 'red' },
+      { label: 'Budget Variance', value: fmtDollarM(Math.abs(delta)) + (delta >= 0 ? ' under' : ' over'), sub: fmtPct(Math.abs(deltaPct)) + (delta >= 0 ? ' below full-year forecast' : ' above full-year forecast'), cls: 'delta', valCls: delta >= 0 ? 'green' : 'red' },
       { label: 'Total Energy Use', value: fmtNum(totalMMBTU) + ' MMBTU', sub: 'Elec: ' + fmtNum(totalElecMMBTU) + ' | Gas: ' + fmtNum(totalGasMMBTU), cls: 'energy', valCls: '' },
       { label: 'Electric Cost', value: fmtDollarM(totalElec), sub: (totalElec / totalAct * 100).toFixed(1) + '% of total', cls: '', valCls: '' },
       { label: 'Gas Cost', value: fmtDollarM(totalGas), sub: (totalGas / totalAct * 100).toFixed(1) + '% of total', cls: '', valCls: '' },

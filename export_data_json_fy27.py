@@ -172,7 +172,8 @@ def build_forecast(hist: dict, hedge_pct: float) -> dict:
         return v1 if v1 else v2
 
     out = {"elecFcast": [], "gasFcast": [], "totalFcast": [],
-           "kwhFcast": [], "mmbtuFcast": [], "kintecFcast": [], "avistaFcast": []}
+           "kwhFcast": [], "mmbtuFcast": [], "kintecFcast": [], "avistaFcast": [],
+           "elecMMFcast": [], "gasMMFcast": []}
     for (y, m) in fy27_cal:
         e = base_month(y, m, "elec") * elec_factor
         g = base_month(y, m, "gas") * gas_factor
@@ -187,6 +188,11 @@ def build_forecast(hist: dict, hedge_pct: float) -> dict:
         # tracked separately in hist; use the long-run split (~91% Kintec).
         out["kintecFcast"].append(int(round(g * 0.91)))
         out["avistaFcast"].append(int(round(g * 0.09)))
+        # Elec/Gas MMBTU parts, same base month as mmbtuFcast above, so the
+        # Energy Use override can split totalActual exactly (elec + gas ==
+        # total) without a kWh->MMBTU conversion factor.
+        out["elecMMFcast"].append(round(base_month(y, m, "elecMM")))
+        out["gasMMFcast"].append(round(base_month(y, m, "gasMM")))
     out["meta"] = {
         "method": "Same month last complete year; electric x YoY trend, gas + hedge; usage held flat",
         "elecFactor": round(elec_factor, 3),
@@ -194,6 +200,67 @@ def build_forecast(hist: dict, hedge_pct: float) -> dict:
         "baseWindow": "Jul 2024 - Jun 2026 billing history",
     }
     return out
+
+
+def apply_forecast_override(energy_use: dict, fc: dict, is_complete: list) -> dict:
+    """Energy Use (MMBTU) override loop for incomplete months.
+
+    totalFcast/totalActual already come from fc["mmbtuFcast"] (clean Python
+    forecast, computed before this runs). For an incomplete month this also
+    now replaces elecActual with fc["elecMMFcast"] (same base-month history
+    build_forecast already summed into mmbtuFcast) and sets
+    gasActual = totalActual - elecActual, so elecActual + gasActual ==
+    totalActual exactly for every month, and gasActual cannot go negative
+    when the history it is drawn from is non-negative (bug: the old loop
+    only overrode totalActual/kwhActual/kwhRate and left
+    elecActual/gasActual on the workbook's own broken forecast, so the
+    Elec/Gas sub-line never summed to the headline Total; an earlier fix
+    used a flat kWh->MMBTU factor for elecActual, which could exceed
+    totalActual and drive gasActual negative). Complete months are left
+    untouched. Mutates and returns energy_use.
+    """
+    for i in range(len(is_complete)):
+        energy_use["totalFcast"][i] = fc["mmbtuFcast"][i]
+        if not is_complete[i]:
+            energy_use["totalActual"][i] = fc["mmbtuFcast"][i]
+            energy_use["kwhActual"][i] = fc["kwhFcast"][i]
+            kwh_i = fc["kwhFcast"][i]
+            energy_use["kwhRate"][i] = round(fc["elecFcast"][i] / kwh_i, 4) if kwh_i else 0
+            energy_use["elecActual"][i] = fc["elecMMFcast"][i]
+            energy_use["gasActual"][i] = energy_use["totalActual"][i] - fc["elecMMFcast"][i]
+    return energy_use
+
+
+def apply_kwh_actual_override(energy_use: dict, hist: dict, fy_cal: list, elec_actual_dollars: list,
+                               is_complete: list) -> dict:
+    """Energy Use kwhActual/kwhRate fix for COMPLETE months (bug f).
+
+    Executive Summary (Print) H39:H50 ("Total kWh Actual") is a verbatim
+    copy of the adjacent "Total kWh Forecast" formula (I39:I50) -- it has no
+    completeness switch, so it never reports billed kWh, even for months
+    flagged complete on row 121. The sibling MMBTU Actual columns (C/D) have
+    the proper IF(complete, direct-sum, trend-fallback) wrapper; kWh does
+    not. read_col() above (energy_use["kwhActual"]) therefore reads that
+    broken formula for every row.
+
+    For a COMPLETE month this replaces kwhActual with the true billed kWh
+    from Consolidated Data -- hist[(year, month)]["kwh"], the same
+    per-calendar-month dict (read_monthly_history(), already in memory)
+    that build_verification() sums from for the verification badge -- and
+    recomputes kwhRate = round(elecActual$ / kwh, 4) (0 if kwh is 0), the
+    same pattern apply_forecast_override() already uses for incomplete
+    months. Incomplete months are left untouched here: they already carry
+    apply_forecast_override()'s clean Python forecast kWh. Mutates and
+    returns energy_use.
+    """
+    for i in range(len(is_complete)):
+        if not is_complete[i]:
+            continue
+        y, m = fy_cal[i]
+        kwh = hist.get((y, m), {}).get("kwh", 0.0)
+        energy_use["kwhActual"][i] = int(round(kwh))
+        energy_use["kwhRate"][i] = round(elec_actual_dollars[i] / kwh, 4) if kwh else 0
+    return energy_use
 
 
 def main() -> int:
@@ -257,6 +324,11 @@ def main() -> int:
         fy27["isActual"] = is_complete
         fy27["forecastMeta"] = fc["meta"]
 
+        # FY27 calendar months, July 2026 - June 2027 (single source: also
+        # used below for the kWh-actual override and the verification block).
+        fy27_cal = [(2026, 7), (2026, 8), (2026, 9), (2026, 10), (2026, 11), (2026, 12),
+                    (2027, 1), (2027, 2), (2027, 3), (2027, 4), (2027, 5), (2027, 6)]
+
         # FY26 gas section: rows 21-32 (header row 20 says "FY2026 Month")
         fy26gas = {
             "cost": read_col(ws_exec, 21, 32, 2),
@@ -275,13 +347,8 @@ def main() -> int:
             "kwhActual": read_col(ws_exec, 39, 50, 8),
             "kwhRate": read_col(ws_exec, 39, 50, 10, decimals=4),
         }
-        for i in range(12):
-            energy_use["totalFcast"][i] = fc["mmbtuFcast"][i]
-            if not is_complete[i]:
-                energy_use["totalActual"][i] = fc["mmbtuFcast"][i]
-                energy_use["kwhActual"][i] = fc["kwhFcast"][i]
-                kwh_i = fc["kwhFcast"][i]
-                energy_use["kwhRate"][i] = round(fc["elecFcast"][i] / kwh_i, 4) if kwh_i else 0
+        apply_forecast_override(energy_use, fc, is_complete)
+        apply_kwh_actual_override(energy_use, ws_con_hist, fy27_cal, fy27["elecActual"], is_complete)
 
         # Cumulative: rebuild from the overridden fy27 arrays
         cum_a, cum_f, cum_ma, cum_mf = [], [], [], []
@@ -348,13 +415,8 @@ def main() -> int:
             cost.append(int(_num(ws_kin.Cells(r, 5).Value)))
         kintec = {"months": months, "dths": dths, "cost": cost}
 
-        # Verification: FY27 months = Jul 2026 through Jun 2027
-        fy27_months = [
-            date(2026, 7, 1), date(2026, 8, 1), date(2026, 9, 1),
-            date(2026, 10, 1), date(2026, 11, 1), date(2026, 12, 1),
-            date(2027, 1, 1), date(2027, 2, 1), date(2027, 3, 1),
-            date(2027, 4, 1), date(2027, 5, 1), date(2027, 6, 1),
-        ]
+        # Verification: FY27 months = Jul 2026 through Jun 2027 (fy27_cal, defined above)
+        fy27_months = [date(y, m, 1) for (y, m) in fy27_cal]
         verification = build_verification(ws_con, fy27_months)
 
         out = {
