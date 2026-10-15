@@ -213,8 +213,8 @@
     },
     "FY2027": {
       "cost": [
-        1698106,
-        1761865,
+        1681846,
+        1719298,
         1759338,
         1718552,
         1874538,
@@ -227,8 +227,8 @@
         1662334
       ],
       "mmbtu": [
-        92864,
-        94668,
+        92011,
+        93211,
         96920,
         129886,
         139662,
@@ -287,15 +287,15 @@
       "forecast": false
     },
     "FY2027": {
-      "cost": 22376354,
-      "mmbtu": 1534458,
-      "rate": 14.58,
+      "cost": 22317527,
+      "mmbtu": 1532148,
+      "rate": 14.57,
       "forecast": true
     }
   },
   "notes": {
-    "FY2026": "June 2026 electric partial until the next Avista pull; Kintec gas Jan-Jun 2026 excludes the small Avista transport charge.",
-    "FY2027": "Forecast (same-month prior year, electric trend, 10% gas hedge). No actual bills posted yet.",
+    "FY2026": "Complete year: 12 actual months. Electric = Avista + Inland bills; gas = Kinect invoices + Avista gas bills.",
+    "FY2027": "2 actual months (July 2026 to August 2026, actual bills); September 2026 to June 2027 forecast (same-month prior year, electric trend, 10% gas hedge).",
     "sources": "FY2020-FY2024 from the archived Energy Data for Projection summaries; FY2025 from the archived Energy Cost Projection Report July 2025; FY2026-FY2027 from the live FY2027 workbook."
   }
 }
