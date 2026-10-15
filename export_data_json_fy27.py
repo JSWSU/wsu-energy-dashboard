@@ -221,6 +221,11 @@ def apply_forecast_override(energy_use: dict, fc: dict, is_complete: list) -> di
     becomes totalActual - elecActual, so the sum is exact every month.
     Mutates and returns energy_use.
     """
+    # Forecast MMBTU by fuel (same base month as totalFcast; elec + gas ==
+    # totalFcast exactly), so the page's forecast $/MMBTU divides forecast $
+    # by forecast MMBTU of the same fuel (K6).
+    energy_use["elecFcast"] = [fc["elecMMFcast"][i] for i in range(len(is_complete))]
+    energy_use["gasFcast"] = [fc["mmbtuFcast"][i] - fc["elecMMFcast"][i] for i in range(len(is_complete))]
     for i in range(len(is_complete)):
         energy_use["totalFcast"][i] = fc["mmbtuFcast"][i]
         if not is_complete[i]:
@@ -236,6 +241,16 @@ def apply_forecast_override(energy_use: dict, fc: dict, is_complete: list) -> di
             # (the workbook's three columns are rounded independently).
             energy_use["gasActual"][i] = energy_use["totalActual"][i] - energy_use["elecActual"][i]
     return energy_use
+
+
+def hdd_delta_pct(prior: list, cur: list, is_complete: list) -> list:
+    """HDD % per month = (cur - prior) / prior * 100, rounded to a whole %.
+
+    None (JSON null, shown as a dash) when prior is 0 or the month is not
+    actual yet (its current-year HDD is not final).
+    """
+    return [int(round((c - p) / p * 100)) if (ok and p) else None
+            for p, c, ok in zip(prior, cur, is_complete)]
 
 
 def apply_kwh_actual_override(energy_use: dict, hist: dict, fy_cal: list, elec_actual_dollars: list,
@@ -450,9 +465,12 @@ def main() -> int:
             "mmbtuDeltaPct": read_col_pct(ws_exec, 127, 138, 8),
             "fy26hdd": read_col(ws_hdd, 6, 17, 4),
             "fy27hdd": read_col(ws_hdd, 6, 17, 8),
-            "hddDeltaPct": read_col_pct_text(ws_exec, 127, 138, 11),
+            "hddDeltaPct": [],   # computed below from fy26hdd/fy27hdd (K4)
             "normalHdd": read_col(ws_exec, 127, 138, 12),
         }
+        # The workbook's col 11 (rows 127-138) still holds the old FY26-vs-FY25
+        # percentages, so compute HDD % from the two HDD columns exported here.
+        variance["hddDeltaPct"] = hdd_delta_pct(variance["fy26hdd"], variance["fy27hdd"], is_complete)
 
         # HDD sheet: col C = FY2025, col D = FY2026, col E = 30-yr normal, col H = FY2027
         hdd = {

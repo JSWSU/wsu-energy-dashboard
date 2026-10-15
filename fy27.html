@@ -434,7 +434,7 @@
       </div>
       <div class="kpi-card forecast" data-kpi="forecast">
         <span class="kpi-expand-icon">&#9660;</span>
-        <span class="kpi-tooltip">Projected total energy cost for the full fiscal year, using CY2024&ndash;2025 growth trends with a price hedge adjustment.</span>
+        <span class="kpi-tooltip" id="forecastTooltip">Projected total energy cost for the full fiscal year. Each month = the same month last year; electric times the July&ndash;December electric cost trend, gas times the price hedge.</span>
         <div class="kpi-label">FY2026 Forecast</div>
         <div class="kpi-value blue"><span id="kpiForecast">--</span></div>
         <div class="kpi-sub">Projected full-year cost</div>
@@ -451,7 +451,7 @@
       <div class="kpi-card energy" data-kpi="mmbtu">
         <span class="kpi-expand-icon">&#9660;</span>
         <span class="kpi-tooltip">Total energy consumed in MMBTU (Million BTU), combining electricity and natural gas across all campus facilities.</span>
-        <div class="kpi-label">Total Energy Use (YTD)</div>
+        <div class="kpi-label">Total Energy Use (Actual + Forecast)</div>
         <div class="kpi-value"><span id="kpiMMBTU">--</span></div>
         <div class="kpi-sub"><span id="kpiMMBTUSub">--</span></div>
         <div class="kpi-expand"></div>
@@ -460,16 +460,16 @@
     <div class="kpi-grid">
       <div class="kpi-card" data-kpi="elecCost">
         <span class="kpi-expand-icon">&#9660;</span>
-        <span class="kpi-tooltip">Electricity cost year-to-date for WSU Pullman Facility Services accounts including Avista and Inland Power. See Data Sources tab for the full account list.</span>
-        <div class="kpi-label">Electric Cost (YTD)</div>
+        <span class="kpi-tooltip">Electricity cost for the fiscal year (actual months plus forecast for the rest) for WSU Pullman Facility Services accounts including Avista and Inland Power. See Data Sources tab for the full account list.</span>
+        <div class="kpi-label">Electric Cost (Actual + Forecast)</div>
         <div class="kpi-value"><span id="kpiElecCost">--</span></div>
         <div class="kpi-sub"><span id="kpiElecPct">--</span></div>
         <div class="kpi-expand"></div>
       </div>
       <div class="kpi-card" data-kpi="gasCost">
         <span class="kpi-expand-icon">&#9660;</span>
-        <span class="kpi-tooltip">Natural gas cost year-to-date for WSU Pullman Facility Services accounts, combining Kintec commodity delivery and Avista distribution charges. See Data Sources tab for the full account list.</span>
-        <div class="kpi-label">Gas Cost (YTD)</div>
+        <span class="kpi-tooltip">Natural gas cost for the fiscal year (actual months plus forecast for the rest) for WSU Pullman Facility Services accounts, combining Kintec commodity delivery and Avista distribution charges. See Data Sources tab for the full account list.</span>
+        <div class="kpi-label">Gas Cost (Actual + Forecast)</div>
         <div class="kpi-value"><span id="kpiGasCost">--</span></div>
         <div class="kpi-sub"><span id="kpiGasPct">--</span></div>
         <div class="kpi-expand"></div>
@@ -641,7 +641,7 @@
       <h2>Methodology Notes</h2>
       <div class="notes" style="background:var(--info-bg);border-color:var(--info-border);color:var(--info-text);"><ul>
         <li>Actuals shown in bold black; Forecasts in blue italic</li>
-        <li>Forecasts calculated using CY2024&ndash;CY2025 annual growth trend applied to CY2025 same-month values</li>
+        <li id="methodForecast">Forecast: electric = same month last year &times; (July&ndash;December electric $, last calendar year / the year before); gas = same month last year &times; (1 + price hedge)</li>
         <li>All data dynamically sourced from Consolidated Data table (Avista, Inland Power, Kintec Gas)</li>
         <li>Data read from &ldquo;Executive Summary (Print)&rdquo; sheet, cross-checked against Consolidated Data</li>
         <li>FY2026 = July 2025 through June 2026; FY2025 = July 2024 through June 2025</li>
@@ -906,8 +906,13 @@ function initDashboard(D) {
   // Compute rates from cost/MMBTU (since cumul no longer has elecRate/gasRate)
   const elecRateAct = totalElecMMBTU > 0 ? totalElec / totalElecMMBTU : 0;
   const gasRateAct = totalGasMMBTU > 0 ? totalGas / totalGasMMBTU : 0;
-  const elecRateFcast = sum(energyUse.elecActual) > 0 ? sum(fy27.elecFcast) / sum(energyUse.elecActual) : 0;
-  const gasRateFcast = sum(energyUse.gasActual) > 0 ? sum(fy27.gasFcast) / sum(energyUse.gasActual) : 0;
+  // Forecast rate = forecast $ / forecast MMBTU of the same fuel (energyUse.elecFcast /
+  // gasFcast from the exporter). Older data.json files without them fall back to the
+  // blended actual MMBTU.
+  const elecMMFcast = sum(energyUse.elecFcast || energyUse.elecActual);
+  const gasMMFcast = sum(energyUse.gasFcast || energyUse.gasActual);
+  const elecRateFcast = elecMMFcast > 0 ? sum(fy27.elecFcast) / elecMMFcast : 0;
+  const gasRateFcast = gasMMFcast > 0 ? sum(fy27.gasFcast) / gasMMFcast : 0;
 
   document.getElementById('kpiActualYTD').textContent = fmtDollarM(totalAct);
   document.getElementById('kpiForecast').textContent = fmtDollarM(totalFcast);
@@ -991,19 +996,19 @@ function initDashboard(D) {
     mmbtu: {
       headers: ['Month', 'Total MMBTU'],
       rows: (i) => [MONTHS[i], fmtNum(energyUse.totalActual[i])],
-      totalLabel: 'YTD Total',
+      totalLabel: 'FY Total',
       totals: () => [fmtNum(totalMMBTU)]
     },
     elecCost: {
       headers: ['Month', 'Electric Cost', 'Elec MMBTU'],
       rows: (i) => [MONTHS[i], fmtDollar(fy27.elecActual[i]), fmtNum(energyUse.elecActual[i])],
-      totalLabel: 'YTD Total',
+      totalLabel: 'FY Total',
       totals: () => [fmtDollar(totalElec), fmtNum(totalElecMMBTU)]
     },
     gasCost: {
       headers: ['Month', 'Gas Cost', 'Gas MMBTU', 'Kintec', 'Avista'],
       rows: (i) => [MONTHS[i], fmtDollar(fy27.gasActual[i]), fmtNum(energyUse.gasActual[i]), fmtDollar(fy27.kintecFcast[i]), fmtDollar(fy27.avistaFcast[i])],
-      totalLabel: 'YTD Total',
+      totalLabel: 'FY Total',
       totals: () => [fmtDollar(totalGas), fmtNum(totalGasMMBTU), fmtDollar(sum(fy27.kintecFcast)), fmtDollar(sum(fy27.avistaFcast))]
     },
     elecRate: {
@@ -1086,7 +1091,15 @@ function initDashboard(D) {
       scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>fmtNum(v)}}}}
   }));
 
-  const pieElec = sum(fy27.elecActual), pieKintec = sum(fy27.kintecFcast), pieAvista = sum(fy27.avistaFcast);
+  // Slices sum to the Actual + Forecast KPI: electric = sum(elecActual); gas =
+  // sum(gasActual) (blended actual + forecast) split by the forecast
+  // Kintec:Avista ratio, so the split stays labelled "(Forecast split)".
+  // Gas is taken as KPI total - electric (= sum(gasActual) within the $1
+  // per-month rounding of the exported totals), so the pie ties to the KPI exactly.
+  const pieElec = sum(fy27.elecActual), pieGas = totalAct - pieElec;
+  const splitK = sum(fy27.kintecFcast), splitA = sum(fy27.avistaFcast);
+  const pieKintec = (splitK + splitA) > 0 ? Math.round(pieGas * splitK / (splitK + splitA)) : pieGas;
+  const pieAvista = pieGas - pieKintec;
   const pieSuffix = actualMonthCount === 12 ? ' (Actual)' : (actualMonthCount ? ' (Actual + Forecast)' : ' (Forecast)');
   const pieTotal = pieElec + pieKintec + pieAvista;
   chartInstances.push(new Chart(document.getElementById('chartPie'), {
@@ -1125,8 +1138,14 @@ function initDashboard(D) {
     tb1.appendChild(tr);}
   const tr1=document.createElement('tr');tr1.className='total-row';
   const sumAct=arr=>arr.reduce((a,v,i)=>a+(isActual[i]?v:0),0);
-  tr1.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(sumAct(fy27.totalActual))}</td><td>${fmtDollar(sumAct(fy27.elecActual))}</td><td>${fmtDollar(sumAct(fy27.gasActual))}</td><td class="forecast">${fmtDollar(totalFcast)}</td><td class="forecast">${fmtDollar(sum(fy27.elecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.gasFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.kintecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.avistaFcast))}</td><td>${fy27.hedge}%</td>`;
-  tb1.appendChild(tr1);
+  // YTD TOTAL: actual months only, in every column (actual and forecast for the same
+  // months). FY TOTAL: full-year forecast; actual columns show a dash until all 12 are in.
+  tr1.innerHTML=`<td>YTD TOTAL (${actualMonthCount} actual months)</td><td>${fmtDollar(sumAct(fy27.totalActual))}</td><td>${fmtDollar(sumAct(fy27.elecActual))}</td><td>${fmtDollar(sumAct(fy27.gasActual))}</td><td class="forecast">${fmtDollar(sumAct(fy27.totalFcast))}</td><td class="forecast">${fmtDollar(sumAct(fy27.elecFcast))}</td><td class="forecast">${fmtDollar(sumAct(fy27.gasFcast))}</td><td class="forecast">${fmtDollar(sumAct(fy27.kintecFcast))}</td><td class="forecast">${fmtDollar(sumAct(fy27.avistaFcast))}</td><td>${fy27.hedge}%</td>`;
+  if (actualMonthCount) tb1.appendChild(tr1);
+  const fyA = v => actualMonthCount === 12 ? fmtDollar(v) : '—';
+  const tr1b=document.createElement('tr');tr1b.className='total-row';
+  tr1b.innerHTML=`<td>FY TOTAL</td><td>${fyA(sum(fy27.totalActual))}</td><td>${fyA(sum(fy27.elecActual))}</td><td>${fyA(sum(fy27.gasActual))}</td><td class="forecast">${fmtDollar(totalFcast)}</td><td class="forecast">${fmtDollar(sum(fy27.elecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.gasFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.kintecFcast))}</td><td class="forecast">${fmtDollar(sum(fy27.avistaFcast))}</td><td>${fy27.hedge}%</td>`;
+  tb1.appendChild(tr1b);
 
   // --- Gas FY25 Table ---
   const pStartYr = FY.startYear - 1, pEndYr = FY.endYear - 1;
@@ -1136,7 +1155,7 @@ function initDashboard(D) {
     tr.innerHTML=`<td>${mfy25[i]}</td><td>${fmtDollar(fy26gas.cost[i])}</td><td>${fmtNum(fy26gas.mmbtu[i])}</td><td>${fmtRate(fy26gas.perUnit[i])}</td><td>${fmtDollar(fy26gas.kintec[i])}</td><td>${fmtDollar(fy26gas.avista[i])}</td>`;
     tb2.appendChild(tr);}
   const tr2=document.createElement('tr');tr2.className='total-row';
-  tr2.innerHTML=`<td>YTD TOTAL</td><td>${fmtDollar(sum(fy26gas.cost))}</td><td>${fmtNum(sum(fy26gas.mmbtu))}</td><td>${fmtRate(sum(fy26gas.cost)/sum(fy26gas.mmbtu))}</td><td>${fmtDollar(sum(fy26gas.kintec))}</td><td>${fmtDollar(sum(fy26gas.avista))}</td>`;
+  tr2.innerHTML=`<td>FY TOTAL</td><td>${fmtDollar(sum(fy26gas.cost))}</td><td>${fmtNum(sum(fy26gas.mmbtu))}</td><td>${fmtRate(sum(fy26gas.cost)/sum(fy26gas.mmbtu))}</td><td>${fmtDollar(sum(fy26gas.kintec))}</td><td>${fmtDollar(sum(fy26gas.avista))}</td>`;
   tb2.appendChild(tr2);
 
   // --- Gas FY25 Chart ---
@@ -1164,7 +1183,7 @@ function initDashboard(D) {
     tb3.appendChild(tr);}
   const tr3=document.createElement('tr');tr3.className='total-row';
   const avgKwh=sum(energyUse.kwhActual)>0?sum(fy27.elecActual)/sum(energyUse.kwhActual):0;
-  tr3.innerHTML=`<td>YTD TOTAL</td><td>${fmtNum(sum(energyUse.totalActual))}</td><td>${fmtNum(sum(energyUse.elecActual))}</td><td>${fmtNum(sum(energyUse.gasActual))}</td><td class="forecast">${fmtNum(sum(energyUse.totalFcast))}</td><td>${fmtNum(sum(energyUse.kwhActual))}</td><td>${fmtRateKwh(avgKwh)}</td>`;
+  tr3.innerHTML=`<td>FY TOTAL</td><td>${fmtNum(sum(energyUse.totalActual))}</td><td>${fmtNum(sum(energyUse.elecActual))}</td><td>${fmtNum(sum(energyUse.gasActual))}</td><td class="forecast">${fmtNum(sum(energyUse.totalFcast))}</td><td>${fmtNum(sum(energyUse.kwhActual))}</td><td>${fmtRateKwh(avgKwh)}</td>`;
   tb3.appendChild(tr3);
 
   // --- Energy Use Chart ---
@@ -1233,12 +1252,17 @@ function initDashboard(D) {
     const varCurCost = fy27.totalActual, varCurMmbtu = energyUse.totalActual;
     const varCostDelta = varCurCost.map((v, i) => v - variance.fy26cost[i]);
     const varMmbtuDelta = varCurMmbtu.map((v, i) => v - variance.fy26mmbtu[i]);
+    // HDD % = (current HDD - prior HDD) / prior HDD, computed here from the two HDD
+    // columns shown beside it (the workbook's own % column is stale). '—' when the
+    // prior-year HDD is 0 or the month is not actual yet.
+    const hddPct = variance.fy26hdd.map((p, i) =>
+      (isActual[i] && p) ? Math.round((variance.fy27hdd[i] - p) / p * 100) + '%' : '—');
     const tb7=document.querySelector('#tableVariance tbody');
     for(let i=0;i<12;i++){const tr=document.createElement('tr');
       if(!isActual[i]) tr.className='forecast-row';
       const costCls=varCostDelta[i]>0?'negative':'positive';
       const mmPct=variance.fy26mmbtu[i]?varMmbtuDelta[i]/variance.fy26mmbtu[i]*100:0;
-      tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtDollar(variance.fy26cost[i])}</td><td>${fmtDollar(varCurCost[i])}</td><td class="${costCls}">${fmtDollar(varCostDelta[i])}</td><td>${fmtNum(variance.fy26mmbtu[i])}</td><td>${fmtNum(varCurMmbtu[i])}</td><td>${fmtNum(varMmbtuDelta[i])}</td><td>${fmtPct(mmPct)}</td><td>${fmtNum(variance.fy26hdd[i])}</td><td>${fmtNum(variance.fy27hdd[i])}</td><td>${variance.hddDeltaPct[i]}%</td><td>${fmtNum(variance.normalHdd[i])}</td>`;
+      tr.innerHTML=`<td>${MONTHS[i]}</td><td>${fmtDollar(variance.fy26cost[i])}</td><td>${fmtDollar(varCurCost[i])}</td><td class="${costCls}">${fmtDollar(varCostDelta[i])}</td><td>${fmtNum(variance.fy26mmbtu[i])}</td><td>${fmtNum(varCurMmbtu[i])}</td><td>${fmtNum(varMmbtuDelta[i])}</td><td>${fmtPct(mmPct)}</td><td>${fmtNum(variance.fy26hdd[i])}</td><td>${fmtNum(variance.fy27hdd[i])}</td><td>${hddPct[i]}</td><td>${fmtNum(variance.normalHdd[i])}</td>`;
       tb7.appendChild(tr);}
     const tr7=document.createElement('tr');tr7.className='total-row';
     tr7.innerHTML=`<td>FY Total</td><td>${fmtDollar(sum(variance.fy26cost))}</td><td>${fmtDollar(sum(varCurCost))}</td><td class="${sum(varCostDelta)>0?'negative':'positive'}">${fmtDollar(sum(varCostDelta))}</td><td>${fmtNum(sum(variance.fy26mmbtu))}</td><td>${fmtNum(sum(varCurMmbtu))}</td><td>${fmtNum(sum(varMmbtuDelta))}</td><td>${fmtPct(sum(varMmbtuDelta)/sum(variance.fy26mmbtu)*100)}</td><td>${fmtNum(sum(variance.fy26hdd))}</td><td>${fmtNum(sum(variance.fy27hdd))}</td><td>--</td><td>${fmtNum(sum(variance.normalHdd))}</td>`;
@@ -1278,11 +1302,24 @@ function initDashboard(D) {
   (function addForecastNotes() {
     const fm = fy27.forecastMeta || {};
     const trendPct = fm.elecFactor ? ((fm.elecFactor - 1) * 100).toFixed(1) : null;
+    // Method text states what export_data_json_fy27.py build_forecast() does:
+    // electric x (Jul-Dec last calendar year / Jul-Dec the year before), gas x (1 + hedge).
+    const hedgePct = fm.gasHedgePct != null ? fm.gasHedgePct : 10;
+    const trendNew = FY.startYear - 1, trendOld = FY.startYear - 2;
+    const elecFactorTxt = fm.elecFactor ? Number(fm.elecFactor).toFixed(3) : 'n/a';
+    const gasFactorTxt = (1 + hedgePct / 100).toFixed(2);
+    const methodTxt = 'electric = same month last year × (Jul–Dec ' + trendNew + ' / Jul–Dec ' + trendOld +
+      ' electric $ = ' + elecFactorTxt + '); gas = same month last year × ' + gasFactorTxt;
+    const mEl = document.getElementById('methodForecast');
+    if (mEl) mEl.textContent = 'Forecast: ' + methodTxt;
+    const tEl = document.getElementById('forecastTooltip');
+    if (tEl) tEl.textContent = 'Projected total energy cost for the full fiscal year. Forecast: ' + methodTxt + '.';
     const noteHTML =
       '<b>How the forecast works:</b> months without actual bills show a forecast. ' +
       'Each forecast month = the same month from the most recent complete billing year, with ' +
-      'electric cost adjusted by the year-over-year trend (' + (trendPct !== null ? (trendPct >= 0 ? '+' : '') + trendPct + '%' : 'n/a') + ') ' +
-      'and gas cost increased by the ' + (fm.gasHedgePct != null ? fm.gasHedgePct : 10) + '% price hedge. ' +
+      'electric cost × ' + elecFactorTxt + ' (Jul–Dec ' + trendNew + ' / Jul–Dec ' + trendOld + ' electric $, ' +
+      (trendPct !== null ? (trendPct >= 0 ? '+' : '') + trendPct + '%' : 'n/a') + ') ' +
+      'and gas cost × ' + gasFactorTxt + ' (' + hedgePct + '% price hedge). ' +
       'Usage (kWh / MMBTU) is held flat at last year’s level. ' +
       'As real bills post, they replace the forecast automatically.' +
       (fm.dataNote ? ' <b>Data note:</b> ' + fm.dataNote : '');

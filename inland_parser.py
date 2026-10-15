@@ -54,6 +54,8 @@ class BillRecord:
     estimated: bool = False
     final_bill: bool = False
     spill_surcharge: Optional[float] = None  # "Mandated Federal Spill Surcharge" line, bills from 07/30/2026
+    foundation_donation: Optional[float] = None  # "Inland Foundation Donation" round-up line (acct 921412012, 2024)
+    capital_credit: Optional[float] = None  # "Capital Credit Refund" line, negative (acct 921412001 11/27/2024)
 
     @property
     def dedup_key(self) -> tuple[str, str]:
@@ -66,7 +68,9 @@ class BillRecord:
 # Regex patterns
 # -----------------------------------------------------------------------------
 
-MONEY = r"\$?-?[\d,]+\.\d{2}"
+# Credit bills print the sign before the dollar sign ("-$1,474.20"); allow it so
+# negative Total Current Charges / Energy Charge lines parse (10/14/2026).
+MONEY = r"-?\$?-?[\d,]+\.\d{2}"
 INT = r"[\d,]+"
 DEC = r"[\d.]+"
 
@@ -84,7 +88,7 @@ RE_TOTAL_AMT_DUE = re.compile(
     r"Total Amount Due\s*(" + MONEY + r")(?!\s+Due Date)"
 )
 RE_ENERGY_CHARGE = re.compile(
-    r"Energy Charge\s*(" + INT + r")\s*kWh\s*@\s*(" + DEC + r")\s*(" + MONEY + r")"
+    r"Energy Charge\s*(-?" + INT + r")\s*kWh\s*@\s*(" + DEC + r")\s*(" + MONEY + r")"
 )
 RE_DEMAND_CHARGE = re.compile(
     r"Demand Charge\s*(" + DEC + r")\s*kW\s*@\s*(" + DEC + r")\s*(" + MONEY + r")"
@@ -107,6 +111,8 @@ RE_SPILL_SURCHARGE_RATED = re.compile(
 RE_SPILL_SURCHARGE_SIMPLE = re.compile(
     r"Federal\s+Spill\s+Surcharge(?:\s*-\s*" + DEC + r"%)?\s*(" + MONEY + r")"
 )
+RE_DONATION = re.compile(r"Inland Foundation Donation\s*(" + MONEY + r")")
+RE_CAPITAL_CREDIT = re.compile(r"Capital Credit(?: Refund)?\s*(" + MONEY + r")")
 RE_OUTDOOR = re.compile(r"Outdoor Lighting(?: Charge)?\s*(" + MONEY + r")")
 RE_TOTAL_CURRENT = re.compile(r"Total Current Charges\s*(" + MONEY + r")")
 RE_WA_TAX = re.compile(r"WA State Tax.*?(" + MONEY + r")")
@@ -285,6 +291,16 @@ def parse_pdf(pdf_path: str | Path) -> list[BillRecord]:
         if m:
             rec.outdoor_lighting = _money(m.group(1))
 
+        # Inland Foundation round-up donation
+        m = RE_DONATION.search(block)
+        if m:
+            rec.foundation_donation = _money(m.group(1))
+
+        # Capital Credit Refund (credit line, counted in Total Current Charges)
+        m = RE_CAPITAL_CREDIT.search(block)
+        if m:
+            rec.capital_credit = _money(m.group(1))
+
         # Total Current Charges
         m = RE_TOTAL_CURRENT.search(block)
         if m:
@@ -379,6 +395,8 @@ def validate(rec: BillRecord, tolerance: float = 0.02) -> list[str]:
             rec.service_availability or 0,
             rec.outdoor_lighting or 0,
             rec.spill_surcharge or 0,
+            rec.foundation_donation or 0,
+            rec.capital_credit or 0,
         ]
         expected_total = round(sum(parts), 2)
         # Inland rounds some statement totals to the whole dollar (observed

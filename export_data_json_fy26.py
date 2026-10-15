@@ -122,10 +122,7 @@ def main() -> int:
                 "elecFactor": round(elec_factor, 3),
                 "gasHedgePct": hedge,
                 "baseWindow": "Jul 2023 - Jun 2025 billing history",
-                "dataNote": ("June 2026 electric bills are partial until the next Avista "
-                             "pull. Kintec gas Jan-Jun 2026 excludes the small Avista "
-                             "transport charge (roughly 1-2% of the gas bill) pending "
-                             "those invoices."),
+                "dataNote": "Gas = Kinect invoices + Avista gas bills.",
             },
         }
 
