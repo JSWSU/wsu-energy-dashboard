@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "October 14, 2026",
+  "lastUpdated": "October 19, 2026",
   "years": {
     "FY2020": {
       "cost": [
@@ -215,7 +215,7 @@
       "cost": [
         1681846,
         1719298,
-        1759338,
+        1636988,
         1718552,
         1874538,
         2062119,
@@ -229,7 +229,7 @@
       "mmbtu": [
         92011,
         93211,
-        96920,
+        102813,
         129886,
         139662,
         164872,
@@ -287,15 +287,15 @@
       "forecast": false
     },
     "FY2027": {
-      "cost": 22317527,
-      "mmbtu": 1532148,
-      "rate": 14.57,
+      "cost": 22195177,
+      "mmbtu": 1538041,
+      "rate": 14.43,
       "forecast": true
     }
   },
   "notes": {
     "FY2026": "Complete year: 12 actual months. Electric = Avista + Inland bills; gas = Kinect invoices + Avista gas bills.",
-    "FY2027": "2 actual months (July 2026 to August 2026, actual bills); September 2026 to June 2027 forecast (same-month prior year, electric trend, 10% gas hedge).",
+    "FY2027": "3 actual months (July 2026 to September 2026, actual bills); October 2026 to June 2027 forecast (same-month prior year, electric trend, 10% gas hedge).",
     "sources": "FY2020-FY2024 from the archived Energy Data for Projection summaries; FY2025 from the archived Energy Cost Projection Report July 2025; FY2026-FY2027 from the live FY2027 workbook."
   }
 }
