@@ -36,7 +36,7 @@ def read_col(ws, start_row: int, end_row: int, col: int, decimals: int | None = 
     for r in range(start_row, end_row + 1):
         v = ws.Cells(r, col).Value
         n = _num(v)
-        out.append(round(n, decimals) if decimals is not None else int(n))
+        out.append(round(n, decimals) if decimals is not None else int(round(n)))
     return out
 
 
@@ -344,8 +344,8 @@ def main() -> int:
             if not v:
                 continue
             months.append(month_label(v))
-            d = int(_num(ws_kin.Cells(r, 6).Value))
-            c = int(_num(ws_kin.Cells(r, 5).Value))
+            d = int(round(_num(ws_kin.Cells(r, 6).Value)))
+            c = int(round(_num(ws_kin.Cells(r, 5).Value)))
             dths.append(d)
             cost.append(c)
             if hasattr(v, "year"):
