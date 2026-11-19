@@ -123,7 +123,7 @@ def load_csv(path: Path) -> list[list]:
 
 
 # Column indexes in the 23-col row layout (0-based)
-_ACCT, _PREM, _START, _END, _EMETER, _KWH, _GMETER = 6, 7, 8, 9, 10, 11, 15
+_ACCT, _PREM, _START, _END, _EMETER, _KWH, _GMETER, _TOTAL = 6, 7, 8, 9, 10, 11, 15, 22
 
 
 def _knorm(v):
@@ -146,10 +146,16 @@ def _row_key(row) -> tuple:
 def dedup_rows(rows: list[list]) -> tuple[list[list], int, int]:
     """In-CSV dedup: exact-bill repeats across pulls, then feeder
     label-duplicates (same acct+prem+dates+kWh under different meter labels
-    - Avista posts feeder bills once per label). Returns (kept, n_exact, n_label)."""
+    - Avista posts feeder bills once per label). Returns (kept, n_exact, n_label).
+    The label key includes GAS_METER (fix 11/19/2026): gas rows have blank
+    kWh, so without it a 2nd gas meter at the same premise and dates was
+    dropped as a "label copy" (0807A 00170871 Sep+Oct, 00092203 + 02451476 Aug).
+    Electric feeder label copies share a blank gas meter, so they still collapse."""
     seen, kept, n_exact = set(), [], 0
     for r in rows:
-        k = _row_key(r) + (_knorm(r[_KWH]),)
+        # TOTAL_BILL in the key (fix 11/19/2026): a reversal (-$) and its
+        # rebill (+$) share every other field (0080 Rotunda Aug 2026, -/+162.12).
+        k = _row_key(r) + (_knorm(r[_KWH]), _knorm(r[_TOTAL]))
         if k in seen:
             n_exact += 1
             continue
@@ -158,7 +164,8 @@ def dedup_rows(rows: list[list]) -> tuple[list[list], int, int]:
     by_bill, out, n_label = set(), [], 0
     for r in kept:
         bk = (_knorm(r[_ACCT]), _knorm(r[_PREM]), _knorm(r[_START]),
-              _knorm(r[_END]), _knorm(r[_KWH]))
+              _knorm(r[_END]), _knorm(r[_KWH]), _knorm(r[_GMETER]),
+              _knorm(r[_TOTAL]))
         if bk in by_bill:
             n_label += 1
             continue
